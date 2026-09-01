@@ -403,9 +403,9 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-object-folder.dark { --folder-back: #343842; --folder-front: #20232a; --folder-line: #20232a; color: #fff; }
 .v1-object-folder.dark .v1-folder-paper { background: #2a2e36; border-color: #3b404a; }
 .v1-object-folder.dark .v1-folder-paper i { background: #555b67; transition: background-color 360ms ease; }
-.v1-object-folder.dark:hover, .v1-object-folder.dark:focus-visible, .v1-object-folder.dark.v1-transition-light { --folder-back: #eceff4; --folder-front: #fff; --folder-line: #dce1e9; color: var(--ink); }
-.v1-object-folder.dark:hover .v1-folder-paper, .v1-object-folder.dark:focus-visible .v1-folder-paper, .v1-object-folder.dark.v1-transition-light .v1-folder-paper { background: #f5f6f8; border-color: #d9dee7; }
-.v1-object-folder.dark:hover .v1-folder-paper i, .v1-object-folder.dark:focus-visible .v1-folder-paper i, .v1-object-folder.dark.v1-transition-light .v1-folder-paper i { background: #d9dee7; }
+.v1-object-folder.dark.v1-transition-light { --folder-back: #eceff4; --folder-front: #fff; --folder-line: #dce1e9; color: var(--ink); }
+.v1-object-folder.dark.v1-transition-light .v1-folder-paper { background: #f5f6f8; border-color: #d9dee7; }
+.v1-object-folder.dark.v1-transition-light .v1-folder-paper i { background: #d9dee7; }
 .v1-object-index { backface-visibility: hidden; color: #8b92a0; font-size: 12px; left: var(--folder-pad); position: absolute; top: var(--folder-pad); transform: translateZ(96px); z-index: 5; }
 .v1-object-copy { backface-visibility: hidden; display: grid; gap: 8px; left: var(--folder-pad); position: absolute; right: var(--folder-pad); top: 74px; transform: translateZ(2px); z-index: 1; }
 .v1-object-copy b { font-family: "Inter", "IBM Plex Serif", "PingFang SC", sans-serif; font-size: 31px; font-weight: 500; letter-spacing: -0.05em; }
