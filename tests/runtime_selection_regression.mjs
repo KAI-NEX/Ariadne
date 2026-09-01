@@ -70,6 +70,12 @@ assert.match(css, /#runtime-action-symbol svg \{[^}]*stroke-linecap: round[^}]*s
 assert.match(css, /\.runtime-chevron svg \{[^}]*stroke-linecap: round[^}]*stroke-linejoin: round[^}]*stroke-width: 2\.4/s);
 assert.match(css, /\.runtime-back-icon svg \{[^}]*stroke-linecap: round[^}]*stroke-linejoin: round[^}]*stroke-width: 2\.4/s);
 assert.match(css, /\.runtime-spinner svg \{ display: none; \}/);
+assert.match(css, /\.runtime-selector \{[^}]*padding: 0 16px 0 20px/s);
+assert.match(css, /\.runtime-menu \{[^}]*padding: 8px/s);
+assert.match(css, /\.runtime-existing-model\[aria-selected="true"\]::after, #runtime-local\[aria-selected="true"\]::after \{[^}]*background: currentColor[^}]*color: #1f2129[^}]*content: ""[^}]*height: 20px[^}]*stroke-width='2\.6'[^}]*stroke-linecap='round'[^}]*stroke-linejoin='round'[^}]*20px 20px[^}]*right: 8px[^}]*width: 20px/s);
+assert.doesNotMatch(css, /\.runtime-existing-model\[aria-selected="true"\]::after, #runtime-local\[aria-selected="true"\]::after \{[^}]*#2961db[^}]*content: "✓"/s);
+assert.match(script, /button\.setAttribute\("aria-selected", String\(state\.mode === "ai"/);
+assert.match(script, /byId\("runtime-local"\)\.setAttribute\("aria-selected", String\(state\.mode === "local"\)\)/);
 assert.match(css, /\.runtime-menu\.is-open/);
 assert.match(css, /\.runtime-menu \{[^}]*top: 68px/s);
 assert.match(css, /\.runtime-action\.ready:hover[^}]*box-shadow/s);
