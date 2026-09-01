@@ -1,0 +1,33 @@
+{
+  "contract_id": "job-radar-canonical-career-context-v1",
+  "description": "Reusable local metadata envelope for a high-fidelity AI-generated Canonical Career Context Markdown artifact.",
+  "required": [
+    "artifact_id",
+    "source_hash",
+    "source_document_id",
+    "document_type",
+    "provider",
+    "model",
+    "prompt_version",
+    "generated_at",
+    "review_status",
+    "canonical_markdown"
+  ],
+  "review_status": ["needs_review", "accepted", "rejected"],
+  "cache_reusable_when": [
+    "review_status is accepted",
+    "source_hash is unchanged",
+    "provider, model and prompt_version are unchanged"
+  ],
+  "epistemic_markers": [
+    "[SOURCE-SUPPORTED FACT]",
+    "[AI INTERPRETATION]",
+    "[UNKNOWN / NOT EXPLICIT]"
+  ],
+  "ownership": {
+    "original_source": "browser IndexedDB SourceDocument file_blob",
+    "canonical_artifact": "browser IndexedDB ai_career_contexts",
+    "server_persistence": "none",
+    "sqlite_persistence": "none"
+  }
+}

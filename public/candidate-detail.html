@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ariadne · 个人材料详情</title>
+    <link rel="stylesheet" href="/styles.css?v=v1-motion-33">
+  </head>
+  <body class="v1-body" data-v1-page="candidate-detail">
+    <main class="v1-page-shell v1-detail-shell">
+      <header class="v1-topbar">
+        <a class="v1-back" href="/personal-information.html" aria-label="返回个人资料"></a>
+        <p class="v1-detail-breadcrumb">个人资料 / 材料对象</p>
+        <details class="v1-menu">
+          <summary aria-label="打开导航菜单"><span></span><span></span></summary>
+          <nav aria-label="主导航">
+            <a href="/workspace.html">工作空间</a>
+            <a aria-current="page" href="/personal-information.html">个人资料</a>
+            <a href="/jd.html">职位描述</a>
+            <a href="/index.html">运行方式</a>
+          </nav>
+        </details>
+      </header>
+
+      <section class="v1-split-view">
+        <article class="v1-structured-pane">
+          <div class="v1-detail-meta-row">
+            <span class="v1-detail-chips"><span id="candidate-type" class="v1-type-chip"></span><span id="candidate-review-state" class="v1-review-chip"></span></span>
+            <button id="open-direct-edit" class="v1-detail-edit-button" type="button" aria-expanded="false" aria-controls="candidate-edit-form">编辑</button>
+          </div>
+          <h1 id="candidate-title">正在读取…</h1>
+          <p id="candidate-subtitle" class="v1-detail-subtitle"></p>
+          <p id="candidate-time" class="v1-detail-time"></p>
+
+          <section class="v1-detail-block"><p class="v1-section-label">摘要</p><p id="candidate-summary" class="v1-detail-summary"></p></section>
+          <section class="v1-detail-block"><p class="v1-section-label">事实</p><div id="candidate-facts" class="v1-fact-list"></div></section>
+          <section class="v1-detail-block"><p class="v1-section-label">责任边界</p><p id="candidate-ownership"></p></section>
+          <section class="v1-detail-block"><p class="v1-section-label">来源</p><p id="candidate-source" class="v1-source-note"></p></section>
+
+          <form id="candidate-edit-form" class="v1-edit-form hidden">
+            <label>摘要<textarea id="candidate-edit-summary"></textarea></label>
+            <label>事实（每行一条）<textarea id="candidate-edit-facts"></textarea></label>
+            <div class="v1-button-row"><button id="preview-direct-edit" class="v1-primary-button" type="button">预览修改</button><button id="cancel-direct-edit" class="v1-tertiary-button" type="button">取消</button></div>
+          </form>
+          <section id="direct-edit-preview" class="v1-patch-card hidden">
+            <p class="v1-section-label">直接编辑预览</p>
+            <div class="v1-diff-grid"><div><small>修改前</small><p id="direct-before"></p></div><div><small>修改后</small><p id="direct-after"></p></div></div>
+            <div class="v1-button-row"><button id="confirm-direct-edit" class="v1-primary-button" type="button">确认保存</button><button id="back-to-direct-edit" class="v1-tertiary-button" type="button">返回编辑</button></div>
+          </section>
+        </article>
+
+        <aside id="candidate-ai-pane" class="v1-conversation-pane hidden" aria-labelledby="candidate-ai-heading">
+          <div class="v1-conversation-heading"><p class="v1-section-label">AI 对话</p><span id="candidate-ai-runtime">仅限当前材料</span></div>
+          <h2 id="candidate-ai-heading">只讨论当前材料</h2>
+          <p class="v1-conversation-copy">使用当前选择的模型讨论这张卡片。对话不会静默修改已确认信息；需要修改时会生成单独的待审核建议。</p>
+          <div id="candidate-conversation-messages" class="v1-conversation-messages" aria-live="polite"></div>
+          <section id="candidate-patch-proposal" class="v1-patch-card hidden">
+            <p class="v1-section-label">待审核修改建议</p>
+            <div class="v1-diff-grid"><div><small>修改前</small><p id="candidate-patch-before"></p></div><div><small>修改后</small><p id="candidate-patch-after"></p></div></div>
+            <p id="candidate-patch-reason" class="v1-patch-reason"></p>
+            <div class="v1-button-row"><button id="accept-candidate-patch" class="v1-primary-button" type="button">确认修改</button><button id="reject-candidate-patch" class="v1-tertiary-button" type="button">拒绝建议</button></div>
+          </section>
+          <form id="candidate-conversation-form" class="v1-conversation-form">
+            <label class="sr-only" for="candidate-conversation-input">询问当前材料</label>
+            <textarea id="candidate-conversation-input" placeholder="询问这份材料，或要求生成可审核的修改建议…"></textarea>
+            <button type="submit" aria-label="发送">↑</button>
+          </form>
+        </aside>
+
+      </section>
+      <p id="candidate-detail-message" class="v1-inline-message" aria-live="polite"></p>
+    </main>
+    <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
+    <script src="/scoped-conversation-domain.js"></script>
+    <script src="/floating-window.js?v=v1-motion-33"></script>
+    <script src="/v1-pages.js?v=v1-motion-33"></script>
+  </body>
+</html>

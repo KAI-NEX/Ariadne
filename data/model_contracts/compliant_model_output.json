@@ -1,0 +1,29 @@
+{
+  "analysis_status": "needs_review",
+  "role_summary": "该岗位强调从产品定义到体验设计的全流程参与，并要求使用 AI 工具进行原型开发。",
+  "capabilities": [
+    {
+      "capability": "AI 驱动的原型开发",
+      "evidence_fields": ["responsibilities"],
+      "confidence": "high"
+    },
+    {
+      "capability": "产品与体验设计",
+      "evidence_fields": ["responsibilities", "requirements"],
+      "confidence": "high"
+    }
+  ],
+  "unknowns": [
+    "职位当前是否仍开放，输入没有可用来源事实支持。"
+  ],
+  "evidence": [
+    {
+      "claim": "岗位要求使用 AI Coding 工具将设计概念转化为高保真 Demo。",
+      "source_fields": ["responsibilities"]
+    },
+    {
+      "claim": "岗位强调产品思维与用户洞察。",
+      "source_fields": ["requirements"]
+    }
+  ]
+}

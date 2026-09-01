@@ -1,0 +1,28 @@
+{
+  "contract_id": "job-radar-canonical-career-context-v2-flexible",
+  "prompt_version": "canonical_career_context_v2_flexible",
+  "artifact_type": "review_only_markdown",
+  "required_headings": [
+    "职业材料 Canonical Context",
+    "认识论标记",
+    "来源与页码",
+    "不确定 / 原文未明确"
+  ],
+  "markers": [
+    "[原文明确支持]",
+    "[AI 解释]",
+    "[原文未明确 / 未知]"
+  ],
+  "entity_policy": {
+    "fixed_schema_required": false,
+    "only_source_supported_fields": true,
+    "unknown_fields_must_not_be_inferred": true,
+    "unmappable_material_section": "待人工归类的原文片段",
+    "unmappable_material_requires": ["source_excerpt", "page_reference", "reason_for_uncertainty"]
+  },
+  "review_policy": {
+    "review_status_initial": "needs_review",
+    "llm_output_is_not_confirmed_career_entity": true,
+    "local_fallback_entities_are_separate_from_ai_artifacts": true
+  }
+}

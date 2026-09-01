@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "job-radar-portfolio-project-v1",
+  "title": "Job Radar Portfolio Project v1 contract",
+  "description": "Portfolio Project entity contract. Visual Portfolio OCR remains review-only and preserves page-level provenance.",
+  "type": "object",
+  "required": ["name", "source_document_ids", "source_pages", "review_status"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "project_kind": { "enum": ["product", "design", "research", "software", "exhibition", "publication", "other"] },
+    "context": { "type": "string" },
+    "organization": { "type": "string" },
+    "role": { "type": "string" },
+    "ownership_scope": { "type": "string" },
+    "timeframe": { "type": "string" },
+    "problem": { "type": "string" },
+    "responsibilities": { "type": "array", "items": { "type": "string" } },
+    "process": { "type": "array", "items": { "type": "string" } },
+    "tools": { "type": "array", "items": { "type": "string" } },
+    "outputs": { "type": "array", "items": { "type": "string" } },
+    "outcomes": { "type": "array", "items": { "type": "string" } },
+    "ai_assistance": { "type": "string" },
+    "boundaries": { "type": "array", "items": { "type": "string" } },
+    "source_document_ids": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+    "source_pages": { "type": "array", "uniqueItems": true, "items": { "type": "integer", "minimum": 1 } },
+    "source_assets": { "type": "array", "items": { "type": "object" } },
+    "field_provenance": { "type": "object" },
+    "review_status": { "enum": ["needs_review", "confirmed", "rejected"] },
+    "extraction_confidence": { "enum": ["low", "medium", "high", "unknown"] },
+    "limitations": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true
+}

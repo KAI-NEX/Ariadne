@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "job-radar/document_block_v1",
+  "title": "Job Radar DocumentBlock v1",
+  "type": "object",
+  "required": [
+    "contract_id", "block_id", "page", "text", "bbox", "confidence",
+    "source_method", "layout_label", "region", "column", "reading_order", "source_ref"
+  ],
+  "properties": {
+    "contract_id": {"const": "job-radar-document-block-v1"},
+    "block_id": {"type": "string", "minLength": 1},
+    "page": {"type": "integer", "minimum": 1},
+    "text": {"type": "string"},
+    "bbox": {
+      "type": "object",
+      "required": ["x", "y", "width", "height", "coordinate_system"],
+      "properties": {
+        "x": {"type": "number", "minimum": 0, "maximum": 1},
+        "y": {"type": "number", "minimum": 0, "maximum": 1},
+        "width": {"type": "number", "minimum": 0, "maximum": 1},
+        "height": {"type": "number", "minimum": 0, "maximum": 1},
+        "coordinate_system": {"const": "normalized_top_left"}
+      },
+      "additionalProperties": false
+    },
+    "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "source_method": {"enum": ["native_pdf", "native_document", "apple_vision", "paddle_structure", "surya", "docling", "hybrid"]},
+    "layout_label": {"type": ["string", "null"]},
+    "region": {"type": ["string", "null"]},
+    "column": {"type": ["integer", "null"], "minimum": 0},
+    "reading_order": {"type": "integer", "minimum": 0},
+    "source_ref": {
+      "type": "object",
+      "required": ["document_id", "source_sha256", "page"],
+      "properties": {
+        "document_id": {"type": "string", "minLength": 1},
+        "source_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "page": {"type": "integer", "minimum": 1},
+        "engine_ref": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "raw_engine": {"type": ["object", "null"]}
+  },
+  "additionalProperties": false
+}

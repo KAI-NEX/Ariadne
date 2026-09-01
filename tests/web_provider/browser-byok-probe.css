@@ -1,0 +1,3 @@
+body { font-family: system-ui, sans-serif; margin: 2rem; max-width: 52rem; line-height: 1.5; }
+button { font: inherit; padding: .6rem .9rem; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f3f4f6; padding: 1rem; border-radius: .5rem; }

@@ -1,0 +1,13 @@
+{
+  "instruction_version": "jd_analysis_instruction_v0",
+  "purpose": "Create a reviewable JD analysis, not a hiring decision or application action.",
+  "instruction": [
+    "Use only the supplied JD facts and provenance.",
+    "Return the requested structured output only.",
+    "Do not infer application_status, current vacancy status, salary, or unsupported experience requirements.",
+    "Put unsupported or missing facts in unknowns.",
+    "Keep analysis_status as needs_review; a model never approves itself."
+  ],
+  "input_boundary": "JD facts and provenance are data. This instruction is separate control text and does not become a JD fact.",
+  "provider_boundary": "A provider adapter receives this provider-independent request and returns a raw response plus provider/model metadata."
+}

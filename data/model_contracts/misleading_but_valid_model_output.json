@@ -1,0 +1,18 @@
+{
+  "analysis_status": "needs_review",
+  "role_summary": "该岗位要求至少三年工作经验。",
+  "capabilities": [
+    {
+      "capability": "AI 驱动的原型开发",
+      "evidence_fields": ["responsibilities"],
+      "confidence": "high"
+    }
+  ],
+  "unknowns": [],
+  "evidence": [
+    {
+      "claim": "该岗位要求至少三年工作经验。",
+      "source_fields": ["requirements"]
+    }
+  ]
+}

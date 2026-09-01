@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ariadne · 添加职位描述</title>
+    <link rel="stylesheet" href="/styles.css?v=v1-motion-33">
+  </head>
+  <body class="v1-body" data-v1-page="job-import">
+    <main class="v1-page-shell v1-import-shell">
+      <header class="v1-topbar v1-library-topbar">
+        <a class="v1-back" href="/jd.html" aria-label="返回职位描述"></a>
+        <div><h1>添加职位描述</h1></div>
+        <details class="v1-menu">
+          <summary aria-label="打开导航菜单"><span></span><span></span></summary>
+          <nav aria-label="主导航"><a href="/workspace.html">工作空间</a><a href="/personal-information.html">个人资料</a><a aria-current="page" href="/jd.html">职位描述</a><a href="/index.html">运行方式</a></nav>
+        </details>
+      </header>
+
+      <section class="v1-import-intro"><h2>导入一份职位描述</h2><p>提供本地文件或粘贴职位文本。每份职位描述会形成独立的职位上下文。</p></section>
+      <section class="v1-import-card" aria-labelledby="job-import-heading">
+        <h2 id="job-import-heading" class="sr-only">职位描述导入</h2>
+        <div class="v1-sheet-body">
+          <section>
+            <p class="v1-field-label">输入方式</p>
+            <div id="job-import-types" class="v1-segmented two" role="radiogroup" aria-label="职位描述输入方式">
+              <button type="button" data-job-import-type="Document" aria-pressed="true">图像</button>
+              <button type="button" data-job-import-type="Paste" aria-pressed="false">粘贴文本</button>
+            </div>
+          </section>
+          <section id="job-file-section" class="v1-file-picker"><label id="job-dropzone" class="v1-file-dropzone" for="job-file-input"><span id="job-dropzone-copy">点击上传文件或直接拖拽文件至此</span><input id="job-file-input" type="file" accept=".pdf,.png,.jpg,.jpeg,.docx,application/pdf,image/png,image/jpeg,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label></section>
+          <section id="job-paste-section" class="v1-paste-input hidden"><label for="job-paste-input">职位描述</label><textarea id="job-paste-input" placeholder="在此粘贴职位描述…"></textarea></section>
+          <section class="v1-link-input"><label for="job-link-input">职位链接 <span>选填</span></label><input id="job-link-input" type="url" inputmode="url" placeholder="https://example.com/jobs/…"><p>链接只作为来源信息保存在本地；本页不会自动访问或上传该网址。</p></section>
+          <section id="job-file-preview" class="v1-file-preview hidden"><div><span id="job-file-icon">TXT</span><p><b id="job-file-name"></b><small id="job-file-meta"></small></p></div><button id="replace-job-file" type="button">替换</button></section>
+          <section id="job-processing" class="v1-processing hidden" aria-live="polite"><div class="v1-processing-orbit" aria-hidden="true"></div><div><p id="job-processing-state">正在准备</p><small>本地样例流程 · 无模型调用</small></div></section>
+          <button id="start-job-processing" class="v1-primary-button v1-sheet-primary" type="button" disabled>开始理解职位</button>
+        </div>
+      </section>
+      <p id="job-page-message" class="v1-inline-message" aria-live="polite"></p>
+    </main>
+    <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
+    <script src="/floating-window.js?v=v1-motion-33"></script>
+    <script src="/v1-pages.js?v=v1-motion-33"></script>
+  </body>
+</html>

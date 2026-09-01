@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "job-radar-local-correction-memory-v1",
+  "title": "Job Radar Local Correction Memory v1",
+  "description": "Browser-local, user-owned parsing memory. It must not be uploaded, centralised or used as shared training data by default.",
+  "type": "object",
+  "required": ["correction_id", "kind", "source_text", "target_value", "scope", "created_at", "updated_at"],
+  "properties": {
+    "correction_id": { "type": "string", "minLength": 1 },
+    "kind": { "enum": ["ocr_replacement", "section_alias", "classification_correction"] },
+    "source_text": { "type": "string", "minLength": 1, "maxLength": 240 },
+    "target_value": { "type": "string", "minLength": 1, "maxLength": 240 },
+    "document_type": { "type": "string" },
+    "scope": { "const": "local_browser_only" },
+    "use_count": { "type": "integer", "minimum": 0 },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" }
+  },
+  "additionalProperties": false
+}

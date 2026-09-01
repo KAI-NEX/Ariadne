@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src https://api.deepseek.com https://generativelanguage.googleapis.com https://api.openai.com https://api.anthropic.com https://openrouter.ai; img-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <title>Job Radar Browser BYOK transport probe</title>
+    <link rel="stylesheet" href="./browser-byok-probe.css">
+  </head>
+  <body>
+    <main>
+      <h1>Browser BYOK transport probe</h1>
+      <p>This test sends only invalid-placeholder credentials to provider model-list endpoints. It makes no inference request, sends no career data, persists nothing, and never writes a credential to the URL.</p>
+      <button id="run-probes" type="button">Run non-billable probes</button>
+      <pre id="results" aria-live="polite">Not run.</pre>
+    </main>
+    <script src="./browser-byok-probe.js"></script>
+  </body>
+</html>

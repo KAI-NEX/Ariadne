@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://generativelanguage.googleapis.com; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'" />
+    <title>Ariadne · 运行方式选择</title>
+    <link rel="stylesheet" href="/styles.css?v=runtime-ui-v48" />
+  </head>
+  <body class="runtime-page">
+    <canvas id="runtime-ascii-waves" class="runtime-ascii-waves" aria-hidden="true"></canvas>
+    <main class="runtime-shell">
+      <section class="runtime-control" aria-label="运行方式">
+        <button id="runtime-selector" class="runtime-selector" type="button" aria-expanded="false" aria-haspopup="listbox">
+          <span id="runtime-selected">正在读取可用模型…</span><span class="runtime-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m7 9 5 6 5-6" /></svg></span>
+        </button>
+        <button id="runtime-action" class="runtime-action" type="button" disabled aria-label="继续">
+          <span id="runtime-action-symbol" aria-hidden="true">→</span>
+        </button>
+        <div id="runtime-menu" class="runtime-menu" role="listbox" aria-label="选择运行方式" aria-hidden="true">
+          <div id="runtime-model-options"></div>
+          <button id="runtime-add-model" class="runtime-menu-item runtime-add-model" type="button" role="option">
+            <span>＋ 添加新的模型</span><small>连接 API 后读取可用模型</small>
+          </button>
+          <div class="runtime-divider"></div>
+          <button id="runtime-local" class="runtime-menu-item" type="button" role="option">
+            <span>本地运行</span><small>不接入 AI；仅使用本地处理</small>
+          </button>
+        </div>
+      </section>
+      <p id="runtime-message" class="runtime-message" aria-live="polite"></p>
+    </main>
+    <div id="add-model-sheet" class="add-model-sheet hidden" aria-hidden="true">
+      <button id="add-model-backdrop" class="add-model-backdrop" type="button" aria-label="关闭添加模型"></button>
+      <section id="add-model-panel" class="add-model-panel" role="dialog" aria-modal="true" aria-labelledby="add-model-title">
+        <header class="add-model-header"><button id="add-model-close" class="sheet-icon-button" type="button" aria-label="关闭"></button><h2 id="add-model-title">添加新的模型</h2></header>
+        <div class="add-model-scroll-area">
+          <div class="add-model-body">
+            <section><label class="add-model-label" for="add-model-provider">模型服务</label><div class="add-model-select-wrap"><button id="add-model-provider" class="add-model-provider-trigger" type="button" aria-label="模型服务" aria-haspopup="listbox" aria-expanded="false"><span id="add-model-provider-value"></span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 9 5 5 5-5" /></svg></button><div id="add-model-provider-menu" class="add-model-provider-menu" role="listbox" aria-label="模型服务" aria-hidden="true"><button type="button" role="option" data-provider-id="deepseek">DeepSeek</button><button type="button" role="option" data-provider-id="gemini">Gemini</button><button type="button" role="option" data-provider-id="qwen">Qwen</button></div></div></section>
+            <section><label class="add-model-label" for="add-model-key">API Key</label><div class="add-model-key-row"><input id="add-model-key" type="password" autocomplete="off" spellcheck="false" placeholder="输入 API Key" /><button id="add-model-clear" class="add-model-clear" type="button" aria-label="删除已保存的 API Key" title="删除已保存的 API Key"><span class="add-model-bin" aria-hidden="true"><svg class="add-model-bin-top" viewBox="0 0 69 14"><path d="M20.8232 2.62734 19.9948 4.21304c-.1724.33005-.514.53696-.8863.53696H4.92857C2.20246 4.75 0 6.87266 0 9.5c0 2.6273 2.20246 4.75 4.92857 4.75h59.14283C66.7975 14.25 69 12.1273 69 9.5c0-2.62734-2.2025-4.75-4.9286-4.75H49.8915c-.3723 0-.7139-.20691-.8863-.53695l-.8284-1.58571C47.3451 1.00938 45.6355 0 43.7719 0H25.2281c-1.8636 0-3.5732 1.00938-4.4049 2.62734Z" /></svg><svg class="add-model-bin-bottom" viewBox="0 0 69 57"><path d="M20.8232-16.3727 19.9948-14.787c-.1724.3301-.514.537-.8863.537H4.92857C2.20246-14.25 0-12.1273 0-9.5c0 2.6273 2.20246 4.75 4.92857 4.75h59.14283C66.7975-4.75 69-6.8727 69-9.5c0-2.6273-2.2025-4.75-4.9286-4.75H49.8915c-.3723 0-.7139-.2069-.8863-.537l-.8284-1.5857C47.3451-17.9906 45.6355-19 43.7719-19H25.2281c-1.8636 0-3.5732 1.0094-4.4049 2.6273ZM64.0023 1.0648C64.0397.4882 63.5822 0 63.0044 0H5.99556C5.4178 0 4.96025.4882 4.99766 1.0648l3.19609 49.2555C8.44018 54.0758 11.6746 57 15.5712 57h37.8576c3.8966 0 7.131-2.9242 7.3774-6.6797L64.0023 1.0648Z" /></svg></span></button></div><p class="add-model-hint">API Key 保存在本地浏览器，不会上传到 Ariadne 云端。</p><a id="add-model-key-link" class="add-model-key-link hidden" href="#" target="_blank" rel="noreferrer"></a></section>
+            <section id="add-model-models-section" class="hidden"><p class="add-model-label">可用图文模型</p><div id="add-model-model-list" class="add-model-list"></div></section>
+          </div>
+        </div>
+        <footer class="add-model-footer"><button id="add-model-connect" class="add-model-connect" type="button" disabled><span class="add-model-connect-content"><svg class="add-model-connect-loader" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9" /></svg><svg class="add-model-connect-check" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="m8.5 12 2.3 2.3 4.8-5" /></svg><span class="add-model-connect-label">连接并读取可用模型</span><span id="add-model-status" class="sr-only" aria-live="polite"></span></span></button></footer>
+      </section>
+    </div>
+    <script src="/ascii-waves.js?v=runtime-ui-v48"></script>
+    <script src="/floating-window.js?v=runtime-ui-v48"></script>
+    <script src="/add-model-sheet.js?v=runtime-ui-v48"></script>
+    <script src="/runtime-selection.js?v=runtime-ui-v48"></script>
+  </body>
+</html>

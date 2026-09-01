@@ -1,0 +1,98 @@
+# Local credentials and machine-specific configuration
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Local runtime state and diagnostics
+data/job_radar.db
+data/runtime/
+data/uploads/
+data/local_ocr_uploads/
+logs/
+*.log
+.cache/
+__pycache__/
+*.py[cod]
+
+# Private candidate material and local exports (do not commit real career data)
+data/resumes/
+data/portfolios/
+data/candidate_documents/
+data/candidate_context_exports/
+data/personal_exports/
+uploads/
+
+# OS metadata
+.DS_Store
+
+# Additional local credentials
+credentials.json
+secrets.json
+token.json
+tokens.json
+access_token.json
+api_key.txt
+apikey.txt
+
+# Local dependencies, tests, coverage, and editor artifacts
+.pytest_cache/
+node_modules/
+.npm/
+.coverage
+.coverage.*
+coverage/
+htmlcov/
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# Local SQLite runtime state, limited to data/ root
+/data/*.db
+/data/*.db-wal
+/data/*.db-shm
+/data/*.db-journal
+/data/*.sqlite
+/data/*.sqlite-wal
+/data/*.sqlite-shm
+/data/*.sqlite-journal
+/data/*.sqlite3
+/data/*.sqlite3-wal
+/data/*.sqlite3-shm
+/data/*.sqlite3-journal
+
+# Browser and local private exports
+/data/indexeddb_exports/
+/data/localstorage_exports/
+/data/conversation_exports/
+/data/runtime_exports/
+/data/session_exports/
+/data/ui_state_exports/
+/data/debug_dumps/
+
+# Additional private career source locations
+/data/source_documents/
+/data/career_sources/
+/document_benchmark/sources/
+
+# Real JD corpus and captured job-source data
+/data/jd-*.json
+/data/batch06_candidates/
+/data/batch06_import_report.json
+/data/raw/
+/data/normalized_candidates/
+/data/reconciliation_plans/
+/data/jd_corpus/
+
+# Private benchmark inputs and derived outputs
+/document_benchmark/benchmark_sources.json
+/document_benchmark/truth_set_v1.json
+/document_benchmark/gpt_audit/
+/document_benchmark/outputs/
+
+# Optional local-only private career regression fixtures
+/tests/private_fixtures/

@@ -1,0 +1,18 @@
+{
+  "contract_id": "job-radar-career-intelligence-v0",
+  "status": "career_intelligence_v0",
+  "persistence_boundary": "browser_local_indexeddb_additive_store",
+  "records": {
+    "review_status": ["needs_review", "confirmed", "rejected"],
+    "capability_state": ["PROVEN", "EMERGING", "TOOL_ASSISTED", "UNDERSTOOD", "UNVERIFIED", "MISSING_EVIDENCE"],
+    "direction_status": ["PENDING_USER_CONFIRMATION", "CONFIRMED", "REJECTED"]
+  },
+  "invariants": [
+    "interest_signal_is_not_capability_evidence",
+    "missing_evidence_is_not_missing_capability",
+    "ai_assisted_implementation_is_not_independent_engineering_capability",
+    "observed_behavior_is_not_confirmed_preference",
+    "career_direction_hypothesis_is_not_user_goal",
+    "proposal_is_not_stored_truth_without_human_review"
+  ]
+}

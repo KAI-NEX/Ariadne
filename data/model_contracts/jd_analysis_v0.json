@@ -1,0 +1,68 @@
+{
+  "contract_id": "jd_analysis_v0",
+  "contract_version": "0.1",
+  "phase": "provider_independent_mock_vertical_slice",
+  "purpose": "Turn one provenanced normalized JD into a reviewable structured analysis; do not assert facts beyond the supplied input.",
+  "input_contract": {
+    "required_job_fields": [
+      "job_id",
+      "title",
+      "company",
+      "location",
+      "seniority",
+      "responsibilities",
+      "requirements"
+    ],
+    "required_provenance_fields": [
+      "external_source_name",
+      "external_job_id",
+      "raw_capture_path",
+      "raw_capture_sha256",
+      "last_successful_fetch_at"
+    ],
+    "excluded_user_owned_fields": [
+      "application_status"
+    ]
+  },
+  "output_contract": {
+    "required": [
+      "analysis_status",
+      "role_summary",
+      "capabilities",
+      "unknowns",
+      "evidence"
+    ],
+    "analysis_status": {
+      "allowed_values": ["needs_review"],
+      "default": "needs_review"
+    },
+    "role_summary": "string or unknown; source-supported summary only",
+    "capabilities": [
+      {
+        "capability": "string",
+        "evidence_fields": ["one or more supplied input field names; required for every capability"],
+        "confidence": "low | medium | high"
+      }
+    ],
+    "unknowns": ["string describing a missing or unsupported fact"],
+    "evidence": [
+      {
+        "claim": "string",
+        "source_fields": ["input field names only"]
+      }
+    ]
+  },
+  "validation_rules": [
+    "Output must be JSON and contain every required field.",
+    "Every capability must have one or more evidence_fields that name supplied input fields.",
+    "Every explicit evidence claim must cite supplied input field names.",
+    "Unsupported facts must appear in unknowns, not as confident claims.",
+    "analysis_status remains needs_review until a human approves it.",
+    "Output must not include or infer application_status."
+  ],
+  "failure_contract": {
+    "non_json_or_missing_required_fields": "reject output; do not persist analysis",
+    "unsupported_claim_or_missing_evidence": "mark needs_review; do not auto-approve",
+    "input_missing_provenance": "stop before model call and request review"
+  }
+}

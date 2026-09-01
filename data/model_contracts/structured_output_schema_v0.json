@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "JDAnalysisV0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["analysis_status", "role_summary", "capabilities", "unknowns", "evidence"],
+  "properties": {
+    "analysis_status": {"const": "needs_review"},
+    "role_summary": {"type": "string"},
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["capability", "evidence_fields", "confidence"],
+        "properties": {
+          "capability": {"type": "string"},
+          "evidence_fields": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"enum": ["job_id", "title", "company", "location", "seniority", "responsibilities", "requirements"]}
+          },
+          "confidence": {"enum": ["low", "medium", "high"]}
+        }
+      }
+    },
+    "unknowns": {"type": "array", "items": {"type": "string"}},
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim", "source_fields"],
+        "properties": {
+          "claim": {"type": "string"},
+          "source_fields": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"enum": ["job_id", "title", "company", "location", "seniority", "responsibilities", "requirements"]}
+          }
+        }
+      }
+    }
+  }
+}

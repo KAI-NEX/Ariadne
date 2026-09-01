@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const read = (name) => fs.readFileSync(path.join(root, "public", name), "utf8");
+const html = read("gemini-connect.html"); const script = read("gemini-connect.js"); const guide = read("gemini-api-key-guide.html");
+assert.match(html, /aistudio\.google\.com\/app\/apikey/); assert.match(html, /gemini-api-key-guide\.html/); assert.match(html, /connect-src https:\/\/generativelanguage\.googleapis\.com/);
+assert.match(script, /runGeminiBrowserSmoke/); assert.match(script, /createSyntheticSmokeImageDataUrl/); assert.match(script, /MULTIMODAL_SMOKE_APPROVED = false/); assert.match(script, /MULTIMODAL_CONNECTION_TEST/); assert.match(script, /key_storage: "memory_only"/); assert.match(script, /proxy_used: false/); assert.match(script, /window\.location\.assign\("\/"\)/);
+assert.doesNotMatch(script, /localStorage|indexedDB|console\.|\?key=/); assert.match(guide, /Google AI Studio API 密钥页面/); assert.match(guide, /Gemini API 密钥安全说明/);
+console.log("gemini_connect_page_contract=pass");

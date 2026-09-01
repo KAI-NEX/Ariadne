@@ -1,0 +1,54 @@
+{
+  "audited_at": "2026-08-24",
+  "method": "shallow clone plus source/schema inspection; README alone was not used",
+  "repositories": [
+    {
+      "name": "alibaba/SmartResume",
+      "commit": "3b62157",
+      "license": "Apache-2.0",
+      "source_patterns_read": ["text_extractor.py", "resume_analyzer.py", "data_processor.py", "prompts.py", "basicInfo/workExperience/education schemas"],
+      "useful_pattern": "layout/read-order text with line ranges, then separate basic/work/education structured extraction and blank missing values",
+      "job_radar_decision": "adopt separation and provenance ranges; do not copy its unpublished internal PDF/OCR path or model prompts"
+    },
+    {
+      "name": "infiniflow/ragflow",
+      "commit": "e17436e",
+      "license": "Apache-2.0",
+      "source_patterns_read": ["rag/app/resume.py"],
+      "useful_pattern": "native PDF cells plus OCR only where native text is absent, then layout/order processing",
+      "job_radar_decision": "adopt selective native/OCR source selection; reject blind overlap fusion after it regressed grouping"
+    },
+    {
+      "name": "hiroi-sora/GapTree_Sort_Algorithm",
+      "commit": "281987c",
+      "license": "MIT",
+      "source_patterns_read": ["gap_tree.py"],
+      "useful_pattern": "recursive whitespace-gap tree over text bounding boxes to reconstruct columns and reading order",
+      "job_radar_decision": "adopt only for OCR Resume pages where multi-column ordering is needed; reject as global default because it split a reliable native Resume"
+    },
+    {
+      "name": "PaddlePaddle/PaddleOCR",
+      "commit": "2661c7c",
+      "license": "Apache-2.0",
+      "source_patterns_read": ["PP-StructureV3 pipeline source and official docs"],
+      "useful_pattern": "layout-labelled regions, OCR, table/formula components and ordered parsing result",
+      "job_radar_decision": "benchmark adapter only; reject default due measured runtime/resource/dependency cost"
+    },
+    {
+      "name": "datalab-to/surya",
+      "commit": "514b0bf",
+      "license": "Apache-2.0 code; modified AI Pubs OpenRAIL-M model weights",
+      "source_patterns_read": ["settings.py", "inference backend manager", "llamacpp/vllm backends", "model license"],
+      "useful_pattern": "unified OCR/layout/reading-order output backed by a document VLM",
+      "job_radar_decision": "reject default because local runtime is not self-contained and model-license obligations materially change the product boundary"
+    },
+    {
+      "name": "docling-project/docling",
+      "commit": "e1cb2b2",
+      "license": "MIT",
+      "source_patterns_read": ["PdfPipelineOptions", "OcrMacOptions", "ocr_mac_model.py", "document_converter.py", "provenance/export structures"],
+      "useful_pattern": "one document IR with typed layout items, bbox/page provenance and PDF-aware OCR modes",
+      "job_radar_decision": "adopt representation ideas in DocumentBlock v1; retain Docling as reference, not runtime dependency"
+    }
+  ]
+}

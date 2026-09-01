@@ -1,0 +1,18 @@
+{
+  "analysis_status": "needs_review",
+  "role_summary": "该岗位要求从产品定义到体验设计的全流程参与。",
+  "capabilities": [
+    {
+      "capability": "AI 驱动的原型开发",
+      "evidence_fields": [],
+      "confidence": "high"
+    }
+  ],
+  "unknowns": [],
+  "evidence": [
+    {
+      "claim": "岗位要求使用 AI Coding 工具将设计概念转化为高保真 Demo。",
+      "source_fields": ["responsibilities"]
+    }
+  ]
+}

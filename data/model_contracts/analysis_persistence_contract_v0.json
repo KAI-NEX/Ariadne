@@ -1,0 +1,36 @@
+{
+  "contract_id": "analysis_persistence_v0",
+  "phase": "provider_independent_mock_vertical_slice",
+  "record_type": "job_analysis",
+  "separate_from": "jobs",
+  "create_preconditions": [
+    "model output has contract_valid: true",
+    "model output analysis_status is needs_review",
+    "job_id and input raw_capture_sha256 are present"
+  ],
+  "record_fields": {
+    "analysis_id": "stable local analysis identifier",
+    "job_id": "existing Job Radar job identifier",
+    "analysis_contract_id": "jd_analysis_v0",
+    "instruction_version": "version of the separate control instruction",
+    "provider_name": "provider adapter identifier, for example mock",
+    "model_name": "provider model identifier or local fixture identifier",
+    "input_raw_capture_sha256": "provenance link to the exact analyzed source input",
+    "input_json": "exact provider-independent JD input used for this analysis",
+    "output_json": "validated model output preserved verbatim",
+    "review_status": "needs_review | approved | rejected",
+    "reviewed_by": "human identifier or unknown",
+    "reviewed_at": "ISO timestamp or null",
+    "review_note": "human reason or null"
+  },
+  "state_transitions": {
+    "model_or_validator": ["creates needs_review only"],
+    "human_reviewer": ["needs_review -> approved", "needs_review -> rejected"],
+    "forbidden": ["model -> approved", "approved -> overwrite original output"]
+  },
+  "persistence_policy": {
+    "pending_output": "may be stored as a separate needs_review analysis record after contract validation",
+    "approved_output": "remains a separate approved analysis record; does not overwrite source job facts",
+    "rejected_output": "remains stored with review note for failure learning; does not affect job facts"
+  }
+}

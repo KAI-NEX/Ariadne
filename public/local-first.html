@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ariadne · 本地导入</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="page-shell">
+      <p class="eyebrow">本地优先 · 不上传用户数据</p>
+      <h1>加载职位</h1>
+      <p class="lede">截图先在本机识别，再直接进入审核；也可由你主动开启视觉 AI 读取。职位数据只保存在你的浏览器。</p>
+      <p class="local-first-link"><a href="/workspace.html">返回职业申请工作台</a> · <a href="/local-jobs.html">查看我的职位</a> · <a href="/career-evidence.html">加载职业材料 →</a></p>
+      <p id="runtime-warning" class="status-message error hidden"></p>
+
+      <section class="panel" aria-labelledby="ai-setup-heading">
+        <h2 id="ai-setup-heading">AI 读取设置（本机）</h2>
+        <p>仅在这台 Mac 的 <code>127.0.0.1</code> 开发版使用。密钥会写入 macOS 钥匙串，不进入浏览器数据、导出备份或项目文件。</p>
+        <label>DeepSeek API 密钥 <input id="deepseek-key" type="password" autocomplete="off" placeholder="仅本机保存"></label>
+        <button id="save-deepseek-key" type="button">保存到本机钥匙串</button>
+        <p id="vision-config-message" class="status-message" aria-live="polite"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="source-heading">
+        <h2 id="source-heading">1. 添加来源与内容</h2>
+        <p>职位链接只作为来源记录，不会被系统主动读取、登录或测试。请再添加截图或粘贴职位描述原文，作为可审核的内容证据。</p>
+        <label>职位链接 <input id="source-link" type="url" inputmode="url" placeholder="https://careers.tencent.com/jobdesc.html?postId=…"></label>
+        <label>或粘贴职位描述原文
+          <textarea id="jd-text" rows="7" placeholder="粘贴职位描述、职责和要求；系统只在本机按规则提出候选，仍要审核。"></textarea>
+        </label>
+        <button id="text-candidate-button" type="button">根据原文进入审核</button>
+        <p id="text-candidate-message" class="status-message" aria-live="polite"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="image-heading">
+        <h2 id="image-heading">截图导入（可选）</h2>
+        <p>一次可选择或粘贴 1–4 张同一职位描述的截图。若上方已填写链接，它会作为同一条候选的可回溯来源；默认只发送到本机 <code>127.0.0.1</code> 的 OCR，不上传到外网；视觉 AI 必须由你单独开启。</p>
+        <label class="file-label">选择截图<input id="image-file" type="file" accept="image/png,image/jpeg" multiple></label>
+        <div id="paste-zone" class="paste-zone" tabindex="0">点击这里后可连续粘贴截图（⌘V）</div>
+        <div id="image-preview-list" class="image-preview-list" aria-live="polite"></div>
+        <div class="button-row intake-actions">
+          <button id="ocr-button" type="button" disabled>本机 OCR 识别并进入审核</button>
+          <button id="vision-button" type="button" class="secondary" disabled>开启 AI 读取截图</button>
+        </div>
+        <p class="muted">AI 读取将直接把所选截图发送给 DeepSeek 视觉模型，不会把 OCR 文字当作唯一依据；结果仍必须审核。</p>
+        <p id="ocr-message" class="status-message" aria-live="polite"></p>
+      </section>
+
+      <section id="review-panel" class="panel" aria-labelledby="review-heading">
+        <h2 id="review-heading">2. 审核职位信息</h2>
+        <p id="review-empty-message" class="muted">完成第 1 步的任一导入方式后，候选字段与来源证据会出现在这里。</p>
+        <p>系统只会填入带来源证据的“候选”；它不是最终事实。请核对原图、原文或来源响应，未知内容保持“未知”。</p>
+        <p id="model-assist-note" class="status-message muted"></p>
+        <details id="review-evidence" class="review-evidence hidden" open></details>
+        <form id="review-form">
+          <fieldset id="review-fields" disabled>
+          <label>公司 <input id="candidate-company" required value="未知"></label>
+          <label>职位标题 <input id="candidate-title" required value="未知"></label>
+          <label>地点 <input id="candidate-location" required value="未知"></label>
+          <label>经验/级别 <input id="candidate-seniority" required value="未知"></label>
+          <label>薪资 <input id="candidate-salary" value="未知"></label>
+          <label>岗位职责（每行一条）<textarea id="candidate-responsibilities" rows="5" placeholder="未知"></textarea></label>
+          <label>任职要求（每行一条）<textarea id="candidate-requirements" rows="5" placeholder="未知"></textarea></label>
+          <button type="submit">确认并保存到我的职位</button>
+          <button id="discard-candidate" type="button" class="secondary">放弃这条待审核记录</button>
+          </fieldset>
+        </form>
+        <p id="review-message" class="status-message" aria-live="polite"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="backup-heading">
+        <h2 id="backup-heading">备份与恢复</h2>
+        <p>浏览器清除网站数据、换电脑或换浏览器前，请先导出备份。</p>
+        <div class="button-row">
+          <button id="export-button" type="button">导出我的数据 JSON</button>
+          <label class="file-label">导入备份 JSON<input id="import-file" type="file" accept="application/json"></label>
+          <button id="clear-button" type="button" class="danger">清空此浏览器的 Ariadne 数据</button>
+        </div>
+        <p id="backup-message" class="status-message" aria-live="polite"></p>
+      </section>
+    </main>
+    <script src="local-first.js"></script>
+  </body>
+</html>

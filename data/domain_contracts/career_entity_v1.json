@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "job-radar-career-entity-v1",
+  "title": "Job Radar Career Entity v1",
+  "type": "object",
+  "required": [
+    "entity_id",
+    "contract_id",
+    "entity_type",
+    "data",
+    "source_document_ids",
+    "field_provenance",
+    "extraction",
+    "review_status"
+  ],
+  "properties": {
+    "entity_id": { "type": "string", "minLength": 1 },
+    "contract_id": { "const": "job-radar-career-entity-v1" },
+    "entity_type": {
+      "enum": [
+        "basics",
+        "work_experience",
+        "education",
+        "skill_group",
+        "language",
+        "project",
+        "certificate",
+        "award",
+        "custom_section"
+      ]
+    },
+    "order": { "type": "integer", "minimum": 0 },
+    "data": { "type": "object" },
+    "source_document_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "field_provenance": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/sourceAnchor" }
+      }
+    },
+    "extraction": {
+      "type": "object",
+      "required": ["method", "confidence"],
+      "properties": {
+        "run_id": { "type": ["string", "null"] },
+        "method": { "type": "string" },
+        "confidence": { "enum": ["low", "medium", "high", "unknown"] },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "review_status": { "enum": ["needs_review", "confirmed", "rejected"] },
+    "limitations": { "type": "array", "items": { "type": "string" } },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" },
+    "reviewed_at": { "type": ["string", "null"] },
+    "review_note": { "type": ["string", "null"] }
+  },
+  "$defs": {
+    "sourceAnchor": {
+      "type": "object",
+      "required": ["anchor_id", "source_document_id", "source_location", "source_excerpt"],
+      "properties": {
+        "anchor_id": { "type": "string" },
+        "source_document_id": { "type": "string" },
+        "page": { "type": ["integer", "null"], "minimum": 1 },
+        "start_line": { "type": "integer", "minimum": 1 },
+        "end_line": { "type": "integer", "minimum": 1 },
+        "source_location": { "type": "string" },
+        "source_excerpt": { "type": "string" },
+        "precision": { "enum": ["exact_text_line", "approximate_text_location", "page_only"] }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

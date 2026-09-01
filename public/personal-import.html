@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ariadne · 添加个人材料</title>
+    <link rel="stylesheet" href="/styles.css?v=v1-motion-33">
+  </head>
+  <body class="v1-body" data-v1-page="personal-import">
+    <main class="v1-page-shell v1-import-shell">
+      <header class="v1-topbar v1-library-topbar">
+        <a class="v1-back" href="/personal-information.html" aria-label="返回个人资料"></a>
+        <div><h1>添加个人材料</h1></div>
+        <details class="v1-menu">
+          <summary aria-label="打开导航菜单"><span></span><span></span></summary>
+          <nav aria-label="主导航"><a href="/workspace.html">工作空间</a><a aria-current="page" href="/personal-information.html">个人资料</a><a href="/jd.html">职位描述</a><a href="/index.html">运行方式</a></nav>
+        </details>
+      </header>
+
+      <section class="v1-import-intro"><h2>导入一份材料</h2><p>选择材料类型并提供本地文件。内容先形成待审核对象，不会直接写入正式职业模型。</p></section>
+      <section class="v1-import-card" aria-labelledby="personal-import-heading">
+        <h2 id="personal-import-heading" class="sr-only">个人材料导入</h2>
+        <div class="v1-sheet-body">
+          <section>
+            <p class="v1-field-label">材料类型</p>
+            <div id="personal-import-types" class="v1-segmented" role="radiogroup" aria-label="材料类型">
+              <button type="button" data-import-type="Resume" aria-pressed="true">简历</button>
+              <button type="button" data-import-type="Portfolio" aria-pressed="false">作品集</button>
+              <button type="button" data-import-type="Project" aria-pressed="false">项目</button>
+              <button type="button" data-import-type="Other" aria-pressed="false">其他</button>
+            </div>
+          </section>
+          <section class="v1-file-picker">
+            <label id="personal-dropzone" class="v1-file-dropzone" for="personal-file-input">
+              <span>点击上传文件或直接拖拽文件至此</span>
+              <input id="personal-file-input" type="file" accept=".pdf,.png,.jpg,.jpeg,.docx,application/pdf,image/png,image/jpeg,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+            </label>
+          </section>
+          <section id="personal-file-preview" class="v1-file-preview hidden">
+            <div><span id="personal-file-icon">PDF</span><p><b id="personal-file-name"></b><small id="personal-file-meta"></small></p></div>
+            <button id="replace-personal-file" type="button">替换</button>
+          </section>
+          <section id="personal-processing" class="v1-processing hidden" aria-live="polite">
+            <div class="v1-processing-orbit" aria-hidden="true"></div><div><p id="personal-processing-state">正在准备</p><small>本地样例流程 · 无模型调用</small></div>
+          </section>
+          <button id="start-personal-processing" class="v1-primary-button v1-sheet-primary" type="button" disabled>开始理解材料</button>
+        </div>
+      </section>
+      <p id="personal-page-message" class="v1-inline-message" aria-live="polite"></p>
+    </main>
+    <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
+    <script src="/floating-window.js?v=v1-motion-33"></script>
+    <script src="/v1-pages.js?v=v1-motion-33"></script>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "contract_id": "job-radar-local-ai-comparison-log-v1",
+  "purpose": "Optional development/user evaluation when the same source is intentionally run through Local and AI modes. This is not normal product execution and never triggers automatic fusion.",
+  "adjudication_authority": "original_source_plus_user_judgment",
+  "required_record_fields": [
+    "comparison_id",
+    "source_document_id",
+    "source_hash",
+    "source_document",
+    "relevant_page_or_section",
+    "local_result",
+    "ai_result",
+    "original_source_verdict",
+    "better_result",
+    "failure_layer",
+    "local_targeted_fix_needed",
+    "ai_prompt_or_contract_fix_needed",
+    "source_genuinely_ambiguous",
+    "reviewed_at"
+  ],
+  "better_result_values": ["local", "ai", "equivalent", "mixed", "undetermined"],
+  "failure_layer_values": ["none", "source", "extraction", "entity_grouping", "entity_mapping", "ai_prompt", "ai_output_contract", "ai_validation", "review", "persistence", "ui"],
+  "privacy": "local_project_evaluation_log; do not include original private document contents or API keys",
+  "records": []
+}

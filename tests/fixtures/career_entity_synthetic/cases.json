@@ -1,0 +1,289 @@
+{
+  "fixture_contract": "ariadne-career-entity-synthetic-v1",
+  "privacy": {
+    "classification": "fully_synthetic",
+    "created_from": "blank_fictional_scenario",
+    "not_derived_from_user_material": true,
+    "reserved_email_domain_only": true
+  },
+  "resume": {
+    "source_id": "source-synthetic-resume-v1",
+    "pages": [
+      {
+        "page": 1,
+        "source_method": "native_document",
+        "lines": [
+          "Nova Quill",
+          "Synthetic Systems Designer",
+          "nova.quill@example.com",
+          "PROFILE",
+          "Builds fictional wayfinding tools for imaginary community observatories.",
+          "WORK EXPERIENCE",
+          "Lattice Orchard Studio | Systems Designer | 2021.04 - 2023.09 | Moon Harbor",
+          "- Prototyped deterministic review states for a fictional exhibit queue.",
+          "- Documented provenance for synthetic visitor notes.",
+          "PROJECTS",
+          "Cloud Compass | HTML + JavaScript prototype | 2020.01 - 2020.10",
+          "- Built a synthetic navigation demo with explicit review boundaries.",
+          "EDUCATION",
+          "Northstar Institute, Moon Harbor",
+          "Master of Speculative Interfaces",
+          "SKILLS",
+          "Tools: HTML, JavaScript, CSV",
+          "Languages: English | Esperanto",
+          "AWARDS",
+          "Winner, Imaginary Interface Challenge",
+          "(Synthetic fixture distinction)"
+        ]
+      }
+    ],
+    "expected": {
+      "entity_type_counts": {
+        "basics": 1,
+        "work_experience": 1,
+        "project": 1,
+        "education": 1,
+        "skill_group": 1,
+        "language": 2,
+        "award": 1
+      },
+      "work_name": "Lattice Orchard Studio",
+      "work_position": "Systems Designer",
+      "work_start": "2021-04",
+      "work_end": "2023-09",
+      "project_name": "Cloud Compass",
+      "education_institution": "Northstar Institute",
+      "skill_group": "Tools",
+      "languages": [
+        "English",
+        "Esperanto"
+      ],
+      "award_name_prefix": "Imaginary Interface Challenge"
+    }
+  },
+  "numbered_portfolio": {
+    "source_id": "source-synthetic-portfolio-v1",
+    "pages": [
+      {
+        "page": 1,
+        "lines": [
+          "01",
+          "ORBITAL SEED LIBRARY",
+          "A fictional archive for imaginary seeds.",
+          "Role",
+          "Interaction Designer",
+          "Problem",
+          "Visitors needed a synthetic browsing model.",
+          "Process",
+          "Mapped deterministic review states.",
+          "HTML",
+          "JavaScript"
+        ]
+      },
+      {
+        "page": 2,
+        "lines": [
+          "Continuation",
+          "Documented prototype",
+          "No verified production deployment."
+        ]
+      },
+      {
+        "page": 3,
+        "lines": [
+          "02",
+          "TIDAL CLOCK ATLAS",
+          "A fictional timeline for a moon harbor.",
+          "Role",
+          "Systems Designer",
+          "Validate",
+          "Tested with synthetic scenarios.",
+          "CSV import and export"
+        ]
+      }
+    ],
+    "expected": {
+      "project_names": [
+        "ORBITAL SEED LIBRARY",
+        "TIDAL CLOCK ATLAS"
+      ],
+      "source_pages": [
+        [
+          1,
+          2
+        ],
+        [
+          3
+        ]
+      ],
+      "roles": [
+        "Interaction Designer",
+        "Systems Designer"
+      ]
+    }
+  },
+  "coordinate_portfolio": {
+    "source_id": "source-synthetic-coordinate-v1",
+    "pages": [
+      {
+        "page": 1,
+        "blocks": [
+          {
+            "text": "CASE 01: SIGNAL GARDEN",
+            "x": 0.05,
+            "y": 0.92,
+            "width": 0.4,
+            "height": 0.04,
+            "confidence": 0.99
+          },
+          {
+            "text": "Role",
+            "x": 0.08,
+            "y": 0.78,
+            "width": 0.12,
+            "height": 0.03,
+            "confidence": 0.99
+          },
+          {
+            "text": "Interaction Designer",
+            "x": 0.08,
+            "y": 0.7,
+            "width": 0.28,
+            "height": 0.03,
+            "confidence": 0.99
+          },
+          {
+            "text": "Decorative Neighbor",
+            "x": 0.68,
+            "y": 0.7,
+            "width": 0.24,
+            "height": 0.03,
+            "confidence": 0.99
+          },
+          {
+            "text": "Problem",
+            "x": 0.08,
+            "y": 0.55,
+            "width": 0.15,
+            "height": 0.03,
+            "confidence": 0.99
+          },
+          {
+            "text": "A fictional archive needed deterministic review.",
+            "x": 0.08,
+            "y": 0.47,
+            "width": 0.44,
+            "height": 0.03,
+            "confidence": 0.99
+          },
+          {
+            "text": "HTML",
+            "x": 0.08,
+            "y": 0.34,
+            "width": 0.1,
+            "height": 0.03,
+            "confidence": 0.99
+          },
+          {
+            "text": "JavaScript",
+            "x": 0.22,
+            "y": 0.34,
+            "width": 0.14,
+            "height": 0.03,
+            "confidence": 0.99
+          }
+        ]
+      }
+    ],
+    "expected": {
+      "name": "SIGNAL GARDEN",
+      "role": "Interaction Designer",
+      "problem_prefix": "A fictional archive needed deterministic review.",
+      "excluded_neighbor": "Decorative Neighbor",
+      "tools": [
+        "HTML",
+        "JavaScript"
+      ]
+    }
+  },
+  "correction_case": {
+    "source_id": "source-synthetic-correction-v1",
+    "pages": [
+      {
+        "page": 1,
+        "lines": [
+          "Nova Quill",
+          "Synthetic Systems Designer",
+          "WORK EXPERIENCE",
+          "Northstar Institute | Learning Designer | 2019 - 2020",
+          "- Built a fictional learning map."
+        ]
+      }
+    ],
+    "corrections": [
+      {
+        "kind": "classification_correction",
+        "document_type": "resume",
+        "source_text": "Northstar Institute",
+        "target_value": "education"
+      }
+    ],
+    "expected": {
+      "corrected_entity_type": "education",
+      "corrected_institution": "Northstar Institute",
+      "warning": "local_classification_memory_applied"
+    }
+  },
+  "adaptive_layout": {
+    "pages": [
+      {
+        "page": 1,
+        "source_method": "apple_vision",
+        "blocks": [
+          {
+            "text": "SYNTHETIC HEADER",
+            "x": 0.05,
+            "y": 0.9,
+            "width": 0.9,
+            "height": 0.04
+          },
+          {
+            "text": "RIGHT TOP",
+            "x": 0.62,
+            "y": 0.74,
+            "width": 0.25,
+            "height": 0.03
+          },
+          {
+            "text": "LEFT TOP",
+            "x": 0.08,
+            "y": 0.78,
+            "width": 0.25,
+            "height": 0.03
+          },
+          {
+            "text": "RIGHT BOTTOM",
+            "x": 0.62,
+            "y": 0.55,
+            "width": 0.25,
+            "height": 0.03
+          },
+          {
+            "text": "LEFT BOTTOM",
+            "x": 0.08,
+            "y": 0.58,
+            "width": 0.25,
+            "height": 0.03
+          }
+        ]
+      }
+    ],
+    "expected_lines": [
+      "SYNTHETIC HEADER",
+      "LEFT TOP",
+      "LEFT BOTTOM",
+      "RIGHT TOP",
+      "RIGHT BOTTOM"
+    ]
+  }
+}

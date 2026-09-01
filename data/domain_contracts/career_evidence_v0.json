@@ -1,0 +1,66 @@
+{
+  "contract_id": "career_evidence_v0",
+  "contract_version": "0.1",
+  "status": "p4_1_first_slice",
+  "source_document": {
+    "required": [
+      "source_document_id",
+      "document_type",
+      "original_filename",
+      "media_type",
+      "content_hash",
+      "byte_size",
+      "extraction_method",
+      "extraction_status",
+      "imported_at"
+    ],
+    "supported_media_types": [
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "text/plain",
+      "text/markdown"
+    ],
+    "persistence_boundary": "browser_local_indexeddb",
+    "processing_boundary": "localhost_transient_document_extraction"
+  },
+  "career_evidence": {
+    "required": [
+      "evidence_id",
+      "claim",
+      "evidence_type",
+      "capability_category",
+      "source_document_id",
+      "source_location",
+      "source_excerpt_or_reference",
+      "verification_status",
+      "confidence",
+      "limitations",
+      "created_at",
+      "updated_at"
+    ],
+    "verification_status": ["needs_review", "confirmed", "rejected"],
+    "confidence": ["low", "medium", "high"],
+    "state_transitions": {
+      "candidate": ["needs_review -> confirmed", "needs_review -> rejected"],
+      "human_only": ["approve", "edit_and_approve", "reject"],
+      "forbidden": ["extractor -> confirmed", "model -> confirmed"]
+    }
+  },
+  "career_profile": {
+    "derivation": "confirmed_evidence_only",
+    "markdown_is_source_of_truth": false,
+    "stale_trigger": "confirmed evidence set changes"
+  },
+  "export": {
+    "evidence_format": "job-radar-career-evidence-v0",
+    "profile_markdown": "CAREER_PROFILE.md",
+    "evidence_json": "EVIDENCE.json",
+    "confirmed_only": true
+  },
+  "privacy": {
+    "external_model_call_default": false,
+    "source_blob_exported_by_first_slice": false,
+    "contact_details_are_not_candidate_evidence": true
+  }
+}
+
