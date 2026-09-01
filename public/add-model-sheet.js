@@ -84,7 +84,7 @@
       if (byId("key").value !== state.apiKey) byId("key").value = state.apiKey;
       byId("key-link").classList.toggle("hidden", !selectedProvider);
       byId("key-link").href = selectedProvider?.apiKeyUrl || "#";
-      byId("key-link").textContent = selectedProvider ? `获取 ${selectedProvider.name} API Key ↗` : "";
+      byId("key-link").textContent = selectedProvider ? `获取 ${selectedProvider.name} API Key` : "";
       byId("connect").disabled = !(selectedProvider && state.apiKey) || isLoading || state.phase === "VERIFIED";
       byId("connect").classList.toggle("is-loading", isLoading);
       byId("connect").classList.toggle("is-success", state.phase === "VERIFIED");

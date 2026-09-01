@@ -47,6 +47,14 @@ assert.doesNotMatch(html, /id="add-model-drag-handle"/); assert.match(html, /id=
 assert.match(html, /class="add-model-provider-trigger"/); assert.match(html, /id="add-model-provider-menu"/); assert.match(html, /data-provider-id="deepseek"/); assert.match(html, /data-provider-id="gemini"/); assert.match(html, /data-provider-id="qwen"/);
 assert.match(html, /class="add-model-footer"/); assert.match(html, /class="add-model-bin-top"/); assert.match(html, /class="add-model-bin-bottom"/);
 assert.match(html, /API Key 保存在本地浏览器，不会上传到 Ariadne 云端/);
+assert.match(html, /id="add-model-key-link"[^>]*target="_blank"[^>]*rel="noreferrer"/);
+assert.match(source, /byId\("key-link"\)\.href = selectedProvider\?\.apiKeyUrl \|\| "#"/);
+assert.match(source, /byId\("key-link"\)\.textContent = selectedProvider \? `获取 \$\{selectedProvider\.name\} API Key` : ""/);
+assert.doesNotMatch(source, /获取 \$\{selectedProvider\.name\} API Key ↗/);
+assert.match(css, /\.add-model-key-link \{[^}]*color: #1f2129[^}]*cursor: pointer[^}]*opacity: \.82[^}]*text-decoration: none/s);
+assert.match(css, /\.add-model-key-link:hover, \.add-model-key-link:focus-visible \{[^}]*opacity: 1[^}]*text-decoration: underline/s);
+assert.doesNotMatch(css, /\.add-model-key-link \{[^}]*#2961db/s);
+assert.match(css, /\.runtime-back-link, \.runtime-guide-links a, \.runtime-guide-page a \{ color: #2961db/s);
 assert.match(html, /add-model-connect-loader/); assert.match(html, /add-model-connect-check/);
 assert.match(html, /删除已保存的 API Key/);
 assert.doesNotMatch(html, /✓ 完成|仅本次使用|provider-picker/);
