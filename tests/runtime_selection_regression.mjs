@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (file) => fs.readFileSync(path.join(root, "public", file), "utf8");
 const html = read("index.html");
+const geminiConnect = read("gemini-connect.html");
+const geminiGuide = read("gemini-api-key-guide.html");
 const script = read("runtime-selection.js");
 const css = read("styles.css");
 
@@ -13,6 +15,15 @@ assert.match(html, /ONE|runtime-selector/);
 assert.match(html, /添加新的模型/);
 assert.match(html, /add-model-sheet\.js/);
 assert.match(html, /runtime-selection\.js\?v=runtime-ui-v48/);
+assert.match(html, /id="runtime-action-symbol"[^>]*><svg viewBox="0 0 24 24"><path d="M9 5\.5 15\.5 12 9 18\.5"/);
+assert.match(html, /class="runtime-chevron"[^>]*><svg viewBox="0 0 24 24"><path d="M5\.5 9 12 15\.5 18\.5 9"/);
+assert.doesNotMatch(html, /id="runtime-action-symbol"[^>]*>→/);
+assert.doesNotMatch(script, /symbol\.textContent/);
+for (const runtimeBackPage of [geminiConnect, geminiGuide]) {
+  assert.match(runtimeBackPage, /class="runtime-back-link"[^>]*><span class="runtime-back-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M15 5\.5 8\.5 12 15 18\.5"/);
+  assert.doesNotMatch(runtimeBackPage, /← 返回/);
+}
+assert.doesNotMatch([html, geminiConnect, geminiGuide].join(""), /M5 12h14|M19 12H5/);
 assert.match(html, /floating-window\.js\?v=runtime-ui-v48/);
 assert.doesNotMatch(html, /<p class="runtime-step">选择运行方式<\/p>/);
 assert.doesNotMatch(html, /01&nbsp;&nbsp;选择运行方式/);
@@ -55,6 +66,10 @@ assert.match(script, /job-radar-runtime-leave/);
 assert.doesNotMatch(script, /runtime-entry-bloom/);
 assert.match(script, /window\.setTimeout\(\(\) => window\.location\.assign\(destination\), 240\)/);
 assert.match(css, /\.runtime-spinner/);
+assert.match(css, /#runtime-action-symbol svg \{[^}]*stroke-linecap: round[^}]*stroke-linejoin: round[^}]*stroke-width: 2\.4/s);
+assert.match(css, /\.runtime-chevron svg \{[^}]*stroke-linecap: round[^}]*stroke-linejoin: round[^}]*stroke-width: 2\.4/s);
+assert.match(css, /\.runtime-back-icon svg \{[^}]*stroke-linecap: round[^}]*stroke-linejoin: round[^}]*stroke-width: 2\.4/s);
+assert.match(css, /\.runtime-spinner svg \{ display: none; \}/);
 assert.match(css, /\.runtime-menu\.is-open/);
 assert.match(css, /\.runtime-menu \{[^}]*top: 68px/s);
 assert.match(css, /\.runtime-action\.ready:hover[^}]*box-shadow/s);

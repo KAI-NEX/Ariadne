@@ -64,8 +64,7 @@ function render() {
   action.disabled = !ready;
   action.classList.toggle("checking", checking);
   action.classList.toggle("ready", ready);
-  symbol.textContent = checking ? "" : "→";
-  symbol.className = checking ? "runtime-spinner" : "";
+  symbol.classList.toggle("runtime-spinner", checking);
   document.querySelectorAll(".runtime-existing-model").forEach((button) => {
     button.setAttribute("aria-selected", String(state.mode === "ai" && button.dataset.model === state.model && button.dataset.provider === state.provider));
   });

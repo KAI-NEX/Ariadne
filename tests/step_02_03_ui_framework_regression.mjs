@@ -231,7 +231,7 @@ assert.match(styles, /\.v1-conversation-form button \{[^}]*background: #20232a[^
 assert.match(styles, /\.v1-conversation-form button::before \{[^}]*height: 20px[^}]*mask: url\([^}]*stroke-width='1\.8'[^}]*stroke-linecap='round'[^}]*stroke-linejoin='round'[^}]*20px 20px[^}]*width: 20px/s);
 assert.match(styles, /\.v1-body button:focus-visible[^}]*outline: 3px solid rgba\(82, 111, 218, 0\.25\)[^}]*outline-offset: 3px/s);
 assert.match(styles, /\.v1-back \{[^}]*border: 0/s);
-assert.match(styles, /\.v1-back::before \{[^}]*mask: url[^}]*stroke-linecap='round'[^}]*width: 24px/s);
+assert.match(styles, /\.v1-back::before \{[^}]*M15 5\.5 8\.5 12 15 18\.5[^}]*stroke-width='2\.4'[^}]*stroke-linecap='round'[^}]*width: 20px/s);
 assert.match(styles, /\.v1-back::after \{ content: none; \}/);
 assert.match(styles, /\.v1-detail-overlay-close::before \{[^}]*height: 24px[^}]*width: 24px/s);
 assert.match(styles, /\.sheet-icon-button::before \{[^}]*height: 24px[^}]*width: 24px/s);
