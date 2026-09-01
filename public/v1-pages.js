@@ -10,7 +10,7 @@
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
   const typeLabels = { WORK_EXPERIENCE: "工作经历", PROJECT: "项目", EDUCATION: "教育经历", OTHER: "其他" };
   const sourceTypeLabels = { SANITIZED_FIXTURE: "本地测试资料", BROWSER_FILE_METADATA: "浏览器本地文件", PASTED_TEXT_METADATA: "本地粘贴文本" };
-  let selectedCandidateSource = null;
+  let selectedCandidateSources = [];
   let selectedCandidateType = "Resume";
   let selectedJobSource = null;
   let selectedJobImportType = "Document";
@@ -565,24 +565,20 @@
   }
 
   function showCandidateSource(source) {
-    selectedCandidateSource = source;
+    const batchSuffix = selectedCandidateSources.length > 1 ? ` · 共 ${selectedCandidateSources.length} 个文件` : "";
     byId("personal-file-preview").classList.remove("hidden");
     byId("personal-file-name").textContent = source.name;
-    byId("personal-file-meta").textContent = `${source.type || selectedCandidateType} · ${source.sizeLabel || "本地文件"} · 仅本地`;
+    byId("personal-file-meta").textContent = `${source.type || selectedCandidateType} · ${source.sizeLabel || "本地文件"}${batchSuffix} · 仅本地`;
     byId("personal-file-icon").textContent = (source.extension || selectedCandidateType.slice(0, 3)).toUpperCase();
     byId("start-personal-processing").disabled = false;
   }
 
-  async function runCandidateProcessing() {
-    const button = byId("start-personal-processing");
-    button.disabled = true;
-    byId("personal-processing").classList.remove("hidden");
+  async function processCandidateSource(source) {
     for (const [state, label] of Demo.CANDIDATE_PROCESSING_STATES) {
       byId("personal-processing").dataset.state = state;
       byId("personal-processing-state").textContent = label;
       await delay(260);
     }
-    const source = { ...selectedCandidateSource, import_type: selectedCandidateType, prompt_profile: Demo.candidatePromptProfile(selectedCandidateType) };
     const incoming = Demo.createLocalCandidateFixtures(source);
     const existing = await Demo.getAll(Demo.DEMO_STORES.candidates);
     const duplicates = Demo.findCandidateDuplicates(incoming, existing);
@@ -590,7 +586,7 @@
     if (duplicates.length) {
       const aiMode = selectedRuntime().mode === "ai";
       const resolution = await askDuplicateResolution({ kind: "candidate", count: duplicates.length, aiMode });
-      if (resolution === "cancel") { button.disabled = false; byId("personal-processing").classList.add("hidden"); return; }
+      if (resolution === "cancel") return { cancelled: true };
       if (resolution === "merge" && aiMode) throw new Error("模型融合需要一次真实模型调用；本轮未获调用批准，因此没有写入或覆盖任何材料。");
       if (resolution === "merge") {
         const byIncoming = new Map(duplicates.map((entry) => [entry.incoming.item_id, entry]));
@@ -601,8 +597,34 @@
       }
     }
     await Demo.persistCandidateImport(items, source);
-    const sourceKey = `candidate:${items[0].item_id}`;
-    if (!completeEmbeddedImport("personal", sourceKey)) returnToCardLibrary("/personal-information.html", sourceKey);
+    return { sourceKey: `candidate:${items[0].item_id}` };
+  }
+
+  async function runCandidateProcessing() {
+    const button = byId("start-personal-processing");
+    button.disabled = true;
+    byId("personal-processing").classList.remove("hidden");
+    let lastSourceKey = null;
+    let lastError = null;
+    for (const source of selectedCandidateSources) {
+      showCandidateSource(source);
+      let result;
+      try { result = await processCandidateSource(source); }
+      catch (error) {
+        lastError = error;
+        byId("personal-page-message").textContent = `无法理解材料：${error.message}`;
+        byId("personal-page-message").classList.add("error");
+        continue;
+      }
+      if (result.cancelled) {
+        button.disabled = false;
+        byId("personal-processing").classList.add("hidden");
+        return;
+      }
+      lastSourceKey = result.sourceKey;
+    }
+    if (lastSourceKey && !completeEmbeddedImport("personal", lastSourceKey)) returnToCardLibrary("/personal-information.html", lastSourceKey);
+    if (lastError) throw lastError;
   }
 
   function initPersonal() {
@@ -616,12 +638,34 @@
       selectedCandidateType = button.dataset.importType;
       byId("personal-import-types").querySelectorAll("button").forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
     });
-    const handleCandidateFile = (file) => showCandidateSource({ source_type: "BROWSER_FILE_METADATA", name: file.name, type: file.type || "unknown", size: file.size, sizeLabel: formatBytes(file.size), extension: file.name.split(".").pop() || "FILE" });
+    const acceptCandidateFiles = (files) => {
+      const batchKey = `personal-source-${crypto.randomUUID()}`;
+      const materialType = selectedCandidateType;
+      selectedCandidateSources = Array.from(files || []).map((file, index) => ({
+        source_type: "BROWSER_FILE_METADATA", source_key: `${batchKey}-${index + 1}`,
+        name: file.name, type: file.type || "unknown", size: file.size, sizeLabel: formatBytes(file.size), extension: file.name.split(".").pop() || "FILE",
+        import_type: materialType, prompt_profile: Demo.candidatePromptProfile(materialType),
+      }));
+      if (selectedCandidateSources[0]) showCandidateSource(selectedCandidateSources[0]);
+    };
     byId("personal-file-input").addEventListener("change", (event) => {
-      const file = event.target.files?.[0];
-      if (file) handleCandidateFile(file);
+      acceptCandidateFiles(event.target.files);
     });
-    installFileDropzone("personal-dropzone", handleCandidateFile);
+    const dropzone = byId("personal-dropzone");
+    const preventDrop = (event) => { event.preventDefault(); event.stopPropagation(); };
+    ["dragenter", "dragover"].forEach((type) => dropzone.addEventListener(type, (event) => {
+      preventDrop(event);
+      dropzone.classList.add("is-dragover");
+    }));
+    dropzone.addEventListener("dragleave", (event) => {
+      preventDrop(event);
+      if (!event.relatedTarget || !dropzone.contains(event.relatedTarget)) dropzone.classList.remove("is-dragover");
+    });
+    dropzone.addEventListener("drop", (event) => {
+      preventDrop(event);
+      dropzone.classList.remove("is-dragover");
+      acceptCandidateFiles(event.dataTransfer?.files);
+    });
     byId("replace-personal-file").addEventListener("click", () => byId("personal-file-input").click());
     byId("start-personal-processing").addEventListener("click", () => runCandidateProcessing().catch(showPersonalError));
   }

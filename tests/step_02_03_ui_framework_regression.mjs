@@ -46,7 +46,7 @@ assert.doesNotMatch(personalImport, /选择文件|支持 PDF/);
 assert.doesNotMatch(personalImport, /use-candidate-fixture|消毒/);
 assert.equal(Demo.candidatePromptProfile("Resume"), "candidate-resume-grounded-v2");
 assert.equal(new Set(Object.values(Demo.CANDIDATE_PROMPT_PROFILES)).size, 4);
-assert.match(pages, /prompt_profile: Demo\.candidatePromptProfile\(selectedCandidateType\)/);
+assert.match(pages, /prompt_profile: Demo\.candidatePromptProfile\(materialType\)/);
 
 // Candidate fixture cards and review interaction.
 assert.equal(Demo.CANDIDATE_FIXTURES.length, 3);
@@ -74,6 +74,9 @@ assert.ok(jobImport.indexOf('data-job-import-type="Document"') < jobImport.index
 assert.match(jobImport, /data-job-import-type="Document" aria-pressed="true"/);
 assert.match(jobImport, /\.pdf,.png,.jpg,.jpeg,.docx/);
 assert.match(jobImport, /点击上传文件或直接拖拽文件至此/);
+assert.match(personalImport, /id="personal-file-input"[^>]*\bmultiple\b/);
+assert.doesNotMatch(jobImport, /id="job-file-input"[^>]*\bmultiple\b/);
+assert.match(pages, /byId\("job-file-input"\)\.addEventListener\("change", \(event\) => \{[\s\S]*event\.target\.files\?\.\[0\]/);
 assert.match(styles, /#job-paste-input \{ overflow-y: auto; resize: none; \}/);
 assert.match(styles, /\.v1-paste-input textarea \{[^}]*min-height: 130px[^}]*resize: vertical/s);
 assert.match(styles, /\.v1-conversation-form textarea \{[^}]*resize: none/s);
@@ -263,11 +266,27 @@ assert.match(pages, /event\.target\.closest\("\.v1-candidate-card, \.v1-add-guid
 assert.match(pages, /overlay\.dataset\.overlayKind = isImport \? "import" : "detail"/);
 assert.match(pages, /job-radar-v1-import-complete/);
 assert.match(pages, /function completeEmbeddedImport/);
-assert.match(pages, /completeEmbeddedImport\("personal", sourceKey\)/);
+assert.match(pages, /completeEmbeddedImport\("personal", lastSourceKey\)/);
 assert.match(pages, /Demo\.createLocalCandidateFixtures/);
 assert.match(pages, /Demo\.findCandidateDuplicates/);
 assert.match(pages, /Demo\.mergeCandidateRecords/);
 assert.match(pages, /Demo\.persistCandidateImport/);
+assert.match(pages, /const acceptCandidateFiles =/);
+assert.match(pages, /Array\.from\(files \|\| \[\]\)/);
+assert.match(pages, /const batchKey = `personal-source-\$\{crypto\.randomUUID\(\)\}`/);
+assert.match(pages, /source_key: `\$\{batchKey\}-\$\{index \+ 1\}`/);
+assert.match(pages, /const materialType = selectedCandidateType/);
+assert.match(pages, /const batchSuffix = selectedCandidateSources\.length > 1 \? ` · 共 \$\{selectedCandidateSources\.length\} 个文件` : ""/);
+assert.match(pages, /\$\{source\.sizeLabel \|\| "本地文件"\}\$\{batchSuffix\} · 仅本地/);
+assert.doesNotMatch(pages, /支持多文件|可上传多个文件|批量上传/);
+assert.match(pages, /for \(const source of selectedCandidateSources\)/);
+assert.match(pages, /await processCandidateSource\(source\)/);
+assert.match(pages, /async function processCandidateSource\(source\)[\s\S]*await askDuplicateResolution/);
+assert.match(pages, /catch \(error\) \{[\s\S]*lastError = error;[\s\S]*continue;/);
+assert.match(pages, /if \(result\.cancelled\) \{/);
+assert.match(pages, /completeEmbeddedImport\("personal", lastSourceKey\)/);
+assert.equal((pages.match(/completeEmbeddedImport\("personal"/g) || []).length, 1);
+assert.match(pages, /acceptCandidateFiles\(event\.dataTransfer\?\.files\)/);
 assert.match(pages, /completeEmbeddedImport\("jd", sourceKey\)/);
 assert.match(pages, /Demo\.createLocalJobFixture/);
 assert.match(pages, /Demo\.findJobDuplicates/);
@@ -314,7 +333,7 @@ assert.match(styles, /\.v1-card-transition-layer\.v1-transition-surface > \* \{ 
 assert.match(styles, /\.v1-card-arrival-cover\.is-clearing \{ opacity: 0; \}/);
 assert.match(styles, /\.v1-card-arrival-cover \{[^}]*background: var\(--paper\)/s);
 assert.match(styles, /\.v1-card-route-in \.v1-page-shell \{[^}]*animation: none/s);
-assert.match(pages, /returnToCardLibrary\("\/personal-information\.html", sourceKey\)/);
+assert.match(pages, /returnToCardLibrary\("\/personal-information\.html", lastSourceKey\)/);
 assert.match(pages, /returnToCardLibrary\("\/jd\.html", sourceKey\)/);
 assert.match(styles, /\.v1-card-transition-layer/);
 assert.match(styles, /\.v1-conversation-message \{[^}]*align-items: center[^}]*display: flex[^}]*min-height: 48px/s);
