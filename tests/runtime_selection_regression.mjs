@@ -66,6 +66,8 @@ assert.doesNotMatch(html, /ascii-tuner|ascii-opacity|ascii-font-size|ascii-flow-
 assert.match(css, /\.ascii-tuner-panel\.is-open/);
 assert.match(css, /\.runtime-page button:not\(:disabled\):active[^}]*scale: \.97/s);
 assert.match(css, /\.runtime-page\.runtime-page-leaving[^}]*opacity: 0/s);
+assert.match(css, /\.runtime-page \{[^}]*animation: v1-page-fade-in 420ms cubic-bezier\(\.22,\.78,\.24,1\)[^}]*opacity: 1[^}]*transition: opacity 240ms/s);
+assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.runtime-page, \.v1-page-shell \{ animation: none; \}/);
 assert.doesNotMatch(css, /@keyframes runtime-entry-bloom|\.runtime-entry-bloom/);
 assert.match(css, /\.runtime-ascii-waves[^}]*opacity: 1/);
 assert.match(css, /\.runtime-ascii-waves[^}]*height: 100vh[^}]*width: 100vw/);

@@ -127,7 +127,7 @@ body { margin: 0; }
 .add-model-choice { border: 1px solid #dbe0e8; border-radius: 12px; text-align: left; width: 100%; }
 .runtime-page button:not(:disabled) { scale: 1; transition-property: background-color, border-color, box-shadow, color, opacity, scale, transform; transition-duration: 180ms; transition-timing-function: cubic-bezier(.22,.78,.24,1); }
 .runtime-page button:not(:disabled):active { scale: .97; }
-.runtime-page { opacity: 1; transition: opacity 240ms cubic-bezier(.22,.78,.24,1); }
+.runtime-page { animation: v1-page-fade-in 420ms cubic-bezier(.22,.78,.24,1); opacity: 1; transition: opacity 240ms cubic-bezier(.22,.78,.24,1); }
 .runtime-page.runtime-page-leaving { opacity: 0; }
 
 .ascii-tuner { bottom: 22px; position: fixed; right: 22px; z-index: 8; }
@@ -674,7 +674,7 @@ button.danger { background: #9c2525; border-color: #9c2525; }
   .v1-card-grid > .v1-add-guide-card.job:only-child { min-height: 380px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .v1-page-shell { animation: none; }
+  .runtime-page, .v1-page-shell { animation: none; }
   .v1-mini-tooltip { transition-duration: 1ms; }
   .v1-mini-tooltip > span { animation: none !important; }
   .v1-card-transition-layer, .v1-card-return-cover::after { display: none !important; }
