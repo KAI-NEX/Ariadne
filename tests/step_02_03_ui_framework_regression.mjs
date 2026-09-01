@@ -37,6 +37,8 @@ assert.doesNotMatch(workspace, /v1-object-index|STEP\s*0[123]/i);
 
 // Personal list stays clean; the guide card links to a dedicated import page.
 assert.doesNotMatch(personal, /v1-bottom-sheet|personal-empty|open-personal-import/);
+assert.match(personalImport, /<div><h1>添加个人材料<\/h1><\/div>/);
+assert.doesNotMatch(personalImport, /导入一份材料|选择材料类型并提供本地文件。内容先形成待审核对象，不会直接写入正式职业模型。/);
 for (const label of ["简历", "作品集", "项目", "其他"]) assert.match(personalImport, new RegExp(`>${label}<`));
 assert.match(personalImport, /\.pdf,.png,.jpg,.jpeg,.docx/);
 assert.match(personalImport, /点击上传文件或直接拖拽文件至此/);
@@ -64,6 +66,8 @@ assert.match(pages, /form\.scrollIntoView\(\{ behavior: "smooth", block: "center
 
 // JD is separate, has five requirements, and no match surface.
 assert.doesNotMatch(jd, /v1-bottom-sheet|job-empty|open-job-import/);
+assert.match(jobImport, /<div><h1>添加职位描述<\/h1><\/div>/);
+assert.doesNotMatch(jobImport, /导入一份职位描述|提供本地文件或粘贴职位文本。每份职位描述会形成独立的职位上下文。/);
 assert.match(jobImport, /粘贴文本/);
 assert.match(jobImport, />图像</);
 assert.ok(jobImport.indexOf('data-job-import-type="Document"') < jobImport.indexOf('data-job-import-type="Paste"'));
