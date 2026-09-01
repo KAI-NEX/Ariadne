@@ -64,6 +64,9 @@ Ariadne 是 Web-first、Local-first、BYOK、evidence-grounded 的 Personal Care
 | 能力权限（Capability Authority） | 决定某个新操作当前是否可见、可发起及必须走哪条执行边界的唯一权威。Ariadne 中由 Current Runtime 承担。 |
 | 运行时快照（RuntimeSnapshot） | 某次操作在规定捕获边界生成的不可变执行身份；包含 Provider/model/protocol/capability/version/delivery/credential reference，但不包含 secret。 |
 | 历史来源（Historical Provenance） | artifact、action、message、proposal、review decision、revision 的实际生成方式和执行来源。它属于具体对象或 revision，不是整条 record 上可随 Runtime 改写的单一标签。 |
+| 提取（Extraction） | 从 PDF、DOCX、TXT、Markdown、supported image 或 pasted text 机械读取内容并保留 source location 的过程。Extraction 不等于 Semantic Understanding。 |
+| 确定性解析/结构化（Deterministic Parsing / Structuring） | 使用可版本化、可解释的本地规则把 extracted content 整理成字段候选、evidence block 或 reviewable draft。它不等于 AI Understanding。 |
+| 语义理解（Semantic Understanding） | 需要大模型进行语义推理、解释、归纳或 inference 的步骤。在 Ariadne 中，它只属于真实调用 selected Provider/model 的 Model Runtime operation。 |
 | `SourceDocument` | 用户提供的一个独立 source identity，包括原始材料、hash、类型、接收时间和本地引用。它权威说明“用户提供了什么”，不自动证明材料中的陈述为真。 |
 | `ExtractionArtifact` | 从 SourceDocument 机械提取出的 text、OCR block、page/block location 或 parser output。它可持久化，但可能包含 OCR/parser error，非 confirmed truth。 |
 | `ProcessingRun` | 一次 extraction、model inference、merge、conversation Send 或 retry 的执行记录，链接 RuntimeSnapshot、状态、错误和输出 artifact。 |
@@ -114,7 +117,7 @@ Proposal
 | Persistence | **REAL，demo-scoped** | IndexedDB 真实保存 demo Candidate/Job records 与 conversations；Runtime/model/key 还涉及 `localStorage`，尚未形成正式 truth persistence contract。 |
 | Provenance | **LOCAL DETERMINISTIC，incomplete** | 存在松散的 `imported_from`、`provider_id`、`model_id`、`merge_metadata` 等字段，但没有统一 RuntimeSnapshot、Proposal/ReviewDecision linkage 或 revision-level provenance。 |
 
-仓库还存在未接入当前 V1 主路径的能力：本地 PDF/DOCX/TXT extraction、本地 Apple Vision OCR、部分真实 PDF→Provider ingestion、CandidateProposal builder/validator 及 CLI JD analysis。这些“仓库中存在”的模块不等于“当前用户路径已经执行”。
+仓库还存在未接入当前 V1 主路径的能力：本地 PDF/DOCX/TXT/Markdown extraction、本地 Apple Vision OCR、部分真实 PDF→Provider ingestion、CandidateProposal builder/validator 及 CLI JD analysis。这些“仓库中存在”的模块不等于“当前用户路径已经执行”。
 
 **关键合规结论：** 当前 Candidate/JD import 与 Candidate/Job conversation surfaces 尚不符合目标 Model Runtime contract。只要 UI 展示 Model identity，就不得继续把 fixture 或 local template 伪装为该 Model 的输出。
 
@@ -122,12 +125,28 @@ Proposal
 
 下表是目标合同，不是当前实现完成度声明。
 
+### Frozen capability invariant
+
+```text
+LOCAL
+= Read + Extract + OCR + Deterministic Rules
+
+MODEL
+= Local Preprocessing + Real Model Semantic Reasoning
+```
+
+- Local 是明确、真实的 offline/local capability mode，不是“功能残缺的 AI”。
+- Local 能读取、OCR、提取并用确定规则整理材料，但不假装进行推理、语义判断或大模型理解。
+- Model Runtime 不表示所有文件处理都必须远程完成。file reading、text extraction 与 OCR 能够安全、机械地在本地完成时，应继续 Local-first。
+- Model Runtime 可以复用 Local extraction、Apple Vision OCR 与 deterministic preprocessing；只有需要语义理解、reasoning 或 inference 的步骤才调用 Provider。
+- 任何 Model semantic result 必须来自实际 selected Provider/model；Local deterministic output 不得成为 Model semantic substitute。
+
 | Capability | LOCAL | MODEL RUNTIME |
 |---|---|---|
 | intake | 接收并在本地保存 source；零 Provider call | 先在本地接收、标识、hash，再按 disclosure/consent 决定传输 |
-| extraction | 本地执行 | 通常先本地执行；extraction 本身不算 model understanding |
-| OCR | 有限本地 OCR；结果须 review | 可用本地 OCR 预处理；发送原图/渲染页要求 snapshot model 具有已验证 vision capability |
-| deterministic parsing | 支持，必须标为 rule-based/local | 可作为 preprocessing，但不得冒充 model output |
+| extraction | 本地读取 PDF、DOCX、TXT、Markdown、supported image 与 pasted text | 优先复用同一本地 extraction；extraction 本身不算 model understanding |
+| OCR | Apple Vision OCR；结果须 review | 可复用 Apple Vision OCR 作为 local preprocessing；发送原图/渲染页要求 snapshot model 具有已验证 vision capability |
+| deterministic parsing | 支持 conservative Candidate/CareerEntity rules 与 local JD rule parsing，必须标为 rule-based/local | 可作为 preprocessing，但不得冒充 model semantic output |
 | semantic understanding | 不支持 | 只有真实 selected Provider/model call 后才支持 |
 | Candidate structuring | 规则明确时产生 limited local draft | selected model 产生 validated CandidateProposal |
 | Job structuring | 对真实 extracted/pasted text 产生 limited local draft | selected model 产生 validated JobProposal |
@@ -223,9 +242,45 @@ Local 表示：
 
 - zero Provider/model calls；
 - no AI Conversation；
-- extraction、OCR 与 deterministic structuring 在本地完成；
+- PDF、DOCX、TXT、Markdown、supported image 与 pasted text 的 reading/extraction 在本地完成；
+- Apple Vision OCR 与 deterministic structuring 在本地完成；
 - 不把 parsing/OCR/deterministic rules 标成“AI understanding”“AI recognized”或任何 model output；
 - sparse/unsupported input 输出 unknown、needs_review 或 manual selection，不补造 fixture facts。
+
+Local UI 不得把上述能力描述为“AI 理解”“AI 识别”“模型分析”或 `model-generated result`。Local 的产品价值是可信的 offline reading、extraction、OCR 与 rule-based organization，而不是模拟一个未实际调用的大模型。
+
+### Personal / Candidate Local contract
+
+```text
+PDF / DOCX / TXT / Markdown / supported image
+→ local extraction
+→ Apple Vision OCR where required
+→ existing conservative Candidate/CareerEntity rules where truthful
+→ reviewable local draft / extracted evidence
+→ user review
+→ confirmed Candidate state
+```
+
+- 优先复用 repository 中已经存在的 local extraction 与 CareerEntity capability；本 Slice 方向不授权另造一套重复 Candidate parser。
+- Deterministic rules 只能在其可解释且有 source support 的范围内形成 Candidate field candidate。
+- 如果 rules 无法可靠形成字段，必须保持 `unknown`、保留 extracted evidence 并要求 manual review。
+- 不 hallucinate，不使用 synthetic fixture 补字段，不声称 semantic AI understanding。
+
+### JD Local contract
+
+```text
+PDF / DOCX / TXT / Markdown / supported image / pasted text
+→ local extraction
+→ Apple Vision OCR where required
+→ existing deterministic local JD rule parser
+→ reviewable Job draft
+→ user review
+→ confirmed JobContext
+```
+
+- Local JD rule parsing 属于 deterministic structuring，不属于 AI semantic understanding。
+- 优先复用 repository 中已经存在的 JD parsing capability；不得为当前 clarification 另造重复 parser。
+- 无法由规则可靠支持的 Job field 保持 `unknown` 或进入 manual review，不能由 fixture 或猜测补齐。
 
 ### Truthful Local V1 by format
 
@@ -233,10 +288,10 @@ Local 表示：
 |---|---|---|
 | PDF | 提取 native text；对无足够可用文本的 image page 可使用现有本地 Apple Vision OCR；保留 page/block provenance | 不保证复杂视觉布局语义，也不称为 AI understanding |
 | DOCX | 提取 `word/document.xml` 中的 paragraph text | 不保证 page geometry、embedded image、复杂 layout、header/footer 或视觉关系理解 |
-| image | 对当前支持的 PNG/JPEG 进行本地 OCR，展示 extracted text/manual review | 在 Slice 4 产品决策前，不从任意图片自动声称 Candidate semantic structuring |
+| image | 对当前支持的 PNG/JPEG 进行本地 OCR；现有 conservative rules 只在 OCR evidence 足以支持时形成 reviewable field candidate | Slice 4 前仍须确定 supported formats/limits/review UX；任何情况下都不得声称 Candidate semantic AI understanding |
 | text | 对 Candidate TXT/Markdown 与 JD pasted text 保存实际内容并执行保守规则解析 | 不把缺失字段推断为用户没有相应能力或经历 |
 
-Candidate rules 可以识别明确 section heading、日期、work/project/education/skill patterns；portfolio 与 `Other` 输入在无法可靠结构化时必须停在 review/manual state。JD pasted text 必须保存真实 text，不能继续仅保存 character count。
+现有 Candidate/CareerEntity rules 可以识别明确 section heading、日期、work/project/education/skill patterns；portfolio 与 `Other` 输入在无法可靠结构化时必须停在 review/manual state。JD pasted text 必须保存真实 text 并优先进入现有 deterministic JD rule parser，不能继续仅保存 character count。
 
 ## 10. Model Execution Contract
 
@@ -248,14 +303,37 @@ SourceDocument
 → capability check
 → disclosure/consent
 → RuntimeSnapshot
+→ local extraction / Apple Vision OCR where appropriate
 → Provider adapter
-→ structured response
+→ real model semantic understanding / reasoning / inference
+→ structured Proposal response
 → syntax/schema/grounding validation
 → Proposal
 → review
 → confirmation
 → authoritative CandidateContext/JobContext revision
 ```
+
+### Model semantic responsibility
+
+Model Runtime 在 Local preprocessing 之上增加以下真实大模型能力：
+
+- Semantic Understanding；
+- Reasoning；
+- Inference；
+- Structured Proposal Generation；
+- AI Conversation；
+- Model Merge Proposal。
+
+Local extraction、OCR 与 deterministic parsing 可以为 Model operation 准备 input，但不能被算作该 Model 的 semantic result。严禁：
+
+```text
+selected Model
+→ local deterministic semantic substitute
+→ UI presents it as model result
+```
+
+如果 selected Provider/model 未实际执行或 semantic output 未通过 validation，该 operation 必须失败并遵守 explicit fallback contract，不得用 Local result 填补 Model result。
 
 ### Local boundary and transmission boundary
 
@@ -583,7 +661,7 @@ Model operation fails
 2. 当前 V1 fail closed：Model import/Send 不再生成 fixture output；Local terminology 不再声称 AI understanding。
 3. 增量建立 SourceDocument、ProcessingRun、Proposal、ReviewDecision 与 Job contracts。
 4. 接入真实 Local Candidate extraction。
-5. 接入真实 Local JD extraction 与 pasted text。
+5. 接入真实 Local JD extraction、pasted text 与 deterministic JD rule parsing。
 6. 建立统一 Provider adapter、credential handle、capability/discovery、error 与 schema validation boundary。
 7. 实现真实 Model-backed Candidate import。
 8. 实现真实 Model-backed JD import。
@@ -601,7 +679,9 @@ Fixture 必须停止成为 user-facing execution path，但在真实替代路径
 - Provider adapter spy 对所有 Local operation 保持 zero calls。
 - AI Conversation pane 不存在，Send 不可触发。
 - Local UI/copy 不使用 AI/model identity 或“AI understanding”描述 deterministic work。
-- PDF、DOCX、image OCR 与 pasted text 的输出必须受真实 source content 影响。
+- PDF、DOCX、TXT、Markdown、image OCR 与 pasted text 的输出必须受真实 source content 影响。
+- Personal flow 优先调用既有 local extraction/CareerEntity capability；JD flow 优先调用既有 deterministic JD parser；不得通过新增重复 parser 偷换本 Slice 边界。
+- deterministic Candidate/JD rules 无法可靠形成字段时保留 extracted evidence 与 `unknown`，并进入 manual review。
 - unsupported/sparse input 产生 unknown/manual review，不生成 fixture facts。
 
 ### MODEL
@@ -609,6 +689,7 @@ Fixture 必须停止成为 user-facing execution path，但在真实替代路径
 - outbound adapter call 包含用户选择的 exact Provider 与 model。
 - RuntimeSnapshot identity 与 ProcessingRun、Proposal/message provenance 一致。
 - 每个 Model-capable operation 都有真实 adapter invocation；fixture/deterministic output 不能声明 Model provenance。
+- local extraction/OCR 可以作为 Model preprocessing，但 semantic Proposal 必须由真实 selected Provider/model response 产生。
 - capability 不满足时在传输前停止。
 
 ### PROVENANCE
@@ -687,16 +768,16 @@ Personal 与 JD 必须共享以下 mandatory regressions：
 
 ### ADR-04 — Local 使用 extraction/deterministic terminology
 
-- **DECISION：** Local 不声称 semantic AI understanding。
-- **WHY：** parsing/OCR 与 model semantic reasoning 是不同能力。
+- **DECISION：** Local 是 `Read + Extract + OCR + Deterministic Rules` 的完整 offline capability mode，不声称 semantic AI understanding。
+- **WHY：** PDF/DOCX/TXT/Markdown extraction、Apple Vision OCR、Candidate/CareerEntity rules 与 JD rule parsing 能提供真实本地价值，但 parsing/OCR 与 model semantic reasoning 是不同能力。
 - **ALTERNATIVES REJECTED：** 为统一 UI copy 把 deterministic output 称为 AI。
-- **IMPLEMENTATION CONSEQUENCE：** Local labels、progress states 与 provenance 必须真实。
+- **IMPLEMENTATION CONSEQUENCE：** Local labels、progress states 与 provenance 必须真实；优先复用 repository 既有 extraction/parser capability，unsupported field 保持 unknown/manual review。
 
 ### ADR-05 — Model operation 必须真实执行 selected identity
 
-- **DECISION：** Model import、merge、conversation 必须调用所选 Provider/model。
+- **DECISION：** Model Runtime 可以复用 Local preprocessing，但 import semantic understanding、merge proposal 与 conversation 必须调用所选 Provider/model。
 - **WHY：** UI identity、费用、隐私和结果 provenance 必须一致。
-- **ALTERNATIVES REJECTED：** 显示 model 但返回 fixture/local output。
+- **ALTERNATIVES REJECTED：** 强制所有机械文件处理远程执行；显示 model 但返回 fixture/local deterministic semantic substitute。
 - **IMPLEMENTATION CONSEQUENCE：** adapter 未可用时 fail closed，不生成假结果。
 
 ### ADR-06 — AI Conversation 只在 Model Runtime 可用
@@ -787,23 +868,23 @@ Slice 顺序已经通过 review。Multi-file Cancel Contract 修订**不需要�
 
 ### Slice 4 — Real Local Candidate import
 
-- **Objective：** 将 Personal import 接入真实 PDF/DOCX/text extraction 与 truthful Candidate draft。
-- **Dependency：** Slices 2–3；`Local Candidate images` 决策须在本 Slice 前确定。
+- **Objective：** 将已有 PDF、DOCX、TXT、Markdown extraction、Apple Vision OCR 与 conservative Candidate/CareerEntity rules 接入当前 Personal V1 flow。
+- **Dependency：** Slices 2–3；supported image formats/limits/review UX 须在本 Slice 前确定，Local image capability boundary 已由本 clarification 冻结。
 - **Likely files/areas：** `public/v1-pages.js`、`app.py`、`src/career_evidence.py`、Candidate adapters/tests。
-- **Risks：** legacy CareerEntity 到 Candidate draft 的语义映射；unsupported image/portfolio 被过度结构化。
-- **Acceptance criteria：** actual content 影响 output；unsupported case 进入 manual review；Local copy 不声称 AI understanding；逐 source 顺序提交。
-- **Regression/eval：** PDF/DOCX/text real-content fixtures；zero Provider calls；中间 cancel 停止后续 extraction；前序 record 不 rollback；Personal queue contract。
+- **Risks：** legacy CareerEntity 到 Candidate draft 的保守映射；重复发明 parser；unsupported image/portfolio 被过度结构化。
+- **Acceptance criteria：** 优先复用 existing local extraction/CareerEntity capability；actual content 影响 output；无法可靠形成字段时保留 evidence 与 unknown/manual review；Local copy 不声称 AI understanding；逐 source 顺序提交。
+- **Regression/eval：** PDF/DOCX/TXT/Markdown/image OCR real-content fixtures；zero Provider calls；no synthetic field fill；中间 cancel 停止后续 extraction；前序 record 不 rollback；Personal queue contract。
 - **Recommended model：** Sol High。
 - **Git commit boundary：** `feat: wire truthful local candidate extraction`
 
 ### Slice 5 — Real Local JD import
 
-- **Objective：** 将 pasted text 与 supported files 接入 deterministic Job draft。
+- **Objective：** 将 file/text extraction、Apple Vision OCR 与 existing deterministic JD rule parsing 接入当前 JD V1 flow。
 - **Dependency：** Slices 2–3。
 - **Likely files/areas：** `public/v1-pages.js`、`app.py`、JD domain/tests。
-- **Risks：** PDF/DOCX extraction-to-JD rules；继续丢弃 pasted text；把 Job understanding 混入 Candidate match。
-- **Acceptance criteria：** pasted text 原文被保存和解析；file output 受实际内容影响；不生成 fixture JobContext；逐 source 顺序提交。
-- **Regression/eval：** pasted/file content tests；zero Provider calls；中间 cancel 停止后续 extraction；前序 record 不 rollback；JD 与 Personal cancel semantics 一致。
+- **Risks：** 重复实现 JD parser；继续丢弃 pasted text；把 deterministic Job structuring 误称 semantic AI understanding；把 Job understanding 混入 Candidate match。
+- **Acceptance criteria：** 优先复用 existing JD parsing capability；pasted text 原文被保存和解析；file/OCR output 受实际内容影响；不生成 fixture JobContext；逐 source 顺序提交。
+- **Regression/eval：** PDF/DOCX/TXT/Markdown/image OCR/pasted-text tests；zero Provider calls；unreliable fields remain unknown/manual review；中间 cancel 停止后续 extraction；前序 record 不 rollback；JD 与 Personal cancel semantics 一致。
 - **Recommended model：** Terra Medium。
 - **Git commit boundary：** `feat: wire truthful local job extraction`
 
@@ -820,22 +901,22 @@ Slice 顺序已经通过 review。Multi-file Cancel Contract 修订**不需要�
 
 ### Slice 7 — Model-backed Candidate import
 
-- **Objective：** 实现真实 CandidateProposal generation、validation 与 review。
+- **Objective：** 在 Slice 4 的 local extraction/OCR preprocessing 之上，实现真实 Candidate semantic understanding、CandidateProposal generation、validation 与 review。
 - **Dependency：** Slices 3、4、6。
 - **Likely files/areas：** `src/candidate_context.py`、new route、Personal UI、tests/evals。
 - **Risks：** grounding、malformed output、vision/source delivery、cancel 后 late response 写 truth。
-- **Acceptance criteria：** selected Provider/model 真实调用；validated Proposal；不 auto-confirm；cancelled source 不形成 authoritative record。
+- **Acceptance criteria：** selected Provider/model 真实承担 semantic reasoning；validated Proposal 来自该 model response；local deterministic result 不冒充 model result；不 auto-confirm；cancelled source 不形成 authoritative record。
 - **Regression/eval：** exact adapter identity；schema/grounding failure；no silent fallback；cancel 后后续 files 无 Provider call；新导入剩余 files 创建新 batch/snapshot。
 - **Recommended model：** Sol High。
 - **Git commit boundary：** `feat: add model backed candidate import proposals`
 
 ### Slice 8 — Model-backed JD import
 
-- **Objective：** 实现真实 JobProposal 与 requirement structuring。
+- **Objective：** 在 Slice 5 的 local extraction/OCR preprocessing 之上，实现真实 JD semantic understanding、JobProposal 与 requirement structuring。
 - **Dependency：** Slices 3、5、6。
 - **Likely files/areas：** Job contracts、Provider prompt、route、JD UI、tests/evals。
 - **Risks：** 将 Candidate matching 混入 Job Understanding；malformed/ungrounded requirements；cancel late result。
-- **Acceptance criteria：** 真实 selected model call；Job-only structured Proposal；review/confirm 后才形成 JobContext revision。
+- **Acceptance criteria：** 真实 selected model call 承担 JD semantic reasoning；Job-only structured Proposal 来自该 model response；local JD rules 不冒充 model result；review/confirm 后才形成 JobContext revision。
 - **Regression/eval：** exact adapter identity；Job/Candidate scope isolation；no silent fallback；cancel 后 remaining files 无 Provider call；前序 results 保留。
 - **Recommended model：** Sol High。
 - **Git commit boundary：** `feat: add model backed job import proposals`
@@ -892,7 +973,7 @@ Slice 顺序已经通过 review。Multi-file Cancel Contract 修订**不需要�
 
 **无。**
 
-Slice 1 只冻结通用 capability authority、RuntimeSnapshot、execution identity、validation 与 secret-free credential reference。下面的 Provider、credential、image 与 transmission 选择不阻塞 Slice 1。
+Slice 1 只冻结通用 capability authority、RuntimeSnapshot、execution identity、validation 与 secret-free credential reference。下面的 Provider、credential、supported-image implementation detail 与 transmission 选择不阻塞 Slice 1。
 
 ### B. Required before a named later Slice
 
@@ -900,7 +981,7 @@ Slice 1 只冻结通用 capability authority、RuntimeSnapshot、execution ident
 |---|---|---|
 | Initial Provider allowlist | Slice 6 前 | Provider boundary 需要知道首个真正 end-to-end 支持 import、merge、conversation 的 adapter，避免过度实现未就绪 Provider。 |
 | Credential storage | Slice 6 前 | 必须冻结 Keychain、session memory、browser-direct handle 与 localhost boundary。 |
-| Local Candidate images | Slice 4 前 | 必须决定 image 仅为 OCR/manual review，还是允许有限 deterministic Candidate draft。 |
+| Local Candidate supported formats/limits/review UX | Slice 4 前 | Local capability boundary 已冻结为 Apple Vision OCR + existing conservative rules where truthful；本决策只确定具体 image formats、数量/大小限制、失败提示与 review interaction。 |
 | Conversation source transmission | Candidate：Slice 10 前；Job：最迟 Slice 11 前 | context compiler、privacy disclosure、token budget 与 attachment UI 依赖该决定。 |
 | Legacy Provider pages | Slice 2 前 | truthful capability gating 必须知道 legacy pages 是 read-only、受 Current Runtime gate，还是从 product execution surface 退役。 |
 
@@ -910,7 +991,7 @@ Slice 1 只冻结通用 capability authority、RuntimeSnapshot、execution ident
 
 - **Initial Provider allowlist：** 先只开放一个真正端到端可用的 Provider；其他 model choice 在 import、merge、conversation 全部合规前隐藏或 disabled。
 - **Credential storage：** desktop localhost 使用 macOS Keychain；未来 browser-direct BYOK 使用 session memory；不把 API key 持久化到 `localStorage`。
-- **Local Candidate images：** 本地 OCR + extracted-text/manual review；不声称从任意图片完成 semantic Candidate understanding。
+- **Local Candidate supported formats/limits/review UX：** 当前沿用 PNG/JPEG、Apple Vision OCR、extracted-evidence review 的保守方案；只有 existing rules 有充分 OCR evidence 时才形成 field candidate，且始终不声称 semantic Candidate understanding。
 - **Conversation source transmission：** 默认发送 current structured record、compact cited excerpts 与最近八条同 scope messages；完整 source/page/image 需要显式 per-send attachment/disclosure。
 - **Legacy Provider pages：** 保留 historical data readability；Provider action 默认受 Current Runtime gate，无法合规接入的 action 暂时 disabled。
 
