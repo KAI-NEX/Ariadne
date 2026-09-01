@@ -13,6 +13,7 @@
   let selectedCandidateSources = [];
   let selectedCandidateType = "Resume";
   let selectedJobSource = null;
+  let selectedJobSources = [];
   let selectedJobImportType = "Document";
   let activeCandidate = null;
   let activeJob = null;
@@ -850,14 +851,15 @@
 
   function showJobSource(source) {
     selectedJobSource = source;
+    const batchSuffix = selectedJobSources.length > 1 ? ` · 共 ${selectedJobSources.length} 个文件` : "";
     byId("job-file-preview").classList.remove("hidden");
     byId("job-file-name").textContent = source.name;
-    byId("job-file-meta").textContent = `${source.type || selectedJobImportType} · ${source.sizeLabel || "本地文本"}`;
+    byId("job-file-meta").textContent = `${source.type || selectedJobImportType} · ${source.sizeLabel || "本地文本"}${batchSuffix} · 仅本地`;
     byId("job-file-icon").textContent = (source.extension || selectedJobImportType).slice(0, 4).toUpperCase();
     byId("start-job-processing").disabled = false;
   }
 
-  function installFileDropzone(dropzoneId, onFile) {
+  function installFileDropzone(dropzoneId, onFiles) {
     const dropzone = byId(dropzoneId);
     if (!dropzone) return;
     const prevent = (event) => { event.preventDefault(); event.stopPropagation(); };
@@ -872,13 +874,13 @@
     dropzone.addEventListener("drop", (event) => {
       prevent(event);
       dropzone.classList.remove("is-dragover");
-      const file = event.dataTransfer?.files?.[0];
-      if (file) onFile(file);
+      onFiles(event.dataTransfer?.files);
     });
   }
 
   function resetJobSource() {
     selectedJobSource = null;
+    selectedJobSources = [];
     byId("job-file-preview").classList.add("hidden");
     byId("start-job-processing").disabled = true;
     byId("job-page-message").textContent = "";
@@ -894,27 +896,34 @@
     resetJobSource();
   }
 
-  function acceptJobFile(file) {
-    const extension = file.name.split(".").pop()?.toLowerCase() || "";
-    const allowed = selectedJobImportType === "Document" && ["pdf", "png", "jpg", "jpeg", "docx"].includes(extension);
-    if (!allowed) {
-      resetJobSource();
-      showJobError(new Error("请选择 PDF、PNG、JPG、JPEG 或 DOCX 文件。"));
-      return;
-    }
-    showJobSource({ source_type: "BROWSER_FILE_METADATA", name: file.name, type: file.type || "unknown", size: file.size, sizeLabel: formatBytes(file.size), extension: extension || "FILE" });
+  function acceptJobFiles(files) {
+    const batchKey = `job-source-${crypto.randomUUID()}`;
+    const sourceUrl = byId("job-link-input")?.value.trim() || null;
+    const rejected = [];
+    selectedJobSources = Array.from(files || []).flatMap((file, index) => {
+      const extension = file.name.split(".").pop()?.toLowerCase() || "";
+      const allowed = selectedJobImportType === "Document" && ["pdf", "png", "jpg", "jpeg", "docx"].includes(extension);
+      if (!allowed) {
+        rejected.push(file);
+        return [];
+      }
+      return [{
+        source_type: "BROWSER_FILE_METADATA", source_key: `${batchKey}-${index + 1}`,
+        name: file.name, type: file.type || "unknown", size: file.size, sizeLabel: formatBytes(file.size), extension: extension || "FILE",
+        import_type: "Document", source_url: sourceUrl,
+      }];
+    });
+    if (selectedJobSources[0]) showJobSource(selectedJobSources[0]);
+    else resetJobSource();
+    if (rejected.length) showJobError(new Error("请选择 PDF、PNG、JPG、JPEG 或 DOCX 文件。"));
   }
 
-  async function runJobProcessing() {
-    const button = byId("start-job-processing");
-    button.disabled = true;
-    byId("job-processing").classList.remove("hidden");
+  async function processJobSource(source) {
     for (const [state, label] of Demo.JOB_PROCESSING_STATES) {
       byId("job-processing").dataset.state = state;
       byId("job-processing-state").textContent = label;
       await delay(260);
     }
-    const source = { ...selectedJobSource, import_type: selectedJobImportType, source_url: byId("job-link-input")?.value.trim() || null };
     const incoming = Demo.createLocalJobFixture(source);
     const existing = await Demo.getAll(Demo.DEMO_STORES.jobs);
     const duplicates = Demo.findJobDuplicates([incoming], existing);
@@ -922,13 +931,42 @@
     if (duplicates.length) {
       const aiMode = selectedRuntime().mode === "ai";
       const resolution = await askDuplicateResolution({ kind: "job", count: duplicates.length, aiMode });
-      if (resolution === "cancel") { button.disabled = false; byId("job-processing").classList.add("hidden"); return; }
+      if (resolution === "cancel") return { cancelled: true };
       if (resolution === "merge" && aiMode) throw new Error("模型融合需要一次真实模型调用；本轮未获调用批准，因此没有写入或覆盖任何职位。");
       if (resolution === "merge") job = Demo.mergeJobRecords(duplicates[0].existing, incoming);
     }
     await Demo.persistJobImport(job, source);
-    const sourceKey = `job:${job.job_context_id}`;
-    if (!completeEmbeddedImport("jd", sourceKey)) returnToCardLibrary("/jd.html", sourceKey);
+    return { sourceKey: `job:${job.job_context_id}` };
+  }
+
+  async function runJobProcessing() {
+    const button = byId("start-job-processing");
+    button.disabled = true;
+    byId("job-processing").classList.remove("hidden");
+    const sources = selectedJobImportType === "Paste"
+      ? [{ ...selectedJobSource, import_type: "Paste", source_url: byId("job-link-input")?.value.trim() || null }]
+      : selectedJobSources;
+    let lastSourceKey = null;
+    let lastError = null;
+    for (const source of sources) {
+      showJobSource(source);
+      let result;
+      try { result = await processJobSource(source); }
+      catch (error) {
+        lastError = error;
+        byId("job-page-message").textContent = `无法理解职位：${error.message}`;
+        byId("job-page-message").classList.add("error");
+        continue;
+      }
+      if (result.cancelled) {
+        button.disabled = false;
+        byId("job-processing").classList.add("hidden");
+        return;
+      }
+      lastSourceKey = result.sourceKey;
+    }
+    if (lastSourceKey && !completeEmbeddedImport("jd", lastSourceKey)) returnToCardLibrary("/jd.html", lastSourceKey);
+    if (lastError) throw lastError;
   }
 
   function initJobLibrary() {
@@ -942,15 +980,14 @@
       configureJobImportType(button.dataset.jobImportType);
     });
     byId("job-paste-input").addEventListener("input", (event) => {
+      selectedJobSources = [];
       if (event.target.value.trim()) showJobSource({ source_type: "PASTED_TEXT_METADATA", name: "粘贴的职位描述.txt", type: "text/plain", sizeLabel: `${event.target.value.trim().length} 字符`, extension: "TXT" });
       else resetJobSource();
     });
     byId("job-file-input").addEventListener("change", (event) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-      acceptJobFile(file);
+      acceptJobFiles(event.target.files);
     });
-    installFileDropzone("job-dropzone", acceptJobFile);
+    installFileDropzone("job-dropzone", acceptJobFiles);
     byId("replace-job-file").addEventListener("click", () => selectedJobImportType === "Paste" ? byId("job-paste-input").focus() : byId("job-file-input").click());
     byId("start-job-processing").addEventListener("click", () => runJobProcessing().catch(showJobError));
     configureJobImportType("Document");
