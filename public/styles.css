@@ -662,6 +662,7 @@ button.danger { background: #9c2525; border-color: #9c2525; }
   .v1-mini-sidebar { display: block; }
   .v1-page-shell { padding-right: 74px; }
   .v1-topbar > .v1-menu, .v1-top-actions > .v1-menu { display: none; }
+  .v1-workspace-grid { column-gap: 89px; margin: max(130px, calc(50vh - 184px)) auto 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .v1-page-shell { animation: none; }
