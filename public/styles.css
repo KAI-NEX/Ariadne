@@ -386,6 +386,7 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-object-folder { --folder-back: #eceff4; --folder-front: #fff; --folder-line: #dce1e9; --folder-pad: 27px; background: transparent; border: 0; border-radius: 20px; color: var(--ink); contain: layout style; display: block; isolation: isolate; min-height: 252px; padding: var(--folder-pad); perspective: 1300px; position: relative; text-decoration: none; transform-style: preserve-3d; transition: color 320ms ease; }
 .v1-folder-back, .v1-folder-front, .v1-folder-paper { display: block; pointer-events: none; position: absolute; }
 .v1-folder-back { backface-visibility: hidden; background: var(--folder-back); border: 0; inset: 0; mask: url("/assets/figma-folder-back.svg?v=v1-motion-33") center / 100% 100% no-repeat; transform: translate3d(0,0,-4px); transition: background-color 360ms ease; z-index: 0; -webkit-mask: url("/assets/figma-folder-back.svg?v=v1-motion-33") center / 100% 100% no-repeat; }
+.v1-object-folder:not(.dark) { --folder-back: #e8ebf0; --folder-front: #fafbfc; }
 .v1-folder-back::before { content: none; }
 .v1-folder-paper { --paper-depth: -1px; --paper-open-scale: .98; --paper-open-y: -7px; backface-visibility: hidden; background: rgba(255,255,255,.96); border: 1px solid rgba(207,213,223,.95); border-radius: 20px; box-shadow: 0 10px 22px rgba(31,34,42,.055); height: 61.77%; left: 7.86%; padding: 18px; right: 7.86%; top: 18.67%; transform: translate3d(0, 7px, var(--paper-depth)) rotateX(0) scale(.98); transform-origin: bottom center; transition: transform 500ms cubic-bezier(.22,.72,.2,1), background-color 360ms ease, border-color 360ms ease; will-change: transform; z-index: 1; }
 .v1-folder-paper i { background: #d9dee7; border-radius: 999px; display: block; height: 5px; margin-top: 11px; width: 58%; }
@@ -394,12 +395,15 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-folder-paper.paper-3 { --paper-depth: -3px; --paper-open-scale: .94; --paper-open-y: -26px; transition-delay: 80ms; z-index: 1; }
 .v1-folder-paper.paper-2 { --paper-depth: -2px; --paper-open-scale: .96; --paper-open-y: -16px; transition-delay: 40ms; z-index: 2; }
 .v1-folder-paper.paper-1 { --paper-depth: -1px; --paper-open-scale: .98; --paper-open-y: -7px; transition-delay: 0ms; z-index: 3; }
+.v1-object-folder:not(.dark) .v1-folder-paper.paper-3 { background: #f0f2f6; }
+.v1-object-folder:not(.dark) .v1-folder-paper.paper-2 { background: #f5f6f8; }
+.v1-object-folder:not(.dark) .v1-folder-paper.paper-1 { background: #fff; }
 .v1-folder-front { backface-visibility: hidden; background: var(--folder-front); border: 1px solid var(--folder-line); border-radius: 20px; bottom: 0; box-shadow: 0 10px 24px rgba(31,34,42,.06); left: 0; right: 0; top: 9.4%; transform: translate3d(0,0,0); transform-origin: bottom center; transform-style: preserve-3d; transition: background-color 360ms ease, border-color 360ms ease, transform 640ms cubic-bezier(.22,.72,.2,1); will-change: transform; z-index: 4; }
 .v1-object-folder:hover .v1-folder-paper, .v1-object-folder:focus-visible .v1-folder-paper { transform: translate3d(0, var(--paper-open-y), var(--paper-depth)) rotateX(-7deg) scale(var(--paper-open-scale)); transition: transform 480ms cubic-bezier(.16,1,.3,1), background-color 360ms ease, border-color 360ms ease; }
 .v1-object-folder:hover .v1-folder-paper.paper-1, .v1-object-folder:focus-visible .v1-folder-paper.paper-1 { transition-delay: 0ms; }
 .v1-object-folder:hover .v1-folder-paper.paper-2, .v1-object-folder:focus-visible .v1-folder-paper.paper-2 { transition-delay: 32ms; }
 .v1-object-folder:hover .v1-folder-paper.paper-3, .v1-object-folder:focus-visible .v1-folder-paper.paper-3 { transition-delay: 64ms; }
-.v1-object-folder:hover .v1-folder-front, .v1-object-folder:focus-visible .v1-folder-front { transform: rotateX(-30deg) translate3d(0,8px,0); transition: background-color 360ms ease, border-color 360ms ease, transform 460ms cubic-bezier(.16,1,.3,1); }
+.v1-object-folder:hover .v1-folder-front, .v1-object-folder:focus-visible .v1-folder-front { box-shadow: 0 14px 30px rgba(31,34,42,.10); transform: rotateX(-30deg) translate3d(0,8px,0); transition: background-color 360ms ease, border-color 360ms ease, box-shadow 360ms ease, transform 460ms cubic-bezier(.16,1,.3,1); }
 .v1-object-folder.dark { --folder-back: #343842; --folder-front: #20232a; --folder-line: #20232a; color: #fff; }
 .v1-object-folder.dark .v1-folder-paper { background: #2a2e36; border-color: #3b404a; }
 .v1-object-folder.dark .v1-folder-paper i { background: #555b67; transition: background-color 360ms ease; }
