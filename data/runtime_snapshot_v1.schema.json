@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ariadne.local/contracts/runtime_snapshot_v1.schema.json",
+  "title": "Ariadne RuntimeSnapshot v1",
+  "description": "Cross-language execution identity contract. This schema contains no Provider registry and no credential values.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "snapshot_id",
+    "captured_at",
+    "mode",
+    "provider",
+    "model",
+    "protocol",
+    "capabilities",
+    "adapter_version",
+    "prompt_version",
+    "schema_version",
+    "delivery_method",
+    "credential_ref"
+  ],
+  "properties": {
+    "snapshot_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "mode": {
+      "enum": ["local", "model"]
+    },
+    "provider": {
+      "type": ["string", "null"],
+      "maxLength": 64
+    },
+    "model": {
+      "type": ["string", "null"],
+      "maxLength": 200
+    },
+    "protocol": {
+      "type": ["string", "null"],
+      "maxLength": 128
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "local_extraction",
+        "local_ocr",
+        "deterministic_structuring",
+        "semantic_understanding",
+        "candidate_model_structuring",
+        "job_model_structuring",
+        "model_merge",
+        "ai_conversation",
+        "vision"
+      ],
+      "properties": {
+        "local_extraction": { "$ref": "#/$defs/capabilityState" },
+        "local_ocr": {
+          "allOf": [{ "$ref": "#/$defs/capabilityState" }],
+          "description": "Apple Vision or other local mechanical OCR availability in the current execution environment. Local mode alone does not imply supported."
+        },
+        "deterministic_structuring": { "$ref": "#/$defs/capabilityState" },
+        "semantic_understanding": { "$ref": "#/$defs/capabilityState" },
+        "candidate_model_structuring": { "$ref": "#/$defs/capabilityState" },
+        "job_model_structuring": { "$ref": "#/$defs/capabilityState" },
+        "model_merge": { "$ref": "#/$defs/capabilityState" },
+        "ai_conversation": { "$ref": "#/$defs/capabilityState" },
+        "vision": {
+          "allOf": [{ "$ref": "#/$defs/capabilityState" }],
+          "description": "Native model visual-semantic input capability. Apple Vision OCR is represented by local_ocr, not by this field."
+        }
+      }
+    },
+    "adapter_version": {
+      "type": ["string", "null"],
+      "maxLength": 128
+    },
+    "prompt_version": {
+      "type": ["string", "null"],
+      "maxLength": 128
+    },
+    "schema_version": {
+      "type": ["string", "null"],
+      "maxLength": 128
+    },
+    "delivery_method": {
+      "type": ["string", "null"],
+      "maxLength": 128
+    },
+    "credential_ref": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+      "description": "Opaque, serializable, non-secret credential handle. Its syntax and backing credential store are intentionally unspecified."
+    }
+  },
+  "$defs": {
+    "capabilityState": {
+      "enum": ["supported", "unsupported", "unverified"]
+    }
+  }
+}
