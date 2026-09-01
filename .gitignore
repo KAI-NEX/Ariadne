@@ -96,7 +96,3 @@ htmlcov/
 
 # Optional local-only private career regression fixtures
 /tests/private_fixtures/
-
-# Generated local task-artifact guides
-docs/current/文件说明.md
-docs/current/文件说明.pdf
