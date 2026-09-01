@@ -52,6 +52,8 @@ assert.deepEqual(Demo.CANDIDATE_FIXTURES.map((item) => item.item_type), ["WORK_E
 assert.ok(Demo.CANDIDATE_FIXTURES.every((item) => item.data_class === "DEMO_FIXTURE" && item.review_status === "NEEDS_REVIEW"));
 assert.match(candidateDetail, /id="candidate-ai-pane"/);
 assert.match(candidateDetail, /candidate-conversation-form/);
+assert.match(candidateDetail, /<button type="submit" aria-label="发送"><\/button>/);
+assert.doesNotMatch(candidateDetail, /<button type="submit" aria-label="发送">↑<\/button>/);
 assert.match(candidateDetail, /candidate-patch-proposal/);
 assert.match(candidateDetail, /直接编辑预览/);
 assert.match(candidateDetail, /id="open-direct-edit"[^>]*>编辑</);
@@ -76,6 +78,8 @@ assert.equal(Demo.JOB_FIXTURE.contract_id, "job-radar-job-context-v1");
 assert.equal(Demo.JOB_FIXTURE.requirements.length, 5);
 assert.match(jobDetail, /v1-type-chip">职位/);
 assert.match(jobDetail, /id="job-ai-pane"[\s\S]*job-conversation-form/);
+assert.match(jobDetail, /<button type="submit" aria-label="发送"><\/button>/);
+assert.doesNotMatch(jobDetail, /<button type="submit" aria-label="发送">↑<\/button>/);
 assert.match(jobDetail, /id="job-patch-proposal"/);
 assert.doesNotMatch(jobDetail, /match score|匹配分数/i);
 const jobPatch = Demo.jobPatchFor(Demo.JOB_FIXTURE);
@@ -204,6 +208,9 @@ assert.doesNotMatch(styles, /\.v1-object-folder\.dark:hover \.v1-folder-paper[^}
 assert.doesNotMatch(styles, /\.v1-object-folder\.dark:focus-visible \.v1-folder-paper[^}]*background:/s);
 assert.match(styles, /\.v1-add-guide-icon \{[^}]*border: 0/s);
 assert.match(styles, /\.v1-add-guide-icon::before \{[^}]*height: 24px[^}]*width: 24px/s);
+assert.match(styles, /\.v1-conversation-form button \{[^}]*background: #20232a[^}]*font-size: 0[^}]*height: 42px[^}]*width: 42px/s);
+assert.match(styles, /\.v1-conversation-form button::before \{[^}]*height: 20px[^}]*mask: url\([^}]*stroke-width='1\.8'[^}]*stroke-linecap='round'[^}]*stroke-linejoin='round'[^}]*20px 20px[^}]*width: 20px/s);
+assert.match(styles, /\.v1-body button:focus-visible[^}]*outline: 3px solid rgba\(82, 111, 218, 0\.25\)[^}]*outline-offset: 3px/s);
 assert.match(styles, /\.v1-back \{[^}]*border: 0/s);
 assert.match(styles, /\.v1-back::before \{[^}]*mask: url[^}]*stroke-linecap='round'[^}]*width: 24px/s);
 assert.match(styles, /\.v1-back::after \{ content: none; \}/);
