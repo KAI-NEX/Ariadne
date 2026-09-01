@@ -74,6 +74,9 @@ assert.ok(jobImport.indexOf('data-job-import-type="Document"') < jobImport.index
 assert.match(jobImport, /data-job-import-type="Document" aria-pressed="true"/);
 assert.match(jobImport, /\.pdf,.png,.jpg,.jpeg,.docx/);
 assert.match(jobImport, /点击上传文件或直接拖拽文件至此/);
+assert.match(styles, /#job-paste-input \{ overflow-y: auto; resize: none; \}/);
+assert.match(styles, /\.v1-paste-input textarea \{[^}]*min-height: 130px[^}]*resize: vertical/s);
+assert.match(styles, /\.v1-conversation-form textarea \{[^}]*resize: none/s);
 assert.doesNotMatch(jobImport, /选择文件|支持 PDF/);
 assert.doesNotMatch(jobImport, /use-job-fixture|消毒/);
 assert.match(jobImport, /id="job-link-input"[^>]*type="url"/);

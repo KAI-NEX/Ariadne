@@ -523,6 +523,7 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-sheet-primary { width: 100%; }
 .v1-paste-input label { color: #596171; font-size: 12px; }
 .v1-paste-input textarea { background: #fff; border: 1px solid var(--line); border-radius: 14px; display: block; margin-top: 9px; min-height: 130px; padding: 13px; resize: vertical; width: 100%; }
+#job-paste-input { overflow-y: auto; resize: none; }
 .v1-link-input { display: grid; gap: 9px; }
 .v1-link-input label { color: #596171; font-size: 12px; }
 .v1-link-input label span { color: #9197a4; font-size: 10px; margin-left: 5px; }
