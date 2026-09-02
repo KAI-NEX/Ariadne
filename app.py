@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
-from src.career_evidence import CareerDocumentError, _document_blocks, extract_career_document, extract_career_document_only
+from src.career_evidence import CareerDocumentError, _document_blocks, extract_career_document, extract_career_document_only, propose_entities
 from src.execution_contract import ExecutionContractError, validate_runtime_snapshot
 from src.ai_career_ingestion import (
     AICareerIngestionError,
@@ -861,6 +861,9 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/local-candidate-image-ocr":
             self.extract_local_candidate_image()
             return
+        if parsed.path == "/api/local-candidate-structure":
+            self.structure_local_candidate_proposal()
+            return
         if parsed.path == "/api/career-document-extract":
             self.extract_career_document_candidate()
             return
@@ -1251,6 +1254,39 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             })
             return
         self.send_json(HTTPStatus.OK, result)
+
+    def structure_local_candidate_proposal(self) -> None:
+        """Run existing deterministic CareerEntity rules over an ExtractionArtifact payload only."""
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+            if content_length <= 0 or content_length > 4_000_000:
+                raise CareerDocumentError("invalid_candidate_structure_request")
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            if not isinstance(payload, dict):
+                raise CareerDocumentError("invalid_candidate_structure_request")
+            snapshot = local_snapshot_from_payload(payload)
+            source_id = payload.get("source_document_id")
+            material_type = payload.get("candidate_material_type")
+            pages = payload.get("pages")
+            if not isinstance(source_id, str) or not source_id.startswith("source-candidate-"):
+                raise CareerDocumentError("invalid_candidate_source_document_id")
+            if material_type not in {"resume", "portfolio", "project_description", "other"}:
+                raise CareerDocumentError("invalid_candidate_material_type")
+            if not isinstance(pages, list) or len(pages) > 500:
+                raise CareerDocumentError("invalid_candidate_structure_pages")
+            entities, warnings, status = propose_entities(pages, source_id, material_type)
+            self.send_json(HTTPStatus.OK, {
+                "entities": entities,
+                "warnings": warnings,
+                "status": status,
+                "runtime_snapshot_id": snapshot["snapshot_id"],
+                "model_call_made": False,
+                "processing_boundary": "localhost_deterministic_candidate_structuring",
+            })
+        except (CareerDocumentError, KeyError) as error:
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(error) or "candidate_local_structuring_failed", "model_call_made": False})
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": "invalid_candidate_structure_request", "model_call_made": False})
 
     def run_local_ocr(self) -> None:
         """Run macOS Vision OCR locally; never forwards the image to the internet."""

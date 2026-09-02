@@ -6,6 +6,7 @@
   const RuntimeExecution = window.AriadneRuntimeExecution;
   const Truth = window.AriadneTruthPersistence;
   const LocalCandidate = window.AriadneLocalCandidateExtraction;
+  const LocalCandidateProposal = window.AriadneLocalCandidateProposal;
   const page = document.body.dataset.v1Page;
   const isEmbeddedDetail = new URLSearchParams(window.location.search).get("embed") === "1";
   if (isEmbeddedDetail) document.body.classList.add("v1-embedded-detail");
@@ -684,7 +685,7 @@
         output_artifact_ids: [artifact.artifact_id],
       });
       await Truth.persistRecord(database, "processing_runs", run);
-      return { sourceId: source.source_document_id, succeeded: true, artifactId: artifact.artifact_id };
+      return { sourceId: source.source_document_id, succeeded: true, artifact };
     } catch (error) {
       if (error?.name === "AbortError") {
         const cancelled = Truth.cancelProcessingRun(run, new Date().toISOString());
@@ -703,11 +704,38 @@
     }
   }
 
+  async function processCandidateProposal(source, artifact, snapshot, database, signal) {
+    const startedAt = new Date().toISOString();
+    let run = LocalCandidateProposal.processingRunFor(source, snapshot.snapshot_id, "PENDING", startedAt);
+    await Truth.persistRecord(database, "processing_runs", run);
+    run = LocalCandidateProposal.processingRunFor(source, snapshot.snapshot_id, "RUNNING", startedAt, { run_id: run.run_id, started_at: startedAt });
+    await Truth.persistRecord(database, "processing_runs", run);
+    try {
+      setCandidateExtractionState("STRUCTURING", `正在按本地确定规则整理：${source.file.name}`);
+      const response = await fetch("/api/local-candidate-structure", { method: "POST", headers: { "Content-Type": "application/json" }, signal, body: JSON.stringify({ source_document_id: source.source_document_id, runtime_snapshot: snapshot, candidate_material_type: artifact.payload.candidate_material_type, pages: artifact.payload.pages }) });
+      const result = await response.json();
+      if (!response.ok || result.model_call_made !== false || result.runtime_snapshot_id !== snapshot.snapshot_id) throw new Error(result.error || "candidate_local_structuring_failed");
+      const proposal = LocalCandidateProposal.proposalFor({ source, artifact, structuringRun: run, result });
+      await Truth.persistRecord(database, "context_proposals", proposal);
+      run = LocalCandidateProposal.processingRunFor(source, snapshot.snapshot_id, "SUCCEEDED", startedAt, { run_id: run.run_id, started_at: startedAt, finished_at: new Date().toISOString(), proposal_ids: [proposal.proposal_id] });
+      await Truth.persistRecord(database, "processing_runs", run);
+      return { succeeded: true, proposal, manual: proposal.payload.manual_review_required };
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        await Truth.persistRecord(database, "processing_runs", Truth.cancelProcessingRun(run, new Date().toISOString()));
+        return { cancelled: true };
+      }
+      const failed = LocalCandidateProposal.processingRunFor(source, snapshot.snapshot_id, "FAILED", startedAt, { run_id: run.run_id, started_at: startedAt, finished_at: new Date().toISOString(), error_code: String(error?.message || "candidate_local_structuring_failed").slice(0, 180) });
+      await Truth.persistRecord(database, "processing_runs", failed);
+      return { failed: true, error: failed.error_code };
+    }
+  }
+
   async function runCandidateProcessing() {
     const button = byId("start-personal-processing");
     const gate = refreshCandidateImportGate();
     if (!gate.allowed || gate.authority.runtime.mode !== "local") throw new Error(`runtime_capability_${gate.state}`);
-    if (!RuntimeExecution || !Truth || !LocalCandidate) throw new Error("local_candidate_extraction_dependencies_unavailable");
+    if (!RuntimeExecution || !Truth || !LocalCandidate || !LocalCandidateProposal) throw new Error("local_candidate_extraction_dependencies_unavailable");
     candidateProcessingInProgress = true;
     candidateBatchAbortController = new AbortController();
     button.disabled = true;
@@ -730,6 +758,8 @@
       await Truth.persistRecord(database, "processing_batches", LocalCandidate.batchFor(sources, "RUNNING", batchCreatedAt, { batch_id: batchId, created_at: batchCreatedAt }));
       const completed = [];
       const failures = [];
+      let proposalCount = 0;
+      let manualReviewCount = 0;
       for (let index = 0; index < sources.length; index += 1) {
         const source = sources[index];
         if (candidateBatchAbortController.signal.aborted) {
@@ -762,7 +792,17 @@
           byId("personal-page-message").textContent = "本次导入已取消。此前已完成的本地提取记录保留；未形成 Candidate 信息。";
           return;
         }
-        if (result.succeeded) completed.push(result.sourceId);
+        if (result.succeeded) {
+          const proposalResult = await processCandidateProposal(source, result.artifact, snapshot, database, candidateBatchAbortController.signal);
+          if (proposalResult.cancelled) {
+            const cancelled = LocalCandidate.batchFor(sources, "CANCELLED", batchCreatedAt, { batch_id: batchId, created_at: batchCreatedAt, cancelled_at: new Date().toISOString(), completed_source_ids: completed, cancelled_source_id: source.source_document_id, not_started_source_ids: sources.slice(index + 1).map((item) => item.source_document_id) });
+            await Truth.persistRecord(database, "processing_batches", cancelled);
+            setCandidateExtractionState("CANCELLED", "已取消本次本地整理；未处理剩余文件");
+            return;
+          }
+          if (proposalResult.failed) failures.push(proposalResult);
+          else { completed.push(result.sourceId); proposalCount += 1; if (proposalResult.manual) manualReviewCount += 1; }
+        }
         if (result.failed) failures.push(result);
       }
       const finalStatus = failures.length ? "FAILED" : "COMPLETED";
@@ -774,8 +814,8 @@
       }));
       setCandidateExtractionState("READY_FOR_REVIEW", failures.length ? "本地提取完成，但部分文件失败" : "本地提取已完成");
       byId("personal-page-message").textContent = failures.length
-        ? `已生成 ${completed.length} 个 ExtractionArtifact；${failures.length} 个文件未能提取。尚未形成 Candidate 信息，未调用 Provider/model。`
-        : `已真实读取并生成 ${completed.length} 个 ExtractionArtifact。尚未形成 Candidate 信息，后续仍需整理/审核；未调用 Provider/model。`;
+        ? `已生成本地提取与 Candidate Proposal，但 ${failures.length} 个文件未能完成整理；尚未形成 Candidate 正式信息，未调用 Provider/model。`
+        : `已根据本地确定规则生成 ${proposalCount} 个 Candidate Proposal（${manualReviewCount} 个需人工处理）；均待人工审核，尚未形成 Candidate 正式信息，未调用 Provider/model。`;
       byId("personal-page-message").classList.toggle("error", failures.length > 0);
     } finally {
       database?.close?.();
