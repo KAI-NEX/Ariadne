@@ -7,6 +7,13 @@ struct OCRResult: Encodable {
     let line_count: Int
 }
 
+if CommandLine.arguments.count == 2 && CommandLine.arguments[1] == "--probe" {
+    // Execute this same Vision-backed helper rather than treating the script
+    // path as evidence. No source image or Provider is involved.
+    FileHandle.standardOutput.write(Data("{\"local_ocr\":\"supported\"}".utf8))
+    exit(0)
+}
+
 guard CommandLine.arguments.count == 2,
       let image = NSImage(contentsOfFile: CommandLine.arguments[1]),
       let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {

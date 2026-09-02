@@ -3,6 +3,9 @@
 (function () {
   const Demo = window.JobRadarV1Demo;
   const RuntimeGate = window.JobRadarRuntimeGate;
+  const RuntimeExecution = window.AriadneRuntimeExecution;
+  const Truth = window.AriadneTruthPersistence;
+  const LocalCandidate = window.AriadneLocalCandidateExtraction;
   const page = document.body.dataset.v1Page;
   const isEmbeddedDetail = new URLSearchParams(window.location.search).get("embed") === "1";
   if (isEmbeddedDetail) document.body.classList.add("v1-embedded-detail");
@@ -20,6 +23,7 @@
   let activeJob = null;
   let pendingDirectEdit = null;
   let candidateProcessingInProgress = false;
+  let candidateBatchAbortController = null;
   let jobProcessingInProgress = false;
 
   function currentOperationGate(operation) {
@@ -615,72 +619,171 @@
 
   function showCandidateSource(source) {
     const batchSuffix = selectedCandidateSources.length > 1 ? ` · 共 ${selectedCandidateSources.length} 个文件` : "";
+    const file = source.file || source;
     byId("personal-file-preview").classList.remove("hidden");
-    byId("personal-file-name").textContent = source.name;
-    byId("personal-file-meta").textContent = `${source.type || selectedCandidateType} · ${source.sizeLabel || "本地文件"}${batchSuffix} · 仅本地`;
-    byId("personal-file-icon").textContent = (source.extension || selectedCandidateType.slice(0, 3)).toUpperCase();
+    byId("personal-file-name").textContent = file.name || source.name;
+    byId("personal-file-meta").textContent = `${file.type || source.mime_type || selectedCandidateType} · ${source.sizeLabel || formatBytes(file.size) || "本地文件"}${batchSuffix} · 仅本地`;
+    byId("personal-file-icon").textContent = (source.extension || file.name?.split(".").pop() || selectedCandidateType.slice(0, 3)).toUpperCase();
     refreshCandidateImportGate();
   }
 
-  async function processCandidateSource(source, batchAuthority) {
-    if (batchAuthority.runtime.mode !== "local") throw new Error("model_candidate_import_not_connected");
-    for (const [state, label] of Demo.CANDIDATE_PROCESSING_STATES) {
-      byId("personal-processing").dataset.state = state;
-      byId("personal-processing-state").textContent = label;
-      await delay(260);
+  function setCandidateExtractionState(state, label) {
+    byId("personal-processing").dataset.state = state;
+    byId("personal-processing-state").textContent = label;
+  }
+
+  async function localOcrEnvironmentCapability() {
+    const response = await fetch("/api/local-ocr-capability", { method: "POST" });
+    const payload = await response.json();
+    if (!response.ok || !["supported", "unsupported", "unverified"].includes(payload.local_ocr)) {
+      throw new Error(payload.error || "local_ocr_capability_unavailable");
     }
-    const incoming = Demo.createLocalCandidateFixtures(source);
-    const existing = await Demo.getAll(Demo.DEMO_STORES.candidates);
-    const duplicates = Demo.findCandidateDuplicates(incoming, existing);
-    let items = incoming;
-    if (duplicates.length) {
-      const aiMode = batchAuthority.runtime.mode === "model";
-      const resolution = await askDuplicateResolution({ kind: "candidate", count: duplicates.length, aiMode });
-      if (resolution === "cancel") return { cancelled: true };
-      if (resolution === "merge" && aiMode) throw new Error("模型融合需要一次真实模型调用；本轮未获调用批准，因此没有写入或覆盖任何材料。");
-      if (resolution === "merge") {
-        const byIncoming = new Map(duplicates.map((entry) => [entry.incoming.item_id, entry]));
-        items = incoming.map((item) => {
-          const duplicate = byIncoming.get(item.item_id);
-          return duplicate ? Demo.mergeCandidateRecords(duplicate.existing, item) : item;
-        });
+    return payload.local_ocr;
+  }
+
+  async function extractCandidateSource(source, snapshot, signal) {
+    const documentDataUrl = await LocalCandidate.readAsDataURL(source.file, source.mime_type);
+    const image = source.source_type === "IMAGE";
+    const response = await fetch(image ? "/api/local-candidate-image-ocr" : "/api/local-candidate-extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal,
+      body: JSON.stringify({
+        filename: source.file.name,
+        media_type: source.mime_type,
+        source_document_id: source.source_document_id,
+        runtime_snapshot: snapshot,
+        ...(image ? { image_data_url: documentDataUrl } : { document_data_url: documentDataUrl }),
+      }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "candidate_local_extraction_failed");
+    if (result.model_call_made !== false || result.runtime_snapshot_id !== snapshot.snapshot_id || result.content_hash !== source.content_hash) {
+      throw new Error("candidate_local_extraction_contract_failed");
+    }
+    return result;
+  }
+
+  async function processCandidateSource(source, snapshot, database, signal) {
+    const sourceDocument = LocalCandidate.sourceDocumentFor(source);
+    await LocalCandidate.persistCanonicalSource(database, sourceDocument);
+    const startedAt = new Date().toISOString();
+    let run = LocalCandidate.processingRunFor(source, snapshot.snapshot_id, "PENDING", startedAt);
+    await Truth.persistRecord(database, "processing_runs", run);
+    run = LocalCandidate.processingRunFor(source, snapshot.snapshot_id, "RUNNING", startedAt, { run_id: run.run_id, started_at: startedAt });
+    await Truth.persistRecord(database, "processing_runs", run);
+    try {
+      setCandidateExtractionState("EXTRACTING", `正在本地读取并提取：${source.file.name}`);
+      const result = await extractCandidateSource(source, snapshot, signal);
+      const artifact = LocalCandidate.artifactFor(source, run, result);
+      await Truth.persistRecord(database, "extraction_artifacts", artifact);
+      run = LocalCandidate.processingRunFor(source, snapshot.snapshot_id, "SUCCEEDED", startedAt, {
+        run_id: run.run_id,
+        started_at: startedAt,
+        finished_at: new Date().toISOString(),
+        output_artifact_ids: [artifact.artifact_id],
+      });
+      await Truth.persistRecord(database, "processing_runs", run);
+      return { sourceId: source.source_document_id, succeeded: true, artifactId: artifact.artifact_id };
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        const cancelled = Truth.cancelProcessingRun(run, new Date().toISOString());
+        await Truth.persistRecord(database, "processing_runs", cancelled);
+        return { sourceId: source.source_document_id, cancelled: true };
       }
+      const errorCode = String(error?.message || "candidate_local_extraction_failed").slice(0, 180);
+      const failed = LocalCandidate.processingRunFor(source, snapshot.snapshot_id, "FAILED", startedAt, {
+        run_id: run.run_id,
+        started_at: startedAt,
+        finished_at: new Date().toISOString(),
+        error_code: errorCode,
+      });
+      await Truth.persistRecord(database, "processing_runs", failed);
+      return { sourceId: source.source_document_id, failed: true, error: errorCode };
     }
-    await Demo.persistCandidateImport(items, source);
-    return { sourceKey: `candidate:${items[0].item_id}` };
   }
 
   async function runCandidateProcessing() {
     const button = byId("start-personal-processing");
     const gate = refreshCandidateImportGate();
-    if (!gate.allowed) throw new Error(`runtime_capability_${gate.state}`);
-    const batchAuthority = gate.authority;
+    if (!gate.allowed || gate.authority.runtime.mode !== "local") throw new Error(`runtime_capability_${gate.state}`);
+    if (!RuntimeExecution || !Truth || !LocalCandidate) throw new Error("local_candidate_extraction_dependencies_unavailable");
     candidateProcessingInProgress = true;
+    candidateBatchAbortController = new AbortController();
     button.disabled = true;
+    byId("replace-personal-file").textContent = "取消本次提取";
     byId("personal-processing").classList.remove("hidden");
-    let lastSourceKey = null;
-    let lastError = null;
-    for (const source of selectedCandidateSources) {
-      showCandidateSource(source);
-      let result;
-      try { result = await processCandidateSource(source, batchAuthority); }
-      catch (error) {
-        lastError = error;
-        byId("personal-page-message").textContent = `无法整理材料：${error.message}`;
-        byId("personal-page-message").classList.add("error");
-        continue;
+    setCandidateExtractionState("PREPARING", "正在验证本地执行环境");
+    const batchId = `batch-candidate-extraction-${crypto.randomUUID()}`;
+    const batchCreatedAt = new Date().toISOString();
+    let database = null;
+    try {
+      const localOcr = await localOcrEnvironmentCapability();
+      const snapshot = RuntimeExecution.createRuntimeSnapshot(
+        { mode: "local" },
+        { environmentCapabilities: { local_ocr: localOcr } },
+      );
+      const sources = await Promise.all(selectedCandidateSources.map((source) => LocalCandidate.prepareSource(source.file, batchId)));
+      database = await Truth.openDatabase();
+      await Truth.persistRecord(database, "runtime_snapshots", snapshot);
+      await Truth.persistRecord(database, "processing_batches", LocalCandidate.batchFor(sources, "PENDING", batchCreatedAt));
+      await Truth.persistRecord(database, "processing_batches", LocalCandidate.batchFor(sources, "RUNNING", batchCreatedAt, { batch_id: batchId, created_at: batchCreatedAt }));
+      const completed = [];
+      const failures = [];
+      for (let index = 0; index < sources.length; index += 1) {
+        const source = sources[index];
+        if (candidateBatchAbortController.signal.aborted) {
+          const cancelled = LocalCandidate.batchFor(sources, "CANCELLED", batchCreatedAt, {
+            batch_id: batchId,
+            created_at: batchCreatedAt,
+            cancelled_at: new Date().toISOString(),
+            completed_source_ids: completed,
+            cancelled_source_id: source.source_document_id,
+            not_started_source_ids: sources.slice(index + 1).map((item) => item.source_document_id),
+          });
+          await Truth.persistRecord(database, "processing_batches", cancelled);
+          setCandidateExtractionState("CANCELLED", "已取消本次本地提取；未处理剩余文件");
+          byId("personal-page-message").textContent = "本次导入已取消。此前已完成的本地提取记录保留；未形成 Candidate 信息。";
+          return;
+        }
+        showCandidateSource(source);
+        const result = await processCandidateSource(source, snapshot, database, candidateBatchAbortController.signal);
+        if (result.cancelled) {
+          const cancelled = LocalCandidate.batchFor(sources, "CANCELLED", batchCreatedAt, {
+            batch_id: batchId,
+            created_at: batchCreatedAt,
+            cancelled_at: new Date().toISOString(),
+            completed_source_ids: completed,
+            cancelled_source_id: source.source_document_id,
+            not_started_source_ids: sources.slice(index + 1).map((item) => item.source_document_id),
+          });
+          await Truth.persistRecord(database, "processing_batches", cancelled);
+          setCandidateExtractionState("CANCELLED", "已取消本次本地提取；未处理剩余文件");
+          byId("personal-page-message").textContent = "本次导入已取消。此前已完成的本地提取记录保留；未形成 Candidate 信息。";
+          return;
+        }
+        if (result.succeeded) completed.push(result.sourceId);
+        if (result.failed) failures.push(result);
       }
-      if (result.cancelled) {
-        candidateProcessingInProgress = false;
-        refreshCandidateImportGate();
-        byId("personal-processing").classList.add("hidden");
-        return;
-      }
-      lastSourceKey = result.sourceKey;
+      const finalStatus = failures.length ? "FAILED" : "COMPLETED";
+      await Truth.persistRecord(database, "processing_batches", LocalCandidate.batchFor(sources, finalStatus, batchCreatedAt, {
+        batch_id: batchId,
+        completed_source_ids: completed,
+        created_at: batchCreatedAt,
+        finished_at: new Date().toISOString(),
+      }));
+      setCandidateExtractionState("READY_FOR_REVIEW", failures.length ? "本地提取完成，但部分文件失败" : "本地提取已完成");
+      byId("personal-page-message").textContent = failures.length
+        ? `已生成 ${completed.length} 个 ExtractionArtifact；${failures.length} 个文件未能提取。尚未形成 Candidate 信息，未调用 Provider/model。`
+        : `已真实读取并生成 ${completed.length} 个 ExtractionArtifact。尚未形成 Candidate 信息，后续仍需整理/审核；未调用 Provider/model。`;
+      byId("personal-page-message").classList.toggle("error", failures.length > 0);
+    } finally {
+      database?.close?.();
+      candidateBatchAbortController = null;
+      candidateProcessingInProgress = false;
+      byId("replace-personal-file").textContent = "替换";
+      refreshCandidateImportGate();
     }
-    if (lastSourceKey && !completeEmbeddedImport("personal", lastSourceKey)) returnToCardLibrary("/personal-information.html", lastSourceKey);
-    candidateProcessingInProgress = false;
-    if (lastError) throw lastError;
   }
 
   function initPersonal() {
@@ -700,7 +803,7 @@
       selectedCandidateSources = Array.from(files || []).map((file, index) => ({
         source_type: "BROWSER_FILE_METADATA", source_key: `${batchKey}-${index + 1}`,
         name: file.name, type: file.type || "unknown", size: file.size, sizeLabel: formatBytes(file.size), extension: file.name.split(".").pop() || "FILE",
-        import_type: materialType, prompt_profile: Demo.candidatePromptProfile(materialType),
+        import_type: materialType, file,
       }));
       if (selectedCandidateSources[0]) showCandidateSource(selectedCandidateSources[0]);
     };
@@ -722,7 +825,14 @@
       dropzone.classList.remove("is-dragover");
       acceptCandidateFiles(event.dataTransfer?.files);
     });
-    byId("replace-personal-file").addEventListener("click", () => byId("personal-file-input").click());
+    byId("replace-personal-file").addEventListener("click", () => {
+      if (candidateProcessingInProgress) {
+        candidateBatchAbortController?.abort();
+        setCandidateExtractionState("CANCELLING", "正在取消本次本地提取");
+        return;
+      }
+      byId("personal-file-input").click();
+    });
     byId("start-personal-processing").addEventListener("click", () => runCandidateProcessing().catch(showPersonalError));
     refreshCandidateImportGate();
   }

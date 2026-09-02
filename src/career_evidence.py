@@ -1450,3 +1450,55 @@ def extract_career_document(payload: dict, pdf_script_path: Path, visual_ocr_scr
         "model_call_made": False,
         "review_required": bool(entities),
     }
+
+
+def extract_career_document_only(
+    payload: dict,
+    pdf_script_path: Path,
+    visual_ocr_script_path: Path | None = None,
+) -> dict:
+    """Extract a bounded local Candidate source without proposing CareerEntities.
+
+    Slice 4A deliberately shares the mature mechanical extraction primitives
+    above while stopping before ``propose_entities``.  The caller supplies the
+    already-chosen canonical SourceDocument ID so DocumentBlock provenance is
+    linked to the same non-authoritative source record that the browser will
+    persist.
+    """
+    filename, media_type = _validate_identity(payload.get("filename"), payload.get("media_type"))
+    source_id = payload.get("source_document_id")
+    if not isinstance(source_id, str) or not source_id.startswith("source-candidate-") or len(source_id) > 160:
+        raise CareerDocumentError("invalid_candidate_source_document_id")
+    content = _decode_data_url(payload.get("document_data_url"), media_type)
+    extraction_warnings: list[str] = []
+    if media_type == "application/pdf":
+        pages, extraction_method, extraction_warnings = _selective_pdf_pages(
+            content,
+            pdf_script_path,
+            visual_ocr_script_path,
+        )
+    elif media_type.endswith("wordprocessingml.document"):
+        pages = _docx_pages(content)
+        extraction_method = "docx_xml_text_v0"
+    else:
+        pages = _text_pages(content)
+        extraction_method = "utf8_text_v0"
+    content_hash = hashlib.sha256(content).hexdigest()
+    document_blocks = _document_blocks(pages, source_id, content_hash)
+    extracted_text = "\n\n".join(
+        "\n".join(str(line) for line in page.get("lines", []) if str(line).strip())
+        for page in pages
+    ).strip()
+    return {
+        "filename": filename,
+        "media_type": media_type,
+        "content_hash": "sha256:" + content_hash,
+        "byte_size": len(content),
+        "pages": pages,
+        "document_blocks": document_blocks,
+        "extracted_text": extracted_text,
+        "extraction_method": extraction_method,
+        "warnings": extraction_warnings,
+        "model_call_made": False,
+        "processing_boundary": "localhost_transient_candidate_extraction",
+    }

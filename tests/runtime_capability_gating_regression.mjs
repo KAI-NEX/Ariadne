@@ -78,10 +78,11 @@ for (const html of [candidateDetail, jobDetail, personalImport, jobImport]) {
 }
 assert.match(candidateDetail, /id="candidate-ai-pane" class="v1-conversation-pane hidden"/);
 assert.match(jobDetail, /id="job-ai-pane" class="v1-conversation-pane hidden"/);
-assert.match(personalImport, /本地演示样例 · 不读取文件内容 · 无模型调用/);
+assert.match(personalImport, /仅本地读取、提取与确定规则；不调用模型服务商/);
 assert.match(jobImport, /本地演示样例 · 不读取文件内容 · 无模型调用/);
-assert.match(personalImport, /开始本地演示整理/);
+assert.match(personalImport, /开始本地提取/);
 assert.match(jobImport, /开始本地演示整理/);
+assert.match(personalImport, /local-candidate-extraction-domain\.js/);
 
 assert.doesNotMatch(pages, /localStorage|preview-source|appendDemoMessage|createConversation|candidatePatchFor|jobPatchFor/);
 assert.match(pages, /currentOperationGate\("candidate_import"\)/);
@@ -89,16 +90,20 @@ assert.match(pages, /currentOperationGate\("job_import"\)/);
 assert.match(pages, /currentOperationGate\("ai_conversation"\)/);
 assert.match(pages, /runtime\.mode === "model" && gate\.allowed/);
 assert.match(pages, /pane\?\.querySelectorAll\("input, textarea, button"\)[\s\S]*control\.disabled = !conversationAllowed/);
-assert.doesNotMatch(pages, /\bfetch\s*\(/);
+assert.match(pages, /fetch\("\/api\/local-ocr-capability"/);
+assert.match(pages, /fetch\(image \? "\/api\/local-candidate-image-ocr" : "\/api\/local-candidate-extract"/);
+assert.doesNotMatch(pages, /fetch\("\/api\/local-ocr"/);
 
 const candidateProcess = pages.slice(pages.indexOf("async function processCandidateSource"), pages.indexOf("async function runCandidateProcessing"));
-assert.ok(candidateProcess.indexOf('batchAuthority.runtime.mode !== "local"') < candidateProcess.indexOf("Demo.createLocalCandidateFixtures"));
-assert.ok(candidateProcess.indexOf('resolution === "cancel"') < candidateProcess.indexOf("Demo.persistCandidateImport"));
+assert.match(candidateProcess, /persistCanonicalSource/);
+assert.match(candidateProcess, /extraction_artifacts/);
+assert.doesNotMatch(candidateProcess, /createLocalCandidateFixtures|persistCandidateImport|findCandidateDuplicates/);
 const candidateRun = pages.slice(pages.indexOf("async function runCandidateProcessing"), pages.indexOf("function initPersonal"));
-const candidateCancel = candidateRun.match(/if \(result\.cancelled\) \{([\s\S]*?)\n      \}/)?.[1] || "";
+const candidateCancel = candidateRun.match(/if \(result\.cancelled\) \{([\s\S]*?)\n        \}/)?.[1] || "";
 assert.match(candidateCancel, /return;/);
 assert.doesNotMatch(candidateCancel, /continue|completeEmbeddedImport|returnToCardLibrary/);
-assert.ok(candidateRun.indexOf("if (result.cancelled)") < candidateRun.indexOf('completeEmbeddedImport("personal"'));
+assert.match(candidateRun, /createRuntimeSnapshot/);
+assert.match(candidateProcess, /snapshot\.snapshot_id/);
 
 const jobProcess = pages.slice(pages.indexOf("async function processJobSource"), pages.indexOf("async function runJobProcessing"));
 assert.ok(jobProcess.indexOf('batchAuthority.runtime.mode !== "local"') < jobProcess.indexOf("Demo.createLocalJobFixture"));

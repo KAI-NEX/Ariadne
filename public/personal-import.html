@@ -32,7 +32,7 @@
           <section class="v1-file-picker">
             <label id="personal-dropzone" class="v1-file-dropzone" for="personal-file-input">
               <span>点击上传文件或直接拖拽文件至此</span>
-              <input id="personal-file-input" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,application/pdf,image/png,image/jpeg,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+              <input id="personal-file-input" type="file" multiple accept=".pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,image/png,image/jpeg">
             </label>
           </section>
           <section id="personal-file-preview" class="v1-file-preview hidden">
@@ -40,15 +40,17 @@
             <button id="replace-personal-file" type="button">替换</button>
           </section>
           <section id="personal-processing" class="v1-processing hidden" aria-live="polite">
-            <div class="v1-processing-orbit" aria-hidden="true"></div><div><p id="personal-processing-state">正在准备</p><small>本地演示样例 · 不读取文件内容 · 无模型调用</small></div>
+            <div class="v1-processing-orbit" aria-hidden="true"></div><div><p id="personal-processing-state">正在准备</p><small>仅本地读取、提取与确定规则；不调用模型服务商</small></div>
           </section>
-          <button id="start-personal-processing" class="v1-primary-button v1-sheet-primary" type="button" disabled>开始本地演示整理</button>
+          <button id="start-personal-processing" class="v1-primary-button v1-sheet-primary" type="button" disabled>开始本地提取</button>
         </div>
       </section>
       <p id="personal-page-message" class="v1-inline-message" aria-live="polite"></p>
     </main>
     <script src="/runtime-capabilities.js?v=runtime-gate-v1"></script>
     <script src="/runtime-capability-gate.js?v=runtime-gate-v1"></script>
+    <script src="/truth-persistence-domain.js?v=slice-4a"></script>
+    <script src="/local-candidate-extraction-domain.js?v=slice-4a"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
     <script src="/v1-pages.js?v=v1-motion-33"></script>

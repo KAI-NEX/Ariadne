@@ -42,13 +42,14 @@ assert.doesNotMatch(personal, /v1-bottom-sheet|personal-empty|open-personal-impo
 assert.match(personalImport, /<div><h1>添加个人材料<\/h1><\/div>/);
 assert.doesNotMatch(personalImport, /导入一份材料|选择材料类型并提供本地文件。内容先形成待审核对象，不会直接写入正式职业模型。/);
 for (const label of ["简历", "作品集", "项目", "其他"]) assert.match(personalImport, new RegExp(`>${label}<`));
-assert.match(personalImport, /\.pdf,.png,.jpg,.jpeg,.docx/);
+assert.match(personalImport, /\.pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg/);
 assert.match(personalImport, /点击上传文件或直接拖拽文件至此/);
 assert.doesNotMatch(personalImport, /选择文件|支持 PDF/);
 assert.doesNotMatch(personalImport, /use-candidate-fixture|消毒/);
 assert.equal(Demo.candidatePromptProfile("Resume"), "candidate-resume-grounded-v2");
 assert.equal(new Set(Object.values(Demo.CANDIDATE_PROMPT_PROFILES)).size, 4);
-assert.match(pages, /prompt_profile: Demo\.candidatePromptProfile\(materialType\)/);
+assert.doesNotMatch(pages, /prompt_profile: Demo\.candidatePromptProfile\(materialType\)/);
+assert.match(pages, /import_type: materialType, file,/);
 
 // Candidate fixture cards and review interaction.
 assert.equal(Demo.CANDIDATE_FIXTURES.length, 3);
@@ -111,7 +112,10 @@ assert.equal(Demo.applyDemoJobPatch(Demo.JOB_FIXTURE, jobPatch).item_version, (N
 // State language, no provider call, and persistence separation.
 assert.deepEqual(Demo.CANDIDATE_PROCESSING_STATES.map(([state]) => state), ["PREPARING", "WAITING", "UNDERSTANDING", "BUILDING_CARDS", "READY_FOR_REVIEW"]);
 assert.deepEqual(Demo.JOB_PROCESSING_STATES.map(([state]) => state), ["PREPARING", "WAITING", "UNDERSTANDING", "BUILDING_CARDS", "READY_FOR_REVIEW"]);
-assert.doesNotMatch(pages, /\bfetch\s*\(/);
+assert.match(pages, /fetch\("\/api\/local-ocr-capability"/);
+assert.match(pages, /\/api\/local-candidate-extract/);
+assert.match(pages, /\/api\/local-candidate-image-ocr/);
+assert.doesNotMatch(pages, /fetch\("\/api\/local-ocr"/);
 assert.ok(Demo.STORES.some(([name]) => name === "demo_candidate_items"));
 assert.ok(Demo.STORES.some(([name]) => name === "demo_job_contexts"));
 assert.equal(Demo.isAIRecognizedRecord({ imported_from: { network_sent: false } }), false);
@@ -278,26 +282,25 @@ assert.match(pages, /event\.target\.closest\("\.v1-candidate-card, \.v1-add-guid
 assert.match(pages, /overlay\.dataset\.overlayKind = isImport \? "import" : "detail"/);
 assert.match(pages, /job-radar-v1-import-complete/);
 assert.match(pages, /function completeEmbeddedImport/);
-assert.match(pages, /completeEmbeddedImport\("personal", lastSourceKey\)/);
-assert.match(pages, /Demo\.createLocalCandidateFixtures/);
-assert.match(pages, /Demo\.findCandidateDuplicates/);
-assert.match(pages, /Demo\.mergeCandidateRecords/);
-assert.match(pages, /Demo\.persistCandidateImport/);
+assert.doesNotMatch(pages, /completeEmbeddedImport\("personal", lastSourceKey\)/);
+assert.doesNotMatch(pages, /Demo\.createLocalCandidateFixtures/);
+assert.doesNotMatch(pages, /Demo\.findCandidateDuplicates/);
+assert.doesNotMatch(pages, /Demo\.mergeCandidateRecords/);
+assert.doesNotMatch(pages, /Demo\.persistCandidateImport/);
 assert.match(pages, /const acceptCandidateFiles =/);
 assert.match(pages, /Array\.from\(files \|\| \[\]\)/);
 assert.match(pages, /const batchKey = `personal-source-\$\{crypto\.randomUUID\(\)\}`/);
 assert.match(pages, /source_key: `\$\{batchKey\}-\$\{index \+ 1\}`/);
 assert.match(pages, /const materialType = selectedCandidateType/);
 assert.match(pages, /const batchSuffix = selectedCandidateSources\.length > 1 \? ` · 共 \$\{selectedCandidateSources\.length\} 个文件` : ""/);
-assert.match(pages, /\$\{source\.sizeLabel \|\| "本地文件"\}\$\{batchSuffix\} · 仅本地/);
+assert.match(pages, /\$\{source\.sizeLabel \|\| formatBytes\(file\.size\) \|\| "本地文件"\}\$\{batchSuffix\} · 仅本地/);
 assert.doesNotMatch(pages, /支持多文件|可上传多个文件|批量上传/);
-assert.match(pages, /for \(const source of selectedCandidateSources\)/);
-assert.match(pages, /await processCandidateSource\(source, batchAuthority\)/);
-assert.match(pages, /async function processCandidateSource\(source, batchAuthority\)[\s\S]*await askDuplicateResolution/);
-assert.match(pages, /catch \(error\) \{[\s\S]*lastError = error;[\s\S]*continue;/);
+assert.match(pages, /for \(let index = 0; index < sources\.length; index \+= 1\)/);
+assert.match(pages, /await processCandidateSource\(source, snapshot, database, candidateBatchAbortController\.signal\)/);
+assert.match(pages, /async function processCandidateSource\(source, snapshot, database, signal\)[\s\S]*persistCanonicalSource/);
+assert.match(pages, /LocalCandidate\.processingRunFor\(source, snapshot\.snapshot_id, "FAILED"/);
 assert.match(pages, /if \(result\.cancelled\) \{/);
-assert.match(pages, /completeEmbeddedImport\("personal", lastSourceKey\)/);
-assert.equal((pages.match(/completeEmbeddedImport\("personal"/g) || []).length, 1);
+assert.doesNotMatch(pages, /completeEmbeddedImport\("personal"/);
 assert.match(pages, /acceptCandidateFiles\(event\.dataTransfer\?\.files\)/);
 assert.match(pages, /function acceptJobFiles\(files\)/);
 assert.match(pages, /Array\.from\(files \|\| \[\]\)\.flatMap/);
@@ -364,7 +367,7 @@ assert.match(styles, /\.v1-card-transition-layer\.v1-transition-surface > \* \{ 
 assert.match(styles, /\.v1-card-arrival-cover\.is-clearing \{ opacity: 0; \}/);
 assert.match(styles, /\.v1-card-arrival-cover \{[^}]*background: var\(--paper\)/s);
 assert.match(styles, /\.v1-card-route-in \.v1-page-shell \{[^}]*animation: none/s);
-assert.match(pages, /returnToCardLibrary\("\/personal-information\.html", lastSourceKey\)/);
+assert.doesNotMatch(pages, /returnToCardLibrary\("\/personal-information\.html", lastSourceKey\)/);
 assert.match(pages, /returnToCardLibrary\("\/jd\.html", lastSourceKey\)/);
 assert.match(styles, /\.v1-card-transition-layer/);
 assert.match(styles, /\.v1-conversation-message \{[^}]*align-items: center[^}]*display: flex[^}]*min-height: 48px/s);

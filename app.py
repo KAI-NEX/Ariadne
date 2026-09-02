@@ -19,7 +19,8 @@ from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
-from src.career_evidence import CareerDocumentError, extract_career_document
+from src.career_evidence import CareerDocumentError, _document_blocks, extract_career_document, extract_career_document_only
+from src.execution_contract import ExecutionContractError, validate_runtime_snapshot
 from src.ai_career_ingestion import (
     AICareerIngestionError,
     DEFAULT_MODEL as AI_CAREER_DEFAULT_MODEL,
@@ -221,6 +222,57 @@ def save_local_evidence(decoded_images: list[tuple[str, bytes]]) -> list[dict]:
             "evidence_path": str(image_path.relative_to(PROJECT_ROOT)),
         })
     return images
+
+
+def local_ocr_environment_capability() -> str:
+    """Return evidence-backed Local OCR availability without a Provider call."""
+    if os.uname().sysname != "Darwin":
+        return "unsupported"
+    try:
+        result = subprocess.run(
+            ["swift", str(OCR_SCRIPT_PATH), "--probe"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "unsupported"
+    if result.returncode != 0:
+        return "unsupported"
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return "unverified"
+    return "supported" if payload.get("local_ocr") == "supported" else "unverified"
+
+
+def local_snapshot_from_payload(payload: dict) -> dict:
+    """Validate the batch snapshot supplied to a local extraction route."""
+    try:
+        snapshot = validate_runtime_snapshot(payload.get("runtime_snapshot"))
+    except ExecutionContractError as error:
+        raise CareerDocumentError("invalid_runtime_snapshot") from error
+    if snapshot.mode != "local":
+        raise CareerDocumentError("candidate_local_runtime_required")
+    return snapshot.to_dict()
+
+
+def run_apple_vision_ocr(image_path: Path) -> dict:
+    try:
+        result = subprocess.run(
+            ["swift", str(OCR_SCRIPT_PATH), str(image_path)],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=45,
+        )
+        payload = json.loads(result.stdout)
+    except (subprocess.SubprocessError, json.JSONDecodeError, OSError) as error:
+        raise CareerDocumentError("local_ocr_failed") from error
+    if not isinstance(payload.get("text", ""), str) or not isinstance(payload.get("line_count", 0), int):
+        raise CareerDocumentError("local_ocr_failed")
+    return payload
 
 
 def keychain_has_deepseek_key() -> bool:
@@ -791,6 +843,9 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/local-vision-config":
             self.configure_local_vision()
             return
+        if parsed.path == "/api/local-ocr-capability":
+            self.local_ocr_capability()
+            return
         if parsed.path == "/api/source-link-import":
             self.import_source_link()
             return
@@ -799,6 +854,12 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/local-ocr":
             self.run_local_ocr()
+            return
+        if parsed.path == "/api/local-candidate-extract":
+            self.extract_local_candidate_source()
+            return
+        if parsed.path == "/api/local-candidate-image-ocr":
+            self.extract_local_candidate_image()
             return
         if parsed.path == "/api/career-document-extract":
             self.extract_career_document_candidate()
@@ -817,6 +878,15 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         self.send_json(HTTPStatus.OK, {
             "provider": "deepseek", "models": [item.to_public_dict() for item in v1_selector_descriptors(descriptors)], "network_call_made": False,
             "career_data_sent": False,
+        })
+
+    def local_ocr_capability(self) -> None:
+        """Probe the actual local Swift/Vision execution boundary once per caller batch."""
+        state = local_ocr_environment_capability()
+        self.send_json(HTTPStatus.OK, {
+            "local_ocr": state,
+            "network_call_made": False,
+            "processing_boundary": "localhost_apple_vision_probe",
         })
 
     def legacy_provider_action_unavailable(self) -> None:
@@ -1091,6 +1161,97 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             return
         self.send_json(HTTPStatus.OK, result)
 
+    def extract_local_candidate_source(self) -> None:
+        """Slice 4A mechanical document extraction; never creates a Candidate Proposal."""
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+            if content_length <= 0 or content_length > 12_000_000:
+                raise CareerDocumentError("invalid_document_request_size")
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            if not isinstance(payload, dict):
+                raise CareerDocumentError("invalid_document_request")
+            snapshot = local_snapshot_from_payload(payload)
+            visual_ocr_script_path = PDF_VISUAL_OCR_SCRIPT_PATH if snapshot["capabilities"]["local_ocr"] == "supported" else None
+            result = extract_career_document_only(payload, PDF_TEXT_SCRIPT_PATH, visual_ocr_script_path)
+            result["runtime_snapshot_id"] = snapshot["snapshot_id"]
+        except (CareerDocumentError, KeyError) as error:
+            self.send_json(HTTPStatus.BAD_REQUEST, {
+                "error": str(error) or "candidate_local_extraction_failed",
+                "persistence": "not_written",
+                "model_call_made": False,
+            })
+            return
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            self.send_json(HTTPStatus.BAD_REQUEST, {
+                "error": "invalid_document_request",
+                "persistence": "not_written",
+                "model_call_made": False,
+            })
+            return
+        self.send_json(HTTPStatus.OK, result)
+
+    def extract_local_candidate_image(self) -> None:
+        """Use only the pure local Apple Vision OCR core for one Candidate image."""
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+            if content_length <= 0 or content_length > 12_000_000:
+                raise CareerDocumentError("invalid_document_request_size")
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            if not isinstance(payload, dict):
+                raise CareerDocumentError("invalid_document_request")
+            snapshot = local_snapshot_from_payload(payload)
+            if snapshot["capabilities"]["local_ocr"] != "supported":
+                raise CareerDocumentError("local_ocr_unavailable")
+            filename = payload.get("filename")
+            source_id = payload.get("source_document_id")
+            if not isinstance(filename, str) or not filename.strip() or Path(filename).name != filename:
+                raise CareerDocumentError("invalid_document_filename")
+            if not isinstance(source_id, str) or not source_id.startswith("source-candidate-") or len(source_id) > 160:
+                raise CareerDocumentError("invalid_candidate_source_document_id")
+            decoded = decode_image_data_urls(payload)
+            if len(decoded) != 1:
+                raise CareerDocumentError("candidate_image_count_invalid")
+            mime_type, image_bytes = decoded[0]
+            extension = Path(filename).suffix.lower()
+            if (mime_type == "image/png" and extension != ".png") or (mime_type == "image/jpeg" and extension not in {".jpg", ".jpeg"}):
+                raise CareerDocumentError("document_extension_mismatch")
+            with tempfile.TemporaryDirectory(prefix="ariadne-candidate-ocr-") as directory:
+                image_path = Path(directory) / ("source.png" if mime_type == "image/png" else "source.jpg")
+                image_path.write_bytes(image_bytes)
+                ocr = run_apple_vision_ocr(image_path)
+            lines = [line.strip() for line in ocr["text"].splitlines() if line.strip()]
+            content_hash = hashlib.sha256(image_bytes).hexdigest()
+            pages = [{"page": 1, "lines": lines, "source_method": "apple_vision"}]
+            result = {
+                "filename": filename.strip(),
+                "media_type": mime_type,
+                "content_hash": "sha256:" + content_hash,
+                "byte_size": len(image_bytes),
+                "pages": pages,
+                "document_blocks": _document_blocks(pages, source_id, content_hash),
+                "extracted_text": "\n".join(lines),
+                "extraction_method": "apple_vision_image_v1",
+                "warnings": [],
+                "model_call_made": False,
+                "processing_boundary": "localhost_transient_candidate_image_ocr",
+                "runtime_snapshot_id": snapshot["snapshot_id"],
+            }
+        except (CareerDocumentError, KeyError, ValueError) as error:
+            self.send_json(HTTPStatus.BAD_REQUEST, {
+                "error": str(error) or "candidate_local_image_ocr_failed",
+                "persistence": "not_written",
+                "model_call_made": False,
+            })
+            return
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            self.send_json(HTTPStatus.BAD_REQUEST, {
+                "error": "invalid_document_request",
+                "persistence": "not_written",
+                "model_call_made": False,
+            })
+            return
+        self.send_json(HTTPStatus.OK, result)
+
     def run_local_ocr(self) -> None:
         """Run macOS Vision OCR locally; never forwards the image to the internet."""
         try:
@@ -1109,15 +1270,8 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             image_index = image["image_index"]
             image_path = PROJECT_ROOT / image["evidence_path"]
             try:
-                result = subprocess.run(
-                    ["swift", str(OCR_SCRIPT_PATH), str(image_path)],
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                    timeout=45,
-                )
-                ocr = json.loads(result.stdout)
-            except (subprocess.SubprocessError, json.JSONDecodeError, OSError):
+                ocr = run_apple_vision_ocr(image_path)
+            except CareerDocumentError:
                 self.send_json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": "local_ocr_failed", "image_index": image_index})
                 return
             ocr_pages.append({
