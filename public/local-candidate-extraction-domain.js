@@ -29,6 +29,12 @@
     "image/png": "IMAGE",
     "image/jpeg": "IMAGE",
   });
+  const CANDIDATE_MATERIAL_TYPES = Object.freeze({
+    Resume: "resume",
+    Portfolio: "portfolio",
+    Project: "project_description",
+    Other: "other",
+  });
 
   class LocalCandidateExtractionError extends Error {
     constructor(code) { super(code); this.name = "LocalCandidateExtractionError"; this.code = code; }
@@ -69,12 +75,14 @@
     });
   }
 
-  async function prepareSource(file, batchId) {
+  async function prepareSource(file, batchId, selectedMaterialType) {
     const mimeType = mediaTypeForFile(file);
     assertFileSize(file, mimeType);
     const contentHash = await sha256File(file);
     const hashValue = contentHash.replace(/^sha256:/, "");
     const sourceDocumentId = `source-candidate-${hashValue}`;
+    const candidateMaterialType = CANDIDATE_MATERIAL_TYPES[selectedMaterialType];
+    if (!candidateMaterialType) throw new LocalCandidateExtractionError("unsupported_candidate_material_type");
     return Object.freeze({
       file,
       mime_type: mimeType,
@@ -82,6 +90,8 @@
       content_hash: contentHash,
       source_document_id: sourceDocumentId,
       batch_id: batchId,
+      candidate_material_type: candidateMaterialType,
+      candidate_material_type_source: "USER_SELECTED",
     });
   }
 
@@ -166,6 +176,8 @@
         extracted_text: String(result.extracted_text || ""),
         byte_size: Number(result.byte_size) || 0,
         processing_boundary: String(result.processing_boundary || "localhost_transient_candidate_extraction"),
+        candidate_material_type: source.candidate_material_type,
+        candidate_material_type_source: source.candidate_material_type_source,
       },
       source_refs: sourceRefsFor(result, source.source_document_id),
       quality: { page_count: Array.isArray(result.pages) ? result.pages.length : 0, local_ocr: result.extraction_method?.includes("vision") === true },
@@ -200,6 +212,7 @@
     MAX_DOCUMENT_BYTES,
     MAX_IMAGE_BYTES,
     MIME_BY_EXTENSION,
+    CANDIDATE_MATERIAL_TYPES,
     LocalCandidateExtractionError,
     mediaTypeForFile,
     sourceTypeForMediaType,

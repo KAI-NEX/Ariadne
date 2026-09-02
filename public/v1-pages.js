@@ -723,7 +723,7 @@
         { mode: "local" },
         { environmentCapabilities: { local_ocr: localOcr } },
       );
-      const sources = await Promise.all(selectedCandidateSources.map((source) => LocalCandidate.prepareSource(source.file, batchId)));
+      const sources = await Promise.all(selectedCandidateSources.map((source) => LocalCandidate.prepareSource(source.file, batchId, selectedCandidateType)));
       database = await Truth.openDatabase();
       await Truth.persistRecord(database, "runtime_snapshots", snapshot);
       await Truth.persistRecord(database, "processing_batches", LocalCandidate.batchFor(sources, "PENDING", batchCreatedAt));

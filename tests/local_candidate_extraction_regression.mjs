@@ -19,8 +19,8 @@ function file(name, text, type = "text/plain") {
 }
 
 const batchId = "batch-candidate-test";
-const first = await Local.prepareSource(file("one.txt", "real source one"), batchId);
-const second = await Local.prepareSource(file("two.md", "# real source two"), batchId);
+const first = await Local.prepareSource(file("one.txt", "real source one"), batchId, "Resume");
+const second = await Local.prepareSource(file("two.md", "# real source two"), batchId, "Portfolio");
 assert.notEqual(first.content_hash, second.content_hash);
 assert.match(first.source_document_id, /^source-candidate-[a-f0-9]{64}$/);
 
@@ -40,7 +40,7 @@ const source = Local.sourceDocumentFor(first, "2026-09-02T10:00:00Z");
 assert.equal(source.local_reference, null);
 assert.equal(source.authority, Truth.AUTHORITY.source);
 await assert.rejects(
-  Local.prepareSource({ ...first.file, size: Local.MAX_DOCUMENT_BYTES + 1 }, batchId),
+  Local.prepareSource({ ...first.file, size: Local.MAX_DOCUMENT_BYTES + 1 }, batchId, "Resume"),
   /invalid_document_size/,
 );
 
@@ -55,6 +55,18 @@ const artifact = Local.artifactFor(first, { ...firstRun, status: "RUNNING", star
 }, "2026-09-02T10:00:03Z");
 assert.equal(artifact.authority, Truth.AUTHORITY.extraction);
 assert.equal(artifact.source_document_id, first.source_document_id);
+assert.equal(artifact.payload.candidate_material_type, "resume");
+assert.equal(artifact.payload.candidate_material_type_source, "USER_SELECTED");
+
+for (const [selected, persisted] of Object.entries(Local.CANDIDATE_MATERIAL_TYPES)) {
+  const selectedSource = await Local.prepareSource(file(`${selected}.txt`, selected), batchId, selected);
+  const selectedArtifact = Local.artifactFor(selectedSource, { ...firstRun, run_id: `run-${persisted}`, source_document_id: selectedSource.source_document_id, status: "RUNNING", started_at: "2026-09-02T10:00:01Z" }, {
+    pages: [{ page: 1, lines: [selected], source_method: "native_document" }], document_blocks: [], extracted_text: selected,
+    extraction_method: "utf8_text_v0", byte_size: selectedSource.file.size, warnings: [], processing_boundary: "localhost_transient_candidate_extraction",
+  }, "2026-09-02T10:00:03Z");
+  assert.equal(selectedArtifact.payload.candidate_material_type, persisted);
+  assert.equal(selectedArtifact.payload.candidate_material_type_source, "USER_SELECTED");
+}
 
 const cancelled = Local.batchFor([first, second], "CANCELLED", "2026-09-02T10:00:04Z", {
   completed_source_ids: [first.source_document_id],
