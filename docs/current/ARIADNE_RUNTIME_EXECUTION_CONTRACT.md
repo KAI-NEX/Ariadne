@@ -63,6 +63,8 @@ Ariadne 是 Web-first、Local-first、BYOK、evidence-grounded 的 Personal Care
 | 当前运行时（Current Runtime） | 用户当前选择且当前可用的执行模式：`LOCAL` 或一个具体的 `MODEL RUNTIME`。它只决定现在可以发起什么能力，不改写历史。 |
 | 能力权限（Capability Authority） | 决定某个新操作当前是否可见、可发起及必须走哪条执行边界的唯一权威。Ariadne 中由 Current Runtime 承担。 |
 | 运行时快照（RuntimeSnapshot） | 某次操作在规定捕获边界生成的不可变执行身份；包含 Provider/model/protocol/capability/version/delivery/credential reference，但不包含 secret。 |
+| 模型资格（Model Eligibility） | 某个具体 Provider/model 是否有资格成为 Ariadne Model Runtime。它由现有 RuntimeCapability / Provider capability evidence 决定，要求真实 semantic understanding、Ariadne 所需 Candidate/Job structuring，以及 verified multimodal/source-capable model contract；普通 text-only/chat-only model 不合格。 |
+| 来源传输兼容性（Source Delivery Compatibility） | 对一个已经 eligible 的 selected model，当前 SourceDocument 是否存在 verified、truthful 的 direct 或 non-semantic mechanical delivery route。它通过现有 Provider capability、`supports_complete_document_review`、`document_delivery` 与 RuntimeSnapshot `delivery_method` 等合同解析，不是新的 RuntimeCapability field、第二套 capability namespace 或另一套 eligibility registry。不能原生接受 raw PDF/DOCX 不自动导致 Model ineligible。 |
 | 历史来源（Historical Provenance） | artifact、action、message、proposal、review decision、revision 的实际生成方式和执行来源。它属于具体对象或 revision，不是整条 record 上可随 Runtime 改写的单一标签。 |
 | 提取（Extraction） | 从 PDF、DOCX、TXT、Markdown、supported image 或 pasted text 机械读取内容并保留 source location 的过程。Extraction 不等于 Semantic Understanding。 |
 | 确定性解析/结构化（Deterministic Parsing / Structuring） | 使用可版本化、可解释的本地规则把 extracted content 整理成字段候选、evidence block 或 reviewable draft。它不等于 AI Understanding。 |
@@ -132,21 +134,26 @@ LOCAL
 = Read + Extract + OCR + Deterministic Rules
 
 MODEL
-= Local Preprocessing + Real Model Semantic Reasoning
+= Verified Source-Capable Model + Direct Semantic Reasoning
+
+when required:
+Mechanical Delivery Adaptation
 ```
 
 - Local 是明确、真实的 offline/local capability mode，不是“功能残缺的 AI”。
 - Local 能读取、OCR、提取并用确定规则整理材料，但不假装进行推理、语义判断或大模型理解。
-- Model Runtime 不表示所有文件处理都必须远程完成。file reading、text extraction 与 OCR 能够安全、机械地在本地完成时，应继续 Local-first。
-- Model Runtime 可以复用 Local extraction、Apple Vision OCR 与 deterministic preprocessing；只有需要语义理解、reasoning 或 inference 的步骤才调用 Provider。
+- Model Runtime 只允许选择经现有 capability authority 验证、通过 Ariadne Model eligibility validation 的 Provider/model；普通 text-only/chat-only model 不作为完整 Ariadne Model Runtime。
+- Model Runtime 不表示所有文件处理都必须远程完成。file reading、text extraction、OCR 与 page rendering 能够安全、机械地在本地完成时，可以作为 delivery adaptation 保持 Local-first。
+- Model Runtime 优先把原始材料以 selected model 直接支持的最直接 representation 交给该模型；只有 delivery 需要时才执行 mechanical adaptation。
+- Local CareerEntity 或 JD deterministic parser 不是 Model semantic understanding 的 mandatory preprocessing layer；它们不得替 selected model 先完成一次语义结构化再冒充 Model input/result。
 - 任何 Model semantic result 必须来自实际 selected Provider/model；Local deterministic output 不得成为 Model semantic substitute。
 
 | Capability | LOCAL | MODEL RUNTIME |
 |---|---|---|
 | intake | 接收并在本地保存 source；零 Provider call | 先在本地接收、标识、hash，再按 disclosure/consent 决定传输 |
-| extraction | 本地读取 PDF、DOCX、TXT、Markdown、supported image 与 pasted text | 优先复用同一本地 extraction；extraction 本身不算 model understanding |
-| OCR | Apple Vision OCR；结果须 review | 可复用 Apple Vision OCR 作为 local preprocessing；发送原图/渲染页要求 snapshot model 具有已验证 vision capability |
-| deterministic parsing | 支持 conservative Candidate/CareerEntity rules 与 local JD rule parsing，必须标为 rule-based/local | 可作为 preprocessing，但不得冒充 model semantic output |
+| extraction | 本地读取 PDF、DOCX、TXT、Markdown、supported image 与 pasted text | raw source 不能直接交付时才作为 mechanical delivery adaptation；extraction 本身不算 model understanding |
+| OCR | Apple Vision OCR；结果须 review | verified image/vision input 时优先直接发送 supported original image；OCR→text 仅是明确允许的 mechanical delivery adaptation，不是默认步骤 |
+| deterministic parsing | 支持 conservative Candidate/CareerEntity rules 与 local JD rule parsing，必须标为 rule-based/local | 不是 Model import mandatory preprocessing；可独立用于 deterministic duplicate detection、validation 或显式辅助 artifact，但不得代替 model semantic reasoning |
 | semantic understanding | 不支持 | 只有真实 selected Provider/model call 后才支持 |
 | Candidate structuring | 规则明确时产生 limited local draft | selected model 产生 validated CandidateProposal |
 | Job structuring | 对真实 extracted/pasted text 产生 limited local draft | selected model 产生 validated JobProposal |
@@ -155,6 +162,27 @@ MODEL
 | conversation | 不显示 pane；无 Send；零 Provider call | pane 可见；每次 Send 真实调用当次 snapshotted Provider/model |
 | proposal generation | 仅 deterministic draft/edit preview，不称为 AI | model Proposal/Patch/MergeProposal，必须 validation 且保持非权威 |
 | persistence | Source、artifact、draft、decision、confirmed revision 均可本地持久化 | 同样本地持久化，并附不可变 model execution provenance |
+
+### Model eligibility vs source delivery compatibility
+
+Model Runtime selector / Add Model 的可执行资格不是由 Provider model list、marketing name 或字符串中是否包含 `multimodal` 决定。权威链路是：
+
+```text
+Provider/model identity
+→ existing RuntimeCapability / Provider capability evidence
+→ Ariadne Model eligibility validation
+→ eligible Model Runtime
+```
+
+- 未验证（unverified）的 model 不得成为可执行 Model Runtime。
+- 不满足 Ariadne Candidate/JD semantic material understanding contract 的 model 不得成为可执行 Model Runtime。
+- 只支持普通 text chat、缺少 verified multimodal/source-capable model contract 的 model 不进入可执行 selector；不能通过 extraction/OCR 把它升级为 eligible Runtime。
+- `multimodal` 只说明可能存在多种 input modality，不证明 API 能原样接收 PDF、DOCX 或任意 document format。
+- Existing RuntimeCapability / Provider capability contract 是唯一 capability authority。当前仓库已有 `TEXT`、`VISION`、`STRUCTURED_JSON`、`multimodal_readiness`、`vision`、`semantic_understanding`、Candidate/Job structuring 等 vocabulary；Slice 6 必须优先复用，不得建立平行 registry 或第二套互相冲突的 flags。
+- Model eligibility 与单个 file container 的 native upload support 是两个判断。Eligibility 回答“该 model 是否具备 Ariadne 要求的真实 multimodal/source material semantic capability”；它不要求每个 eligible model 都原生接受 raw PDF 和 raw DOCX。
+- Source delivery compatibility 只在 Model eligibility 已通过后回答“当前 SourceDocument 如何交给该 model”。当前仓库已有 `supports_complete_document_review`、`document_delivery`（例如 `original_pdf`、`rendered_pdf_pages`、`not_implemented`）与 RuntimeSnapshot `delivery_method`；Slice 6 应在这些现有合同内规范 direct/adapted route，并只在确有必要时做 versioned extension。
+- Raw PDF/DOCX direct input 不是所有 eligible model 的共同要求。只要当前 source 存在 verified direct route，或存在把 source 转成该 eligible model 已验证接受的 `TEXT` / `VISION` representation 的 non-semantic mechanical route，且 semantic result 真实来自 selected model，该 source 可以合规处理。
+- Delivery adaptation 不能反向授予 Model eligibility。普通 text-only/chat-only model 即使能够接收 OCR/extracted text，仍不具备 Ariadne Model Runtime 资格。
 
 ## 7. Current Runtime vs Historical Provenance
 
@@ -300,10 +328,12 @@ PDF / DOCX / TXT / Markdown / supported image / pasted text
 ```text
 SourceDocument
 → local preservation/hash
-→ capability check
-→ disclosure/consent
+→ validate selected model eligibility from existing capability authority
+→ resolve this SourceDocument's verified delivery compatibility
+→ choose most direct supported delivery route
+→ disclosure/consent for exact Provider + model + outbound representation
 → RuntimeSnapshot
-→ local extraction / Apple Vision OCR where appropriate
+→ mechanical delivery adaptation only when required
 → Provider adapter
 → real model semantic understanding / reasoning / inference
 → structured Proposal response
@@ -316,7 +346,7 @@ SourceDocument
 
 ### Model semantic responsibility
 
-Model Runtime 在 Local preprocessing 之上增加以下真实大模型能力：
+Model Runtime 由 eligible selected Provider/model 直接承担以下真实大模型能力：
 
 - Semantic Understanding；
 - Reasoning；
@@ -325,7 +355,7 @@ Model Runtime 在 Local preprocessing 之上增加以下真实大模型能力：
 - AI Conversation；
 - Model Merge Proposal。
 
-Local extraction、OCR 与 deterministic parsing 可以为 Model operation 准备 input，但不能被算作该 Model 的 semantic result。严禁：
+Local mechanical extraction、OCR 或 page rendering 可以在 raw source delivery 不受支持时准备 model input，但不能被算作该 Model 的 semantic result。Local CareerEntity/JD deterministic parsing 不属于 Model import 的必经步骤。严禁：
 
 ```text
 selected Model
@@ -334,6 +364,25 @@ selected Model
 ```
 
 如果 selected Provider/model 未实际执行或 semantic output 未通过 validation，该 operation 必须失败并遵守 explicit fallback contract，不得用 Local result 填补 Model result。
+
+### Source delivery strategy
+
+Source delivery compatibility 只对已经通过 Model eligibility validation 的 selected model 求值。Delivery 必须由同一个 RuntimeCapability / Provider capability authority 根据当前 SourceDocument 与 snapshotted Provider/model 选择，优先采用该 model 已验证支持的最直接 representation；它不重新决定或放宽 Model eligibility：
+
+| Source | Preferred verified delivery | Mechanical adaptation when direct delivery is unavailable |
+|---|---|---|
+| TXT / Markdown / pasted text | exact text input | 必要的安全 decoding/normalization；不得先运行 Candidate/JD semantic parser |
+| image | supported original image 直接交给 verified image/vision model | 只有未来 capability contract 明确允许该 model 通过 text representation 处理此 source 时，才可 Apple Vision OCR→text；这不是当前 text-only model eligibility 的绕过方式 |
+| PDF | Provider/model verified raw PDF/document input 时发送 original PDF | 否则按 verified input capability 选择 native text extraction、page rendering→image，或二者的明确组合 |
+| DOCX | Provider/model/adapter verified direct document input 时发送 original DOCX | 否则执行 mechanical DOCX text extraction→model |
+
+- Mechanical adaptation 的唯一职责是把 source 可靠地转换为 selected model 已验证接受的 representation；它不是 Local semantic understanding。
+- 一个 eligible multimodal/source-capable model 不会仅因缺少 raw PDF 或 raw DOCX upload support 而整体失去资格；是否能处理该具体 source，取决于是否存在下面任一 verified route：native container、exact-text mechanical extraction，或 page rendering→verified `VISION` input。
+- 普通 text-only/chat-only model 即使存在 OCR/extracted-text route 仍然 ineligible；mechanical adaptation 只能为 eligible model 解决具体 container/representation delivery，不能绕过 selector eligibility。
+- Adaptation method、input representation、output representation 与 loss/limitations 必须进入 `delivery_method`、ExtractionArtifact 或等价 provenance。
+- 不得为了统一 pipeline 强制执行 CareerEntity deterministic structuring 或 JD deterministic parsing，再把这些本地结构当成 Model understanding input。
+- Native structured-output、JSON schema、tool calling 或 adapter-normalized structured response 均须由 Slice 6 的 capability/adapter contract 验证；最终 Proposal 仍必须通过 Ariadne schema 与 grounding validation。
+- 如果当前 source 没有任何 verified compatible delivery，operation 必须在传输前 fail closed。未来若提供其他 delivery alternative，必须明确展示并由用户选择；不得自动换模型或自动切 Local semantic path。
 
 ### Local boundary and transmission boundary
 
@@ -346,11 +395,13 @@ selected Model
 
 可能离开设备的内容必须在 action-scoped disclosure 中明确：
 
-- PDF：selected adapter 明确支持时可发送原 PDF；否则可发送本地渲染页或 extracted text；
-- DOCX：首个安全版本默认只发送 extracted text；
-- image：只有 snapshot model 具备 verified vision capability 时才可发送原 image bytes 或 rendered page；
-- pasted text：可发送用户本次提供的 exact text；
+- TXT / Markdown / pasted text：可发送用户本次提供或机械提取的 exact text；
+- PDF：selected Provider/model/adapter 明确支持时可发送原 PDF；否则可发送本地渲染页、extracted text 或 capability-authorized combination；
+- DOCX：direct document input 已验证时可发送原 DOCX；否则只发送机械提取的 exact text；
+- image：snapshot model 具备 verified image/vision input 时可发送 supported original image；OCR text alternative 必须符合 source capability contract；
 - source URL：默认只保留为 local provenance，不自动 fetch 或 transmit。
+
+任何 source payload 离开本机前，disclosure 至少必须明确当前目标 Provider、Model 与将发送的 representation。用户选择 Model Runtime 不得被描述为完全本地执行；本 clarification 不规定具体 consent UI。
 
 Credential 永远不得进入：
 
@@ -366,7 +417,7 @@ Credential 永远不得进入：
 中央 Provider adapter 必须解析并执行：
 
 ```text
-provider + model + protocol + verified capabilities
+provider + model + protocol + verified source/input capabilities
 + adapter_version + credential_ref
 + prompt_version + schema_version + delivery_method
 ```
@@ -605,7 +656,7 @@ Assistant text、tool-looking response 或已持久化 message 均不得直接�
 | unavailable model | 禁止使用该 selection 发起新 operation；要求用户重新选择 |
 | invalid JSON | parsing failure；不创建 Proposal |
 | schema mismatch | contract validation failure；不创建 Proposal |
-| unsupported vision | transmission 前停止；可明确提供“仅使用 extracted text”等替代方案 |
+| unsupported source/input capability | transmission 前停止；当前 model 不可执行该 source；未来可明确提供 capability-compatible delivery、重新选择 eligible model 或显式 Local operation，但不得自动切换 |
 | model import failure | confirmed record 不变；保留 SourceDocument 与合法 local artifacts |
 | merge failure | existing record 不变；queue 暂停等待显式 retry/keep/cancel/Local choice |
 | conversation failure | 不生成 fabricated assistant message；保存 failed run 与 user-message delivery state |
@@ -621,7 +672,7 @@ Model operation fails
 → new execution decision / ProcessingRun / provenance
 ```
 
-禁止 silent Model→Local fallback。显式 Local alternative 也不能复用或伪装为原 Model provenance。
+禁止 silent Model→Local fallback、silent model substitution 或未经验证的 delivery substitution。显式 Local/delivery alternative 也不能复用或伪装为原 Model provenance。
 
 ### Failure and cancel are distinct
 
@@ -686,11 +737,16 @@ Fixture 必须停止成为 user-facing execution path，但在真实替代路径
 
 ### MODEL
 
+- selector 中的可执行 model 全部通过 evidence-backed Ariadne Model eligibility validation；Provider list presence、model name 或 marketing `multimodal` label 均不能单独授予 eligibility。
+- eligible multimodal model + no native DOCX + verified exact-text delivery 必须允许 DOCX mechanical extraction→selected model；no native raw PDF + verified page/image delivery 必须允许 page rendering→selected model。
+- 普通 text-only/chat-only model + OCR/extracted-text route 仍必须被 selector 排除；delivery compatibility 不得授予或提升 Model eligibility。
 - outbound adapter call 包含用户选择的 exact Provider 与 model。
 - RuntimeSnapshot identity 与 ProcessingRun、Proposal/message provenance 一致。
 - 每个 Model-capable operation 都有真实 adapter invocation；fixture/deterministic output 不能声明 Model provenance。
-- local extraction/OCR 可以作为 Model preprocessing，但 semantic Proposal 必须由真实 selected Provider/model response 产生。
-- capability 不满足时在传输前停止。
+- raw source direct delivery 已验证时优先直接交给 selected model；不支持 raw format 时只执行 capability-authorized mechanical delivery adaptation。
+- Local CareerEntity/JD deterministic parsing 不是 Model import mandatory preprocessing；semantic Proposal 必须由真实 selected Provider/model response 产生。
+- PDF raw input、PDF page rendering/text、DOCX raw input/text 与 image original/OCR-text 等 delivery branches 均有 capability evidence、`delivery_method` 与 provenance regression。
+- 当前 source 没有任何 verified compatible delivery route 时在传输前停止；不得换模型或切 Local semantic fallback。
 
 ### PROVENANCE
 
@@ -773,12 +829,12 @@ Personal 与 JD 必须共享以下 mandatory regressions：
 - **ALTERNATIVES REJECTED：** 为统一 UI copy 把 deterministic output 称为 AI。
 - **IMPLEMENTATION CONSEQUENCE：** Local labels、progress states 与 provenance 必须真实；优先复用 repository 既有 extraction/parser capability，unsupported field 保持 unknown/manual review。
 
-### ADR-05 — Model operation 必须真实执行 selected identity
+### ADR-05 — Model operation 必须真实执行 eligible selected identity
 
-- **DECISION：** Model Runtime 可以复用 Local preprocessing，但 import semantic understanding、merge proposal 与 conversation 必须调用所选 Provider/model。
-- **WHY：** UI identity、费用、隐私和结果 provenance 必须一致。
-- **ALTERNATIVES REJECTED：** 强制所有机械文件处理远程执行；显示 model 但返回 fixture/local deterministic semantic substitute。
-- **IMPLEMENTATION CONSEQUENCE：** adapter 未可用时 fail closed，不生成假结果。
+- **DECISION：** Model Runtime 只允许经过现有 RuntimeCapability / Provider capability evidence 与 Ariadne Model eligibility validation 的 Provider/model；eligibility 不要求原生接受每一种 file container。对已 eligible model，import 再按当前 SourceDocument 解析 verified direct/mechanical delivery；semantic understanding、merge proposal 与 conversation 必须调用所选 Provider/model。
+- **WHY：** UI identity、source compatibility、费用、隐私和结果 provenance 必须一致；`multimodal` 名称本身不能证明具体 API input contract。
+- **ALTERNATIVES REJECTED：** 普通 text-only chat model 作为完整 Ariadne Runtime；Provider list/name 自动授予 eligibility；强制所有机械文件处理远程执行；强制 Local CareerEntity/JD parser 成为 Model semantic 前置层；显示 model 但返回 fixture/local deterministic semantic substitute。
+- **IMPLEMENTATION CONSEQUENCE：** selector 只暴露 eligible multimodal/source-capable models；Slice 6 在现有 capability authority 内分别执行 eligibility validation 与 per-source delivery routing。缺少 raw PDF/DOCX support 本身不淘汰 eligible model；没有 verified delivery route 时才对该 source fail closed，不生成假结果、不静默换模型或切 Local。
 
 ### ADR-06 — AI Conversation 只在 Model Runtime 可用
 
@@ -890,34 +946,34 @@ Slice 顺序已经通过 review。Multi-file Cancel Contract 修订**不需要�
 
 ### Slice 6 — Provider execution boundary
 
-- **Objective：** 建立 central adapter、credential reference、discovery/capability 与 normalized failures。
+- **Objective：** 建立 central adapter、credential reference，并在现有 Provider/model capability authority 内明确分离 Ariadne Model eligibility 与 per-SourceDocument direct/mechanical delivery routing，以及 normalized failures。
 - **Dependency：** Slices 1–3；`Initial Provider allowlist` 与 `Credential storage` 须在本 Slice 前确定。
 - **Likely files/areas：** new `src/provider_execution.py`、`provider_runtime.py`、`app.py`、Add Model/runtime UI。
-- **Risks：** Provider protocol 与 credential storage 差异；重复连接逻辑；secret leakage。
-- **Acceptance criteria：** selected identity 恰好进入一个 adapter；capability fail closed；key 不进入 Proposal/log/export/model context。
-- **Regression/eval：** adapter routing、exact model propagation、credential-reference-only、normalized error、unsupported capability preflight tests。
+- **Risks：** Provider protocol、source modality 与 credential storage 差异；把 model list/marketing label 误当 capability evidence；重复连接逻辑；secret leakage。
+- **Acceptance criteria：** selected identity 恰好进入一个 adapter；selector 只允许 Ariadne-compatible multimodal/source-capable models；ordinary text-only + adaptation 仍 ineligible；raw PDF/DOCX support 不作为通用 eligibility requirement；existing capability/delivery authority 能为每个 source 选择最直接 verified delivery；无 route 时 fail closed；key 不进入 Proposal/log/export/model context。
+- **Regression/eval：** adapter routing、exact model propagation、eligible/ineligible selector filtering、Provider-list/name/text-only-with-adaptation negative tests、eligible-without-native-DOCX + exact-text positive test、eligible-without-native-PDF + page/image positive test、raw PDF/DOCX/image direct-delivery tests、mechanical text/page-rendering adaptation tests、no-route fail-closed、credential-reference-only、normalized error。
 - **Recommended model：** Sol High。
 - **Git commit boundary：** `arch: centralize provider execution and credentials`
 
 ### Slice 7 — Model-backed Candidate import
 
-- **Objective：** 在 Slice 4 的 local extraction/OCR preprocessing 之上，实现真实 Candidate semantic understanding、CandidateProposal generation、validation 与 review。
+- **Objective：** 在 selected model eligibility 已由 Slice 6 验证后，对 SourceDocument 解析最直接 verified delivery route，由真实 selected model 完成 Candidate semantic understanding、CandidateProposal generation、validation 与 review；Slice 4 CareerEntity deterministic pipeline 不是 mandatory preprocessing。
 - **Dependency：** Slices 3、4、6。
 - **Likely files/areas：** `src/candidate_context.py`、new route、Personal UI、tests/evals。
-- **Risks：** grounding、malformed output、vision/source delivery、cancel 后 late response 写 truth。
-- **Acceptance criteria：** selected Provider/model 真实承担 semantic reasoning；validated Proposal 来自该 model response；local deterministic result 不冒充 model result；不 auto-confirm；cancelled source 不形成 authoritative record。
-- **Regression/eval：** exact adapter identity；schema/grounding failure；no silent fallback；cancel 后后续 files 无 Provider call；新导入剩余 files 创建新 batch/snapshot。
+- **Risks：** grounding、malformed output、错误 source capability/delivery routing、把 Local CareerEntity draft 当 model input/result、cancel 后 late response 写 truth。
+- **Acceptance criteria：** selected eligible Provider/model 真实承担 semantic reasoning；raw source 直接支持时优先 direct delivery，不支持时只使用 verified mechanical adaptation；validated Proposal 来自该 model response；Local CareerEntity result 不冒充 model result；不 auto-confirm；cancelled source 不形成 authoritative record。
+- **Regression/eval：** exact adapter identity；source capability/delivery branch；deterministic Candidate parser non-mandatory negative test；schema/grounding failure；no silent fallback/model substitution；cancel 后后续 files 无 Provider call；新导入剩余 files 创建新 batch/snapshot。
 - **Recommended model：** Sol High。
 - **Git commit boundary：** `feat: add model backed candidate import proposals`
 
 ### Slice 8 — Model-backed JD import
 
-- **Objective：** 在 Slice 5 的 local extraction/OCR preprocessing 之上，实现真实 JD semantic understanding、JobProposal 与 requirement structuring。
+- **Objective：** 在 selected model eligibility 已由 Slice 6 验证后，对 SourceDocument/pasted source 解析最直接 verified delivery route，由真实 selected model 完成 JD semantic understanding、JobProposal 与 requirement structuring；Slice 5 local JD deterministic parser 不是 mandatory preprocessing。
 - **Dependency：** Slices 3、5、6。
 - **Likely files/areas：** Job contracts、Provider prompt、route、JD UI、tests/evals。
-- **Risks：** 将 Candidate matching 混入 Job Understanding；malformed/ungrounded requirements；cancel late result。
-- **Acceptance criteria：** 真实 selected model call 承担 JD semantic reasoning；Job-only structured Proposal 来自该 model response；local JD rules 不冒充 model result；review/confirm 后才形成 JobContext revision。
-- **Regression/eval：** exact adapter identity；Job/Candidate scope isolation；no silent fallback；cancel 后 remaining files 无 Provider call；前序 results 保留。
+- **Risks：** 将 Candidate matching 混入 Job Understanding；错误 source capability/delivery routing；malformed/ungrounded requirements；把 local JD rule output 当 model input/result；cancel late result。
+- **Acceptance criteria：** 真实 selected eligible model call 承担 JD semantic reasoning；raw source 直接支持时优先 direct delivery，不支持时只使用 verified mechanical adaptation；Job-only structured Proposal 来自该 model response；local JD rules 不冒充 model result；review/confirm 后才形成 JobContext revision。
+- **Regression/eval：** exact adapter identity；source capability/delivery branch；local JD parser non-mandatory negative test；Job/Candidate scope isolation；no silent fallback/model substitution；cancel 后 remaining files 无 Provider call；前序 results 保留。
 - **Recommended model：** Sol High。
 - **Git commit boundary：** `feat: add model backed job import proposals`
 
@@ -989,11 +1045,13 @@ Slice 1 只冻结通用 capability authority、RuntimeSnapshot、execution ident
 
 在到达上述 decision gate 前，可按以下推荐默认值继续规划，但这些默认值不等于最终产品决定：
 
-- **Initial Provider allowlist：** 先只开放一个真正端到端可用的 Provider；其他 model choice 在 import、merge、conversation 全部合规前隐藏或 disabled。
+- **Initial Provider allowlist：** 先只开放一个真正端到端可用且通过 Ariadne Model eligibility validation、并具有当前产品 source 的 verified delivery coverage 的 Provider/model；普通 text-only、capability unverified 或只存在于 Provider listing 的 model 不进入可执行 selector；其他 model choice 在 import、merge、conversation 全部合规前隐藏或 disabled。
 - **Credential storage：** desktop localhost 使用 macOS Keychain；未来 browser-direct BYOK 使用 session memory；不把 API key 持久化到 `localStorage`。
 - **Local Candidate supported formats/limits/review UX：** 当前沿用 PNG/JPEG、Apple Vision OCR、extracted-evidence review 的保守方案；只有 existing rules 有充分 OCR evidence 时才形成 field candidate，且始终不声称 semantic Candidate understanding。
 - **Conversation source transmission：** 默认发送 current structured record、compact cited excerpts 与最近八条同 scope messages；完整 source/page/image 需要显式 per-send attachment/disclosure。
 - **Legacy Provider pages：** 保留 historical data readability；Provider action 默认受 Current Runtime gate，无法合规接入的 action 暂时 disabled。
+
+本 clarification 已冻结 Model eligibility 与 Source Delivery Compatibility 的分离原则及 delivery priority；`Initial Provider allowlist` 仍须在 Slice 6 前确定具体 Provider/model identity，但不得重新允许普通 text-only 或 capability unverified model 成为完整 Ariadne Runtime，也不得把 raw PDF/DOCX native upload support 误设为所有 eligible model 的共同门槛。
 
 ## 23. Gate Status
 
