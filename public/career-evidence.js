@@ -25,6 +25,7 @@ const DEMO_CONVERSATIONS = "demo_conversations";
 const DEMO_UI_STATE = "demo_ui_state";
 const Domain = window.CareerEvidenceDomain;
 const AIDomain = window.AICareerContextDomain;
+const RuntimeGate = window.JobRadarRuntimeGate;
 let selectedSourceId = null;
 let selectedAIContextId = null;
 let selectedAIFile = null;
@@ -232,10 +233,29 @@ function setAIProgress(state, message) {
   show("ai-import-message", message, state === "failed");
 }
 
+function candidateProviderGate(provider = byId("ai-provider")?.value, model = byId("ai-model")?.value.trim()) {
+  try {
+    return RuntimeGate.legacyProviderAction({ provider, model: model || null, capability: "candidate_model_structuring" });
+  } catch (_error) {
+    return { allowed: false, state: "unsupported", identity_matches: false };
+  }
+}
+
+function legacyCandidateUnavailableMessage() {
+  return "此旧版 Provider 操作尚未安全接入当前运行时能力权限，现已停用；不会发送资料，也不会生成替代结果。";
+}
+
+function updateLegacyProviderGates() {
+  byId("deepseek-document-preflight").disabled = !candidateProviderGate("deepseek", null).allowed;
+  byId("gemini-document-preflight").disabled = !candidateProviderGate("gemini", null).allowed;
+  updateAIStartButton(true);
+}
+
 function updateAIStartButton(preserveProgress = false) {
-  const ready = Boolean(selectedAIFile && byId("ai-upload-consent").checked && byId("ai-cost-consent").checked && byId("ai-model").value.trim() && !aiSendInProgress);
+  const providerGate = candidateProviderGate();
+  const ready = Boolean(providerGate.allowed && selectedAIFile && byId("ai-upload-consent").checked && byId("ai-cost-consent").checked && byId("ai-model").value.trim() && !aiSendInProgress);
   byId("run-ai-career-ingestion").disabled = !ready;
-  if (selectedAIFile && !aiSendInProgress && !preserveProgress) setAIProgress(ready ? "ready" : "idle", ready ? "两项确认已完成。点击“开始解析”后会发送一次完整资料。" : "请完成两项确认，并先检查所选模型；尚未发送。");
+  if (selectedAIFile && !aiSendInProgress && !preserveProgress) setAIProgress(ready ? "ready" : "idle", ready ? "两项确认已完成。点击“开始解析”后会发送一次完整资料。" : providerGate.allowed ? "请完成两项确认，并先检查所选模型；尚未发送。" : legacyCandidateUnavailableMessage());
 }
 
 async function renderAIContexts() {
@@ -260,6 +280,8 @@ async function renderAIContexts() {
 }
 
 async function ingestWithAI(file, forceRegenerate = false, documentType = byId("ai-document-type").value) {
+  const providerGate = candidateProviderGate();
+  if (!providerGate.allowed) throw new Error("current_runtime_candidate_model_structuring_unavailable");
   if (mediaTypeFor(file) !== "application/pdf") throw new Error("AI 模式当前只接受原始 PDF");
   if (file.size > 50_000_000) throw new Error("原始 PDF 超过当前模型服务商 50 MB 直传上限；原文件不会被改写或压缩后偷偷上传");
   const sourceHash = await sha256File(file);
@@ -742,6 +764,7 @@ byId("ai-career-document").addEventListener("change", async (event) => {
   event.target.value = "";
 });
 byId("run-ai-career-ingestion").addEventListener("click", async () => {
+  if (!candidateProviderGate().allowed) { setAIProgress("failed", legacyCandidateUnavailableMessage()); return; }
   if (!selectedAIFile) { show("ai-import-message", "请先选择一份原始 PDF。", true); return; }
   if (aiSendInProgress) return;
   aiSendInProgress = true;
@@ -765,6 +788,7 @@ byId("save-ai-api-key").addEventListener("click", async () => {
   } catch (error) { show("ai-import-message", `Key 保存失败：${error.message}`, true); }
 });
 byId("deepseek-document-preflight").addEventListener("click", async () => {
+  if (!candidateProviderGate("deepseek", null).allowed) { show("ai-import-message", legacyCandidateUnavailableMessage(), true); return; }
   try {
     show("ai-import-message", "正在检查 DeepSeek 账号可用的完整资料模型；不会发送任何职业资料…");
     const response = await fetch("/api/ai-providers/deepseek/document-preflight", { method: "POST" });
@@ -780,6 +804,7 @@ byId("deepseek-document-preflight").addEventListener("click", async () => {
   } catch (error) { show("ai-import-message", `DeepSeek 模型检查失败：${error.message}`, true); }
 });
 byId("gemini-document-preflight").addEventListener("click", async () => {
+  if (!candidateProviderGate("gemini", null).allowed) { show("ai-import-message", legacyCandidateUnavailableMessage(), true); return; }
   try {
     show("ai-import-message", "正在检查 Gemini 当前账号可用的完整资料模型；不会发送任何职业资料…");
     const response = await fetch("/api/ai-providers/gemini/document-preflight", { method: "POST" });
@@ -802,6 +827,7 @@ byId("ai-provider").addEventListener("change", () => {
 });
 byId("ai-upload-consent").addEventListener("change", updateAIStartButton);
 byId("ai-cost-consent").addEventListener("change", updateAIStartButton);
+RuntimeGate.subscribe(updateLegacyProviderGates);
 byId("accept-ai-context").addEventListener("click", async () => {
   try {
     const artifact = await get(AI_CAREER_CONTEXTS, selectedAIContextId);
@@ -856,4 +882,5 @@ byId("correction-form").addEventListener("submit", async (event) => {
 byId("export-entities").addEventListener("click", () => exportArtifacts("entities"));
 byId("export-evidence").addEventListener("click", () => exportArtifacts("evidence"));
 byId("export-profile").addEventListener("click", () => exportArtifacts("profile"));
+updateLegacyProviderGates();
 Promise.all([renderAll(), loadAIConfig()]).catch((error) => show("import-message", `无法打开本地职业资料库：${error.message}`, true));

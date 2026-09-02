@@ -3,9 +3,11 @@ const DB_NAME = "job-radar-local-first-v1";
 const DB_VERSION = 10;
 const JOBS = "jobs";
 const CANDIDATES = "candidates";
+const RuntimeGate = window.JobRadarRuntimeGate;
 let activeCandidateId = null;
 let pendingImages = [];
 let deepseekConfigured = false;
+let deepseekModel = null;
 const FULL_VISION_PROMPT = "vision_extract_v1_full";
 
 function openDatabase() {
@@ -178,7 +180,15 @@ function renderReviewEvidence(candidate) {
 function renderPendingImages() {
   byId("image-preview-list").innerHTML = pendingImages.map((image, index) => `<figure><img class="image-preview" src="${image.dataUrl}" alt="待识别 JD 截图 ${index + 1}"><figcaption>截图 ${index + 1}：${escapeHtml(image.name)}</figcaption></figure>`).join("");
   byId("ocr-button").disabled = pendingImages.length === 0;
-  byId("vision-button").disabled = pendingImages.length === 0 || !deepseekConfigured;
+  byId("vision-button").disabled = pendingImages.length === 0 || !deepseekConfigured || !jobProviderGate().allowed;
+}
+
+function jobProviderGate() {
+  try {
+    return RuntimeGate.legacyProviderAction({ provider: "deepseek", model: deepseekModel, capability: "job_model_structuring" });
+  } catch (_error) {
+    return { allowed: false, state: "unsupported", identity_matches: false };
+  }
 }
 
 async function refreshVisionConfiguration() {
@@ -186,11 +196,13 @@ async function refreshVisionConfiguration() {
     const response = await fetch("/api/local-vision-config");
     const result = await response.json();
     deepseekConfigured = Boolean(response.ok && result.key_configured);
+    deepseekModel = response.ok ? result.model : null;
     show("vision-config-message", deepseekConfigured
       ? `DeepSeek Key 已保存在本机 Keychain；视觉模型：${result.model}。`
       : "尚未保存 DeepSeek Key；AI 读取按钮会保持禁用。");
   } catch (error) {
     deepseekConfigured = false;
+    deepseekModel = null;
     show("vision-config-message", "无法连接本机服务；请用 http://127.0.0.1:8000 打开页面。", true);
   }
   renderPendingImages();
@@ -289,6 +301,10 @@ byId("save-deepseek-key").addEventListener("click", async () => {
 
 byId("vision-button").addEventListener("click", async () => {
   if (!pendingImages.length) return;
+  if (!jobProviderGate().allowed) {
+    show("ocr-message", "此旧版视觉模型操作尚未安全接入当前运行时能力权限，现已停用；不会发送图片，也不会生成替代结果。", true);
+    return;
+  }
   const sourceUrl = canonicalizeSourceLink(byId("source-link").value);
   show("ocr-message", `将把 ${pendingImages.length} 张截图发送给 DeepSeek 视觉模型，正在读取…`);
   try {
@@ -319,6 +335,8 @@ byId("vision-button").addEventListener("click", async () => {
     show("ocr-message", messages[error.message] || "视觉 AI 结果未通过校验；没有写入职位。", true);
   }
 });
+
+RuntimeGate.subscribe(renderPendingImages);
 
 if (window.location.protocol === "file:") {
   const warning = byId("runtime-warning");

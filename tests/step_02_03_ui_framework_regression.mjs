@@ -23,6 +23,8 @@ for (const html of [workspace, personal, personalImport, candidateDetail, jd, jo
   assert.match(html, /v1-motion-33/);
   assert.match(html, /floating-window\.js\?v=v1-motion-33/);
   assert.match(html, /v1-demo-domain\.js\?v=v1-motion-33/);
+  assert.ok(html.indexOf("runtime-capabilities.js") < html.indexOf("runtime-capability-gate.js"));
+  assert.ok(html.indexOf("runtime-capability-gate.js") < html.indexOf("v1-pages.js"));
 }
 
 // Workspace and navigation grammar.
@@ -60,8 +62,9 @@ assert.match(candidateDetail, /candidate-patch-proposal/);
 assert.match(candidateDetail, /直接编辑预览/);
 assert.match(candidateDetail, /id="open-direct-edit"[^>]*>编辑</);
 assert.doesNotMatch(candidateDetail, /直接编辑摘要与事实/);
-assert.match(pages, /runtime\.mode === "ai"/);
-assert.match(pages, /byId\(editButtonId\)\?\.classList\.toggle\("hidden", modelMode\)/);
+assert.match(pages, /const conversationAllowed = runtime\.mode === "model" && gate\.allowed/);
+assert.match(pages, /byId\(editButtonId\)\?\.classList\.toggle\("hidden", conversationAllowed\)/);
+assert.doesNotMatch(pages, /preview-source|appendDemoMessage|initCandidateConversation|initJobConversation/);
 assert.match(pages, /form\.scrollIntoView\(\{ behavior: "smooth", block: "center" \}\)/);
 
 // JD is separate, has five requirements, and no match surface.
@@ -289,8 +292,8 @@ assert.match(pages, /const batchSuffix = selectedCandidateSources\.length > 1 \?
 assert.match(pages, /\$\{source\.sizeLabel \|\| "本地文件"\}\$\{batchSuffix\} · 仅本地/);
 assert.doesNotMatch(pages, /支持多文件|可上传多个文件|批量上传/);
 assert.match(pages, /for \(const source of selectedCandidateSources\)/);
-assert.match(pages, /await processCandidateSource\(source\)/);
-assert.match(pages, /async function processCandidateSource\(source\)[\s\S]*await askDuplicateResolution/);
+assert.match(pages, /await processCandidateSource\(source, batchAuthority\)/);
+assert.match(pages, /async function processCandidateSource\(source, batchAuthority\)[\s\S]*await askDuplicateResolution/);
 assert.match(pages, /catch \(error\) \{[\s\S]*lastError = error;[\s\S]*continue;/);
 assert.match(pages, /if \(result\.cancelled\) \{/);
 assert.match(pages, /completeEmbeddedImport\("personal", lastSourceKey\)/);
@@ -308,8 +311,8 @@ assert.match(pages, /onFiles\(event\.dataTransfer\?\.files\)/);
 assert.match(pages, /const batchSuffix = selectedJobSources\.length > 1 \? ` · 共 \$\{selectedJobSources\.length\} 个文件` : ""/);
 assert.match(pages, /\$\{source\.sizeLabel \|\| "本地文本"\}\$\{batchSuffix\} · 仅本地/);
 assert.match(pages, /for \(const source of sources\)/);
-assert.match(pages, /await processJobSource\(source\)/);
-assert.match(pages, /async function processJobSource\(source\)[\s\S]*await askDuplicateResolution/);
+assert.match(pages, /await processJobSource\(source, batchAuthority\)/);
+assert.match(pages, /async function processJobSource\(source, batchAuthority\)[\s\S]*await askDuplicateResolution/);
 assert.match(pages, /catch \(error\) \{[\s\S]*lastError = error;[\s\S]*continue;/);
 assert.match(pages, /if \(result\.cancelled\) \{/);
 assert.match(pages, /completeEmbeddedImport\("jd", lastSourceKey\)/);
@@ -385,4 +388,4 @@ assert.doesNotMatch(pages, /installPageTransitions|v1-page-enter|v1-page-leaving
 assert.match(pages, /"personal-import": initPersonalImport/);
 assert.match(pages, /"job-import": initJobImport/);
 
-console.log(JSON.stringify({ step_02_03_ui_framework: "expanded_checks_pass", mini_sidebar_fisheye_contract: "compact_idle_expanded_proximity_active_emphasis_and_fade_navigation_pass", workspace_folders: "figma_vector_back_and_layered_hover_open_with_three_papers_pass", workspace_navigation: "folder_and_workspace_back_smooth_page_fade_pass", stored_card_detail: "selected_local_runtime_direct_edit_and_selected_model_runtime_scoped_conversation", import_guides: "personal_and_job_import_share_the_same_reversible_overlay_and_complete_in_place", page_motion: "folder_fade_overlay_morph_and_mini_fade_pass", real_provider_calls: "none", fixture_truth_separation: "pass" }, null, 2));
+console.log(JSON.stringify({ step_02_03_ui_framework: "expanded_checks_pass", mini_sidebar_fisheye_contract: "compact_idle_expanded_proximity_active_emphasis_and_fade_navigation_pass", workspace_folders: "figma_vector_back_and_layered_hover_open_with_three_papers_pass", workspace_navigation: "folder_and_workspace_back_smooth_page_fade_pass", stored_card_detail: "current_runtime_capability_gated_with_local_direct_edit", import_guides: "personal_and_job_import_share_the_same_reversible_overlay_and_complete_in_place", page_motion: "folder_fade_overlay_morph_and_mini_fade_pass", real_provider_calls: "none", fixture_truth_separation: "pass" }, null, 2));

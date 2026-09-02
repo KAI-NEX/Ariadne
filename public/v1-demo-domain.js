@@ -28,16 +28,16 @@
   const CANDIDATE_PROCESSING_STATES = [
     ["PREPARING", "正在准备本地材料"],
     ["WAITING", "等待本地解析任务"],
-    ["UNDERSTANDING", "正在理解材料结构"],
-    ["BUILDING_CARDS", "正在生成候选卡片"],
-    ["READY_FOR_REVIEW", "已生成 3 张待审核卡片"],
+    ["UNDERSTANDING", "正在按确定规则整理材料"],
+    ["BUILDING_CARDS", "正在生成本地演示卡片"],
+    ["READY_FOR_REVIEW", "已生成 3 张本地演示卡片"],
   ];
   const JOB_PROCESSING_STATES = [
     ["PREPARING", "正在准备职位材料"],
     ["WAITING", "等待本地解析任务"],
-    ["UNDERSTANDING", "正在理解职位描述"],
-    ["BUILDING_CARDS", "正在生成职位卡片"],
-    ["READY_FOR_REVIEW", "已生成 1 张职位卡片"],
+    ["UNDERSTANDING", "正在按确定规则整理职位材料"],
+    ["BUILDING_CARDS", "正在生成本地演示卡片"],
+    ["READY_FOR_REVIEW", "已生成 1 张本地演示卡片"],
   ];
   const CANDIDATE_PROMPT_PROFILES = {
     Resume: "candidate-resume-grounded-v2",

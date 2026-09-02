@@ -67,6 +67,13 @@ GEMINI_KEYCHAIN_ACCOUNT = "career-ingestion"
 APPLICATION_STATUSES = {
     "unknown", "not_applied", "applied", "interviewing", "rejected", "offer", "withdrawn"
 }
+LEGACY_PROVIDER_ACTION_PATHS = frozenset({
+    "/api/ai-providers/deepseek/text-preflight",
+    "/api/ai-providers/deepseek/document-preflight",
+    "/api/ai-providers/gemini/document-preflight",
+    "/api/ai-career-ingest",
+    "/api/vision-extract",
+})
 
 
 # These patterns deliberately produce review candidates, never authoritative Job fields.
@@ -769,6 +776,9 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802 - required by the standard library
         parsed = urlparse(self.path)
+        if parsed.path in LEGACY_PROVIDER_ACTION_PATHS:
+            self.legacy_provider_action_unavailable()
+            return
         if parsed.path == "/api/runtime-check":
             self.runtime_check()
             return
@@ -777,18 +787,6 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/ai-career-ingestion-config":
             self.configure_ai_career_ingestion()
-            return
-        if parsed.path == "/api/ai-providers/deepseek/text-preflight":
-            self.preflight_deepseek_text()
-            return
-        if parsed.path == "/api/ai-providers/deepseek/document-preflight":
-            self.preflight_deepseek_document()
-            return
-        if parsed.path == "/api/ai-providers/gemini/document-preflight":
-            self.preflight_gemini_document()
-            return
-        if parsed.path == "/api/ai-career-ingest":
-            self.run_ai_career_ingestion()
             return
         if parsed.path == "/api/local-vision-config":
             self.configure_local_vision()
@@ -801,9 +799,6 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/local-ocr":
             self.run_local_ocr()
-            return
-        if parsed.path == "/api/vision-extract":
-            self.run_vision_extraction()
             return
         if parsed.path == "/api/career-document-extract":
             self.extract_career_document_candidate()
@@ -818,13 +813,18 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
 
     def runtime_options(self) -> None:
         """List current runtime choices without sending career material or an inference."""
-        result = deepseek_runtime_models()
-        if not result["ok"]:
-            self.send_json(result["status"], {key: value for key, value in result.items() if key not in {"ok", "status"}})
-            return
+        descriptors = deepseek_model_descriptors([DEEPSEEK_VISION_MODEL])
         self.send_json(HTTPStatus.OK, {
-            "provider": "deepseek", "models": [item.to_public_dict() for item in v1_selector_descriptors(result["descriptors"])], "network_call_made": result["network_call_made"],
+            "provider": "deepseek", "models": [item.to_public_dict() for item in v1_selector_descriptors(descriptors)], "network_call_made": False,
             "career_data_sent": False,
+        })
+
+    def legacy_provider_action_unavailable(self) -> None:
+        """Fail closed until legacy Provider actions consume Current Runtime authority."""
+        self.send_json(HTTPStatus.CONFLICT, {
+            "error": "legacy_provider_action_disabled_pending_runtime_adapter",
+            "failure_layer": "capability",
+            "network_call_made": False,
         })
 
     def runtime_check(self) -> None:

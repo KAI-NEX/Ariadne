@@ -2,6 +2,7 @@
 
 (function () {
   const Demo = window.JobRadarV1Demo;
+  const RuntimeGate = window.JobRadarRuntimeGate;
   const page = document.body.dataset.v1Page;
   const isEmbeddedDetail = new URLSearchParams(window.location.search).get("embed") === "1";
   if (isEmbeddedDetail) document.body.classList.add("v1-embedded-detail");
@@ -18,18 +19,65 @@
   let activeCandidate = null;
   let activeJob = null;
   let pendingDirectEdit = null;
-  let pendingPatch = null;
-  let pendingJobPatch = null;
+  let candidateProcessingInProgress = false;
+  let jobProcessingInProgress = false;
 
-  function selectedRuntime() {
-    try { return JSON.parse(window.localStorage.getItem("job-radar-selected-runtime") || "null") || { mode: "local" }; }
-    catch (_error) { return { mode: "local" }; }
+  function currentOperationGate(operation) {
+    try { return RuntimeGate.operationGate(operation); }
+    catch (_error) {
+      return Object.freeze({
+        allowed: false,
+        operation,
+        capability: "invalid_current_runtime",
+        state: "unsupported",
+        authority: Object.freeze({ runtime: Object.freeze({ mode: "invalid", provider: null, model: null }), capabilities: Object.freeze({}) }),
+      });
+    }
   }
 
   function runtimeLabel(runtime) {
-    if (runtime.mode !== "ai") return "本地运行";
-    const provider = ({ deepseek: "DeepSeek", gemini: "Gemini", qwen: "Qwen", preview: "模型" }[runtime.provider] || runtime.provider || "模型");
+    if (runtime.mode !== "model") return "本地运行";
+    const provider = ({ deepseek: "DeepSeek", gemini: "Gemini", qwen: "Qwen" }[runtime.provider] || runtime.provider || "模型");
     return runtime.model ? `${provider} · ${runtime.model}` : provider;
+  }
+
+  function unavailableCopy(gate, subject) {
+    if (gate.authority.runtime.mode === "model") {
+      return `当前所选模型的${subject}能力尚未真实接通；操作已停用，不会生成模型样例，也不会静默改用本地结果。`;
+    }
+    return "当前运行方式无效；操作已安全停用，请重新选择运行方式。";
+  }
+
+  function setRuntimeGateMessage(elementId, message) {
+    const element = byId(elementId);
+    if (!element) return;
+    if (message) {
+      element.textContent = message;
+      element.classList.add("error");
+      element.dataset.runtimeGateMessage = "true";
+    } else if (element.dataset.runtimeGateMessage === "true") {
+      element.textContent = "";
+      element.classList.remove("error");
+      delete element.dataset.runtimeGateMessage;
+    }
+  }
+
+  function refreshCandidateImportGate() {
+    const gate = currentOperationGate("candidate_import");
+    const button = byId("start-personal-processing");
+    if (!button) return gate;
+    button.disabled = candidateProcessingInProgress || !selectedCandidateSources.length || !gate.allowed;
+    setRuntimeGateMessage("personal-page-message", gate.allowed ? "" : unavailableCopy(gate, "个人材料语义结构化"));
+    return gate;
+  }
+
+  function refreshJobImportGate() {
+    const gate = currentOperationGate("job_import");
+    const button = byId("start-job-processing");
+    if (!button) return gate;
+    button.disabled = jobProcessingInProgress || !selectedJobSource || !gate.allowed;
+    setRuntimeGateMessage("job-page-message", gate.allowed ? "" : unavailableCopy(gate, "职位语义结构化"));
+    return gate;
   }
 
   function askDuplicateResolution({ kind, count, aiMode }) {
@@ -571,10 +619,11 @@
     byId("personal-file-name").textContent = source.name;
     byId("personal-file-meta").textContent = `${source.type || selectedCandidateType} · ${source.sizeLabel || "本地文件"}${batchSuffix} · 仅本地`;
     byId("personal-file-icon").textContent = (source.extension || selectedCandidateType.slice(0, 3)).toUpperCase();
-    byId("start-personal-processing").disabled = false;
+    refreshCandidateImportGate();
   }
 
-  async function processCandidateSource(source) {
+  async function processCandidateSource(source, batchAuthority) {
+    if (batchAuthority.runtime.mode !== "local") throw new Error("model_candidate_import_not_connected");
     for (const [state, label] of Demo.CANDIDATE_PROCESSING_STATES) {
       byId("personal-processing").dataset.state = state;
       byId("personal-processing-state").textContent = label;
@@ -585,7 +634,7 @@
     const duplicates = Demo.findCandidateDuplicates(incoming, existing);
     let items = incoming;
     if (duplicates.length) {
-      const aiMode = selectedRuntime().mode === "ai";
+      const aiMode = batchAuthority.runtime.mode === "model";
       const resolution = await askDuplicateResolution({ kind: "candidate", count: duplicates.length, aiMode });
       if (resolution === "cancel") return { cancelled: true };
       if (resolution === "merge" && aiMode) throw new Error("模型融合需要一次真实模型调用；本轮未获调用批准，因此没有写入或覆盖任何材料。");
@@ -603,6 +652,10 @@
 
   async function runCandidateProcessing() {
     const button = byId("start-personal-processing");
+    const gate = refreshCandidateImportGate();
+    if (!gate.allowed) throw new Error(`runtime_capability_${gate.state}`);
+    const batchAuthority = gate.authority;
+    candidateProcessingInProgress = true;
     button.disabled = true;
     byId("personal-processing").classList.remove("hidden");
     let lastSourceKey = null;
@@ -610,21 +663,23 @@
     for (const source of selectedCandidateSources) {
       showCandidateSource(source);
       let result;
-      try { result = await processCandidateSource(source); }
+      try { result = await processCandidateSource(source, batchAuthority); }
       catch (error) {
         lastError = error;
-        byId("personal-page-message").textContent = `无法理解材料：${error.message}`;
+        byId("personal-page-message").textContent = `无法整理材料：${error.message}`;
         byId("personal-page-message").classList.add("error");
         continue;
       }
       if (result.cancelled) {
-        button.disabled = false;
+        candidateProcessingInProgress = false;
+        refreshCandidateImportGate();
         byId("personal-processing").classList.add("hidden");
         return;
       }
       lastSourceKey = result.sourceKey;
     }
     if (lastSourceKey && !completeEmbeddedImport("personal", lastSourceKey)) returnToCardLibrary("/personal-information.html", lastSourceKey);
+    candidateProcessingInProgress = false;
     if (lastError) throw lastError;
   }
 
@@ -669,12 +724,14 @@
     });
     byId("replace-personal-file").addEventListener("click", () => byId("personal-file-input").click());
     byId("start-personal-processing").addEventListener("click", () => runCandidateProcessing().catch(showPersonalError));
+    refreshCandidateImportGate();
   }
 
   function showPersonalError(error) {
-    byId("personal-page-message").textContent = `无法理解材料：${error.message}`;
+    candidateProcessingInProgress = false;
+    byId("personal-page-message").textContent = `无法整理材料：${error.message}`;
     byId("personal-page-message").classList.add("error");
-    if (byId("start-personal-processing")) byId("start-personal-processing").disabled = false;
+    refreshCandidateImportGate();
     byId("personal-processing")?.classList.add("hidden");
   }
 
@@ -691,85 +748,21 @@
     byId("candidate-source").textContent = `${item.source_refs[0]?.location || "示例材料"} · ${item.source_refs[0]?.excerpt_or_reference || "来源未记录"}`;
   }
 
-  function messageMarkup(message) {
-    const role = message.role === "USER" ? "user" : "assistant";
-    const roleLabel = role === "user" ? "你" : "AI";
-    const content = role === "assistant" ? String(message.content)
-      .replaceAll("当前 Job Context 的", "当前职位上下文的")
-      .replaceAll("当前 Candidate Context 的", "当前个人上下文的")
-      .replaceAll("Job Context", "职位上下文")
-      .replaceAll("Candidate Context", "个人上下文")
-      .replaceAll("Human-in-the-loop", "人工参与")
-      .replaceAll("local-first", "本地优先")
-      .replaceAll("evidence-grounded", "有证据依据")
-      .replaceAll("fixture", "测试样例")
-      .replaceAll("patch review", "修改审核") : message.content;
-    return `<p class="v1-conversation-message ${role}"><span class="sr-only">${roleLabel}：</span>${escapeHtml(content)}</p>`;
-  }
-
   function setDetailRuntimeMode(record, paneId, editButtonId, runtimeBadgeId) {
-    const selected = selectedRuntime();
-    const previewModelMode = new URLSearchParams(window.location.search).get("preview-source") === "ai";
-    const runtime = previewModelMode ? { mode: "ai", provider: "preview", model: "设计预览" } : selected;
-    const modelMode = runtime.mode === "ai";
-    document.body.dataset.detailRuntime = modelMode ? "ai" : "local";
+    const gate = currentOperationGate("ai_conversation");
+    const runtime = gate.authority.runtime;
+    const conversationAllowed = runtime.mode === "model" && gate.allowed;
+    document.body.dataset.detailRuntime = runtime.mode;
     document.body.dataset.recordRecognition = Demo.isAIRecognizedRecord(record) ? "ai" : "local";
-    document.body.classList.toggle("v1-ai-capable", modelMode);
-    byId(paneId)?.classList.toggle("hidden", !modelMode);
-    byId(editButtonId)?.classList.toggle("hidden", modelMode);
+    document.body.classList.toggle("v1-ai-capable", conversationAllowed);
+    const pane = byId(paneId);
+    pane?.classList.toggle("hidden", !conversationAllowed);
+    pane?.setAttribute("aria-hidden", String(!conversationAllowed));
+    pane?.querySelectorAll("input, textarea, button").forEach((control) => { control.disabled = !conversationAllowed; });
+    byId(editButtonId)?.classList.toggle("hidden", conversationAllowed);
     if (byId(runtimeBadgeId)) byId(runtimeBadgeId).textContent = runtimeLabel(runtime);
-    return modelMode;
-  }
-
-  function renderConversation(targetId, conversation, emptyCopy) {
-    const target = byId(targetId);
-    target.innerHTML = conversation?.messages?.length
-      ? conversation.messages.map(messageMarkup).join("")
-      : `<p class="v1-conversation-empty">${escapeHtml(emptyCopy)}</p>`;
-    target.scrollTop = target.scrollHeight;
-  }
-
-  function showCandidatePatch(patch) {
-    pendingPatch = patch;
-    byId("candidate-patch-before").textContent = patch.before_snapshot.summary;
-    byId("candidate-patch-after").textContent = patch.after_preview.summary;
-    byId("candidate-patch-reason").textContent = patch.reason;
-    byId("candidate-patch-proposal").classList.remove("hidden");
-  }
-
-  async function initCandidateConversation(item) {
-    const scopeId = item.item_id;
-    const emptyCopy = "模型识别结果已保留。你可以询问当前材料，或要求生成单独审核的修改建议。";
-    renderConversation("candidate-conversation-messages", await Demo.get(Demo.DEMO_STORES.conversations, Demo.createConversation("CANDIDATE_ITEM", scopeId).conversation_id), emptyCopy);
-    byId("candidate-conversation-form").addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const input = byId("candidate-conversation-input");
-      const content = input.value.trim();
-      if (!content) return;
-      input.value = "";
-      await Demo.appendDemoMessage("CANDIDATE_ITEM", scopeId, "USER", content);
-      const asksForChange = /修改|更正|纠正|不准确|不对|收紧|改成/.test(content);
-      const assistantCopy = asksForChange
-        ? "我已把修改整理成独立的待审核建议。只有你确认后，当前材料才会更新。"
-        : `根据当前已识别材料：${activeCandidate.summary} 对话内容不会直接改写已确认事实。`;
-      const conversation = await Demo.appendDemoMessage("CANDIDATE_ITEM", scopeId, "ASSISTANT", assistantCopy);
-      renderConversation("candidate-conversation-messages", conversation, emptyCopy);
-      if (asksForChange) showCandidatePatch(Demo.candidatePatchFor(activeCandidate));
-    });
-    byId("accept-candidate-patch").addEventListener("click", async () => {
-      if (!pendingPatch) return;
-      activeCandidate = Demo.applyDemoPatch(activeCandidate, pendingPatch);
-      await Demo.put(Demo.DEMO_STORES.candidates, activeCandidate);
-      renderCandidate(activeCandidate);
-      pendingPatch = null;
-      byId("candidate-patch-proposal").classList.add("hidden");
-      byId("candidate-detail-message").textContent = "AI 修改建议已由你确认并保存。";
-    });
-    byId("reject-candidate-patch").addEventListener("click", () => {
-      pendingPatch = null;
-      byId("candidate-patch-proposal").classList.add("hidden");
-      byId("candidate-detail-message").textContent = "AI 修改建议已拒绝，材料内容保持不变。";
-    });
+    setRuntimeGateMessage(record.item_id ? "candidate-detail-message" : "job-detail-message", runtime.mode === "model" && !conversationAllowed ? unavailableCopy(gate, "对话") : "");
+    return conversationAllowed;
   }
 
   async function initCandidateDetail() {
@@ -779,11 +772,9 @@
     const stored = storedRecords[0] || null;
     const fallback = Demo.CANDIDATE_FIXTURES.find((item) => item.item_id === itemId);
     if (!stored && !fallback) throw new Error("candidate_item_not_found");
-    let candidate = stored || Demo.clone(fallback);
-    if (new URLSearchParams(window.location.search).get("preview-source") === "ai") candidate = { ...candidate, ai_recognized: true, imported_from: { ...(candidate.imported_from || {}), network_sent: true, provider_id: "gemini", model_id: "gemini-3.7-flash" } };
+    const candidate = stored || Demo.clone(fallback);
     renderCandidate(candidate);
-    const modelMode = setDetailRuntimeMode(candidate, "candidate-ai-pane", "open-direct-edit", "candidate-ai-runtime");
-    if (modelMode) await initCandidateConversation(candidate);
+    setDetailRuntimeMode(candidate, "candidate-ai-pane", "open-direct-edit", "candidate-ai-runtime");
     const setDirectEditOpen = (open, focusTarget = true) => {
       const form = byId("candidate-edit-form");
       form.classList.toggle("hidden", !open);
@@ -856,7 +847,7 @@
     byId("job-file-name").textContent = source.name;
     byId("job-file-meta").textContent = `${source.type || selectedJobImportType} · ${source.sizeLabel || "本地文本"}${batchSuffix} · 仅本地`;
     byId("job-file-icon").textContent = (source.extension || selectedJobImportType).slice(0, 4).toUpperCase();
-    byId("start-job-processing").disabled = false;
+    refreshJobImportGate();
   }
 
   function installFileDropzone(dropzoneId, onFiles) {
@@ -882,9 +873,9 @@
     selectedJobSource = null;
     selectedJobSources = [];
     byId("job-file-preview").classList.add("hidden");
-    byId("start-job-processing").disabled = true;
     byId("job-page-message").textContent = "";
     byId("job-page-message").classList.remove("error");
+    refreshJobImportGate();
   }
 
   function configureJobImportType(type) {
@@ -918,7 +909,8 @@
     if (rejected.length) showJobError(new Error("请选择 PDF、PNG、JPG、JPEG 或 DOCX 文件。"));
   }
 
-  async function processJobSource(source) {
+  async function processJobSource(source, batchAuthority) {
+    if (batchAuthority.runtime.mode !== "local") throw new Error("model_job_import_not_connected");
     for (const [state, label] of Demo.JOB_PROCESSING_STATES) {
       byId("job-processing").dataset.state = state;
       byId("job-processing-state").textContent = label;
@@ -929,7 +921,7 @@
     const duplicates = Demo.findJobDuplicates([incoming], existing);
     let job = incoming;
     if (duplicates.length) {
-      const aiMode = selectedRuntime().mode === "ai";
+      const aiMode = batchAuthority.runtime.mode === "model";
       const resolution = await askDuplicateResolution({ kind: "job", count: duplicates.length, aiMode });
       if (resolution === "cancel") return { cancelled: true };
       if (resolution === "merge" && aiMode) throw new Error("模型融合需要一次真实模型调用；本轮未获调用批准，因此没有写入或覆盖任何职位。");
@@ -941,6 +933,10 @@
 
   async function runJobProcessing() {
     const button = byId("start-job-processing");
+    const gate = refreshJobImportGate();
+    if (!gate.allowed) throw new Error(`runtime_capability_${gate.state}`);
+    const batchAuthority = gate.authority;
+    jobProcessingInProgress = true;
     button.disabled = true;
     byId("job-processing").classList.remove("hidden");
     const sources = selectedJobImportType === "Paste"
@@ -951,21 +947,23 @@
     for (const source of sources) {
       showJobSource(source);
       let result;
-      try { result = await processJobSource(source); }
+      try { result = await processJobSource(source, batchAuthority); }
       catch (error) {
         lastError = error;
-        byId("job-page-message").textContent = `无法理解职位：${error.message}`;
+        byId("job-page-message").textContent = `无法整理职位：${error.message}`;
         byId("job-page-message").classList.add("error");
         continue;
       }
       if (result.cancelled) {
-        button.disabled = false;
+        jobProcessingInProgress = false;
+        refreshJobImportGate();
         byId("job-processing").classList.add("hidden");
         return;
       }
       lastSourceKey = result.sourceKey;
     }
     if (lastSourceKey && !completeEmbeddedImport("jd", lastSourceKey)) returnToCardLibrary("/jd.html", lastSourceKey);
+    jobProcessingInProgress = false;
     if (lastError) throw lastError;
   }
 
@@ -994,18 +992,18 @@
   }
 
   function showJobError(error) {
-    byId("job-page-message").textContent = `无法理解职位：${error.message}`;
+    jobProcessingInProgress = false;
+    byId("job-page-message").textContent = `无法整理职位：${error.message}`;
     byId("job-page-message").classList.add("error");
-    if (byId("start-job-processing")) byId("start-job-processing").disabled = false;
+    refreshJobImportGate();
     byId("job-processing")?.classList.add("hidden");
   }
 
   async function initJobDetail() {
     const jobId = new URLSearchParams(window.location.search).get("job") || Demo.JOB_FIXTURE.job_context_id;
     const storedJob = await Demo.get(Demo.DEMO_STORES.jobs, jobId);
-    let job = (await localizedJobRecords(storedJob ? [storedJob] : []))[0] || (jobId === Demo.JOB_FIXTURE.job_context_id ? Demo.clone(Demo.JOB_FIXTURE) : null);
+    const job = (await localizedJobRecords(storedJob ? [storedJob] : []))[0] || (jobId === Demo.JOB_FIXTURE.job_context_id ? Demo.clone(Demo.JOB_FIXTURE) : null);
     if (!job) throw new Error("job_context_not_found");
-    if (new URLSearchParams(window.location.search).get("preview-source") === "ai") job = { ...job, ai_recognized: true, imported_from: { ...(job.imported_from || {}), network_sent: true, provider_id: "gemini", model_id: "gemini-3.7-flash" } };
     activeJob = job;
     byId("job-title").textContent = job.title;
     byId("job-company").textContent = job.company;
@@ -1013,49 +1011,7 @@
     byId("job-summary").textContent = job.summary;
     byId("job-source").textContent = `${sourceTypeLabels[job.source.source_type] || job.source.source_type} · ${job.source.display_name}`;
     byId("job-requirements").innerHTML = job.requirements.map((requirement, index) => `<div><span>${String(index + 1).padStart(2, "0")}</span><p><b>${escapeHtml(requirement.label)}</b>${escapeHtml(requirement.detail)}</p></div>`).join("");
-    if (setDetailRuntimeMode(job, "job-ai-pane", null, "job-ai-runtime")) await initJobConversation(job);
-  }
-
-  async function initJobConversation(job) {
-    const scopeId = job.job_context_id;
-    const emptyCopy = "模型识别结果已保留。你可以询问当前职位；系统不会推断候选人匹配度。";
-    renderConversation("job-conversation-messages", await Demo.get(Demo.DEMO_STORES.conversations, Demo.createConversation("JOB", scopeId).conversation_id), emptyCopy);
-    byId("job-conversation-form").addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const input = byId("job-conversation-input");
-      const content = input.value.trim();
-      if (!content) return;
-      input.value = "";
-      await Demo.appendDemoMessage("JOB", scopeId, "USER", content);
-      const asksForChange = /修改|更正|纠正|不准确|不对|收紧|改成/.test(content);
-      const keyRequirements = job.requirements.slice(0, 3).map((item) => item.label).join("、");
-      const assistantCopy = asksForChange
-        ? "我已把修改整理成独立的待审核建议。只有你确认后，当前职位卡片才会更新。"
-        : `当前职位最核心的要求包括：${keyRequirements}。这只是对职位文本的解释，不代表候选人匹配判断。`;
-      const conversation = await Demo.appendDemoMessage("JOB", scopeId, "ASSISTANT", assistantCopy);
-      renderConversation("job-conversation-messages", conversation, emptyCopy);
-      if (asksForChange) {
-        pendingJobPatch = Demo.jobPatchFor(activeJob);
-        byId("job-patch-before").textContent = pendingJobPatch.before_snapshot.summary;
-        byId("job-patch-after").textContent = pendingJobPatch.after_preview.summary;
-        byId("job-patch-reason").textContent = pendingJobPatch.reason;
-        byId("job-patch-proposal").classList.remove("hidden");
-      }
-    });
-    byId("accept-job-patch").addEventListener("click", async () => {
-      if (!pendingJobPatch) return;
-      activeJob = Demo.applyDemoJobPatch(activeJob, pendingJobPatch);
-      await Demo.put(Demo.DEMO_STORES.jobs, activeJob);
-      byId("job-summary").textContent = activeJob.summary;
-      pendingJobPatch = null;
-      byId("job-patch-proposal").classList.add("hidden");
-      byId("job-detail-message").textContent = "AI 修改建议已由你确认并保存。";
-    });
-    byId("reject-job-patch").addEventListener("click", () => {
-      pendingJobPatch = null;
-      byId("job-patch-proposal").classList.add("hidden");
-      byId("job-detail-message").textContent = "AI 修改建议已拒绝，职位内容保持不变。";
-    });
+    setDetailRuntimeMode(job, "job-ai-pane", null, "job-ai-runtime");
   }
 
   document.addEventListener("keydown", (event) => {
@@ -1068,6 +1024,12 @@
   installMenuBehavior();
   installDetailCardOverlay();
   installCardPageTransitions();
+  RuntimeGate.subscribe(() => {
+    if (page === "personal-import") refreshCandidateImportGate();
+    if (page === "job-import") refreshJobImportGate();
+    if (page === "candidate-detail" && activeCandidate) setDetailRuntimeMode(activeCandidate, "candidate-ai-pane", "open-direct-edit", "candidate-ai-runtime");
+    if (page === "job-detail" && activeJob) setDetailRuntimeMode(activeJob, "job-ai-pane", null, "job-ai-runtime");
+  });
   const initializers = { workspace: initWorkspace, personal: initPersonal, "personal-import": initPersonalImport, "candidate-detail": initCandidateDetail, jd: initJobLibrary, "job-import": initJobImport, "job-detail": initJobDetail };
   async function initializePage() {
     await Demo.consolidateExistingDuplicatesOnce();

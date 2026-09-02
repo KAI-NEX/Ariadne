@@ -21,7 +21,7 @@
           <label>模型<input id="ai-model" value="" placeholder="先检查所选模型" autocomplete="off" readonly></label>
           <label>资料类型<select id="ai-document-type"><option value="resume">简历</option><option value="portfolio">作品集</option></select></label>
         </div>
-        <div class="button-row"><button id="deepseek-document-preflight" type="button" class="secondary">检查 DeepSeek 模型</button><button id="gemini-document-preflight" type="button" class="secondary">检查 Gemini 模型</button></div>
+        <div class="button-row"><button id="deepseek-document-preflight" type="button" class="secondary" disabled>检查 DeepSeek 模型</button><button id="gemini-document-preflight" type="button" class="secondary" disabled>检查 Gemini 模型</button></div>
         <details class="credential-panel"><summary>配置 Gemini API 密钥（仅存 macOS 钥匙串）</summary>
           <div class="button-row credential-row"><input id="ai-api-key" type="password" autocomplete="new-password" placeholder="Gemini API 密钥"><button id="save-ai-api-key" type="button" class="secondary">保存 Gemini 密钥</button></div>
           <p class="muted">密钥不进入 IndexedDB、项目文件或导出物。DeepSeek 已使用本机钥匙串；此处仅用于配置 Gemini。</p>
@@ -112,6 +112,8 @@
     </main>
     <script src="career-evidence-domain.js"></script>
     <script src="ai-career-context-domain.js"></script>
+    <script src="/runtime-capabilities.js?v=runtime-gate-v1"></script>
+    <script src="/runtime-capability-gate.js?v=runtime-gate-v1"></script>
     <script src="career-evidence.js"></script>
   </body>
 </html>

@@ -165,10 +165,6 @@ async function loadModels() {
       const restoredModel = selectableModels().find((model) => model.provider_id === state.provider && model.model_id === state.model);
       if (restoredModel) applyReadyModel(restoredModel, false);
     }
-    if (!(["READY", "OFFICIAL_READY", "LOCAL_READY"].includes(state.phase) && (state.model || state.mode === "local"))) {
-      const defaultModel = state.models.find((model) => model.runtime_default) || state.models[0];
-      if (defaultModel) applyReadyModel(defaultModel);
-    }
     renderModels(); render();
   } catch (_error) {
     // DeepSeek discovery is optional to V1. Gemini remains usable even without a local keychain entry.

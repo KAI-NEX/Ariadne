@@ -40,13 +40,15 @@
             <button id="replace-personal-file" type="button">替换</button>
           </section>
           <section id="personal-processing" class="v1-processing hidden" aria-live="polite">
-            <div class="v1-processing-orbit" aria-hidden="true"></div><div><p id="personal-processing-state">正在准备</p><small>本地样例流程 · 无模型调用</small></div>
+            <div class="v1-processing-orbit" aria-hidden="true"></div><div><p id="personal-processing-state">正在准备</p><small>本地演示样例 · 不读取文件内容 · 无模型调用</small></div>
           </section>
-          <button id="start-personal-processing" class="v1-primary-button v1-sheet-primary" type="button" disabled>开始理解材料</button>
+          <button id="start-personal-processing" class="v1-primary-button v1-sheet-primary" type="button" disabled>开始本地演示整理</button>
         </div>
       </section>
       <p id="personal-page-message" class="v1-inline-message" aria-live="polite"></p>
     </main>
+    <script src="/runtime-capabilities.js?v=runtime-gate-v1"></script>
+    <script src="/runtime-capability-gate.js?v=runtime-gate-v1"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
     <script src="/v1-pages.js?v=v1-motion-33"></script>
