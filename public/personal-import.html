@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ariadne · 添加个人材料</title>
-    <link rel="stylesheet" href="/styles.css?v=v1-motion-33">
+    <link rel="stylesheet" href="/styles.css?v=personal-lifecycle-v1">
   </head>
   <body class="v1-body" data-v1-page="personal-import">
     <main class="v1-page-shell v1-import-shell">
@@ -30,10 +30,10 @@
             </div>
           </section>
           <section class="v1-file-picker">
-            <label id="personal-dropzone" class="v1-file-dropzone" for="personal-file-input">
+            <button id="personal-dropzone" class="v1-file-dropzone" type="button" aria-controls="personal-file-input">
               <span>点击上传文件或直接拖拽文件至此</span>
-              <input id="personal-file-input" type="file" multiple accept=".pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,image/png,image/jpeg">
-            </label>
+            </button>
+            <input id="personal-file-input" class="v1-file-input" type="file" multiple accept=".pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,image/png,image/jpeg">
           </section>
           <section id="personal-file-preview" class="v1-file-preview hidden">
             <div><span id="personal-file-icon">PDF</span><p><b id="personal-file-name"></b><small id="personal-file-meta"></small></p></div>
@@ -45,15 +45,21 @@
           <button id="start-personal-processing" class="v1-primary-button v1-sheet-primary" type="button" disabled>开始本地提取</button>
         </div>
       </section>
+      <section id="candidate-review-surface" class="v1-review-surface hidden" aria-labelledby="candidate-review-heading">
+        <div class="v1-review-heading"><p class="v1-field-label">待人工审核</p><h2 id="candidate-review-heading">本地候选信息提案</h2><p>这些内容来自本地确定规则，尚未成为已确认候选信息。</p></div>
+        <div id="candidate-review-list"></div>
+      </section>
       <p id="personal-page-message" class="v1-inline-message" aria-live="polite"></p>
     </main>
     <script src="/runtime-capabilities.js?v=runtime-gate-v1"></script>
     <script src="/runtime-capability-gate.js?v=runtime-gate-v1"></script>
-    <script src="/truth-persistence-domain.js?v=slice-4a"></script>
+    <script src="/truth-persistence-domain.js?v=personal-lifecycle-v1"></script>
+    <script src="/local-context-lifecycle-domain.js?v=lifecycle-final-v1"></script>
     <script src="/local-candidate-extraction-domain.js?v=slice-4a"></script>
-    <script src="/local-candidate-proposal-domain.js?v=slice-4b"></script>
+    <script src="/local-candidate-proposal-domain.js?v=personal-lifecycle-v1"></script>
+    <script src="/local-candidate-review-domain.js?v=personal-lifecycle-v1"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
-    <script src="/v1-pages.js?v=v1-motion-33"></script>
+    <script src="/v1-pages.js?v=personal-lifecycle-v1"></script>
   </body>
 </html>

@@ -12,6 +12,7 @@ from src.execution_contract import create_runtime_snapshot  # noqa: E402
 from src.truth_persistence import (  # noqa: E402
     AUTHORITY,
     BATCH_STATUSES,
+    CANDIDATE_CONTEXT_LIFECYCLE_STATES,
     CANCEL_REASON,
     CONTEXT_TYPES,
     CONTRACT_ID,
@@ -33,6 +34,7 @@ from src.truth_persistence import (  # noqa: E402
     cancel_proposal,
     validate_cancelled_workflow_state,
     validate_context_revision,
+    validate_candidate_context_lifecycle,
     validate_execution_chain,
     validate_extraction_artifact,
     validate_for_store,
@@ -47,7 +49,7 @@ from src.truth_persistence import (  # noqa: E402
 
 assert CONTRACT_ID == SCHEMA["x-contract-id"]
 assert DB_NAME == SCHEMA["x-indexeddb-name"]
-assert DB_VERSION == SCHEMA["x-indexeddb-version"] == 11
+assert DB_VERSION == SCHEMA["x-indexeddb-version"] == 12
 assert STORE_SPECS == tuple((item["name"], item["keyPath"], item["lifecycle"]) for item in SCHEMA["x-stores"])
 assert NEW_STORE_SPECS == tuple(item for item in STORE_SPECS if item[2] == "new")
 assert SOURCE_TYPES == tuple(SCHEMA["$defs"]["sourceDocument"]["properties"]["source_type"]["enum"])
@@ -58,6 +60,7 @@ assert PROPOSAL_TYPES == tuple(SCHEMA["$defs"]["proposal"]["properties"]["propos
 assert PROPOSAL_STATUSES == tuple(SCHEMA["$defs"]["proposal"]["properties"]["status"]["enum"])
 assert REVIEW_DECISIONS == tuple(SCHEMA["$defs"]["reviewDecision"]["properties"]["decision"]["enum"])
 assert CONTEXT_TYPES == tuple(SCHEMA["$defs"]["contextRevision"]["properties"]["context_type"]["enum"])
+assert CANDIDATE_CONTEXT_LIFECYCLE_STATES == ("REMOVED",)
 assert FIELDS["source"] == tuple(SCHEMA["$defs"]["sourceDocument"]["required"])
 assert FIELDS["proposal"] == tuple(SCHEMA["$defs"]["proposal"]["required"])
 assert "never retroactively rewritten" in SCHEMA["x-status-semantics"]["processing_run"]
@@ -400,6 +403,23 @@ expect_error(
 
 candidate_revision = validate_context_revision(confirmed["revision"])
 assert candidate_revision["version"] == 1
+lifecycle = {
+    "contract_id": "ariadne-candidate-context-lifecycle-v1",
+    "lifecycle_id": "candidate-context-removal-1",
+    "context_id": candidate_revision["context_id"],
+    "item_id": candidate_revision["payload"]["items"][0]["item_id"],
+    "state": "REMOVED",
+    "removed_from_revision_id": candidate_revision["revision_id"],
+    "removed_at": "2026-09-02T01:07:00Z",
+    "reason": "USER_REMOVED",
+    "authority": AUTHORITY["lifecycle"],
+}
+assert validate_candidate_context_lifecycle(lifecycle)["context_id"] == candidate_revision["context_id"]
+assert validate_for_store("candidate_context_lifecycle", lifecycle)["state"] == "REMOVED"
+expect_error("candidate_context_lifecycle_reason_invalid", lambda: validate_candidate_context_lifecycle({**lifecycle, "reason": "HARD_DELETE"}))
+assert source["source_document_id"] == "source-candidate-1"  # Lifecycle validation never mutates source/evidence history.
+assert artifact["artifact_id"] == "artifact-candidate-1"
+assert proposal["proposal_id"] == "proposal-candidate-1"
 
 source_text = (ROOT / "src" / "truth_persistence.py").read_text(encoding="utf-8")
 assert "requests." not in source_text and "urlopen" not in source_text

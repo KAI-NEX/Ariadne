@@ -34,6 +34,7 @@ PROPOSAL_TYPES = tuple(SCHEMA["$defs"]["proposal"]["properties"]["proposal_type"
 PROPOSAL_STATUSES = tuple(SCHEMA["$defs"]["proposal"]["properties"]["status"]["enum"])
 REVIEW_DECISIONS = tuple(SCHEMA["$defs"]["reviewDecision"]["properties"]["decision"]["enum"])
 CONTEXT_TYPES = tuple(SCHEMA["$defs"]["contextRevision"]["properties"]["context_type"]["enum"])
+CANDIDATE_CONTEXT_LIFECYCLE_STATES = ("REMOVED",)
 CANCEL_REASON = "USER_CANCELLED_UPLOAD"
 AUTHORITY = {
     "source": "SOURCE_INPUT_ONLY",
@@ -42,6 +43,7 @@ AUTHORITY = {
     "proposal": "NON_AUTHORITATIVE_PROPOSAL",
     "review": "AUTHORITATIVE_USER_DECISION",
     "revision": "AUTHORITATIVE_CONFIRMED_CONTEXT",
+    "lifecycle": "AUTHORITATIVE_USER_DECISION",
 }
 FIELDS = {
     "source": tuple(SCHEMA["$defs"]["sourceDocument"]["required"]),
@@ -51,6 +53,7 @@ FIELDS = {
     "proposal": tuple(SCHEMA["$defs"]["proposal"]["required"]),
     "review": tuple(SCHEMA["$defs"]["reviewDecision"]["required"]),
     "revision": tuple(SCHEMA["$defs"]["contextRevision"]["required"]),
+    "lifecycle": tuple(SCHEMA["$defs"]["candidateContextLifecycle"]["required"]),
 }
 
 _SECRET_KEY_PATTERN = re.compile(r"(?:api[_-]?key|authorization|access[_-]?token|refresh[_-]?token|bearer|secret)", re.IGNORECASE)
@@ -472,6 +475,29 @@ def validate_context_revision(revision: Any) -> dict[str, Any]:
     }
 
 
+def validate_candidate_context_lifecycle(record: Any) -> dict[str, Any]:
+    value = _prepare(record, FIELDS["lifecycle"], "candidate_context_lifecycle")
+    if value["contract_id"] != "ariadne-candidate-context-lifecycle-v1":
+        raise TruthPersistenceError("candidate_context_lifecycle_contract_invalid")
+    if value["state"] not in CANDIDATE_CONTEXT_LIFECYCLE_STATES:
+        raise TruthPersistenceError("candidate_context_lifecycle_state_invalid")
+    if value["reason"] != "USER_REMOVED":
+        raise TruthPersistenceError("candidate_context_lifecycle_reason_invalid")
+    if value["authority"] != AUTHORITY["lifecycle"]:
+        raise TruthPersistenceError("candidate_context_lifecycle_authority_invalid")
+    return {
+        "contract_id": value["contract_id"],
+        "lifecycle_id": _required_string(value["lifecycle_id"], "candidate_context_lifecycle_id_invalid"),
+        "context_id": _required_string(value["context_id"], "candidate_context_lifecycle_context_id_invalid"),
+        "item_id": _required_string(value["item_id"], "candidate_context_lifecycle_item_id_invalid"),
+        "state": value["state"],
+        "removed_from_revision_id": _required_string(value["removed_from_revision_id"], "candidate_context_lifecycle_revision_id_invalid"),
+        "removed_at": _valid_iso(value["removed_at"], "candidate_context_lifecycle_removed_at_invalid"),
+        "reason": value["reason"],
+        "authority": value["authority"],
+    }
+
+
 def validate_runtime_snapshot_record(snapshot: RuntimeSnapshot | Mapping[str, Any]) -> dict[str, Any]:
     try:
         return validate_runtime_snapshot(snapshot).to_dict()
@@ -553,6 +579,7 @@ def validate_for_store(store_name: str, value: Any) -> dict[str, Any]:
         "context_proposals": validate_proposal,
         "context_review_decisions": validate_review_decision,
         "candidate_context_revisions": validate_context_revision,
+        "candidate_context_lifecycle": validate_candidate_context_lifecycle,
         "job_context_revisions": validate_context_revision,
     }
     validator = validators.get(store_name)

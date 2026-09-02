@@ -1,7 +1,7 @@
 "use strict";
 
 const DB_NAME = "job-radar-local-first-v1";
-const DB_VERSION = 11;
+const DB_VERSION = 12;
 const SOURCE_DOCUMENTS = "source_documents";
 const EXTRACTION_RUNS = "extraction_runs";
 const CAREER_ENTITIES = "career_entities";
@@ -116,6 +116,7 @@ function openDatabase() {
       if (!db.objectStoreNames.contains("context_proposals")) db.createObjectStore("context_proposals", { keyPath: "proposal_id" });
       if (!db.objectStoreNames.contains("context_review_decisions")) db.createObjectStore("context_review_decisions", { keyPath: "review_id" });
       if (!db.objectStoreNames.contains("candidate_context_revisions")) db.createObjectStore("candidate_context_revisions", { keyPath: "revision_id" });
+      if (!db.objectStoreNames.contains("candidate_context_lifecycle")) db.createObjectStore("candidate_context_lifecycle", { keyPath: "lifecycle_id" });
       if (!db.objectStoreNames.contains("job_context_revisions")) db.createObjectStore("job_context_revisions", { keyPath: "revision_id" });
       if (!db.objectStoreNames.contains(PROCESSING_CONSENTS)) db.createObjectStore(PROCESSING_CONSENTS, { keyPath: "consent_id" });
       if (!db.objectStoreNames.contains(CONVERSATION_SESSIONS)) db.createObjectStore(CONVERSATION_SESSIONS, { keyPath: "conversation_id" });

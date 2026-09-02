@@ -107,12 +107,13 @@ assert.match(candidateProcess, /snapshot\.snapshot_id/);
 
 const jobProcess = pages.slice(pages.indexOf("async function processJobSource"), pages.indexOf("async function runJobProcessing"));
 assert.ok(jobProcess.indexOf('batchAuthority.runtime.mode !== "local"') < jobProcess.indexOf("Demo.createLocalJobFixture"));
-assert.ok(jobProcess.indexOf('resolution === "cancel"') < jobProcess.indexOf("Demo.persistJobImport"));
+assert.ok(jobProcess.indexOf("signal.aborted") < jobProcess.indexOf("LocalJobLifecycle.persistPendingImport"));
 const jobRun = pages.slice(pages.indexOf("async function runJobProcessing"), pages.indexOf("function initJobLibrary"));
-const jobCancel = jobRun.match(/if \(result\.cancelled\) \{([\s\S]*?)\n      \}/)?.[1] || "";
+const jobCancel = jobRun.match(/if \(result\.cancelled\) \{([\s\S]*?)\n          \}/)?.[1] || "";
 assert.match(jobCancel, /return;/);
 assert.doesNotMatch(jobCancel, /continue|completeEmbeddedImport|returnToCardLibrary/);
-assert.ok(jobRun.indexOf("if (result.cancelled)") < jobRun.indexOf('completeEmbeddedImport("jd"'));
+assert.match(jobCancel, /当前来源未形成成功结果/);
+assert.match(jobRun, /剩余文件没有处理/);
 
 for (const labels of [Demo.CANDIDATE_PROCESSING_STATES, Demo.JOB_PROCESSING_STATES]) {
   for (const [, label] of labels) assert.doesNotMatch(label, /AI|模型|理解|识别/);

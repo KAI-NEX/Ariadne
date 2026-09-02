@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ariadne · 个人材料详情</title>
-    <link rel="stylesheet" href="/styles.css?v=v1-motion-33">
+    <link rel="stylesheet" href="/styles.css?v=personal-lifecycle-v1">
   </head>
   <body class="v1-body" data-v1-page="candidate-detail">
     <main class="v1-page-shell v1-detail-shell">
@@ -26,7 +26,7 @@
         <article class="v1-structured-pane">
           <div class="v1-detail-meta-row">
             <span class="v1-detail-chips"><span id="candidate-type" class="v1-type-chip"></span><span id="candidate-review-state" class="v1-review-chip"></span></span>
-            <button id="open-direct-edit" class="v1-detail-edit-button" type="button" aria-expanded="false" aria-controls="candidate-edit-form">编辑</button>
+            <span class="v1-detail-actions"><button id="open-direct-edit" class="v1-detail-edit-button" type="button" aria-expanded="false" aria-controls="candidate-edit-form">编辑</button></span>
           </div>
           <h1 id="candidate-title">正在读取…</h1>
           <p id="candidate-subtitle" class="v1-detail-subtitle"></p>
@@ -37,10 +37,13 @@
           <section class="v1-detail-block"><p class="v1-section-label">责任边界</p><p id="candidate-ownership"></p></section>
           <section class="v1-detail-block"><p class="v1-section-label">来源</p><p id="candidate-source" class="v1-source-note"></p></section>
 
-          <form id="candidate-edit-form" class="v1-edit-form hidden">
+          <form id="candidate-edit-form" class="v1-edit-form v1-detail-state-panel hidden" aria-hidden="true">
+            <label>标题<input id="candidate-edit-title"></label>
+            <label>组织 / 副标题<input id="candidate-edit-subtitle"></label>
+            <label>日期<input id="candidate-edit-time"></label>
             <label>摘要<textarea id="candidate-edit-summary"></textarea></label>
             <label>事实（每行一条）<textarea id="candidate-edit-facts"></textarea></label>
-            <div class="v1-button-row"><button id="preview-direct-edit" class="v1-primary-button" type="button">预览修改</button><button id="cancel-direct-edit" class="v1-tertiary-button" type="button">取消</button></div>
+            <div class="v1-button-row v1-edit-actions"><button id="cancel-direct-edit" class="v1-tertiary-button" type="button">取消</button><span class="v1-edit-primary-actions"><button id="preview-direct-edit" class="v1-primary-button" type="button">预览修改</button><button id="open-candidate-delete" class="v1-primary-button v1-detail-remove-button" type="button">删除</button></span></div>
           </form>
           <section id="direct-edit-preview" class="v1-patch-card hidden">
             <p class="v1-section-label">直接编辑预览</p>
@@ -70,11 +73,18 @@
       </section>
       <p id="candidate-detail-message" class="v1-inline-message" aria-live="polite"></p>
     </main>
+    <div id="candidate-delete-popover" class="v1-delete-popover hidden" aria-hidden="true">
+      <button class="v1-delete-popover-backdrop" type="button" data-delete-popover-cancel aria-label="关闭删除操作"></button>
+      <section class="v1-delete-popover-menu" role="menu" aria-label="删除操作"><button data-candidate-delete-scope="card" class="v1-delete-popover-option destructive" type="button">仅删除这张卡片</button><button data-candidate-delete-scope="source" class="v1-delete-popover-option destructive" type="button">移除此文件导入的所有内容</button><button class="v1-delete-popover-option cancel" data-delete-popover-cancel type="button">取消</button></section>
+    </div>
     <script src="/runtime-capabilities.js?v=runtime-gate-v1"></script>
     <script src="/runtime-capability-gate.js?v=runtime-gate-v1"></script>
+    <script src="/truth-persistence-domain.js?v=personal-lifecycle-v1"></script>
+    <script src="/local-context-lifecycle-domain.js?v=lifecycle-final-v1"></script>
+    <script src="/local-candidate-review-domain.js?v=personal-lifecycle-v1"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
     <script src="/scoped-conversation-domain.js"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
-    <script src="/v1-pages.js?v=v1-motion-33"></script>
+    <script src="/v1-pages.js?v=personal-lifecycle-v1"></script>
   </body>
 </html>

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ariadne · 职位详情</title>
-    <link rel="stylesheet" href="/styles.css?v=v1-motion-33">
+    <link rel="stylesheet" href="/styles.css?v=lifecycle-final-v1">
   </head>
   <body class="v1-body" data-v1-page="job-detail">
     <main class="v1-page-shell v1-detail-shell">
@@ -21,12 +21,25 @@
 
       <section class="v1-split-view">
         <article class="v1-structured-pane job">
-          <div class="v1-detail-meta-row"><span class="v1-type-chip">职位</span><span class="v1-review-chip">待审核</span></div>
+          <div class="v1-detail-meta-row"><span class="v1-detail-chips"><span class="v1-type-chip">职位描述</span><span id="job-review-state" class="v1-review-chip"></span></span><span class="v1-detail-actions"><button id="open-job-edit" class="v1-detail-edit-button" type="button" aria-expanded="false" aria-controls="job-edit-form">编辑</button></span></div>
           <h1 id="job-title">正在读取…</h1>
           <p id="job-company" class="v1-detail-subtitle"></p><p id="job-location" class="v1-detail-time"></p>
           <section class="v1-detail-block"><p class="v1-section-label">摘要</p><p id="job-summary" class="v1-detail-summary"></p></section>
           <section class="v1-detail-block"><p class="v1-section-label">任职要求</p><div id="job-requirements" class="v1-requirement-list"></div></section>
           <section class="v1-detail-block"><p class="v1-section-label">来源</p><p id="job-source" class="v1-source-note"></p></section>
+          <form id="job-edit-form" class="v1-edit-form v1-detail-state-panel hidden" aria-hidden="true">
+            <label>职位名称<input id="job-edit-title"></label>
+            <label>公司<input id="job-edit-company"></label>
+            <label>地点<input id="job-edit-location"></label>
+            <label>摘要<textarea id="job-edit-summary"></textarea></label>
+            <label>任职要求（每行一条）<textarea id="job-edit-requirements"></textarea></label>
+            <div class="v1-button-row v1-edit-actions"><button id="cancel-job-edit" class="v1-tertiary-button" type="button">取消</button><span class="v1-edit-primary-actions"><button id="preview-job-edit" class="v1-primary-button" type="button">预览修改</button><button id="open-job-delete" class="v1-primary-button v1-detail-remove-button" type="button">删除</button></span></div>
+          </form>
+          <section id="job-edit-preview" class="v1-patch-card hidden">
+            <p class="v1-section-label">直接编辑预览</p>
+            <div class="v1-diff-grid"><div><small>修改前</small><p id="job-edit-before"></p></div><div><small>修改后</small><p id="job-edit-after"></p></div></div>
+            <div class="v1-button-row v1-detail-action-row"><button id="confirm-job-edit" class="v1-primary-button" type="button">确认保存</button><button id="back-to-job-edit" class="v1-tertiary-button" type="button">返回编辑</button></div>
+          </section>
         </article>
 
         <aside id="job-ai-pane" class="v1-conversation-pane hidden" aria-labelledby="job-ai-heading">
@@ -50,11 +63,17 @@
       </section>
       <p id="job-detail-message" class="v1-inline-message" aria-live="polite"></p>
     </main>
+    <div id="job-delete-popover" class="v1-delete-popover hidden" aria-hidden="true">
+      <button class="v1-delete-popover-backdrop" type="button" data-delete-popover-cancel aria-label="关闭删除操作"></button>
+      <section class="v1-delete-popover-menu" role="menu" aria-label="删除操作"><button data-job-delete-scope="card" class="v1-delete-popover-option destructive" type="button">仅删除这张卡片</button><button data-job-delete-scope="source" class="v1-delete-popover-option destructive" type="button">移除此文件导入的所有内容</button><button class="v1-delete-popover-option cancel" data-delete-popover-cancel type="button">取消</button></section>
+    </div>
     <script src="/runtime-capabilities.js?v=runtime-gate-v1"></script>
     <script src="/runtime-capability-gate.js?v=runtime-gate-v1"></script>
+    <script src="/local-context-lifecycle-domain.js?v=lifecycle-final-v1"></script>
+    <script src="/local-job-lifecycle-domain.js?v=lifecycle-final-v1"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
     <script src="/scoped-conversation-domain.js"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
-    <script src="/v1-pages.js?v=v1-motion-33"></script>
+    <script src="/v1-pages.js?v=lifecycle-final-v1"></script>
   </body>
 </html>

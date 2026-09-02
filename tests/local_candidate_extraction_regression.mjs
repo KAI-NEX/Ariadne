@@ -21,8 +21,12 @@ function file(name, text, type = "text/plain") {
 const batchId = "batch-candidate-test";
 const first = await Local.prepareSource(file("one.txt", "real source one"), batchId, "Resume");
 const second = await Local.prepareSource(file("two.md", "# real source two"), batchId, "Portfolio");
+const exactSameBytes = await Local.prepareSource(file("renamed-copy.txt", "real source one"), "batch-candidate-later", "Other");
 assert.notEqual(first.content_hash, second.content_hash);
 assert.match(first.source_document_id, /^source-candidate-[a-f0-9]{64}$/);
+assert.equal(exactSameBytes.content_hash, first.content_hash);
+assert.equal(exactSameBytes.source_document_id, first.source_document_id);
+assert.notEqual(exactSameBytes.batch_id, first.batch_id);
 
 const snapshot = Runtime.createRuntimeSnapshot({ mode: "local" }, {
   snapshotId: "runtime-snapshot-candidate-batch",

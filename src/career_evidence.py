@@ -41,8 +41,15 @@ SECTION_HEADINGS = {
     "教育与工具": "education_and_tools",
     "教育经历": "education",
     "教育背景": "education",
+    "其他经历": "other_experience",
+    "社会经历": "other_experience",
     "技能": "skills",
     "专业技能": "skills",
+    "核心能力": "skills",
+    "核心技能": "skills",
+    "获奖情况": "awards",
+    "获奖经历": "awards",
+    "荣誉奖项": "awards",
     "核心匹配": "summary",
     "个人简介": "summary",
     "WORK EXPERIENCE": "work",
@@ -82,6 +89,14 @@ ENGLISH_SKILL_CATEGORY_PATTERN = re.compile(
 )
 AWARD_RECORD_PATTERN = re.compile(
     r"^(?P<result>Finalist|Winner|Runner[- ]?up|Merit Award|Award of Excellence|[A-Za-z][A-Za-z ]+ Award)\s*,\s*(?P<name>.+)$",
+    re.IGNORECASE,
+)
+CHINESE_AWARD_RECORD_PATTERN = re.compile(
+    r"^[•●▪‣·\-*]?\s*(?P<name>.+?)\s+(?P<result>入围总决赛|特等奖|一等奖|二等奖|三等奖|优秀奖|入围奖|金奖|银奖|铜奖|获奖|入选)$"
+)
+ROLE_CONTINUATION_PATTERN = re.compile(
+    r"(?:负责人|经理|总监|设计师|研究员|策展人|工程师|顾问|实习生|项目支持|产品开发|供应链协作|策划|运营|"
+    r"Director|Designer|Manager|Researcher|Engineer|Lead|Consultant|Intern)",
     re.IGNORECASE,
 )
 
@@ -332,6 +347,7 @@ def _line_records(pages: list[dict]) -> list[dict]:
         page_number = page.get("page") if isinstance(page.get("page"), int) else None
         blocks = page.get("blocks") if isinstance(page.get("blocks"), list) else []
         raw_records = blocks if blocks else page.get("lines") if isinstance(page.get("lines"), list) else []
+        page_records = []
         for line_number, raw_line in enumerate(raw_records, 1):
             text = str(raw_line.get("text", "")).strip() if isinstance(raw_line, dict) else str(raw_line).strip()
             if text:
@@ -340,7 +356,54 @@ def _line_records(pages: list[dict]) -> list[dict]:
                     for key in ("x", "y", "width", "height", "confidence"):
                         if isinstance(raw_line.get(key), (int, float)):
                             record[key] = float(raw_line[key])
-                records.append(record)
+                page_records.append(record)
+
+        # PDFKit can split one visual header row into a left-hand label and a
+        # right-hand date block. Coalesce only date-bearing aligned rows so
+        # unrelated multi-column Resume content remains under engine ordering.
+        consumed: set[int] = set()
+        coalesced: list[dict] = []
+        for index, record in enumerate(page_records):
+            if index in consumed:
+                continue
+            aligned = [
+                (other_index, other)
+                for other_index, other in enumerate(page_records)
+                if other_index not in consumed
+                and "x" in record and "y" in record and "x" in other and "y" in other
+                and abs(float(other["y"]) - float(record["y"])) <= 0.006
+            ]
+            if len(aligned) > 1 and any(DATE_RANGE_PATTERN.search(item["text"]) for _, item in aligned):
+                ordered = sorted(aligned, key=lambda pair: float(pair[1]["x"]))
+                members = [item for _, item in ordered]
+                consumed.update(member_index for member_index, _ in aligned)
+                left = min(float(item["x"]) for item in members)
+                right = max(float(item["x"]) + float(item.get("width", 0.0)) for item in members)
+                coalesced.append({
+                    **members[0],
+                    "line": min(item["line"] for item in members),
+                    "text": " ".join(item["text"] for item in members),
+                    "x": left,
+                    "y": max(float(item["y"]) for item in members),
+                    "width": max(0.0, right - left),
+                    "height": max(float(item.get("height", 0.0)) for item in members),
+                })
+            else:
+                consumed.add(index)
+                coalesced.append(record)
+
+        # Use bbox to repair only an evidenced heading-order anomaly: a raw
+        # heading emitted after content that is visually below that heading.
+        normalized_headings = {_normalized_section_heading(heading) for heading in SECTION_HEADINGS}
+        anomaly = any(
+            "y" in heading
+            and _normalized_section_heading(heading["text"]) in normalized_headings
+            and any("y" in earlier and float(earlier["y"]) < float(heading["y"]) for earlier in coalesced[:heading_index])
+            for heading_index, heading in enumerate(coalesced)
+        )
+        if anomaly:
+            coalesced.sort(key=lambda item: (-float(item.get("y", 0.0)), float(item.get("x", 0.0))))
+        records.extend({**record, "line": line_number} for line_number, record in enumerate(coalesced, 1))
     return records
 
 
@@ -524,7 +587,7 @@ def _sections(records: list[dict], corrections: list[dict] | None = None) -> dic
     aliases = {
         _normalized_section_heading(item["source_text"]): item["target_value"]
         for item in corrections or []
-        if item["kind"] == "section_alias" and item["target_value"] in {"work", "projects", "education", "skills", "summary"}
+        if item["kind"] == "section_alias" and item["target_value"] in {"work", "projects", "education", "skills", "summary", "awards", "other_experience"}
     }
     current = "basics"
     canonical_headings = {_normalized_section_heading(heading): section for heading, section in SECTION_HEADINGS.items()}
@@ -716,7 +779,7 @@ def _parse_grouped_entities(source_id: str, records: list[dict], entity_type: st
             return
         flush_highlight()
         header = current["header"]
-        header_anchor = _anchor(source_id, [current["header_record"]])
+        header_anchor = _anchor(source_id, current["header_records"])
         if entity_type == "work_experience":
             data = {
                 "name": header["primary"], "position": header["secondary"], "location": header["location"], "url": "",
@@ -726,7 +789,7 @@ def _parse_grouped_entities(source_id: str, records: list[dict], entity_type: st
                 "skills": [], "employmentType": "", "department": "",
             }
             paths = ("/name", "/position", "/rawDate", "/startDate", "/endDate", "/location")
-        else:
+        elif entity_type == "project":
             description = header["secondary"]
             project_kind = "software" if re.search(r"(?:HTML|JavaScript|React|网站|软件)", description, re.I) else "design"
             data = {
@@ -739,6 +802,13 @@ def _parse_grouped_entities(source_id: str, records: list[dict], entity_type: st
                 "boundaries": [item for item in current["highlights"] if re.search(r"不宣称|不包含|未包含|责任边界", item)],
             }
             paths = ("/name", "/description", "/rawDate", "/startDate", "/endDate")
+        else:
+            data = {
+                "name": header["primary"], "title": header["secondary"], "section": "其他经历",
+                "location": header["location"], "startDate": header["startDate"], "endDate": header["endDate"],
+                "rawDate": header["rawDate"], "summary": "", "unclassified_highlights": current["highlights"],
+            }
+            paths = ("/name", "/title", "/section", "/rawDate", "/startDate", "/endDate", "/location")
         provenance = _field_provenance(header_anchor, *paths)
         highlight_path = "/unclassified_highlights"
         for index, highlight_records in enumerate(current["highlight_records"]):
@@ -769,9 +839,12 @@ def _parse_grouped_entities(source_id: str, records: list[dict], entity_type: st
         header = None if bullet else _header_parts(record["text"], include_location=entity_type == "work_experience")
         if header:
             flush_entity()
-            current = {"header": header, "header_record": record, "highlights": [], "highlight_records": []}
+            current = {"header": header, "header_records": [record], "highlights": [], "highlight_records": []}
         elif active_highlight:
             active_highlight["records"].append(record)
+        elif current and not current["header"]["secondary"] and ROLE_CONTINUATION_PATTERN.search(record["text"]) and len(record["text"]) <= 90 and not re.search(r"[。；;]", record["text"]):
+            current["header"]["secondary"] = record["text"].strip()
+            current["header_records"].append(record)
         elif current and not _canonical_month_first_range(record["text"]):
             # Some Resume layouts use one visual line per responsibility
             # without bullet glyphs. Preserve each as unclassified evidence;
@@ -784,7 +857,7 @@ def _parse_grouped_entities(source_id: str, records: list[dict], entity_type: st
 def _parse_education(source_id: str, records: list[dict], start_order: int) -> tuple[list[dict], list[dict]]:
     entities = []
     consumed_records = []
-    for record in records:
+    for record_index, record in enumerate(records):
         matches = list(DATE_RANGE_PATTERN.finditer(record["text"]))
         if not matches:
             continue
@@ -799,18 +872,26 @@ def _parse_education(source_id: str, records: list[dict], start_order: int) -> t
             institution_match = INSTITUTION_PATTERN.match(core)
             institution = institution_match.group(1).strip() if institution_match else core
             study = institution_match.group(2).strip() if institution_match else ""
-            degree_match = re.search(r"(博士|硕士|本科|学士|Master|Bachelor|PhD)", study, re.I)
+            adjacent = records[record_index + 1] if record_index + 1 < len(records) else None
+            adjacent_degree = re.search(r"(博士|硕士|本科|学士|Master|Bachelor|PhD)", adjacent["text"], re.I) if adjacent and not DATE_RANGE_PATTERN.search(adjacent["text"]) else None
+            inline_degree = re.search(r"(博士|硕士|本科|学士|Master|Bachelor|PhD)", study, re.I)
+            degree_match = inline_degree or adjacent_degree
+            uses_adjacent_degree = bool(adjacent_degree and not inline_degree)
             study_type = degree_match.group(1) if degree_match else study
-            area = study[:degree_match.start()].strip(" （(") if degree_match else ""
+            degree_source = study if inline_degree else adjacent["text"] if uses_adjacent_degree else ""
+            area = re.sub(r"^[•●▪‣·\-*]\s*", "", degree_source[:degree_match.start()]).strip(" -（(") if degree_match else ""
             data = {
                 "institution": institution, "url": "", "area": area, "studyType": study_type,
                 "location": tokens[1].strip() if len(tokens) > 1 else "", "startDate": _normalize_date(match.group("start")),
                 "endDate": _normalize_date(match.group("end")), "rawDate": match.group(0), "score": "", "courses": [],
                 "summary": "", "highlights": [],
             }
-            anchor = _anchor(source_id, [record], excerpt=chunk)
+            anchor_records = [record, adjacent] if uses_adjacent_degree else [record]
+            anchor = _anchor(source_id, anchor_records, excerpt=" ".join(item["text"] for item in anchor_records))
             provenance = _field_provenance(anchor, "/institution", "/area", "/studyType", "/location", "/rawDate", "/startDate", "/endDate")
             entities.append(_entity(source_id, "education", start_order + len(entities), data, provenance, ["self_reported_resume_claim_not_independently_verified"]))
+            if uses_adjacent_degree and adjacent not in consumed_records:
+                consumed_records.append(adjacent)
 
     # English CVs often put institution and degree on separate lines and omit
     # dates. Preserve the Education entity with unknown dates instead of
@@ -925,10 +1006,14 @@ def _parse_skills(source_id: str, records: list[dict], start_order: int) -> list
 def _parse_awards(source_id: str, records: list[dict], start_order: int) -> list[dict]:
     """Map only explicitly labelled Resume awards; absent dates stay unknown."""
     ordered = _visual_record_order(records)
-    starts = [(index, AWARD_RECORD_PATTERN.match(record["text"])) for index, record in enumerate(ordered)]
-    starts = [(index, match) for index, match in starts if match]
+    starts = [
+        (index, AWARD_RECORD_PATTERN.match(record["text"]), CHINESE_AWARD_RECORD_PATTERN.match(record["text"]))
+        for index, record in enumerate(ordered)
+    ]
+    starts = [(index, english, chinese) for index, english, chinese in starts if english or chinese]
     entities = []
-    for position, (index, match) in enumerate(starts):
+    for position, (index, english_match, chinese_match) in enumerate(starts):
+        match = english_match or chinese_match
         assert match is not None
         next_index = starts[position + 1][0] if position + 1 < len(starts) else len(ordered)
         start_record = ordered[index]
@@ -1382,6 +1467,7 @@ def propose_entities(pages: list[dict], source_id: str, document_type: str, loca
         if basics:
             entities.append(basics)
         entities.extend(_parse_grouped_entities(source_id, sections.get("work", []), "work_experience", len(entities)))
+        entities.extend(_parse_grouped_entities(source_id, sections.get("other_experience", []), "custom_section", len(entities)))
         entities.extend(_parse_grouped_entities(source_id, sections.get("projects", []), "project", len(entities)))
         education_records = sections.get("education", []) + sections.get("education_and_tools", [])
         education, consumed = _parse_education(source_id, education_records, len(entities))

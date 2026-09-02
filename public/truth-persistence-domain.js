@@ -10,7 +10,7 @@
 
   const CONTRACT_ID = "ariadne-truth-persistence-v1";
   const DB_NAME = "job-radar-local-first-v1";
-  const DB_VERSION = 11;
+  const DB_VERSION = 12;
   const STORE_SPECS = Object.freeze([
     Object.freeze({ name: "source_documents", keyPath: "source_document_id", lifecycle: "reused" }),
     Object.freeze({ name: "runtime_snapshots", keyPath: "snapshot_id", lifecycle: "new" }),
@@ -20,6 +20,7 @@
     Object.freeze({ name: "context_proposals", keyPath: "proposal_id", lifecycle: "new" }),
     Object.freeze({ name: "context_review_decisions", keyPath: "review_id", lifecycle: "new" }),
     Object.freeze({ name: "candidate_context_revisions", keyPath: "revision_id", lifecycle: "new" }),
+    Object.freeze({ name: "candidate_context_lifecycle", keyPath: "lifecycle_id", lifecycle: "new" }),
     Object.freeze({ name: "job_context_revisions", keyPath: "revision_id", lifecycle: "new" }),
   ]);
   const STORE_NAMES = Object.freeze(Object.fromEntries(STORE_SPECS.map((spec) => [spec.name.toUpperCase(), spec.name])));
@@ -32,12 +33,14 @@
   const PROPOSAL_STATUSES = Object.freeze(["AWAITING_REVIEW", "ACCEPTED", "REJECTED", "CANCELLED_BY_USER", "SUPERSEDED"]);
   const REVIEW_DECISIONS = Object.freeze(["CONFIRM", "REJECT", "EDIT_AND_CONFIRM"]);
   const CONTEXT_TYPES = Object.freeze(["CANDIDATE", "JOB"]);
+  const CANDIDATE_CONTEXT_LIFECYCLE_STATES = Object.freeze(["REMOVED"]);
   const CANCEL_REASON = "USER_CANCELLED_UPLOAD";
   const APPEND_ONLY_STORES = Object.freeze([
     "runtime_snapshots",
     "extraction_artifacts",
     "context_review_decisions",
     "candidate_context_revisions",
+    "candidate_context_lifecycle",
     "job_context_revisions",
   ]);
   const AUTHORITY = Object.freeze({
@@ -47,6 +50,7 @@
     proposal: "NON_AUTHORITATIVE_PROPOSAL",
     review: "AUTHORITATIVE_USER_DECISION",
     revision: "AUTHORITATIVE_CONFIRMED_CONTEXT",
+    lifecycle: "AUTHORITATIVE_USER_DECISION",
   });
   const SECRET_KEY_PATTERN = /(?:api[_-]?key|authorization|access[_-]?token|refresh[_-]?token|bearer|secret)/i;
   const EMBEDDED_BYTES_KEY_PATTERN = /(?:file[_-]?blob|file[_-]?bytes|raw[_-]?bytes|document[_-]?data[_-]?url|image[_-]?data[_-]?url|base64[_-]?data)/i;
@@ -66,6 +70,7 @@
     proposal: Object.freeze(["contract_id", "proposal_id", "proposal_type", "source_document_ids", "processing_run_id", "runtime_snapshot_id", "status", "created_at", "payload", "grounding_refs", "warnings", "uncertainties", "authority"]),
     review: Object.freeze(["contract_id", "review_id", "proposal_id", "decision", "reviewed_at", "accepted_payload", "authority"]),
     revision: Object.freeze(["contract_id", "context_type", "context_id", "revision_id", "version", "previous_revision_id", "confirmed_from_proposal_id", "review_decision_id", "created_at", "provenance", "payload", "authority"]),
+    lifecycle: Object.freeze(["contract_id", "lifecycle_id", "context_id", "item_id", "state", "removed_from_revision_id", "removed_at", "reason", "authority"]),
   });
 
   class TruthPersistenceError extends Error {
@@ -431,6 +436,25 @@
     });
   }
 
+  function validateCandidateContextLifecycle(record) {
+    const value = prepare(record, FIELDS.lifecycle, "candidate_context_lifecycle");
+    if (value.contract_id !== "ariadne-candidate-context-lifecycle-v1") throw new TruthPersistenceError("candidate_context_lifecycle_contract_invalid");
+    if (!CANDIDATE_CONTEXT_LIFECYCLE_STATES.includes(value.state)) throw new TruthPersistenceError("candidate_context_lifecycle_state_invalid");
+    if (value.reason !== "USER_REMOVED") throw new TruthPersistenceError("candidate_context_lifecycle_reason_invalid");
+    if (value.authority !== AUTHORITY.lifecycle) throw new TruthPersistenceError("candidate_context_lifecycle_authority_invalid");
+    return Object.freeze({
+      contract_id: value.contract_id,
+      lifecycle_id: requiredString(value.lifecycle_id, "candidate_context_lifecycle_id_invalid"),
+      context_id: requiredString(value.context_id, "candidate_context_lifecycle_context_id_invalid"),
+      item_id: requiredString(value.item_id, "candidate_context_lifecycle_item_id_invalid"),
+      state: value.state,
+      removed_from_revision_id: requiredString(value.removed_from_revision_id, "candidate_context_lifecycle_revision_id_invalid"),
+      removed_at: validIso(value.removed_at, "candidate_context_lifecycle_removed_at_invalid"),
+      reason: value.reason,
+      authority: value.authority,
+    });
+  }
+
   function validateRuntimeSnapshotRecord(snapshot) {
     if (!RuntimeExecution || typeof RuntimeExecution.validateRuntimeSnapshot !== "function") throw new TruthPersistenceError("runtime_snapshot_validator_unavailable");
     try { return RuntimeExecution.validateRuntimeSnapshot(snapshot); }
@@ -499,6 +523,7 @@
       context_proposals: validateProposal,
       context_review_decisions: validateReviewDecision,
       candidate_context_revisions: validateContextRevision,
+      candidate_context_lifecycle: validateCandidateContextLifecycle,
       job_context_revisions: validateContextRevision,
     };
     const validator = validators[storeName];
@@ -639,6 +664,7 @@
     PROPOSAL_STATUSES,
     REVIEW_DECISIONS,
     CONTEXT_TYPES,
+    CANDIDATE_CONTEXT_LIFECYCLE_STATES,
     CANCEL_REASON,
     APPEND_ONLY_STORES,
     AUTHORITY,
@@ -654,6 +680,7 @@
     validateCancelledWorkflowState,
     validateReviewDecision,
     validateContextRevision,
+    validateCandidateContextLifecycle,
     validateRuntimeSnapshotRecord,
     validateExecutionChain,
     applyReviewDecision,

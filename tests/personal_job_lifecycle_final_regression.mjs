@@ -1,0 +1,87 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const read = (name) => fs.readFileSync(path.join(root, "public", name), "utf8");
+const pages = read("v1-pages.js");
+const styles = read("styles.css");
+const candidateDetail = read("candidate-detail.html");
+const jobDetail = read("job-detail.html");
+const jobImport = read("jd-import.html");
+const lifecycle = read("local-context-lifecycle-domain.js");
+const jobLifecycle = read("local-job-lifecycle-domain.js");
+
+assert.match(styles, /:where\(\.v1-body\) button, :where\(\.v1-body\) input, :where\(\.v1-body\) textarea \{ font: inherit; \}/);
+for (const detail of [candidateDetail, jobDetail]) {
+  assert.match(detail, /v1-detail-edit-button/);
+  assert.match(detail, /v1-detail-remove-button/);
+  assert.match(detail, /v1-detail-state-panel/);
+  assert.match(detail, /v1-delete-popover/);
+  assert.match(detail, /仅删除这张卡片[\s\S]*移除此文件导入的所有内容[\s\S]*取消/);
+  assert.doesNotMatch(detail, /id="(?:candidate|job)-delete-first"|id="(?:candidate|job)-delete-scope"|要从个人资料中移除内容吗？|要从职位描述中移除内容吗？/);
+  assert.match(detail, /class="v1-primary-button v1-detail-remove-button"/);
+}
+assert.match(styles, /\.v1-detail-edit-button \{ background: #20232a;[^}]*color: #fff/);
+assert.match(styles, /\.v1-detail-remove-button \{ background: #bd2f2a;[^}]*border-color: #bd2f2a[^}]*color: #fff/);
+assert.doesNotMatch(styles, /\.v1-detail-remove-button \{[^}]*border-radius|\.v1-detail-remove-button \{[^}]*font-size|\.v1-detail-remove-button \{[^}]*min-height|\.v1-detail-remove-button \{[^}]*padding/);
+assert.match(styles, /\.v1-edit-actions \{[^}]*justify-content: space-between/);
+assert.match(styles, /\.v1-edit-primary-actions \{[^}]*justify-content: flex-end/);
+assert.match(styles, /\.v1-delete-popover-menu \{[^}]*position: fixed/);
+assert.match(styles, /\.v1-delete-popover-menu \{[^}]*border-radius: 20px[^}]*padding: 4px[^}]*width: max-content/);
+assert.doesNotMatch(styles, /\.v1-delete-popover-menu \{[^}]*min-width/);
+assert.match(styles, /\.v1-delete-popover-option \{[^}]*text-align: right/);
+assert.match(styles, /\.v1-delete-popover-option:not\(:last-child\) \{ border-bottom: 1px solid rgba\(220,225,233,\.8\); \}/);
+assert.match(styles, /\.v1-body \.v1-detail-remove-button:focus:not\(:focus-visible\) \{ outline: 0; \}/);
+assert.match(styles, /\.v1-body \.v1-detail-remove-button:focus-visible \{ outline: 2px solid rgba\(189,47,42,\.32\); outline-offset: 2px; \}/);
+assert.match(styles, /\.v1-delete-popover-option\.destructive \{[^}]*color: #bd2f2a/);
+assert.match(styles, /\.v1-delete-popover-option\.cancel \{[^}]*color: #737b8c/);
+assert.match(styles, /\.v1-detail-overlay-content > header \{[^}]*grid-template-columns: minmax\(0, 1fr\) auto minmax\(0, 1fr\)/);
+assert.match(styles, /\.v1-detail-overlay-edit \{[^}]*background: transparent[^}]*font-size: 10px[^}]*height: 36px[^}]*min-width: 56px[^}]*white-space: nowrap/);
+assert.match(styles, /\.v1-detail-overlay-edit::before \{[^}]*background: #20232a[^}]*border-radius: 20px[^}]*corner-shape: squircle[^}]*inset: 2px 3px/);
+assert.match(styles, /\.v1-embedded-detail \.v1-structured-pane \{[^}]*padding:[^}]*max\(28px, env\(safe-area-inset-bottom\)\)/);
+assert.match(styles, /\.v1-edit-form textarea \{[^}]*resize: none/);
+assert.match(styles, /\.v1-detail-state-panel\.is-active/);
+assert.match(styles, /\.v1-detail-edit-button:active/);
+assert.match(styles, /\.v1-detail-remove-button:active/);
+
+const candidateCard = pages.slice(pages.indexOf("function candidateCardMarkup"), pages.indexOf("function personalGuideCardMarkup"));
+const jobCard = pages.slice(pages.indexOf("function jobCardMarkup"), pages.indexOf("function jobGuideCardMarkup"));
+assert.doesNotMatch(candidateCard, /已确认|用户确认|USER_CONFIRMED/);
+assert.doesNotMatch(jobCard, /已确认|用户确认|USER_CONFIRMED/);
+assert.match(candidateCard, /candidateTypeLabel/);
+assert.match(jobCard, /职位描述/);
+assert.match(candidateCard, /待审核 · 演示/);
+assert.match(jobCard, /演示数据/);
+
+assert.match(candidateDetail, /local-context-lifecycle-domain\.js/);
+assert.match(jobDetail, /local-context-lifecycle-domain\.js/);
+assert.match(jobDetail, /local-job-lifecycle-domain\.js/);
+assert.match(jobImport, /\bmultiple\b/);
+assert.match(jobImport, /job-review-surface/);
+assert.match(pages, /LocalContextLifecycle\.prepareFileSource/);
+assert.match(pages, /LocalContextLifecycle\.uniqueSources/);
+assert.match(pages, /LocalJobLifecycle\.sourceImportState/);
+assert.match(pages, /LocalJobLifecycle\.persistPendingImport/);
+assert.match(pages, /LocalJobLifecycle\.hardDeleteSource/);
+assert.match(pages, /renderAwaitingJobReviews/);
+assert.match(pages, /if \(!remaining\.length\)/);
+assert.match(pages, /source_document_id/);
+assert.doesNotMatch(pages, /askDuplicateResolution/);
+assert.doesNotMatch(lifecycle, /\bfetch\s*\(|XMLHttpRequest|provider|model_metadata/i);
+assert.doesNotMatch(jobLifecycle, /\bfetch\s*\(|XMLHttpRequest|Authorization|Bearer/i);
+assert.match(jobLifecycle, /network_sent: false/);
+assert.match(jobLifecycle, /content_read_for_identity_only: true/);
+assert.match(jobLifecycle, /database\.transaction\(\[storeName, sourceStoreName\], "readwrite"\)/);
+
+assert.match(pages, /function createDeletePopover\(popoverId\)/);
+assert.match(pages, /rect\.right - width/);
+assert.match(pages, /createDeletePopover\("candidate-delete-popover"\)/);
+assert.match(pages, /createDeletePopover\("job-delete-popover"\)/);
+const candidateRemove = pages.slice(pages.indexOf('document.querySelectorAll("[data-candidate-delete-scope]"'), pages.indexOf('byId("preview-direct-edit")'));
+assert.match(candidateRemove, /persistSourceHardDelete/);
+assert.match(candidateRemove, /hardDeleteLegacySource/);
+assert.doesNotMatch(candidateRemove, /Promise\.all\(related\.map/);
+
+console.log("personal_job_lifecycle_final=pass");

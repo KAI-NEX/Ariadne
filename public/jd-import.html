@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ariadne · 添加职位描述</title>
-    <link rel="stylesheet" href="/styles.css?v=v1-motion-33">
+    <link rel="stylesheet" href="/styles.css?v=lifecycle-final-v1">
   </head>
   <body class="v1-body" data-v1-page="job-import">
     <main class="v1-page-shell v1-import-shell">
@@ -27,7 +27,7 @@
               <button type="button" data-job-import-type="Paste" aria-pressed="false">粘贴文本</button>
             </div>
           </section>
-          <section id="job-file-section" class="v1-file-picker"><label id="job-dropzone" class="v1-file-dropzone" for="job-file-input"><span id="job-dropzone-copy">点击上传文件或直接拖拽文件至此</span><input id="job-file-input" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,application/pdf,image/png,image/jpeg,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label></section>
+          <section id="job-file-section" class="v1-file-picker"><button id="job-dropzone" class="v1-file-dropzone" type="button" aria-controls="job-file-input"><span id="job-dropzone-copy">点击上传文件或直接拖拽文件至此</span></button><input id="job-file-input" class="v1-file-input" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,application/pdf,image/png,image/jpeg,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></section>
           <section id="job-paste-section" class="v1-paste-input hidden"><label for="job-paste-input">职位描述</label><textarea id="job-paste-input" placeholder="在此粘贴职位描述…"></textarea></section>
           <section class="v1-link-input"><label for="job-link-input">职位链接 <span>选填</span></label><input id="job-link-input" type="url" inputmode="url" placeholder="https://example.com/jobs/…"><p>链接只作为来源信息保存在本地；本页不会自动访问或上传该网址。</p></section>
           <section id="job-file-preview" class="v1-file-preview hidden"><div><span id="job-file-icon">TXT</span><p><b id="job-file-name"></b><small id="job-file-meta"></small></p></div><button id="replace-job-file" type="button">替换</button></section>
@@ -35,12 +35,18 @@
           <button id="start-job-processing" class="v1-primary-button v1-sheet-primary" type="button" disabled>开始本地演示整理</button>
         </div>
       </section>
+      <section id="job-review-surface" class="v1-review-surface hidden" aria-labelledby="job-review-heading">
+        <div class="v1-review-heading"><p class="v1-field-label">待人工审核</p><h2 id="job-review-heading">本地职位演示草稿</h2><p>当前旧版流程只生成明确标注的本地演示草稿；请逐条审核，不代表真实 JD 语义理解。</p></div>
+        <div id="job-review-list"></div>
+      </section>
       <p id="job-page-message" class="v1-inline-message" aria-live="polite"></p>
     </main>
     <script src="/runtime-capabilities.js?v=runtime-gate-v1"></script>
     <script src="/runtime-capability-gate.js?v=runtime-gate-v1"></script>
+    <script src="/local-context-lifecycle-domain.js?v=lifecycle-final-v1"></script>
+    <script src="/local-job-lifecycle-domain.js?v=lifecycle-final-v1"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
-    <script src="/v1-pages.js?v=v1-motion-33"></script>
+    <script src="/v1-pages.js?v=lifecycle-final-v1"></script>
   </body>
 </html>

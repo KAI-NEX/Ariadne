@@ -25,6 +25,7 @@ assert.deepEqual([...Truth.FIELDS.batch], schema.$defs.processingBatch.required)
 assert.deepEqual([...Truth.FIELDS.proposal], schema.$defs.proposal.required);
 assert.deepEqual([...Truth.FIELDS.review], schema.$defs.reviewDecision.required);
 assert.deepEqual([...Truth.FIELDS.revision], schema.$defs.contextRevision.required);
+assert.deepEqual([...Truth.FIELDS.lifecycle], schema.$defs.candidateContextLifecycle.required);
 assert.deepEqual([...Truth.SOURCE_TYPES], schema.$defs.sourceDocument.properties.source_type.enum);
 assert.deepEqual([...Truth.MATERIAL_TYPES], schema.$defs.sourceDocument.properties.material_type.enum);
 assert.deepEqual([...Truth.PROCESSING_STATUSES], schema.$defs.processingRun.properties.status.enum);
@@ -161,6 +162,19 @@ assert.equal(confirmed.revision.previous_revision_id, null);
 assert.equal(confirmed.revision.confirmed_from_proposal_id, proposal.proposal_id);
 assert.equal(confirmed.revision.review_decision_id, confirm.review_id);
 assert.equal(confirmed.revision.provenance.runtime_snapshot_id, localSnapshot.snapshot_id);
+const lifecycle = Truth.validateCandidateContextLifecycle({
+  contract_id: "ariadne-candidate-context-lifecycle-v1",
+  lifecycle_id: "candidate-context-removal-1",
+  context_id: confirmed.revision.context_id,
+  item_id: confirmed.revision.payload.items[0].item_id,
+  state: "REMOVED",
+  removed_from_revision_id: confirmed.revision.revision_id,
+  removed_at: "2026-09-02T01:01:30Z",
+  reason: "USER_REMOVED",
+  authority: Truth.AUTHORITY.lifecycle,
+});
+assert.equal(lifecycle.item_id, "work-1");
+assert.throws(() => Truth.validateCandidateContextLifecycle({ ...lifecycle, item_id: "" }), (error) => error.code === "candidate_context_lifecycle_item_id_invalid");
 assert.throws(
   () => Truth.applyReviewDecision({ proposal, review_decision: { ...confirm, accepted_payload: { items: [] } }, current_revision: null, expected_version: 0, context_id: "candidate-context-mislabeled-edit", revision_id: "candidate-context-mislabeled-edit-v1" }),
   (error) => error.code === "review_confirm_payload_mismatch",
@@ -455,7 +469,7 @@ assert.equal(memoryDb.records.get("candidate_context_revisions").size, 1); // Pr
 const openers = ["v1-demo-domain.js", "career-evidence.js", "local-first.js", "career-profile.js", "local-jobs.js"];
 for (const filename of openers) {
   const sourceText = fs.readFileSync(path.join(root, "public", filename), "utf8");
-  assert.match(sourceText, /const DB_VERSION = 11;/, `${filename} must open IndexedDB v11`);
+  assert.match(sourceText, /const DB_VERSION = 12;/, `${filename} must open IndexedDB v12`);
   for (const spec of Truth.NEW_STORE_SPECS) {
     assert(sourceText.includes(`"${spec.name}"`), `${filename} must add ${spec.name}`);
     assert(sourceText.includes(`"${spec.keyPath}"`), `${filename} must use ${spec.keyPath}`);

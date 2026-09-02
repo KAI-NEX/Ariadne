@@ -5,8 +5,11 @@
   const RuntimeGate = window.JobRadarRuntimeGate;
   const RuntimeExecution = window.AriadneRuntimeExecution;
   const Truth = window.AriadneTruthPersistence;
+  const LocalContextLifecycle = window.AriadneLocalContextLifecycle;
   const LocalCandidate = window.AriadneLocalCandidateExtraction;
   const LocalCandidateProposal = window.AriadneLocalCandidateProposal;
+  const LocalCandidateReview = window.AriadneLocalCandidateReview;
+  const LocalJobLifecycle = window.AriadneLocalJobLifecycle;
   const page = document.body.dataset.v1Page;
   const isEmbeddedDetail = new URLSearchParams(window.location.search).get("embed") === "1";
   if (isEmbeddedDetail) document.body.classList.add("v1-embedded-detail");
@@ -14,6 +17,9 @@
   const byId = (id) => document.getElementById(id);
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
   const typeLabels = { WORK_EXPERIENCE: "工作经历", PROJECT: "项目", EDUCATION: "教育经历", OTHER: "其他" };
+  const subtypeLabels = { work_experience: "工作经历", project: "项目经历", education: "教育经历", custom_section: "其他经历", skill_group: "核心能力", award: "获奖经历", language: "语言能力" };
+  const materialTypeLabels = { resume: "简历", portfolio: "作品集", project_description: "项目说明", other: "其他材料" };
+  const factLabels = { rawDate: "日期", achievements: "成果", responsibilities: "职责", summary: "摘要", location: "地点", area: "专业", score: "成绩", result: "结果", awarder: "颁发方", keywords: "核心能力", section: "分类", category: "分类", organization: "组织", role: "角色", context: "背景", outputs: "产出", outcomes: "结果" };
   const sourceTypeLabels = { SANITIZED_FIXTURE: "本地测试资料", BROWSER_FILE_METADATA: "浏览器本地文件", PASTED_TEXT_METADATA: "本地粘贴文本" };
   let selectedCandidateSources = [];
   let selectedCandidateType = "Resume";
@@ -25,7 +31,16 @@
   let pendingDirectEdit = null;
   let candidateProcessingInProgress = false;
   let candidateBatchAbortController = null;
+  let candidateExecutionState = "READY";
+  let candidateSelectionVersion = 0;
+  let candidateReviewSessionTotal = 0;
+  let candidateReviewSessionResolved = 0;
   let jobProcessingInProgress = false;
+  let jobBatchAbortController = null;
+  let jobExecutionState = "READY";
+  let jobSelectionVersion = 0;
+  let jobReviewSessionTotal = 0;
+  let jobReviewSessionResolved = 0;
 
   function currentOperationGate(operation) {
     try { return RuntimeGate.operationGate(operation); }
@@ -44,6 +59,23 @@
     if (runtime.mode !== "model") return "本地运行";
     const provider = ({ deepseek: "DeepSeek", gemini: "Gemini", qwen: "Qwen" }[runtime.provider] || runtime.provider || "模型");
     return runtime.model ? `${provider} · ${runtime.model}` : provider;
+  }
+
+  function candidateTypeLabel(item) { return subtypeLabels[item?.item_subtype] || typeLabels[item?.item_type] || "其他经历"; }
+  function candidateFactLabel(value) { return factLabels[value] || (/[\u3400-\u9fff]/.test(String(value || "")) ? value : "补充信息"); }
+  function personalErrorCopy(error) {
+    const code = String(error?.message || error || "");
+    const messages = {
+      candidate_source_identity_required: "无法确认这张卡片对应的原始文件。",
+      candidate_source_not_found: "原始文件已不存在，无需再次删除。",
+      candidate_item_not_found: "这张卡片已不存在。",
+      candidate_item_already_removed: "这张卡片已被移除。",
+      context_version_conflict: "卡片已在其他操作中更新，请重新打开后再试。",
+      unsupported_document_type: "暂不支持这种文件格式。",
+      invalid_document_size: "文件大小不符合本地导入要求。",
+      document_read_failed: "无法读取这个本地文件。",
+    };
+    return messages[code] || "操作未完成，请重试。";
   }
 
   function unavailableCopy(gate, subject) {
@@ -71,7 +103,14 @@
     const gate = currentOperationGate("candidate_import");
     const button = byId("start-personal-processing");
     if (!button) return gate;
-    button.disabled = candidateProcessingInProgress || !selectedCandidateSources.length || !gate.allowed;
+    const local = gate.authority.runtime.mode === "local";
+    document.body.dataset.candidateImportRuntime = local ? "local" : "model-unavailable";
+    button.textContent = !local ? "模型导入尚不可用" : candidateExecutionState === "COMPLETE" ? "本地提取已完成" : candidateExecutionState === "PROCESSING" ? "正在本地提取" : "开始本地提取";
+    button.disabled = candidateProcessingInProgress || candidateExecutionState === "COMPLETE" || !selectedCandidateSources.length || !gate.allowed;
+    byId("personal-file-input").disabled = !local || candidateProcessingInProgress;
+    byId("personal-dropzone").disabled = !local || candidateProcessingInProgress;
+    byId("personal-dropzone").setAttribute("aria-disabled", String(!local || candidateProcessingInProgress));
+    byId("personal-import-types").querySelectorAll("button").forEach((item) => { item.disabled = !local || candidateProcessingInProgress; });
     setRuntimeGateMessage("personal-page-message", gate.allowed ? "" : unavailableCopy(gate, "个人材料语义结构化"));
     return gate;
   }
@@ -80,39 +119,14 @@
     const gate = currentOperationGate("job_import");
     const button = byId("start-job-processing");
     if (!button) return gate;
-    button.disabled = jobProcessingInProgress || !selectedJobSource || !gate.allowed;
+    button.textContent = gate.authority.runtime.mode !== "local" ? "模型导入尚不可用" : jobExecutionState === "COMPLETE" ? "等待审核完成" : jobProcessingInProgress ? "正在本地整理" : "开始本地演示整理";
+    const local = gate.authority.runtime.mode === "local";
+    button.disabled = jobProcessingInProgress || jobExecutionState === "COMPLETE" || !selectedJobSource || !gate.allowed;
+    byId("job-file-input").disabled = !local || jobProcessingInProgress;
+    byId("job-dropzone").disabled = !local || jobProcessingInProgress;
+    byId("job-dropzone").setAttribute("aria-disabled", String(!local || jobProcessingInProgress));
     setRuntimeGateMessage("job-page-message", gate.allowed ? "" : unavailableCopy(gate, "职位语义结构化"));
     return gate;
-  }
-
-  function askDuplicateResolution({ kind, count, aiMode }) {
-    return new Promise((resolve) => {
-      const entityLabel = kind === "candidate" ? "个人材料" : "职位描述";
-      const overlay = document.createElement("div");
-      overlay.className = "v1-duplicate-overlay";
-      overlay.innerHTML = `<div class="v1-duplicate-dialog" role="dialog" aria-modal="true" aria-labelledby="duplicate-dialog-title">
-        <p class="v1-section-label">重复内容检查</p>
-        <h2 id="duplicate-dialog-title">检测到 ${count} 组相似${entityLabel}</h2>
-        <p>${aiMode ? "可以使用当前模型生成融合建议；建议仍需人工确认后才会保存。" : "本地模式只合并完全一致或高度相似的结构化字段，不会静默覆盖原记录。"}</p>
-        <div class="v1-duplicate-actions">
-          <button type="button" class="v1-primary-button" data-duplicate-resolution="merge">${aiMode ? "生成模型融合建议" : "融合重复内容"}</button>
-          <button type="button" class="v1-secondary-button" data-duplicate-resolution="keep">保留两份</button>
-          <button type="button" class="v1-tertiary-button" data-duplicate-resolution="cancel">取消</button>
-        </div>
-      </div>`;
-      document.body.appendChild(overlay);
-      document.body.classList.add("v1-dialog-open");
-      const finish = (resolution) => {
-        overlay.classList.add("is-closing");
-        window.setTimeout(() => { overlay.remove(); document.body.classList.remove("v1-dialog-open"); resolve(resolution); }, 180);
-      };
-      overlay.addEventListener("click", (event) => {
-        const button = event.target.closest("[data-duplicate-resolution]");
-        if (button) finish(button.dataset.duplicateResolution);
-        else if (event.target === overlay) finish("cancel");
-      });
-      overlay.querySelector("[data-duplicate-resolution='merge']")?.focus();
-    });
   }
 
   function formatBytes(bytes) {
@@ -302,7 +316,7 @@
       <section class="v1-detail-overlay-surface" role="dialog" aria-modal="true" aria-label="资料详情" tabindex="-1">
         <div class="v1-detail-overlay-preview" aria-hidden="true"></div>
         <div class="v1-detail-overlay-content">
-          <header><button class="v1-detail-overlay-close" type="button" aria-label="关闭详情"></button><p></p><span aria-hidden="true"></span></header>
+          <header><button class="v1-detail-overlay-close" type="button" aria-label="关闭详情"></button><p></p><button class="v1-detail-overlay-edit" type="button" aria-label="编辑当前内容">编辑</button></header>
           <iframe title="本地资料详情"></iframe>
         </div>
       </section>
@@ -314,6 +328,7 @@
     const content = overlay.querySelector(".v1-detail-overlay-content");
     const title = content.querySelector("header p");
     const closeButton = overlay.querySelector(".v1-detail-overlay-close");
+    const editButton = overlay.querySelector(".v1-detail-overlay-edit");
     const frame = overlay.querySelector("iframe");
     const surfaceControls = window.JobRadarFloatingWindow?.mount(surface, {
       dragHandle: content.querySelector("header"),
@@ -343,6 +358,8 @@
       surfaceControls?.reset();
       sourceCard = card;
       const isImport = card.matches(".v1-add-guide-card");
+      editButton.classList.toggle("hidden", isImport);
+      editButton.disabled = isImport;
       const sourceRect = card.getBoundingClientRect();
       const destinationRect = targetRect();
       const sourceRadius = getComputedStyle(card).borderRadius;
@@ -438,6 +455,7 @@
       openOverlay(card);
     });
     closeButton.addEventListener("click", closeOverlay);
+    editButton.addEventListener("click", () => frame.contentWindow?.postMessage({ type: "job-radar-v1-open-detail-edit" }, window.location.origin));
     backdrop.addEventListener("click", closeOverlay);
     document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeOverlay(); });
     window.addEventListener("message", (event) => {
@@ -581,11 +599,14 @@
   }
 
   function candidateCardMarkup(item) {
-    const facts = item.facts.slice(0, 4).map((fact) => `<li>${escapeHtml(fact.value)}</li>`).join("");
-    return `<a class="v1-candidate-card" data-transition-key="candidate:${escapeHtml(item.item_id)}" href="/candidate-detail.html?item=${encodeURIComponent(item.item_id)}">
-      <div class="v1-card-top"><span class="v1-type-chip">${escapeHtml(typeLabels[item.item_type] || item.item_type)}</span><span class="v1-review-chip">待审核</span></div>
+    const facts = (item.facts || []).slice(0, 4).map((fact) => `<li>${escapeHtml(fact.value)}</li>`).join("");
+    const canonical = item.data_class === "CANONICAL_CONFIRMED";
+    const href = canonical ? `/candidate-detail.html?context=${encodeURIComponent(item.context_id)}&item=${encodeURIComponent(item.item_id)}` : `/candidate-detail.html?item=${encodeURIComponent(item.item_id)}`;
+    const stateBadge = canonical ? "" : '<span class="v1-review-chip">待审核 · 演示</span>';
+    return `<a class="v1-candidate-card" data-transition-key="candidate:${escapeHtml(item.item_id)}" href="${href}">
+      <div class="v1-card-top"><span class="v1-type-chip">${escapeHtml(candidateTypeLabel(item))}</span>${stateBadge}</div>
       <h3>${escapeHtml(item.title)}</h3><p class="v1-card-subtitle">${escapeHtml(item.subtitle)} · ${escapeHtml(item.time)}</p>
-      <p class="v1-card-summary">${escapeHtml(item.summary)}</p><ul>${facts}</ul>
+      <p class="v1-card-summary">${escapeHtml(item.summary || "")}</p><ul>${facts}</ul>
     </a>`;
   }
 
@@ -612,17 +633,108 @@
   }
 
   async function renderPersonalLibrary() {
-    const items = await localizedCandidateRecords(await Demo.getAll(Demo.DEMO_STORES.candidates));
+    const legacy = await localizedCandidateRecords(await Demo.getAll(Demo.DEMO_STORES.candidates));
+    let canonical = [];
+    if (Truth && LocalCandidateReview) {
+      const database = await Truth.openDatabase();
+      const [revisionRecords, lifecycleRecords] = await Promise.all([
+        LocalCandidateReview.getAll(database, "candidate_context_revisions"),
+        LocalCandidateReview.getAll(database, "candidate_context_lifecycle"),
+      ]);
+      database.close();
+      const revisions = LocalCandidateReview.activeConfirmedRevisions(revisionRecords, lifecycleRecords);
+      canonical = revisions.flatMap((revision) => (revision.payload.items || []).map((item) => ({ ...item, context_id: revision.context_id, revision_id: revision.revision_id, data_class: "CANONICAL_CONFIRMED", review_status: "CONFIRMED", source_refs: item.grounding_refs || [] })));
+    }
+    const items = [...canonical, ...legacy];
     const grid = byId("candidate-card-grid");
     grid.innerHTML = personalGuideCardMarkup() + items.map(candidateCardMarkup).join("");
     window.requestAnimationFrame(playPendingCardReturn);
+  }
+
+  function proposalItemEditor(item, index, fallbackRefs) {
+    const evidence = (item.grounding_refs || fallbackRefs || [])[0];
+    return `<section class="v1-review-item" data-review-item="${index}"><div class="v1-review-source"><p class="v1-section-label">原文</p><p class="v1-review-evidence">${escapeHtml(evidence?.excerpt_or_reference || "无可用结构化摘录")}</p><small>${escapeHtml(evidence?.location || "来源位置待人工核对")}</small></div><div class="v1-review-result"><p class="v1-section-label">提取结果</p><label>标题<input data-field="title" value="${escapeHtml(item.title || "")}"></label><label>组织 / 副标题<input data-field="subtitle" value="${escapeHtml(item.subtitle || "")}"></label><label>日期<input data-field="time" value="${escapeHtml(item.time || "")}"></label><label>摘要<textarea data-field="summary">${escapeHtml(item.summary || "")}</textarea></label><label>事实（每行一条）<textarea data-field="facts">${escapeHtml((item.facts || []).map((fact) => fact.value).join("\n"))}</textarea></label></div></section>`;
+  }
+
+  function humanReviewNotices(codes) {
+    const messages = (codes || []).map((code) => {
+      if (String(code).startsWith("selective_ocr_pages")) return "部分页面经过本地 OCR，请对照原文核对。";
+      if (code === "missing_date") return "日期信息不完整，可留空或人工补充。";
+      if (code === "ambiguous_company_or_title") return "组织与职位边界不明确，请人工核对。";
+      if (code === "no_highlights_detected") return "未识别到明确的经历要点。";
+      if (String(code).startsWith("self_reported_")) return "该内容来自材料自述，确认前请核对。";
+      return "部分字段需要人工核对。";
+    });
+    return [...new Set(messages)];
+  }
+
+  function proposalReviewMarkup(proposal, position, total) {
+    const items = proposal.payload.items?.length ? proposal.payload.items : [{ item_id: `user-item-${proposal.proposal_id}`, item_type: "OTHER", title: "", subtitle: null, time: null, facts: [], grounding_refs: proposal.grounding_refs, warnings: [], uncertainties: [], review_status: "NEEDS_REVIEW" }];
+    const warnings = [...(proposal.warnings || []), ...items.flatMap((item) => item.warnings || [])];
+    const notices = humanReviewNotices(warnings);
+    const materialLabel = materialTypeLabels[proposal.payload.candidate_material_type] || "个人材料";
+    return `<article class="v1-review-card" data-proposal-id="${escapeHtml(proposal.proposal_id)}"><p class="v1-review-progress">第 ${position} / ${total} 条</p><h3>${escapeHtml(candidateTypeLabel(items[0]))} · ${escapeHtml(materialLabel)}</h3><p class="v1-review-note">来源：${escapeHtml(proposal.source_label || "本地文件")}${proposal.payload.manual_review_required ? " · 需要人工核对" : ""}</p>${notices.length ? `<p class="v1-review-warning">${escapeHtml(notices.join(" "))}</p>` : ""}${items.map((item, index) => proposalItemEditor(item, index, proposal.grounding_refs)).join("")}<p class="v1-review-note">确认会保存当前字段；如字段经过修改，系统会在内部记录为用户编辑。原始提案始终保留。</p><div class="v1-button-row"><button type="button" class="v1-primary-button" data-review-action="confirm">确认</button><button type="button" class="v1-tertiary-button" data-review-action="reject">拒绝</button></div></article>`;
+  }
+
+  async function renderAwaitingCandidateReviews({ advance = false, reset = false } = {}) {
+    if (!LocalCandidateReview || !byId("candidate-review-surface")) return;
+    const database = await Truth.openDatabase();
+    const sources = await LocalCandidateReview.getAll(database, "source_documents");
+    const sourceById = new Map(sources.map((source) => [source.source_document_id, source]));
+    let proposalRecords = await LocalCandidateReview.getAll(database, "context_proposals");
+    proposalRecords = await LocalCandidateReview.ensureItemProposalQueue(database, proposalRecords);
+    const proposals = proposalRecords.filter((proposal) => proposal.proposal_type === "CANDIDATE_CONTEXT" && proposal.status === "AWAITING_REVIEW" && proposal.payload?.contract_id === "ariadne-local-candidate-proposal-payload-v1").sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.proposal_id.localeCompare(b.proposal_id)).map((proposal) => ({ ...proposal, source_label: sourceById.get(proposal.source_document_ids[0])?.filename || null }));
+    database.close();
+    if (reset || !candidateReviewSessionTotal) { candidateReviewSessionTotal = proposals.length; candidateReviewSessionResolved = 0; }
+    else if (advance) candidateReviewSessionResolved += 1;
+    if (proposals.length > candidateReviewSessionTotal - candidateReviewSessionResolved) candidateReviewSessionTotal = candidateReviewSessionResolved + proposals.length;
+    byId("candidate-review-surface").classList.toggle("hidden", !proposals.length);
+    byId("candidate-review-list").innerHTML = proposals.length ? proposalReviewMarkup(proposals[0], Math.min(candidateReviewSessionResolved + 1, candidateReviewSessionTotal), candidateReviewSessionTotal) : "";
+    if (!proposals.length) { candidateReviewSessionTotal = 0; candidateReviewSessionResolved = 0; }
+    return proposals;
+  }
+
+  function editedItemsFromCard(card, proposal) {
+    return [...card.querySelectorAll("[data-review-item]")].map((section, index) => {
+      const original = proposal.payload.items[index] || { item_id: `user-item-${crypto.randomUUID()}`, item_type: "OTHER", grounding_refs: proposal.grounding_refs, warnings: [], uncertainties: [] };
+      const value = (field) => section.querySelector(`[data-field="${field}"]`).value.trim();
+      const factValues = value("facts").split("\n").map((text) => text.trim()).filter(Boolean);
+      const unchanged = value("title") === String(original.title || "") && (value("subtitle") || null) === (original.subtitle || null) && (value("time") || null) === (original.time || null) && (value("summary") || null) === (original.summary || null) && JSON.stringify(factValues) === JSON.stringify((original.facts || []).map((fact) => fact.value));
+      if (unchanged) return structuredClone(original);
+      return { ...original, title: value("title"), subtitle: value("subtitle") || null, time: value("time") || null, summary: value("summary") || null, facts: factValues.map((text, factIndex) => ({ fact_id: original.facts?.[factIndex]?.fact_id || `${original.item_id}-user-fact-${factIndex + 1}`, label: original.facts?.[factIndex]?.label || "用户补充", value: text })), review_status: "NEEDS_REVIEW", content_origin: "USER_CONFIRMED" };
+    });
+  }
+
+  async function reviewCandidateProposal(proposalId, action, card) {
+    const buttons = [...card.querySelectorAll("[data-review-action]")];
+    buttons.forEach((button) => { button.disabled = true; });
+    const activeButton = card.querySelector(`[data-review-action="${action}"]`);
+    if (activeButton) activeButton.textContent = action === "reject" ? "正在拒绝…" : "正在确认…";
+    const database = await Truth.openDatabase();
+    try {
+      const proposal = (await LocalCandidateReview.getAll(database, "context_proposals")).find((item) => item.proposal_id === proposalId);
+      if (!proposal) throw new Error("candidate_proposal_not_found");
+      const editedItems = action === "reject" ? null : editedItemsFromCard(card, proposal);
+      const decision = action === "reject" ? "REJECT" : JSON.stringify(editedItems) === JSON.stringify(proposal.payload.items) ? "CONFIRM" : "EDIT_AND_CONFIRM";
+      const acceptedPayload = decision === "CONFIRM" ? proposal.payload : decision === "EDIT_AND_CONFIRM" ? LocalCandidateReview.editedPayload(proposal, editedItems) : null;
+      const outcome = await LocalCandidateReview.persistDecision(database, proposal, decision, acceptedPayload);
+      const remaining = await renderAwaitingCandidateReviews({ advance: true });
+      byId("personal-page-message").textContent = remaining.length ? "当前内容已处理，继续审核下一条。" : outcome.revision ? "全部内容已审核并保存为候选信息。" : "全部待审核内容已处理。";
+      const confirmedItemId = outcome.revision?.payload?.items?.[0]?.item_id;
+      if (!remaining.length) completeEmbeddedImport("personal", confirmedItemId ? `candidate:${confirmedItemId}` : "personal-guide");
+    } catch (error) {
+      buttons.forEach((button) => { button.disabled = false; });
+      if (activeButton) activeButton.textContent = action === "reject" ? "拒绝" : "确认";
+      throw error;
+    } finally { database.close(); }
   }
 
   function showCandidateSource(source) {
     const batchSuffix = selectedCandidateSources.length > 1 ? ` · 共 ${selectedCandidateSources.length} 个文件` : "";
     const file = source.file || source;
     byId("personal-file-preview").classList.remove("hidden");
-    byId("personal-file-name").textContent = file.name || source.name;
+    const selectedNames = selectedCandidateSources.map((item) => item.file?.name || item.name).filter(Boolean);
+    byId("personal-file-name").textContent = selectedNames.length > 1 ? selectedNames.join("、") : file.name || source.name;
     byId("personal-file-meta").textContent = `${file.type || source.mime_type || selectedCandidateType} · ${source.sizeLabel || formatBytes(file.size) || "本地文件"}${batchSuffix} · 仅本地`;
     byId("personal-file-icon").textContent = (source.extension || file.name?.split(".").pop() || selectedCandidateType.slice(0, 3)).toUpperCase();
     refreshCandidateImportGate();
@@ -715,11 +827,11 @@
       const response = await fetch("/api/local-candidate-structure", { method: "POST", headers: { "Content-Type": "application/json" }, signal, body: JSON.stringify({ source_document_id: source.source_document_id, runtime_snapshot: snapshot, candidate_material_type: artifact.payload.candidate_material_type, pages: artifact.payload.pages }) });
       const result = await response.json();
       if (!response.ok || result.model_call_made !== false || result.runtime_snapshot_id !== snapshot.snapshot_id) throw new Error(result.error || "candidate_local_structuring_failed");
-      const proposal = LocalCandidateProposal.proposalFor({ source, artifact, structuringRun: run, result });
-      await Truth.persistRecord(database, "context_proposals", proposal);
-      run = LocalCandidateProposal.processingRunFor(source, snapshot.snapshot_id, "SUCCEEDED", startedAt, { run_id: run.run_id, started_at: startedAt, finished_at: new Date().toISOString(), proposal_ids: [proposal.proposal_id] });
+      const proposals = LocalCandidateProposal.proposalsFor({ source, artifact, structuringRun: run, result });
+      for (const proposal of proposals) await Truth.persistRecord(database, "context_proposals", proposal);
+      run = LocalCandidateProposal.processingRunFor(source, snapshot.snapshot_id, "SUCCEEDED", startedAt, { run_id: run.run_id, started_at: startedAt, finished_at: new Date().toISOString(), proposal_ids: proposals.map((proposal) => proposal.proposal_id) });
       await Truth.persistRecord(database, "processing_runs", run);
-      return { succeeded: true, proposal, manual: proposal.payload.manual_review_required };
+      return { succeeded: true, proposals, manual: proposals.some((proposal) => proposal.payload.manual_review_required) };
     } catch (error) {
       if (error?.name === "AbortError") {
         await Truth.persistRecord(database, "processing_runs", Truth.cancelProcessingRun(run, new Date().toISOString()));
@@ -737,12 +849,15 @@
     if (!gate.allowed || gate.authority.runtime.mode !== "local") throw new Error(`runtime_capability_${gate.state}`);
     if (!RuntimeExecution || !Truth || !LocalCandidate || !LocalCandidateProposal) throw new Error("local_candidate_extraction_dependencies_unavailable");
     candidateProcessingInProgress = true;
+    candidateExecutionState = "PROCESSING";
     candidateBatchAbortController = new AbortController();
     button.disabled = true;
     byId("replace-personal-file").textContent = "取消本次提取";
     byId("personal-processing").classList.remove("hidden");
     setCandidateExtractionState("PREPARING", "正在验证本地执行环境");
-    const batchId = `batch-candidate-extraction-${crypto.randomUUID()}`;
+    const sources = selectedCandidateSources.filter((source) => ["NEW", "RETRY"].includes(source.import_state));
+    if (!sources.length) { await renderAwaitingCandidateReviews(); return; }
+    const batchId = sources[0].batch_id;
     const batchCreatedAt = new Date().toISOString();
     let database = null;
     try {
@@ -751,7 +866,6 @@
         { mode: "local" },
         { environmentCapabilities: { local_ocr: localOcr } },
       );
-      const sources = await Promise.all(selectedCandidateSources.map((source) => LocalCandidate.prepareSource(source.file, batchId, selectedCandidateType)));
       database = await Truth.openDatabase();
       await Truth.persistRecord(database, "runtime_snapshots", snapshot);
       await Truth.persistRecord(database, "processing_batches", LocalCandidate.batchFor(sources, "PENDING", batchCreatedAt));
@@ -773,7 +887,7 @@
           });
           await Truth.persistRecord(database, "processing_batches", cancelled);
           setCandidateExtractionState("CANCELLED", "已取消本次本地提取；未处理剩余文件");
-          byId("personal-page-message").textContent = "本次导入已取消。此前已完成的本地提取记录保留；未形成 Candidate 信息。";
+          byId("personal-page-message").textContent = "本次导入已取消。此前已完成的本地提取记录保留；未形成已确认候选信息。";
           return;
         }
         showCandidateSource(source);
@@ -789,7 +903,7 @@
           });
           await Truth.persistRecord(database, "processing_batches", cancelled);
           setCandidateExtractionState("CANCELLED", "已取消本次本地提取；未处理剩余文件");
-          byId("personal-page-message").textContent = "本次导入已取消。此前已完成的本地提取记录保留；未形成 Candidate 信息。";
+          byId("personal-page-message").textContent = "本次导入已取消。此前已完成的本地提取记录保留；未形成已确认候选信息。";
           return;
         }
         if (result.succeeded) {
@@ -801,7 +915,7 @@
             return;
           }
           if (proposalResult.failed) failures.push(proposalResult);
-          else { completed.push(result.sourceId); proposalCount += 1; if (proposalResult.manual) manualReviewCount += 1; }
+          else { completed.push(result.sourceId); proposalCount += proposalResult.proposals.length; if (proposalResult.manual) manualReviewCount += proposalResult.proposals.filter((proposal) => proposal.payload.manual_review_required).length; }
         }
         if (result.failed) failures.push(result);
       }
@@ -814,13 +928,15 @@
       }));
       setCandidateExtractionState("READY_FOR_REVIEW", failures.length ? "本地提取完成，但部分文件失败" : "本地提取已完成");
       byId("personal-page-message").textContent = failures.length
-        ? `已生成本地提取与 Candidate Proposal，但 ${failures.length} 个文件未能完成整理；尚未形成 Candidate 正式信息，未调用 Provider/model。`
-        : `已根据本地确定规则生成 ${proposalCount} 个 Candidate Proposal（${manualReviewCount} 个需人工处理）；均待人工审核，尚未形成 Candidate 正式信息，未调用 Provider/model。`;
+        ? `已生成本地提取与候选信息提案，但 ${failures.length} 个文件未能完成整理；尚未形成正式候选信息，未调用服务商或模型。`
+        : `已根据本地确定规则生成 ${proposalCount} 条候选信息提案（${manualReviewCount} 条需人工处理）；均待人工审核，尚未形成正式候选信息，未调用服务商或模型。`;
       byId("personal-page-message").classList.toggle("error", failures.length > 0);
+      await renderAwaitingCandidateReviews({ reset: true });
     } finally {
       database?.close?.();
       candidateBatchAbortController = null;
       candidateProcessingInProgress = false;
+      if (candidateExecutionState === "PROCESSING") candidateExecutionState = "COMPLETE";
       byId("replace-personal-file").textContent = "替换";
       refreshCandidateImportGate();
     }
@@ -831,46 +947,60 @@
   }
 
   function initPersonalImport() {
+    renderAwaitingCandidateReviews().catch(showPersonalError);
+    byId("candidate-review-list").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-review-action]");
+      if (!button) return;
+      const card = button.closest("[data-proposal-id]");
+      reviewCandidateProposal(card.dataset.proposalId, button.dataset.reviewAction, card).catch(showPersonalError);
+    });
     byId("personal-import-types").addEventListener("click", (event) => {
       const button = event.target.closest("[data-import-type]");
       if (!button) return;
       selectedCandidateType = button.dataset.importType;
       byId("personal-import-types").querySelectorAll("button").forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
+      if (selectedCandidateSources.length) acceptCandidateFiles(selectedCandidateSources.map((source) => source.file)).catch(showPersonalError);
     });
-    const acceptCandidateFiles = (files) => {
-      const batchKey = `personal-source-${crypto.randomUUID()}`;
-      const materialType = selectedCandidateType;
-      selectedCandidateSources = Array.from(files || []).map((file, index) => ({
-        source_type: "BROWSER_FILE_METADATA", source_key: `${batchKey}-${index + 1}`,
-        name: file.name, type: file.type || "unknown", size: file.size, sizeLabel: formatBytes(file.size), extension: file.name.split(".").pop() || "FILE",
-        import_type: materialType, file,
-      }));
+    const acceptCandidateFiles = async (files) => {
+      const selectionVersion = ++candidateSelectionVersion;
+      const batchId = `batch-candidate-extraction-${crypto.randomUUID()}`;
+      candidateExecutionState = "READY";
+      const prepared = await Promise.all(Array.from(files || []).map((file) => LocalCandidate.prepareSource(file, batchId, selectedCandidateType)));
+      const unique = [...new Map(prepared.map((source) => [source.source_document_id, source])).values()];
+      const database = await Truth.openDatabase();
+      let records;
+      try {
+        const [sourceDocuments, proposals, runs, revisions, lifecycle] = await Promise.all([
+          LocalCandidateReview.getAll(database, "source_documents"),
+          LocalCandidateReview.getAll(database, "context_proposals"),
+          LocalCandidateReview.getAll(database, "processing_runs"),
+          LocalCandidateReview.getAll(database, "candidate_context_revisions"),
+          LocalCandidateReview.getAll(database, "candidate_context_lifecycle"),
+        ]);
+        records = { source_documents: sourceDocuments, context_proposals: proposals, processing_runs: runs, candidate_context_revisions: revisions, candidate_context_lifecycle: lifecycle };
+      } finally { database.close(); }
+      if (selectionVersion !== candidateSelectionVersion) return;
+      selectedCandidateSources = unique.map((source) => ({ ...source, import_state: LocalCandidateReview.sourceImportState(source.source_document_id, records) }));
       if (selectedCandidateSources[0]) showCandidateSource(selectedCandidateSources[0]);
+      const pending = selectedCandidateSources.filter((source) => source.import_state === "PENDING_REVIEW");
+      const active = selectedCandidateSources.filter((source) => source.import_state === "ACTIVE");
+      const actionable = selectedCandidateSources.filter((source) => ["NEW", "RETRY"].includes(source.import_state));
+      if (pending.length) await renderAwaitingCandidateReviews({ reset: true });
+      candidateExecutionState = actionable.length ? "READY" : "COMPLETE";
+      if (pending.length && !actionable.length) byId("personal-page-message").textContent = "该文件已有待审核内容，已恢复审核队列。";
+      else if (active.length && !actionable.length) byId("personal-page-message").textContent = "该文件已导入，无需重复处理。";
+      else if (active.length || pending.length) byId("personal-page-message").textContent = `已跳过 ${active.length + pending.length} 个已导入或待审核文件；其余文件可以继续本地提取。`;
+      else byId("personal-page-message").textContent = "";
+      refreshCandidateImportGate();
     };
-    byId("personal-file-input").addEventListener("change", (event) => {
-      acceptCandidateFiles(event.target.files);
-    });
-    const dropzone = byId("personal-dropzone");
-    const preventDrop = (event) => { event.preventDefault(); event.stopPropagation(); };
-    ["dragenter", "dragover"].forEach((type) => dropzone.addEventListener(type, (event) => {
-      preventDrop(event);
-      dropzone.classList.add("is-dragover");
-    }));
-    dropzone.addEventListener("dragleave", (event) => {
-      preventDrop(event);
-      if (!event.relatedTarget || !dropzone.contains(event.relatedTarget)) dropzone.classList.remove("is-dragover");
-    });
-    dropzone.addEventListener("drop", (event) => {
-      preventDrop(event);
-      dropzone.classList.remove("is-dragover");
-      acceptCandidateFiles(event.dataTransfer?.files);
-    });
+    installFileDropzone("personal-dropzone", "personal-file-input", (files) => acceptCandidateFiles(files).catch(showPersonalError));
     byId("replace-personal-file").addEventListener("click", () => {
       if (candidateProcessingInProgress) {
         candidateBatchAbortController?.abort();
         setCandidateExtractionState("CANCELLING", "正在取消本次本地提取");
         return;
       }
+      byId("personal-file-input").value = "";
       byId("personal-file-input").click();
     });
     byId("start-personal-processing").addEventListener("click", () => runCandidateProcessing().catch(showPersonalError));
@@ -879,23 +1009,127 @@
 
   function showPersonalError(error) {
     candidateProcessingInProgress = false;
-    byId("personal-page-message").textContent = `无法整理材料：${error.message}`;
+    if (candidateExecutionState === "PROCESSING") candidateExecutionState = "COMPLETE";
+    byId("personal-page-message").textContent = `无法整理材料：${personalErrorCopy(error)}`;
     byId("personal-page-message").classList.add("error");
     refreshCandidateImportGate();
     byId("personal-processing")?.classList.add("hidden");
   }
 
+  const detailPanelTimers = new WeakMap();
+  function firstVisibleEditableControl(form) {
+    return [...form.querySelectorAll("input, textarea, select, button")].find((control) => {
+      if (control.disabled || control.hidden || control.type === "hidden") return false;
+      const style = window.getComputedStyle(control);
+      return control.offsetParent !== null && style.display !== "none" && style.visibility !== "hidden";
+    });
+  }
+
+  function createDetailPanelController(triggerId, stages) {
+    let current = "closed";
+    const show = (stage, { focusFirst = false } = {}) => {
+      current = stage;
+      Object.entries(stages).forEach(([name, panelId]) => {
+        const panel = byId(panelId);
+        const active = name === stage;
+        window.clearTimeout(detailPanelTimers.get(panel));
+        panel.setAttribute("aria-hidden", String(!active));
+        if (active) {
+          panel.classList.remove("hidden");
+          window.requestAnimationFrame(() => {
+            panel.classList.add("is-active");
+            if (focusFirst) {
+              panel.scrollIntoView({ behavior: "smooth", block: "center" });
+              firstVisibleEditableControl(panel)?.focus({ preventScroll: true });
+            }
+          });
+        } else {
+          panel.classList.remove("is-active");
+          const timer = window.setTimeout(() => panel.classList.add("hidden"), 210);
+          detailPanelTimers.set(panel, timer);
+        }
+      });
+      byId(triggerId).setAttribute("aria-expanded", String(stage !== "closed"));
+    };
+    return Object.freeze({ show, current: () => current });
+  }
+
+  function createDeletePopover(popoverId) {
+    const popover = byId(popoverId);
+    const menu = popover.querySelector(".v1-delete-popover-menu");
+    let opener = null;
+    let closeTimer = null;
+    const close = ({ restoreFocus = false } = {}) => {
+      window.clearTimeout(closeTimer);
+      popover.classList.remove("is-open");
+      popover.setAttribute("aria-hidden", "true");
+      closeTimer = window.setTimeout(() => popover.classList.add("hidden"), 180);
+      if (restoreFocus) opener?.focus({ preventScroll: true });
+    };
+    const position = () => {
+      const rect = opener.getBoundingClientRect();
+      const viewportPadding = 12;
+      const width = menu.offsetWidth;
+      const height = menu.offsetHeight;
+      const left = Math.max(viewportPadding, Math.min(rect.right - width, window.innerWidth - width - viewportPadding));
+      const top = rect.top - height - 10 >= viewportPadding ? rect.top - height - 10 : Math.min(rect.bottom + 10, window.innerHeight - height - viewportPadding);
+      menu.style.left = `${left}px`;
+      menu.style.top = `${top}px`;
+    };
+    const open = (trigger) => {
+      opener = trigger;
+      window.clearTimeout(closeTimer);
+      popover.classList.remove("hidden");
+      popover.setAttribute("aria-hidden", "false");
+      position();
+      window.requestAnimationFrame(() => popover.classList.add("is-open"));
+    };
+    popover.querySelectorAll("[data-delete-popover-cancel]").forEach((button) => button.addEventListener("click", () => close({ restoreFocus: true })));
+    window.addEventListener("resize", () => { if (!popover.classList.contains("hidden")) position(); });
+    return Object.freeze({ open, close });
+  }
+
+  function installFileDropzone(dropzoneId, inputId, onFiles) {
+    const dropzone = byId(dropzoneId);
+    const input = byId(inputId);
+    if (!dropzone || !input) return;
+    const openChooser = () => {
+      if (input.disabled) return;
+      input.value = "";
+      input.click();
+    };
+    dropzone.addEventListener("click", openChooser);
+    input.addEventListener("change", (event) => onFiles(event.target.files));
+    const prevent = (event) => { event.preventDefault(); event.stopPropagation(); };
+    ["dragenter", "dragover"].forEach((type) => dropzone.addEventListener(type, (event) => {
+      prevent(event);
+      if (!input.disabled) dropzone.classList.add("is-dragover");
+    }));
+    dropzone.addEventListener("dragleave", (event) => {
+      prevent(event);
+      if (!event.relatedTarget || !dropzone.contains(event.relatedTarget)) dropzone.classList.remove("is-dragover");
+    });
+    dropzone.addEventListener("drop", (event) => {
+      prevent(event);
+      dropzone.classList.remove("is-dragover");
+      if (!input.disabled) onFiles(event.dataTransfer?.files);
+    });
+  }
+
   function renderCandidate(item) {
     activeCandidate = item;
-    byId("candidate-type").textContent = typeLabels[item.item_type] || item.item_type;
-    byId("candidate-review-state").textContent = "待审核 · 演示";
+    byId("candidate-type").textContent = candidateTypeLabel(item);
+    const reviewState = byId("candidate-review-state");
+    const canonical = item.data_class === "CANONICAL_CONFIRMED";
+    reviewState.classList.toggle("hidden", canonical);
+    reviewState.textContent = canonical ? "" : "待审核 · 演示";
     byId("candidate-title").textContent = item.title;
     byId("candidate-subtitle").textContent = item.subtitle || "";
     byId("candidate-time").textContent = item.time || "";
     byId("candidate-summary").textContent = item.summary;
-    byId("candidate-facts").innerHTML = item.facts.map((fact, index) => `<div><span>${String(index + 1).padStart(2, "0")}</span><p><b>${escapeHtml(fact.label)}</b>${escapeHtml(fact.value)}</p></div>`).join("");
+    byId("candidate-facts").innerHTML = item.facts.map((fact, index) => `<div><span>${String(index + 1).padStart(2, "0")}</span><p><b>${escapeHtml(candidateFactLabel(fact.label))}</b>${escapeHtml(fact.value)}</p></div>`).join("");
     byId("candidate-ownership").textContent = item.ownership || "未记录";
-    byId("candidate-source").textContent = `${item.source_refs[0]?.location || "示例材料"} · ${item.source_refs[0]?.excerpt_or_reference || "来源未记录"}`;
+    byId("candidate-source").textContent = `${item.source_refs?.[0]?.location || "来源待核对"} · ${item.source_refs?.[0]?.excerpt_or_reference || "来源未记录"}`;
   }
 
   function setDetailRuntimeMode(record, paneId, editButtonId, runtimeBadgeId) {
@@ -916,39 +1150,92 @@
   }
 
   async function initCandidateDetail() {
+    const contextId = new URLSearchParams(window.location.search).get("context");
     const itemId = new URLSearchParams(window.location.search).get("item") || Demo.CANDIDATE_FIXTURES[0].item_id;
-    const storedCandidate = await Demo.get(Demo.DEMO_STORES.candidates, itemId);
-    const storedRecords = await localizedCandidateRecords(storedCandidate ? [storedCandidate] : []);
-    const stored = storedRecords[0] || null;
-    const fallback = Demo.CANDIDATE_FIXTURES.find((item) => item.item_id === itemId);
-    if (!stored && !fallback) throw new Error("candidate_item_not_found");
-    const candidate = stored || Demo.clone(fallback);
+    let canonicalRevision = null;
+    let candidate = null;
+    if (contextId && Truth && LocalCandidateReview) {
+      const database = await Truth.openDatabase();
+      const [revisionRecords, lifecycleRecords] = await Promise.all([
+        LocalCandidateReview.getAll(database, "candidate_context_revisions"),
+        LocalCandidateReview.getAll(database, "candidate_context_lifecycle"),
+      ]);
+      database.close();
+      canonicalRevision = LocalCandidateReview.latestRevision(revisionRecords, contextId);
+      const item = canonicalRevision?.payload?.items?.find((candidateItem) => candidateItem.item_id === itemId);
+      if (!item) throw new Error("candidate_item_not_found");
+      if (LocalCandidateReview.removedItemKeys(lifecycleRecords).has(LocalCandidateReview.candidateItemKey(contextId, itemId))) throw new Error("candidate_item_removed");
+      candidate = { ...item, data_class: "CANONICAL_CONFIRMED", context_id: contextId, source_refs: item.grounding_refs || [] };
+    } else {
+      const storedCandidate = await Demo.get(Demo.DEMO_STORES.candidates, itemId);
+      const storedRecords = await localizedCandidateRecords(storedCandidate ? [storedCandidate] : []);
+      const stored = storedRecords[0] || null;
+      const fallback = Demo.CANDIDATE_FIXTURES.find((item) => item.item_id === itemId);
+      if (!stored && !fallback) throw new Error("candidate_item_not_found");
+      candidate = stored || Demo.clone(fallback);
+    }
     renderCandidate(candidate);
     setDetailRuntimeMode(candidate, "candidate-ai-pane", "open-direct-edit", "candidate-ai-runtime");
+    const sourceIdFor = (record, revision) => {
+      const allowed = new Set(revision?.provenance?.source_document_ids || []);
+      const grounded = (record.source_refs || record.grounding_refs || []).map((ref) => ref.source_document_id).find((sourceId) => sourceId && (!allowed.size || allowed.has(sourceId)));
+      return grounded || revision?.provenance?.source_document_ids?.[0] || null;
+    };
+    const panels = createDetailPanelController("open-direct-edit", { edit: "candidate-edit-form" });
+    const deletePopover = createDeletePopover("candidate-delete-popover");
     const setDirectEditOpen = (open, focusTarget = true) => {
-      const form = byId("candidate-edit-form");
-      form.classList.toggle("hidden", !open);
-      byId("open-direct-edit").setAttribute("aria-expanded", String(open));
-      if (open && focusTarget) window.requestAnimationFrame(() => {
-        form.scrollIntoView({ behavior: "smooth", block: "center" });
-        byId("candidate-edit-summary").focus({ preventScroll: true });
-      });
+      panels.show(open ? "edit" : "closed", { focusFirst: open && focusTarget });
     };
     byId("open-direct-edit").addEventListener("click", () => {
-      const opening = byId("candidate-edit-form").classList.contains("hidden");
+      const opening = panels.current() === "closed";
       if (!opening) { setDirectEditOpen(false, false); return; }
-      byId("candidate-edit-summary").value = activeCandidate.summary;
+      byId("candidate-edit-title").value = activeCandidate.title || "";
+      byId("candidate-edit-subtitle").value = activeCandidate.subtitle || "";
+      byId("candidate-edit-time").value = activeCandidate.time || "";
+      byId("candidate-edit-summary").value = activeCandidate.summary || "";
       byId("candidate-edit-facts").value = activeCandidate.facts.map((fact) => fact.value).join("\n");
       byId("direct-edit-preview").classList.add("hidden");
       setDirectEditOpen(true);
     });
+    window.addEventListener("message", (event) => {
+      if (event.origin === window.location.origin && event.data?.type === "job-radar-v1-open-detail-edit") byId("open-direct-edit").click();
+    });
     byId("cancel-direct-edit").addEventListener("click", () => setDirectEditOpen(false, false));
+    byId("open-candidate-delete").addEventListener("click", (event) => deletePopover.open(event.currentTarget));
+    document.querySelectorAll("[data-candidate-delete-scope]").forEach((button) => button.addEventListener("click", async () => {
+      const scope = button.dataset.candidateDeleteScope;
+      const scopeButtons = [...document.querySelectorAll("[data-candidate-delete-scope]")];
+      scopeButtons.forEach((control) => { control.disabled = true; });
+      const sourceId = sourceIdFor(activeCandidate, canonicalRevision);
+      try {
+        if (canonicalRevision) {
+          const database = await Truth.openDatabase();
+          try {
+            if (scope === "source") await LocalCandidateReview.persistSourceHardDelete(database, sourceId);
+            else await LocalCandidateReview.persistRemoval(database, canonicalRevision, itemId);
+          } finally { database.close(); }
+        } else if (scope === "source") {
+          await LocalCandidateReview.hardDeleteLegacySource(Demo, Demo.DEMO_STORES.candidates, sourceId);
+        } else {
+          await LocalCandidateReview.removeLegacyContext(Demo, Demo.DEMO_STORES.candidates, itemId);
+        }
+        const message = scope === "source" ? "已移除此文件导入的所有内容；现在可以重新导入同一文件。" : "已从个人资料中移除这张卡片；原始文件与提取记录仍然保留。";
+        deletePopover.close();
+        byId("candidate-detail-message").textContent = message;
+        byId("candidate-detail-message").classList.remove("error");
+        if (!completeEmbeddedImport("personal", `candidate:${itemId}`)) returnToCardLibrary("/personal-information.html", "personal-guide");
+      } catch (error) {
+        scopeButtons.forEach((control) => { control.disabled = false; });
+        byId("candidate-detail-message").textContent = `无法删除：${personalErrorCopy(error)}`;
+        byId("candidate-detail-message").classList.add("error");
+      }
+    }));
     byId("preview-direct-edit").addEventListener("click", () => {
       const values = byId("candidate-edit-facts").value.split("\n").map((value) => value.trim()).filter(Boolean);
-      pendingDirectEdit = { summary: byId("candidate-edit-summary").value.trim(), facts: values.map((value, index) => ({ fact_id: activeCandidate.facts[index]?.fact_id || `direct-fact-${index + 1}`, label: activeCandidate.facts[index]?.label || "补充", value })) };
-      if (!pendingDirectEdit.summary || !pendingDirectEdit.facts.length) return;
-      byId("direct-before").textContent = `${activeCandidate.summary} · ${activeCandidate.facts.length} 条事实`;
-      byId("direct-after").textContent = `${pendingDirectEdit.summary} · ${pendingDirectEdit.facts.length} 条事实`;
+      pendingDirectEdit = { title: byId("candidate-edit-title").value.trim(), subtitle: byId("candidate-edit-subtitle").value.trim() || null, time: byId("candidate-edit-time").value.trim() || null, summary: byId("candidate-edit-summary").value.trim() || null, facts: values.map((value, index) => ({ fact_id: activeCandidate.facts[index]?.fact_id || `direct-fact-${index + 1}`, label: activeCandidate.facts[index]?.label || "用户补充", value })) };
+      if (!pendingDirectEdit.title) return;
+      byId("direct-before").textContent = `${activeCandidate.title} · ${activeCandidate.facts.length} 条事实`;
+      byId("direct-after").textContent = `${pendingDirectEdit.title} · ${pendingDirectEdit.facts.length} 条事实`;
       setDirectEditOpen(false, false);
       byId("direct-edit-preview").classList.remove("hidden");
       byId("direct-edit-preview").scrollIntoView({ behavior: "smooth", block: "center" });
@@ -956,18 +1243,40 @@
     byId("back-to-direct-edit").addEventListener("click", () => { byId("direct-edit-preview").classList.add("hidden"); setDirectEditOpen(true); });
     byId("confirm-direct-edit").addEventListener("click", async () => {
       if (!pendingDirectEdit) return;
-      activeCandidate = { ...activeCandidate, ...pendingDirectEdit, item_version: (Number(activeCandidate.item_version) || 1) + 1, updated_at: new Date().toISOString() };
-      await Demo.put(Demo.DEMO_STORES.candidates, activeCandidate);
-      renderCandidate(activeCandidate);
-      byId("direct-edit-preview").classList.add("hidden");
-      byId("open-direct-edit").setAttribute("aria-expanded", "false");
-      byId("candidate-detail-message").textContent = "直接编辑已确认并保存到本地演示数据仓库；正式候选人事实未被修改。";
+      const button = byId("confirm-direct-edit");
+      button.disabled = true;
+      try {
+        if (canonicalRevision) {
+          const originalItem = canonicalRevision.payload.items.find((item) => item.item_id === itemId);
+          const editedItem = { ...originalItem, ...pendingDirectEdit, content_origin: "USER_CONFIRMED", review_status: "CONFIRMED" };
+          const database = await Truth.openDatabase();
+          try {
+            const outcome = await LocalCandidateReview.persistUserEdit(database, canonicalRevision, itemId, editedItem);
+            canonicalRevision = outcome.revision;
+            const confirmedItem = canonicalRevision.payload.items.find((item) => item.item_id === itemId);
+            activeCandidate = { ...confirmedItem, data_class: "CANONICAL_CONFIRMED", context_id: contextId, source_refs: confirmedItem.grounding_refs || [] };
+            byId("candidate-detail-message").textContent = `修改已保存为第 ${canonicalRevision.version} 个确认版本；上一版本仍保留。`;
+          } finally { database.close(); }
+        } else {
+          activeCandidate = { ...activeCandidate, ...pendingDirectEdit, item_version: (Number(activeCandidate.item_version) || 1) + 1, updated_at: new Date().toISOString() };
+          await Demo.put(Demo.DEMO_STORES.candidates, activeCandidate);
+          byId("candidate-detail-message").textContent = "修改只保存到本地演示记录；未晋升为已确认候选信息。";
+        }
+        renderCandidate(activeCandidate);
+        byId("direct-edit-preview").classList.add("hidden");
+        panels.show("closed");
+        pendingDirectEdit = null;
+      } finally {
+        button.disabled = false;
+      }
     });
 
   }
 
   function jobCardMarkup(job) {
-    return `<a class="v1-candidate-card job" data-transition-key="job:${escapeHtml(job.job_context_id)}" href="/job-detail.html?job=${encodeURIComponent(job.job_context_id)}"><div class="v1-card-top"><span class="v1-type-chip">职位</span><span class="v1-review-chip">待审核</span></div><h3>${escapeHtml(job.title)}</h3><p class="v1-card-subtitle">${escapeHtml(job.company)} · ${escapeHtml(job.location)}</p><p class="v1-card-summary">${escapeHtml(job.summary)}</p><ul>${job.requirements.slice(0, 3).map((item) => `<li>${escapeHtml(item.label)}</li>`).join("")}</ul></a>`;
+    const canonical = job.data_class === "CANONICAL_CONFIRMED";
+    const stateBadge = canonical ? "" : '<span class="v1-review-chip">演示数据</span>';
+    return `<a class="v1-candidate-card job" data-transition-key="job:${escapeHtml(job.job_context_id)}" href="/job-detail.html?job=${encodeURIComponent(job.job_context_id)}"><div class="v1-card-top"><span class="v1-type-chip">职位描述</span>${stateBadge}</div><h3>${escapeHtml(job.title)}</h3><p class="v1-card-subtitle">${escapeHtml(job.company)} · ${escapeHtml(job.location)}</p><p class="v1-card-summary">${escapeHtml(job.summary)}</p><ul>${job.requirements.slice(0, 3).map((item) => `<li>${escapeHtml(item.label)}</li>`).join("")}</ul></a>`;
   }
 
   function jobGuideCardMarkup() {
@@ -984,7 +1293,8 @@
   }
 
   async function renderJobLibrary() {
-    const jobs = await localizedJobRecords(await Demo.getAll(Demo.DEMO_STORES.jobs));
+    const records = await localizedJobRecords(await Demo.getAll(Demo.DEMO_STORES.jobs));
+    const jobs = LocalJobLifecycle ? LocalJobLifecycle.libraryJobs(records) : records;
     const grid = byId("job-card-grid");
     grid.innerHTML = jobGuideCardMarkup() + jobs.map(jobCardMarkup).join("");
     window.requestAnimationFrame(playPendingCardReturn);
@@ -993,38 +1303,22 @@
   function showJobSource(source) {
     selectedJobSource = source;
     const batchSuffix = selectedJobSources.length > 1 ? ` · 共 ${selectedJobSources.length} 个文件` : "";
+    const selectedNames = selectedJobSources.map((item) => item.name).filter(Boolean);
     byId("job-file-preview").classList.remove("hidden");
-    byId("job-file-name").textContent = source.name;
+    byId("job-file-name").textContent = selectedNames.length > 1 ? selectedNames.join("、") : source.name;
     byId("job-file-meta").textContent = `${source.type || selectedJobImportType} · ${source.sizeLabel || "本地文本"}${batchSuffix} · 仅本地`;
     byId("job-file-icon").textContent = (source.extension || selectedJobImportType).slice(0, 4).toUpperCase();
     refreshJobImportGate();
   }
 
-  function installFileDropzone(dropzoneId, onFiles) {
-    const dropzone = byId(dropzoneId);
-    if (!dropzone) return;
-    const prevent = (event) => { event.preventDefault(); event.stopPropagation(); };
-    ["dragenter", "dragover"].forEach((type) => dropzone.addEventListener(type, (event) => {
-      prevent(event);
-      dropzone.classList.add("is-dragover");
-    }));
-    dropzone.addEventListener("dragleave", (event) => {
-      prevent(event);
-      if (!event.relatedTarget || !dropzone.contains(event.relatedTarget)) dropzone.classList.remove("is-dragover");
-    });
-    dropzone.addEventListener("drop", (event) => {
-      prevent(event);
-      dropzone.classList.remove("is-dragover");
-      onFiles(event.dataTransfer?.files);
-    });
-  }
-
   function resetJobSource() {
+    jobSelectionVersion += 1;
     selectedJobSource = null;
     selectedJobSources = [];
     byId("job-file-preview").classList.add("hidden");
     byId("job-page-message").textContent = "";
     byId("job-page-message").classList.remove("error");
+    jobExecutionState = "READY";
     refreshJobImportGate();
   }
 
@@ -1037,48 +1331,43 @@
     resetJobSource();
   }
 
-  function acceptJobFiles(files) {
-    const batchKey = `job-source-${crypto.randomUUID()}`;
+  async function acceptJobFiles(files) {
+    const batchKey = `job-batch-${crypto.randomUUID()}`;
     const sourceUrl = byId("job-link-input")?.value.trim() || null;
-    const rejected = [];
-    selectedJobSources = Array.from(files || []).flatMap((file, index) => {
-      const extension = file.name.split(".").pop()?.toLowerCase() || "";
-      const allowed = selectedJobImportType === "Document" && ["pdf", "png", "jpg", "jpeg", "docx"].includes(extension);
-      if (!allowed) {
-        rejected.push(file);
-        return [];
-      }
-      return [{
-        source_type: "BROWSER_FILE_METADATA", source_key: `${batchKey}-${index + 1}`,
-        name: file.name, type: file.type || "unknown", size: file.size, sizeLabel: formatBytes(file.size), extension: extension || "FILE",
-        import_type: "Document", source_url: sourceUrl,
-      }];
-    });
+    const settled = await Promise.allSettled(Array.from(files || []).map((file) => LocalContextLifecycle.prepareFileSource(file, { batchId: batchKey, namespace: "job", allowedExtensions: ["pdf", "png", "jpg", "jpeg", "docx"] })));
+    const prepared = settled.filter((result) => result.status === "fulfilled").map((result) => ({ ...result.value, sizeLabel: formatBytes(result.value.size), import_type: "Document", source_url: sourceUrl }));
+    const jobs = await Demo.getAll(Demo.DEMO_STORES.jobs);
+    selectedJobSources = LocalContextLifecycle.uniqueSources(prepared).map((source) => ({ ...source, import_state: LocalJobLifecycle.sourceImportState(source.source_document_id, jobs) }));
+    jobExecutionState = selectedJobSources.some((source) => ["NEW", "RETRY"].includes(source.import_state)) ? "READY" : "COMPLETE";
     if (selectedJobSources[0]) showJobSource(selectedJobSources[0]);
     else resetJobSource();
-    if (rejected.length) showJobError(new Error("请选择 PDF、PNG、JPG、JPEG 或 DOCX 文件。"));
+    const duplicateCount = prepared.length - selectedJobSources.length;
+    const rejectedCount = settled.filter((result) => result.status === "rejected").length;
+    const activeCount = selectedJobSources.filter((source) => source.import_state === "ACTIVE").length;
+    const pendingCount = selectedJobSources.filter((source) => source.import_state === "PENDING_REVIEW").length;
+    const messages = [];
+    if (selectedJobSources.length) messages.push(`已识别 ${selectedJobSources.length} 个独立来源。`);
+    if (duplicateCount) messages.push(`${duplicateCount} 个完全相同的文件已合并处理。`);
+    if (activeCount) messages.push(`${activeCount} 个来源已导入，不会重复生成。`);
+    if (pendingCount) messages.push(`${pendingCount} 个来源将恢复现有待审核草稿。`);
+    if (rejectedCount) messages.push(`${rejectedCount} 个不支持的文件已跳过。`);
+    byId("job-page-message").textContent = messages.join(" ");
+    byId("job-page-message").classList.toggle("error", !selectedJobSources.length);
+    await renderAwaitingJobReviews({ reset: true });
+    refreshJobImportGate();
   }
 
-  async function processJobSource(source, batchAuthority) {
+  async function processJobSource(source, batchAuthority, signal) {
     if (batchAuthority.runtime.mode !== "local") throw new Error("model_job_import_not_connected");
     for (const [state, label] of Demo.JOB_PROCESSING_STATES) {
+      if (signal.aborted) return { cancelled: true };
       byId("job-processing").dataset.state = state;
       byId("job-processing-state").textContent = label;
       await delay(260);
     }
+    if (signal.aborted) return { cancelled: true };
     const incoming = Demo.createLocalJobFixture(source);
-    const existing = await Demo.getAll(Demo.DEMO_STORES.jobs);
-    const duplicates = Demo.findJobDuplicates([incoming], existing);
-    let job = incoming;
-    if (duplicates.length) {
-      const aiMode = batchAuthority.runtime.mode === "model";
-      const resolution = await askDuplicateResolution({ kind: "job", count: duplicates.length, aiMode });
-      if (resolution === "cancel") return { cancelled: true };
-      if (resolution === "merge" && aiMode) throw new Error("模型融合需要一次真实模型调用；本轮未获调用批准，因此没有写入或覆盖任何职位。");
-      if (resolution === "merge") job = Demo.mergeJobRecords(duplicates[0].existing, incoming);
-    }
-    await Demo.persistJobImport(job, source);
-    return { sourceKey: `job:${job.job_context_id}` };
+    return LocalJobLifecycle.persistPendingImport(Demo, incoming, source);
   }
 
   async function runJobProcessing() {
@@ -1087,34 +1376,93 @@
     if (!gate.allowed) throw new Error(`runtime_capability_${gate.state}`);
     const batchAuthority = gate.authority;
     jobProcessingInProgress = true;
+    jobBatchAbortController = new AbortController();
     button.disabled = true;
+    byId("replace-job-file").textContent = "取消本次整理";
     byId("job-processing").classList.remove("hidden");
-    const sources = selectedJobImportType === "Paste"
-      ? [{ ...selectedJobSource, import_type: "Paste", source_url: byId("job-link-input")?.value.trim() || null }]
-      : selectedJobSources;
-    let lastSourceKey = null;
+    const sources = (selectedJobImportType === "Paste" ? [selectedJobSource] : selectedJobSources).filter((source) => ["NEW", "RETRY"].includes(source.import_state || "NEW"));
     let lastError = null;
-    for (const source of sources) {
-      showJobSource(source);
-      let result;
-      try { result = await processJobSource(source, batchAuthority); }
-      catch (error) {
-        lastError = error;
-        byId("job-page-message").textContent = `无法整理职位：${error.message}`;
-        byId("job-page-message").classList.add("error");
-        continue;
+    try {
+      for (const source of sources) {
+        if (jobBatchAbortController.signal.aborted) {
+          jobExecutionState = "COMPLETE";
+          byId("job-page-message").textContent = "本次职位整理已取消；此前已保存的草稿保留，剩余文件没有处理。";
+          byId("job-page-message").classList.remove("error");
+          return;
+        }
+        showJobSource(source);
+        try {
+          const result = await processJobSource(source, batchAuthority, jobBatchAbortController.signal);
+          if (result.cancelled) {
+            jobExecutionState = "COMPLETE";
+            byId("job-page-message").textContent = "本次职位整理已取消；当前来源未形成成功结果，剩余文件没有处理，此前已保存的草稿保留。";
+            byId("job-page-message").classList.remove("error");
+            return;
+          }
+        }
+        catch (error) {
+          lastError = error;
+          byId("job-page-message").textContent = `无法整理 ${source.name}：${error.message}；其他独立来源将继续处理。`;
+          byId("job-page-message").classList.add("error");
+        }
       }
-      if (result.cancelled) {
-        jobProcessingInProgress = false;
-        refreshJobImportGate();
-        byId("job-processing").classList.add("hidden");
-        return;
+      const pending = await renderAwaitingJobReviews({ reset: true });
+      jobExecutionState = pending.length ? "COMPLETE" : "READY";
+      if (pending.length) {
+        byId("job-page-message").textContent = `已建立 ${pending.length} 条待审核职位演示草稿，请逐条确认或拒绝。`;
+        byId("job-page-message").classList.remove("error");
       }
-      lastSourceKey = result.sourceKey;
+      if (lastError && !pending.length) throw lastError;
+    } finally {
+      jobBatchAbortController = null;
+      jobProcessingInProgress = false;
+      byId("replace-job-file").textContent = "替换";
+      byId("job-processing").classList.add("hidden");
+      refreshJobImportGate();
     }
-    if (lastSourceKey && !completeEmbeddedImport("jd", lastSourceKey)) returnToCardLibrary("/jd.html", lastSourceKey);
-    jobProcessingInProgress = false;
-    if (lastError) throw lastError;
+  }
+
+  function jobReviewMarkup(job, position, total) {
+    const source = job.imported_from || {};
+    return `<article class="v1-review-card" data-job-id="${escapeHtml(job.job_context_id)}"><p class="v1-review-progress">第 ${position} / ${total} 条</p><h3>职位描述 · 演示草稿</h3><p class="v1-review-note">来源：${escapeHtml(source.name || "本地来源")} · 仅用于验证生命周期，不代表真实 JD 语义理解</p><section class="v1-review-item"><div class="v1-review-source"><p class="v1-section-label">来源</p><p class="v1-review-evidence">${escapeHtml(source.name || "本地粘贴文本")}</p><small>${escapeHtml(source.content_hash || source.source_document_id || "来源身份待核对")}</small></div><div class="v1-review-result"><p class="v1-section-label">演示整理结果</p><label>职位名称<input data-job-field="title" value="${escapeHtml(job.title || "")}"></label><label>公司<input data-job-field="company" value="${escapeHtml(job.company || "")}"></label><label>地点<input data-job-field="location" value="${escapeHtml(job.location || "")}"></label><label>摘要<textarea data-job-field="summary">${escapeHtml(job.summary || "")}</textarea></label></div></section><div class="v1-button-row"><button type="button" class="v1-primary-button" data-job-review-action="confirm">确认</button><button type="button" class="v1-tertiary-button" data-job-review-action="reject">拒绝</button></div></article>`;
+  }
+
+  async function renderAwaitingJobReviews({ advance = false, reset = false } = {}) {
+    if (!LocalJobLifecycle || !byId("job-review-surface")) return [];
+    const pending = LocalJobLifecycle.pendingJobs(await Demo.getAll(Demo.DEMO_STORES.jobs)).sort((a, b) => String(a.updated_at || "").localeCompare(String(b.updated_at || "")) || a.job_context_id.localeCompare(b.job_context_id));
+    if (reset || !jobReviewSessionTotal) { jobReviewSessionTotal = pending.length; jobReviewSessionResolved = 0; }
+    else if (advance) jobReviewSessionResolved += 1;
+    if (pending.length > jobReviewSessionTotal - jobReviewSessionResolved) jobReviewSessionTotal = jobReviewSessionResolved + pending.length;
+    byId("job-review-surface").classList.toggle("hidden", !pending.length);
+    byId("job-review-list").innerHTML = pending.length ? jobReviewMarkup(pending[0], Math.min(jobReviewSessionResolved + 1, jobReviewSessionTotal), jobReviewSessionTotal) : "";
+    if (!pending.length) { jobReviewSessionTotal = 0; jobReviewSessionResolved = 0; }
+    return pending;
+  }
+
+  async function reviewJobDraft(jobId, action, card) {
+    const buttons = [...card.querySelectorAll("[data-job-review-action]")];
+    buttons.forEach((button) => { button.disabled = true; });
+    try {
+      const job = await Demo.get(Demo.DEMO_STORES.jobs, jobId);
+      if (!job || job.review_status !== "NEEDS_REVIEW") throw new Error("job_review_draft_not_found");
+      let confirmed = null;
+      if (action === "reject") await LocalJobLifecycle.reject(Demo, Demo.DEMO_STORES.jobs, jobId);
+      else {
+        const value = (field) => card.querySelector(`[data-job-field="${field}"]`).value.trim();
+        if (!value("title")) throw new Error("job_title_required");
+        confirmed = await LocalJobLifecycle.confirm(Demo, Demo.DEMO_STORES.jobs, job, { ...job, title: value("title"), company: value("company"), location: value("location"), summary: value("summary") });
+      }
+      const remaining = await renderAwaitingJobReviews({ advance: true });
+      byId("job-page-message").textContent = remaining.length ? "当前草稿已处理，继续审核下一条。" : "全部职位草稿已审核；演示数据已按你的选择更新。";
+      byId("job-page-message").classList.remove("error");
+      if (!remaining.length) {
+        const sourceKey = confirmed ? `job:${confirmed.job_context_id}` : "job-guide";
+        if (!completeEmbeddedImport("jd", sourceKey)) returnToCardLibrary("/jd.html", sourceKey);
+      }
+    } catch (error) {
+      buttons.forEach((button) => { button.disabled = false; });
+      throw error;
+    }
   }
 
   function initJobLibrary() {
@@ -1127,18 +1475,38 @@
       if (!button) return;
       configureJobImportType(button.dataset.jobImportType);
     });
-    byId("job-paste-input").addEventListener("input", (event) => {
+    byId("job-paste-input").addEventListener("input", async (event) => {
+      const text = event.target.value.trim();
+      if (!text) { resetJobSource(); return; }
+      const selectionVersion = ++jobSelectionVersion;
+      const source = await LocalContextLifecycle.prepareTextSource(text, { batchId: `job-batch-${crypto.randomUUID()}`, namespace: "job" });
+      const jobs = await Demo.getAll(Demo.DEMO_STORES.jobs);
+      if (selectionVersion !== jobSelectionVersion || event.target.value.trim() !== text) return;
       selectedJobSources = [];
-      if (event.target.value.trim()) showJobSource({ source_type: "PASTED_TEXT_METADATA", name: "粘贴的职位描述.txt", type: "text/plain", sizeLabel: `${event.target.value.trim().length} 字符`, extension: "TXT" });
-      else resetJobSource();
+      selectedJobSource = { ...source, sizeLabel: `${text.length} 字符`, import_type: "Paste", source_url: byId("job-link-input")?.value.trim() || null, import_state: LocalJobLifecycle.sourceImportState(source.source_document_id, jobs) };
+      jobExecutionState = ["NEW", "RETRY"].includes(selectedJobSource.import_state) ? "READY" : "COMPLETE";
+      showJobSource(selectedJobSource);
+      await renderAwaitingJobReviews({ reset: true });
     });
-    byId("job-file-input").addEventListener("change", (event) => {
-      acceptJobFiles(event.target.files);
+    installFileDropzone("job-dropzone", "job-file-input", (files) => acceptJobFiles(files).catch(showJobError));
+    byId("replace-job-file").addEventListener("click", () => {
+      if (jobProcessingInProgress) {
+        jobBatchAbortController?.abort();
+        byId("job-processing-state").textContent = "正在取消本次职位整理";
+        return;
+      }
+      if (selectedJobImportType === "Paste") byId("job-paste-input").focus();
+      else byId("job-file-input").click();
     });
-    installFileDropzone("job-dropzone", acceptJobFiles);
-    byId("replace-job-file").addEventListener("click", () => selectedJobImportType === "Paste" ? byId("job-paste-input").focus() : byId("job-file-input").click());
     byId("start-job-processing").addEventListener("click", () => runJobProcessing().catch(showJobError));
+    byId("job-review-list").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-job-review-action]");
+      const card = event.target.closest("[data-job-id]");
+      if (!button || !card) return;
+      reviewJobDraft(card.dataset.jobId, button.dataset.jobReviewAction, card).catch(showJobError);
+    });
     configureJobImportType("Document");
+    renderAwaitingJobReviews({ reset: true }).catch(showJobError);
   }
 
   function showJobError(error) {
@@ -1154,14 +1522,81 @@
     const storedJob = await Demo.get(Demo.DEMO_STORES.jobs, jobId);
     const job = (await localizedJobRecords(storedJob ? [storedJob] : []))[0] || (jobId === Demo.JOB_FIXTURE.job_context_id ? Demo.clone(Demo.JOB_FIXTURE) : null);
     if (!job) throw new Error("job_context_not_found");
-    activeJob = job;
-    byId("job-title").textContent = job.title;
-    byId("job-company").textContent = job.company;
-    byId("job-location").textContent = job.location;
-    byId("job-summary").textContent = job.summary;
-    byId("job-source").textContent = `${sourceTypeLabels[job.source.source_type] || job.source.source_type} · ${job.source.display_name}`;
-    byId("job-requirements").innerHTML = job.requirements.map((requirement, index) => `<div><span>${String(index + 1).padStart(2, "0")}</span><p><b>${escapeHtml(requirement.label)}</b>${escapeHtml(requirement.detail)}</p></div>`).join("");
-    setDetailRuntimeMode(job, "job-ai-pane", null, "job-ai-runtime");
+    const renderJob = (record) => {
+      activeJob = record;
+      const canonical = record.data_class === "CANONICAL_CONFIRMED";
+      byId("job-review-state").classList.toggle("hidden", canonical);
+      byId("job-review-state").textContent = canonical ? "" : "演示数据";
+      byId("job-title").textContent = record.title;
+      byId("job-company").textContent = record.company;
+      byId("job-location").textContent = record.location;
+      byId("job-summary").textContent = record.summary;
+      const imported = record.imported_from || {};
+      byId("job-source").textContent = imported.name ? `${sourceTypeLabels[imported.source_type] || "本地来源"} · ${imported.name}` : `${sourceTypeLabels[record.source?.source_type] || record.source?.source_type || "演示来源"} · ${record.source?.display_name || "来源未记录"}`;
+      byId("job-requirements").innerHTML = (record.requirements || []).map((requirement, index) => `<div><span>${String(index + 1).padStart(2, "0")}</span><p><b>${escapeHtml(requirement.label)}</b>${escapeHtml(requirement.detail)}</p></div>`).join("");
+    };
+    renderJob(job);
+    setDetailRuntimeMode(job, "job-ai-pane", "open-job-edit", "job-ai-runtime");
+    const panels = createDetailPanelController("open-job-edit", { edit: "job-edit-form" });
+    const deletePopover = createDeletePopover("job-delete-popover");
+    let pendingJobEdit = null;
+    const openEdit = (focusFirst = true) => {
+      byId("job-edit-title").value = activeJob.title || "";
+      byId("job-edit-company").value = activeJob.company || "";
+      byId("job-edit-location").value = activeJob.location || "";
+      byId("job-edit-summary").value = activeJob.summary || "";
+      byId("job-edit-requirements").value = (activeJob.requirements || []).map((item) => `${item.label}：${item.detail}`).join("\n");
+      panels.show("edit", { focusFirst });
+    };
+    byId("open-job-edit").addEventListener("click", () => panels.current() === "closed" ? openEdit() : panels.show("closed"));
+    window.addEventListener("message", (event) => {
+      if (event.origin === window.location.origin && event.data?.type === "job-radar-v1-open-detail-edit") byId("open-job-edit").click();
+    });
+    byId("cancel-job-edit").addEventListener("click", () => panels.show("closed"));
+    byId("open-job-delete").addEventListener("click", (event) => deletePopover.open(event.currentTarget));
+    byId("preview-job-edit").addEventListener("click", () => {
+      const title = byId("job-edit-title").value.trim();
+      if (!title) return;
+      const requirements = byId("job-edit-requirements").value.split("\n").map((line) => line.trim()).filter(Boolean).map((line, index) => {
+        const [label, ...detail] = line.split(/[：:]/);
+        return { requirement_id: activeJob.requirements?.[index]?.requirement_id || `job-user-requirement-${index + 1}`, label: label.trim() || "要求", detail: detail.join("：").trim() || label.trim() };
+      });
+      pendingJobEdit = { title, company: byId("job-edit-company").value.trim(), location: byId("job-edit-location").value.trim(), summary: byId("job-edit-summary").value.trim(), requirements };
+      byId("job-edit-before").textContent = `${activeJob.title} · ${activeJob.requirements?.length || 0} 条要求`;
+      byId("job-edit-after").textContent = `${pendingJobEdit.title} · ${pendingJobEdit.requirements.length} 条要求`;
+      panels.show("closed");
+      byId("job-edit-preview").classList.remove("hidden");
+      byId("job-edit-preview").scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    byId("back-to-job-edit").addEventListener("click", () => { byId("job-edit-preview").classList.add("hidden"); openEdit(); });
+    byId("confirm-job-edit").addEventListener("click", async () => {
+      if (!pendingJobEdit) return;
+      const button = byId("confirm-job-edit");
+      button.disabled = true;
+      try {
+        activeJob = { ...activeJob, ...pendingJobEdit, item_version: (Number(activeJob.item_version) || 1) + 1, updated_at: new Date().toISOString() };
+        await Demo.put(Demo.DEMO_STORES.jobs, activeJob);
+        renderJob(activeJob);
+        byId("job-edit-preview").classList.add("hidden");
+        byId("job-detail-message").textContent = "修改已保存到当前本地职位记录。";
+        pendingJobEdit = null;
+      } finally { button.disabled = false; }
+    });
+    document.querySelectorAll("[data-job-delete-scope]").forEach((button) => button.addEventListener("click", async () => {
+      const controls = [...document.querySelectorAll("[data-job-delete-scope]")];
+      controls.forEach((control) => { control.disabled = true; });
+      try {
+        if (button.dataset.jobDeleteScope === "source") await LocalJobLifecycle.hardDeleteSource(Demo, Demo.DEMO_STORES.jobs, LocalJobLifecycle.sourceIdFor(activeJob));
+        else await LocalJobLifecycle.removeCard(Demo, Demo.DEMO_STORES.jobs, activeJob.job_context_id);
+        deletePopover.close();
+        byId("job-detail-message").textContent = button.dataset.jobDeleteScope === "source" ? "已移除此来源导入的所有职位内容；同批其他来源不受影响。" : "已移除当前职位卡片；来源身份保持不变。";
+        if (!completeEmbeddedImport("jd", `job:${activeJob.job_context_id}`)) returnToCardLibrary("/jd.html", "job-guide");
+      } catch (error) {
+        controls.forEach((control) => { control.disabled = false; });
+        byId("job-detail-message").textContent = `无法删除：${error.message}`;
+        byId("job-detail-message").classList.add("error");
+      }
+    }));
   }
 
   document.addEventListener("keydown", (event) => {
@@ -1178,11 +1613,10 @@
     if (page === "personal-import") refreshCandidateImportGate();
     if (page === "job-import") refreshJobImportGate();
     if (page === "candidate-detail" && activeCandidate) setDetailRuntimeMode(activeCandidate, "candidate-ai-pane", "open-direct-edit", "candidate-ai-runtime");
-    if (page === "job-detail" && activeJob) setDetailRuntimeMode(activeJob, "job-ai-pane", null, "job-ai-runtime");
+    if (page === "job-detail" && activeJob) setDetailRuntimeMode(activeJob, "job-ai-pane", "open-job-edit", "job-ai-runtime");
   });
   const initializers = { workspace: initWorkspace, personal: initPersonal, "personal-import": initPersonalImport, "candidate-detail": initCandidateDetail, jd: initJobLibrary, "job-import": initJobImport, "job-detail": initJobDetail };
   async function initializePage() {
-    await Demo.consolidateExistingDuplicatesOnce();
     await initializers[page]?.();
   }
   Promise.resolve(initializePage()).catch((error) => {

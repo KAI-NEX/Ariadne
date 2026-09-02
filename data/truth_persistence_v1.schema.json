@@ -5,12 +5,13 @@
   "description": "Canonical cross-language contract for Slice 3 persistence objects. Persistence never changes an object's authority role.",
   "x-contract-id": "ariadne-truth-persistence-v1",
   "x-indexeddb-name": "job-radar-local-first-v1",
-  "x-indexeddb-version": 11,
+  "x-indexeddb-version": 12,
   "x-status-semantics": {
     "processing_run": "Records actual execution outcome and is never retroactively rewritten because a later user workflow was cancelled.",
     "processing_batch": "Records workflow disposition; CANCELLED remains CANCELLED even if an in-flight execution later succeeds or fails.",
     "proposal": "A Proposal abandoned by workflow cancellation is CANCELLED_BY_USER and remains non-authoritative.",
-    "cancelled_run_invariant": "A ProcessingRun that actually stopped as CANCELLED cannot produce a new Proposal after cancellation."
+    "cancelled_run_invariant": "A ProcessingRun that actually stopped as CANCELLED cannot produce a new Proposal after cancellation.",
+    "candidate_context_removal": "A Candidate context REMOVED by the user is excluded from active current truth while its revisions, source documents, extraction artifacts, proposals, review decisions, and historical provenance remain retained."
   },
   "x-stores": [
     { "name": "source_documents", "keyPath": "source_document_id", "lifecycle": "reused" },
@@ -21,6 +22,7 @@
     { "name": "context_proposals", "keyPath": "proposal_id", "lifecycle": "new" },
     { "name": "context_review_decisions", "keyPath": "review_id", "lifecycle": "new" },
     { "name": "candidate_context_revisions", "keyPath": "revision_id", "lifecycle": "new" },
+    { "name": "candidate_context_lifecycle", "keyPath": "lifecycle_id", "lifecycle": "new" },
     { "name": "job_context_revisions", "keyPath": "revision_id", "lifecycle": "new" }
   ],
   "$defs": {
@@ -266,6 +268,32 @@
         },
         "payload": { "type": "object" },
         "authority": { "const": "AUTHORITATIVE_CONFIRMED_CONTEXT" }
+      }
+    },
+    "candidateContextLifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_id",
+        "lifecycle_id",
+        "context_id",
+        "item_id",
+        "state",
+        "removed_from_revision_id",
+        "removed_at",
+        "reason",
+        "authority"
+      ],
+      "properties": {
+        "contract_id": { "const": "ariadne-candidate-context-lifecycle-v1" },
+        "lifecycle_id": { "$ref": "#/$defs/nonEmptyString" },
+        "context_id": { "$ref": "#/$defs/nonEmptyString" },
+        "item_id": { "$ref": "#/$defs/nonEmptyString" },
+        "state": { "const": "REMOVED" },
+        "removed_from_revision_id": { "$ref": "#/$defs/nonEmptyString" },
+        "removed_at": { "$ref": "#/$defs/isoTimestamp" },
+        "reason": { "const": "USER_REMOVED" },
+        "authority": { "const": "AUTHORITATIVE_USER_DECISION" }
       }
     }
   }
