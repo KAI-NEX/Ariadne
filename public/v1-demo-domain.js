@@ -6,15 +6,18 @@
   "use strict";
 
   const DB_NAME = "job-radar-local-first-v1";
-  const DB_VERSION = 10;
+  const DB_VERSION = 11;
   const DATA_CLASS = "DEMO_FIXTURE";
   const STORES = [
     ["jobs", "job_id"], ["candidates", "candidate_id"], ["source_documents", "source_document_id"],
+    ["runtime_snapshots", "snapshot_id"], ["extraction_artifacts", "artifact_id"],
     ["extraction_runs", "extraction_run_id"], ["career_entities", "entity_id"], ["entity_review_decisions", "decision_id"],
     ["career_evidence", "evidence_id"], ["review_decisions", "decision_id"], ["career_profiles", "profile_id"],
     ["correction_memory", "correction_id"], ["ai_career_contexts", "artifact_id"], ["ai_career_profiles", "profile_id"],
     ["career_intelligence", "record_id"], ["candidate_contexts", "context_id"], ["candidate_proposals", "candidate_proposal_id"],
-    ["candidate_context_patches", "patch_id"], ["processing_runs", "run_id"], ["processing_consents", "consent_id"],
+    ["candidate_context_patches", "patch_id"], ["processing_runs", "run_id"], ["processing_batches", "batch_id"], ["processing_consents", "consent_id"],
+    ["context_proposals", "proposal_id"], ["context_review_decisions", "review_id"],
+    ["candidate_context_revisions", "revision_id"], ["job_context_revisions", "revision_id"],
     ["conversation_sessions", "conversation_id"], ["conversation_messages", "message_id"],
     ["demo_candidate_items", "item_id"], ["demo_job_contexts", "job_context_id"],
     ["demo_conversations", "conversation_id"], ["demo_ui_state", "state_id"],

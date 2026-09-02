@@ -1,5 +1,5 @@
 const DB_NAME = "job-radar-local-first-v1";
-const DB_VERSION = 10;
+const DB_VERSION = 11;
 const JOBS = "jobs";
 
 function openDatabase() {
@@ -10,6 +10,8 @@ function openDatabase() {
       if (!db.objectStoreNames.contains(JOBS)) db.createObjectStore(JOBS, { keyPath: "job_id" });
       if (!db.objectStoreNames.contains("candidates")) db.createObjectStore("candidates", { keyPath: "candidate_id" });
       if (!db.objectStoreNames.contains("source_documents")) db.createObjectStore("source_documents", { keyPath: "source_document_id" });
+      if (!db.objectStoreNames.contains("runtime_snapshots")) db.createObjectStore("runtime_snapshots", { keyPath: "snapshot_id" });
+      if (!db.objectStoreNames.contains("extraction_artifacts")) db.createObjectStore("extraction_artifacts", { keyPath: "artifact_id" });
       if (!db.objectStoreNames.contains("career_evidence")) db.createObjectStore("career_evidence", { keyPath: "evidence_id" });
       if (!db.objectStoreNames.contains("review_decisions")) db.createObjectStore("review_decisions", { keyPath: "decision_id" });
       if (!db.objectStoreNames.contains("career_profiles")) db.createObjectStore("career_profiles", { keyPath: "profile_id" });
@@ -24,6 +26,11 @@ function openDatabase() {
       if (!db.objectStoreNames.contains("candidate_proposals")) db.createObjectStore("candidate_proposals", { keyPath: "candidate_proposal_id" });
       if (!db.objectStoreNames.contains("candidate_context_patches")) db.createObjectStore("candidate_context_patches", { keyPath: "patch_id" });
       if (!db.objectStoreNames.contains("processing_runs")) db.createObjectStore("processing_runs", { keyPath: "run_id" });
+      if (!db.objectStoreNames.contains("processing_batches")) db.createObjectStore("processing_batches", { keyPath: "batch_id" });
+      if (!db.objectStoreNames.contains("context_proposals")) db.createObjectStore("context_proposals", { keyPath: "proposal_id" });
+      if (!db.objectStoreNames.contains("context_review_decisions")) db.createObjectStore("context_review_decisions", { keyPath: "review_id" });
+      if (!db.objectStoreNames.contains("candidate_context_revisions")) db.createObjectStore("candidate_context_revisions", { keyPath: "revision_id" });
+      if (!db.objectStoreNames.contains("job_context_revisions")) db.createObjectStore("job_context_revisions", { keyPath: "revision_id" });
       if (!db.objectStoreNames.contains("processing_consents")) db.createObjectStore("processing_consents", { keyPath: "consent_id" });
       if (!db.objectStoreNames.contains("conversation_sessions")) db.createObjectStore("conversation_sessions", { keyPath: "conversation_id" });
       if (!db.objectStoreNames.contains("conversation_messages")) db.createObjectStore("conversation_messages", { keyPath: "message_id" });
