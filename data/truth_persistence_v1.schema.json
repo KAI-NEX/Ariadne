@@ -2,10 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ariadne.local/schemas/truth_persistence_v1.schema.json",
   "title": "Ariadne truth and persistence contracts v1",
-  "description": "Canonical cross-language contract for Slice 3 persistence objects. Persistence never changes an object's authority role.",
+  "description": "Canonical cross-language contract for Ariadne local truth and durable Candidate conversation objects. Persistence never changes an object's authority role.",
   "x-contract-id": "ariadne-truth-persistence-v1",
   "x-indexeddb-name": "job-radar-local-first-v1",
-  "x-indexeddb-version": 13,
+  "x-indexeddb-version": 14,
   "x-status-semantics": {
     "processing_run": "Records actual execution outcome and is never retroactively rewritten because a later user workflow was cancelled.",
     "processing_batch": "Records workflow disposition; CANCELLED remains CANCELLED even if an in-flight execution later succeeds or fails.",
@@ -13,7 +13,9 @@
     "cancelled_run_invariant": "A ProcessingRun that actually stopped as CANCELLED cannot produce a new Proposal after cancellation.",
     "candidate_context_removal": "A Candidate context REMOVED by the user is excluded from active current truth while its revisions, source documents, extraction artifacts, proposals, review decisions, and historical provenance remain retained.",
     "candidate_working_model": "A Candidate Working Model is an immutable, non-authoritative versioned draft. User edits create a new version instead of rewriting the prior snapshot.",
-    "candidate_workspace_acceptance": "A Workspace Acceptance is one immutable Human authority event accepting one exact Working Model version and fingerprint; it is not a set of per-Proposal ReviewDecisions."
+    "candidate_workspace_acceptance": "A Workspace Acceptance is one immutable Human authority event accepting one exact Working Model version and fingerprint; it is not a set of per-Proposal ReviewDecisions.",
+    "candidate_conversation": "Conversation messages and CandidateActions are append-only history; a mutable TurnExecution retains its complete state_history while Working Model versions retain their own lineage.",
+    "candidate_conversation_failure": "A USER message may exist without an ASSISTANT message when its durable TurnExecution fails, is cancelled, or becomes stale."
   },
   "x-stores": [
     { "name": "source_documents", "keyPath": "source_document_id", "lifecycle": "reused" },
@@ -27,7 +29,11 @@
     { "name": "candidate_workspace_acceptances", "keyPath": "acceptance_id", "lifecycle": "new" },
     { "name": "candidate_context_revisions", "keyPath": "revision_id", "lifecycle": "new" },
     { "name": "candidate_context_lifecycle", "keyPath": "lifecycle_id", "lifecycle": "new" },
-    { "name": "job_context_revisions", "keyPath": "revision_id", "lifecycle": "new" }
+    { "name": "job_context_revisions", "keyPath": "revision_id", "lifecycle": "new" },
+    { "name": "conversation_sessions", "keyPath": "conversation_id", "lifecycle": "reused" },
+    { "name": "conversation_messages", "keyPath": "message_id", "lifecycle": "reused" },
+    { "name": "conversation_turn_executions", "keyPath": "execution_id", "lifecycle": "new" },
+    { "name": "candidate_actions", "keyPath": "action_id", "lifecycle": "new" }
   ],
   "$defs": {
     "nonEmptyString": {
@@ -340,6 +346,83 @@
         },
         "payload": { "type": "object" },
         "authority": { "const": "AUTHORITATIVE_CONFIRMED_CONTEXT" }
+      }
+    },
+    "candidateConversationSession": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "conversation_id", "subject_type", "subject_id", "source_document_id", "created_at", "updated_at"],
+      "properties": {
+        "contract_id": { "const": "ariadne-candidate-conversation-v1" },
+        "conversation_id": { "$ref": "#/$defs/nonEmptyString" },
+        "subject_type": { "const": "CANDIDATE" },
+        "subject_id": { "$ref": "#/$defs/nonEmptyString" },
+        "source_document_id": { "$ref": "#/$defs/nonEmptyString" },
+        "created_at": { "$ref": "#/$defs/isoTimestamp" },
+        "updated_at": { "$ref": "#/$defs/isoTimestamp" }
+      }
+    },
+    "candidateConversationMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "message_id", "conversation_id", "turn_id", "role", "text", "created_at", "provider", "model", "runtime_snapshot_id", "candidate_action_id"],
+      "properties": {
+        "contract_id": { "const": "ariadne-candidate-conversation-v1-message-v1" },
+        "message_id": { "$ref": "#/$defs/nonEmptyString" },
+        "conversation_id": { "$ref": "#/$defs/nonEmptyString" },
+        "turn_id": { "$ref": "#/$defs/nonEmptyString" },
+        "role": { "enum": ["USER", "ASSISTANT"] },
+        "text": { "$ref": "#/$defs/nonEmptyString" },
+        "created_at": { "$ref": "#/$defs/isoTimestamp" },
+        "provider": { "$ref": "#/$defs/nullableString" },
+        "model": { "$ref": "#/$defs/nullableString" },
+        "runtime_snapshot_id": { "$ref": "#/$defs/nullableString" },
+        "candidate_action_id": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+    "candidateConversationTurnExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "execution_id", "conversation_id", "operation", "generation", "observation", "runtime_snapshot_id", "state", "state_history", "failure_code", "result_action", "created_at", "updated_at", "cancelled_at", "user_message_id", "action_id", "usage"],
+      "properties": {
+        "contract_id": { "const": "ariadne-candidate-conversation-v1-turn-execution-v1" },
+        "execution_id": { "$ref": "#/$defs/nonEmptyString" },
+        "conversation_id": { "$ref": "#/$defs/nonEmptyString" },
+        "operation": { "const": "CANDIDATE_CONVERSATION_TURN" },
+        "generation": { "$ref": "#/$defs/nonEmptyString" },
+        "observation": { "type": "object" },
+        "runtime_snapshot_id": { "$ref": "#/$defs/nonEmptyString" },
+        "state": { "enum": ["CREATED", "SENDING", "RECEIVED", "VALIDATING", "APPLIED", "NO_CHANGE", "NEEDS_CLARIFICATION", "FAILED", "CANCELLED", "STALE"] },
+        "state_history": { "type": "array", "minItems": 1, "items": { "type": "object" } },
+        "failure_code": { "$ref": "#/$defs/nullableString" },
+        "result_action": { "$ref": "#/$defs/nullableString" },
+        "created_at": { "$ref": "#/$defs/isoTimestamp" },
+        "updated_at": { "$ref": "#/$defs/isoTimestamp" },
+        "cancelled_at": { "type": ["string", "null"], "format": "date-time" },
+        "user_message_id": { "$ref": "#/$defs/nonEmptyString" },
+        "action_id": { "$ref": "#/$defs/nullableString" },
+        "usage": { "type": "object" }
+      }
+    },
+    "candidateActionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "action_id", "conversation_id", "turn_id", "originating_user_message_id", "observed_working_model", "focus_snapshot", "normalized_action", "validation_result", "application_result", "resulting_working_model_id", "model_response_hash", "created_at", "updated_at"],
+      "properties": {
+        "contract_id": { "const": "ariadne-candidate-conversation-action-v1-record-v1" },
+        "action_id": { "$ref": "#/$defs/nonEmptyString" },
+        "conversation_id": { "$ref": "#/$defs/nonEmptyString" },
+        "turn_id": { "$ref": "#/$defs/nonEmptyString" },
+        "originating_user_message_id": { "$ref": "#/$defs/nonEmptyString" },
+        "observed_working_model": { "type": "object" },
+        "focus_snapshot": { "type": "object" },
+        "normalized_action": { "type": "object" },
+        "validation_result": { "type": "object" },
+        "application_result": { "type": "object" },
+        "resulting_working_model_id": { "$ref": "#/$defs/nullableString" },
+        "model_response_hash": { "$ref": "#/$defs/nonEmptyString" },
+        "created_at": { "$ref": "#/$defs/isoTimestamp" },
+        "updated_at": { "$ref": "#/$defs/isoTimestamp" }
       }
     },
     "candidateContextLifecycle": {

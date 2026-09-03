@@ -1,7 +1,7 @@
 "use strict";
 
 const DB_NAME = "job-radar-local-first-v1";
-const DB_VERSION = 13;
+const DB_VERSION = 14;
 const SOURCE_DOCUMENTS = "source_documents";
 const EXTRACTION_RUNS = "extraction_runs";
 const CAREER_ENTITIES = "career_entities";
@@ -19,6 +19,8 @@ const PROCESSING_RUNS = "processing_runs";
 const PROCESSING_CONSENTS = "processing_consents";
 const CONVERSATION_SESSIONS = "conversation_sessions";
 const CONVERSATION_MESSAGES = "conversation_messages";
+const CONVERSATION_TURN_EXECUTIONS = "conversation_turn_executions";
+const CANDIDATE_ACTIONS = "candidate_actions";
 const DEMO_CANDIDATE_ITEMS = "demo_candidate_items";
 const DEMO_JOB_CONTEXTS = "demo_job_contexts";
 const DEMO_CONVERSATIONS = "demo_conversations";
@@ -123,6 +125,8 @@ function openDatabase() {
       if (!db.objectStoreNames.contains(PROCESSING_CONSENTS)) db.createObjectStore(PROCESSING_CONSENTS, { keyPath: "consent_id" });
       if (!db.objectStoreNames.contains(CONVERSATION_SESSIONS)) db.createObjectStore(CONVERSATION_SESSIONS, { keyPath: "conversation_id" });
       if (!db.objectStoreNames.contains(CONVERSATION_MESSAGES)) db.createObjectStore(CONVERSATION_MESSAGES, { keyPath: "message_id" });
+      if (!db.objectStoreNames.contains(CONVERSATION_TURN_EXECUTIONS)) db.createObjectStore(CONVERSATION_TURN_EXECUTIONS, { keyPath: "execution_id" });
+      if (!db.objectStoreNames.contains(CANDIDATE_ACTIONS)) db.createObjectStore(CANDIDATE_ACTIONS, { keyPath: "action_id" });
       if (!db.objectStoreNames.contains(DEMO_CANDIDATE_ITEMS)) db.createObjectStore(DEMO_CANDIDATE_ITEMS, { keyPath: "item_id" });
       if (!db.objectStoreNames.contains(DEMO_JOB_CONTEXTS)) db.createObjectStore(DEMO_JOB_CONTEXTS, { keyPath: "job_context_id" });
       if (!db.objectStoreNames.contains(DEMO_CONVERSATIONS)) db.createObjectStore(DEMO_CONVERSATIONS, { keyPath: "conversation_id" });

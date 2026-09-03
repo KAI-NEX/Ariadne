@@ -1,6 +1,6 @@
 /* Browser-only Ariadne storage: no app.py route and no network request. */
 const DB_NAME = "job-radar-local-first-v1";
-const DB_VERSION = 13;
+const DB_VERSION = 14;
 const JOBS = "jobs";
 const CANDIDATES = "candidates";
 const RuntimeGate = window.JobRadarRuntimeGate;
@@ -45,6 +45,8 @@ function openDatabase() {
       if (!db.objectStoreNames.contains("processing_consents")) db.createObjectStore("processing_consents", { keyPath: "consent_id" });
       if (!db.objectStoreNames.contains("conversation_sessions")) db.createObjectStore("conversation_sessions", { keyPath: "conversation_id" });
       if (!db.objectStoreNames.contains("conversation_messages")) db.createObjectStore("conversation_messages", { keyPath: "message_id" });
+      if (!db.objectStoreNames.contains("conversation_turn_executions")) db.createObjectStore("conversation_turn_executions", { keyPath: "execution_id" });
+      if (!db.objectStoreNames.contains("candidate_actions")) db.createObjectStore("candidate_actions", { keyPath: "action_id" });
       if (!db.objectStoreNames.contains("demo_candidate_items")) db.createObjectStore("demo_candidate_items", { keyPath: "item_id" });
       if (!db.objectStoreNames.contains("demo_job_contexts")) db.createObjectStore("demo_job_contexts", { keyPath: "job_context_id" });
       if (!db.objectStoreNames.contains("demo_conversations")) db.createObjectStore("demo_conversations", { keyPath: "conversation_id" });

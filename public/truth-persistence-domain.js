@@ -10,7 +10,7 @@
 
   const CONTRACT_ID = "ariadne-truth-persistence-v1";
   const DB_NAME = "job-radar-local-first-v1";
-  const DB_VERSION = 13;
+  const DB_VERSION = 14;
   const STORE_SPECS = Object.freeze([
     Object.freeze({ name: "source_documents", keyPath: "source_document_id", lifecycle: "reused" }),
     Object.freeze({ name: "runtime_snapshots", keyPath: "snapshot_id", lifecycle: "new" }),
@@ -24,6 +24,10 @@
     Object.freeze({ name: "candidate_context_revisions", keyPath: "revision_id", lifecycle: "new" }),
     Object.freeze({ name: "candidate_context_lifecycle", keyPath: "lifecycle_id", lifecycle: "new" }),
     Object.freeze({ name: "job_context_revisions", keyPath: "revision_id", lifecycle: "new" }),
+    Object.freeze({ name: "conversation_sessions", keyPath: "conversation_id", lifecycle: "reused" }),
+    Object.freeze({ name: "conversation_messages", keyPath: "message_id", lifecycle: "reused" }),
+    Object.freeze({ name: "conversation_turn_executions", keyPath: "execution_id", lifecycle: "new" }),
+    Object.freeze({ name: "candidate_actions", keyPath: "action_id", lifecycle: "new" }),
   ]);
   const STORE_NAMES = Object.freeze(Object.fromEntries(STORE_SPECS.map((spec) => [spec.name.toUpperCase(), spec.name])));
   const NEW_STORE_SPECS = Object.freeze(STORE_SPECS.filter((spec) => spec.lifecycle === "new"));
@@ -46,6 +50,8 @@
     "candidate_context_revisions",
     "candidate_context_lifecycle",
     "job_context_revisions",
+    "conversation_messages",
+    "candidate_actions",
   ]);
   const AUTHORITY = Object.freeze({
     source: "SOURCE_INPUT_ONLY",

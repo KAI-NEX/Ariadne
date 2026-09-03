@@ -389,7 +389,7 @@ function migrationDatabase(existingNames) {
 }
 
 const legacyDemoRow = { item_id: "demo-existing", data_class: "DEMO_FIXTURE", review_status: "NEEDS_REVIEW" };
-const migrationDb = migrationDatabase(["source_documents", "processing_runs", "demo_candidate_items", "demo_job_contexts", "demo_conversations", "demo_ui_state"]);
+const migrationDb = migrationDatabase(["source_documents", "processing_runs", "conversation_sessions", "conversation_messages", "demo_candidate_items", "demo_job_contexts", "demo_conversations", "demo_ui_state"]);
 const createdStores = Truth.ensureTruthStores(migrationDb);
 assert.deepEqual(createdStores.sort(), Truth.NEW_STORE_SPECS.map((spec) => spec.name).sort());
 assert.equal(legacyDemoRow.data_class, "DEMO_FIXTURE");
@@ -532,7 +532,7 @@ assert.equal(memoryDb.records.get("candidate_context_revisions").size, 3); // Pr
 const openers = ["v1-demo-domain.js", "career-evidence.js", "local-first.js", "career-profile.js", "local-jobs.js"];
 for (const filename of openers) {
   const sourceText = fs.readFileSync(path.join(root, "public", filename), "utf8");
-  assert.match(sourceText, /const DB_VERSION = 13;/, `${filename} must open IndexedDB v13`);
+  assert.match(sourceText, /const DB_VERSION = 14;/, `${filename} must open IndexedDB v14`);
   for (const spec of Truth.NEW_STORE_SPECS) {
     assert(sourceText.includes(`"${spec.name}"`), `${filename} must add ${spec.name}`);
     assert(sourceText.includes(`"${spec.keyPath}"`), `${filename} must use ${spec.keyPath}`);

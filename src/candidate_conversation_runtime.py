@@ -65,6 +65,7 @@ class CandidateConversationRequest:
     human_message: str
     observation: dict[str, Any]
     working_model: dict[str, Any]
+    compiled_context: dict[str, Any] | None
     runtime_snapshot: dict[str, Any]
     draft: dict[str, Any] | None
     execution_id: str
@@ -202,8 +203,55 @@ def _validate_observation(value: Any, working_model: dict[str, Any], conversatio
     return normalized
 
 
+_CONTEXT_FORBIDDEN_KEY = re.compile(r"(?:api[_-]?key|authorization|credential|access[_-]?token|refresh[_-]?token|raw[_-]?(?:pdf|response|http)|pdf[_-]?bytes|rendered[_-]?page|image[_-]?data)", re.IGNORECASE)
+_CONTEXT_FORBIDDEN_VALUE = re.compile(r"(?:\bBearer\s+\S+|\b(?:sk|rk|pk|sess)-[A-Za-z0-9_-]{8,}|^data:(?:application|image)/|%PDF)", re.IGNORECASE)
+
+
+def _assert_compiled_context_safe(value: Any) -> None:
+    if isinstance(value, Mapping):
+        for key, nested in value.items():
+            if not isinstance(key, str) or _CONTEXT_FORBIDDEN_KEY.search(key):
+                raise CandidateConversationRuntimeError("CONTEXT_PRIVATE_MATERIAL_FORBIDDEN", "context")
+            _assert_compiled_context_safe(nested)
+    elif isinstance(value, list):
+        for item in value:
+            _assert_compiled_context_safe(item)
+    elif isinstance(value, str) and _CONTEXT_FORBIDDEN_VALUE.search(value):
+        raise CandidateConversationRuntimeError("CONTEXT_PRIVATE_MATERIAL_FORBIDDEN", "context")
+
+
+def _validate_compiled_context(value: Any, conversation: dict[str, Any], observation: dict[str, Any], working_model: dict[str, Any], human_message: str) -> dict[str, Any]:
+    context = _exact(value, {
+        "contract_id", "compiler_version", "conversation_subject", "observed_working_model", "focus",
+        "candidate", "open_uncertainties", "bounded_history", "current_user_message", "summary", "diagnostics",
+    }, "COMPILED_CONTEXT_INVALID")
+    if context.get("contract_id") != "ariadne-candidate-conversation-context-v1" or context.get("compiler_version") != "candidate-conversation-context-compiler-v1":
+        raise CandidateConversationRuntimeError("COMPILED_CONTEXT_INVALID", "context")
+    subject = _exact(context.get("conversation_subject"), {"conversation_id", "subject_type", "candidate_context_id", "source_document_id"}, "COMPILED_CONTEXT_INVALID")
+    observed = _exact(context.get("observed_working_model"), {"working_model_id", "version", "fingerprint"}, "COMPILED_CONTEXT_INVALID")
+    current = _exact(context.get("current_user_message"), {"message_id", "turn_id", "text", "created_at"}, "COMPILED_CONTEXT_INVALID")
+    diagnostics = _mapping(context.get("diagnostics"), "COMPILED_CONTEXT_INVALID")
+    if (subject.get("conversation_id") != conversation["conversation_id"] or subject.get("subject_type") != SUBJECT_TYPE
+            or subject.get("candidate_context_id") != conversation["subject_id"] or subject.get("source_document_id") != working_model["source_document_id"]
+            or dict(observed) != {key: observation[key] for key in ("working_model_id", "version", "fingerprint")}
+            or context.get("focus") != observation["focus"] or current.get("text") != human_message
+            or not isinstance(context.get("candidate"), Mapping) or not isinstance(context.get("open_uncertainties"), list)
+            or not isinstance(context.get("bounded_history"), list) or context.get("summary") is not None):
+        raise CandidateConversationRuntimeError("COMPILED_CONTEXT_INVALID", "context")
+    _assert_compiled_context_safe(context)
+    serialized_size = len(json.dumps(context, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    if diagnostics.get("serialized_size_bytes") != serialized_size or serialized_size > 64 * 1024:
+        raise CandidateConversationRuntimeError("CONTEXT_LIMIT_EXCEEDED", "context")
+    if diagnostics.get("history_turn_count") != len(context["bounded_history"]) or diagnostics.get("focus_type") != observation["focus"]["type"]:
+        raise CandidateConversationRuntimeError("COMPILED_CONTEXT_INVALID", "context")
+    return json.loads(json.dumps(context, ensure_ascii=False))
+
+
 def validate_candidate_conversation_request(payload: Any) -> CandidateConversationRequest:
-    request = _exact(payload, {"contract_id", "conversation", "human_message", "observation", "working_model", "runtime_snapshot", "draft", "turn"})
+    request = _mapping(payload, "EXACT_SCHEMA_FAILURE")
+    base_keys = {"contract_id", "conversation", "human_message", "observation", "working_model", "runtime_snapshot", "draft", "turn"}
+    if set(request) not in (base_keys, base_keys | {"compiled_context"}):
+        raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation")
     if request.get("contract_id") != f"{CONTRACT_ID}-runtime-request-v1":
         raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation")
     conversation = _validate_conversation(request.get("conversation"))
@@ -215,6 +263,9 @@ def validate_candidate_conversation_request(payload: Any) -> CandidateConversati
     if working_model["fingerprint"] != _fingerprint(working_model["payload"]):
         raise CandidateConversationRuntimeError("WORKING_MODEL_INVALID", "contract_validation")
     observation = _validate_observation(request.get("observation"), working_model, conversation)
+    compiled_context = None
+    if "compiled_context" in request:
+        compiled_context = _validate_compiled_context(request.get("compiled_context"), conversation, observation, working_model, human_message)
     snapshot = _validate_snapshot(request.get("runtime_snapshot"))
     draft_value = request.get("draft")
     draft = None
@@ -232,7 +283,7 @@ def validate_candidate_conversation_request(payload: Any) -> CandidateConversati
     turn = _exact(request.get("turn"), {"execution_id", "generation"})
     execution_id = _string(turn.get("execution_id"), "TURN_EXECUTION_ID_INVALID", 256)
     generation = _string(turn.get("generation"), "TURN_GENERATION_INVALID", 256)
-    return CandidateConversationRequest(conversation, human_message, observation, working_model, snapshot, draft, execution_id, generation)
+    return CandidateConversationRequest(conversation, human_message, observation, working_model, compiled_context, snapshot, draft, execution_id, generation)
 
 
 def _source_ref_ids(item: Mapping[str, Any]) -> set[str]:
@@ -389,12 +440,24 @@ def _model_input(request: CandidateConversationRequest) -> dict[str, Any]:
 
 
 def build_candidate_conversation_payload(request: CandidateConversationRequest) -> dict[str, Any]:
-    return {
-        "model": MODEL_ID,
-        "messages": [
+    if request.compiled_context is None:
+        messages = [
             {"role": "system", "content": candidate_conversation_prompt()},
             {"role": "user", "content": json.dumps(_model_input(request), ensure_ascii=False, separators=(",", ":"))},
-        ],
+        ]
+    else:
+        context_only = {key: value for key, value in request.compiled_context.items() if key not in {"bounded_history", "current_user_message"}}
+        messages = [
+            {"role": "system", "content": candidate_conversation_prompt()},
+            {"role": "user", "content": json.dumps({"message_type": "COMPILED_CANDIDATE_CONTEXT", "context": context_only}, ensure_ascii=False, separators=(",", ":"))},
+        ]
+        for turn in request.compiled_context["bounded_history"]:
+            messages.append({"role": "user", "content": str(turn["user"]["text"])})
+            messages.append({"role": "assistant", "content": str(turn["assistant"]["text"])})
+        messages.append({"role": "user", "content": request.human_message})
+    return {
+        "model": MODEL_ID,
+        "messages": messages,
         "response_format": {"type": "json_object"},
         "thinking": {"type": "disabled"},
         "temperature": 0,

@@ -119,6 +119,62 @@ def request_for(message: str = "请解释这一项。", focus: dict | None = Non
     }
 
 
+def compiled_context_for(request: dict) -> dict:
+    context = {
+        "contract_id": "ariadne-candidate-conversation-context-v1",
+        "compiler_version": "candidate-conversation-context-compiler-v1",
+        "conversation_subject": {
+            "conversation_id": request["conversation"]["conversation_id"],
+            "subject_type": "CANDIDATE",
+            "candidate_context_id": request["conversation"]["subject_id"],
+            "source_document_id": request["working_model"]["source_document_id"],
+        },
+        "observed_working_model": {
+            "working_model_id": request["observation"]["working_model_id"],
+            "version": request["observation"]["version"],
+            "fingerprint": request["observation"]["fingerprint"],
+        },
+        "focus": request["observation"]["focus"],
+        "candidate": {
+            "target_mode": "CANDIDATE",
+            "candidate_items": [{"item_id": "item-edu-001", "title": "Synthetic item", "facts": [], "open_uncertainties": [], "grounding_refs": []}],
+            "current_item": None,
+            "persisted_item": None,
+            "draft_item": None,
+            "draft_fingerprint": None,
+            "other_item_directory": [],
+        },
+        "open_uncertainties": [],
+        "bounded_history": [{
+            "turn_id": "history-turn-1",
+            "user": {"message_id": "history-user-1", "text": "Synthetic earlier question.", "created_at": "2026-09-03T07:01:10Z"},
+            "assistant": {"message_id": "history-assistant-1", "text": "Synthetic earlier answer.", "created_at": "2026-09-03T07:01:11Z"},
+        }],
+        "current_user_message": {"message_id": "current-user-1", "turn_id": request["turn"]["execution_id"], "text": request["human_message"], "created_at": "2026-09-03T07:02:01Z"},
+        "summary": None,
+        "diagnostics": {
+            "serialized_size_bytes": 0,
+            "estimated_tokens": 0,
+            "history_turn_count": 1,
+            "candidate_item_count": 2,
+            "focus_type": request["observation"]["focus"]["type"],
+            "compiler_version": "candidate-conversation-context-compiler-v1",
+            "history_turn_limit": 8,
+            "trimmed_history_turn_count": 0,
+            "trimmed_directory_item_count": 0,
+        },
+    }
+    previous_size = -1
+    for _ in range(8):
+        size = len(json.dumps(context, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+        context["diagnostics"]["serialized_size_bytes"] = size
+        context["diagnostics"]["estimated_tokens"] = (size + 3) // 4
+        if size == previous_size:
+            break
+        previous_size = size
+    return context
+
+
 def observed(request: dict) -> dict:
     observation = request["observation"]
     return {key: observation[key] for key in ("candidate_context_id", "working_model_id", "version", "fingerprint")}
@@ -172,6 +228,22 @@ assert provider_payload["temperature"] == 0 and provider_payload["max_tokens"] =
 serialized_provider_request = json.dumps(provider_payload, ensure_ascii=False)
 assert "%PDF" not in serialized_provider_request and "document_data_url" not in serialized_provider_request
 assert "consent" not in serialized_provider_request and "CANDIDATE_MODEL_STRUCTURING" not in serialized_provider_request
+
+# Compiled context is separately auditable: action rules, bounded context/history, then the exact current Human message.
+compiled_request = request_for("Current synthetic compiled instruction.")
+compiled_request["compiled_context"] = compiled_context_for(compiled_request)
+validated_compiled = validate_candidate_conversation_request(compiled_request)
+compiled_provider_payload = build_candidate_conversation_payload(validated_compiled)
+assert [message["role"] for message in compiled_provider_payload["messages"]] == ["system", "user", "user", "assistant", "user"]
+assert compiled_provider_payload["messages"][-1]["content"] == compiled_request["human_message"]
+assert "COMPILED_CANDIDATE_CONTEXT" in compiled_provider_payload["messages"][1]["content"]
+assert "Synthetic item" not in compiled_provider_payload["messages"][0]["content"]
+private_context_request = json.loads(json.dumps(compiled_request))
+private_context_request["compiled_context"]["candidate"]["credential"] = "not-stored"
+expect_error("CONTEXT_PRIVATE_MATERIAL_FORBIDDEN", lambda: validate_candidate_conversation_request(private_context_request))
+wrong_size_request = json.loads(json.dumps(compiled_request))
+wrong_size_request["compiled_context"]["diagnostics"]["serialized_size_bytes"] = 999999
+expect_error("CONTEXT_LIMIT_EXCEEDED", lambda: validate_candidate_conversation_request(wrong_size_request))
 
 # Subject identity is stable when turn focus changes.
 item_request = request_for(focus={"type": "ITEM", "item_id": "item-edu-001"})
@@ -253,8 +325,10 @@ assert "applyCandidateWorkspaceCorrection" in pages_source
 assert "CandidateModel.editedCandidateWorkingModel" in pages_source
 assert 'fetch("/api/candidate-conversation-turn"' not in pages_source
 truth_source = (ROOT / "public" / "truth-persistence-domain.js").read_text(encoding="utf-8")
-assert 'name: "conversation_sessions"' not in truth_source
-assert 'name: "conversation_messages"' not in truth_source
+assert 'name: "conversation_sessions"' in truth_source
+assert 'name: "conversation_messages"' in truth_source
+assert 'name: "conversation_turn_executions"' in truth_source
+assert 'name: "candidate_actions"' in truth_source
 assert "applyWorkspaceAcceptance" in truth_source and "AUTHORITATIVE_CONFIRMED_CONTEXT" in truth_source
 
 print("candidate_conversation_runtime_contract=pass")

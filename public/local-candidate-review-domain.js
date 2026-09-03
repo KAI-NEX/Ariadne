@@ -232,6 +232,8 @@
     const revisions = (records.candidate_context_revisions || []).filter((revision) => revision.provenance?.source_document_ids?.includes(sourceId));
     const revisionIds = new Set(revisions.map((revision) => revision.revision_id));
     const contextIds = new Set(revisions.map((revision) => revision.context_id));
+    const conversationSessions = (records.conversation_sessions || []).filter((session) => session.source_document_id === sourceId);
+    const conversationIds = new Set(conversationSessions.map((session) => session.conversation_id));
     return Object.freeze({
       source_documents: sourceRecords.filter((source) => source.source_document_id === sourceId || RawSource.isPayloadRecordFor(source, sourceId)).map((source) => source.source_document_id),
       extraction_artifacts: (records.extraction_artifacts || []).filter((artifact) => artifact.source_document_id === sourceId).map((artifact) => artifact.artifact_id),
@@ -242,11 +244,15 @@
       candidate_workspace_acceptances: (records.candidate_workspace_acceptances || []).filter((acceptance) => acceptance.source_document_id === sourceId).map((acceptance) => acceptance.acceptance_id),
       candidate_context_revisions: [...revisionIds],
       candidate_context_lifecycle: (records.candidate_context_lifecycle || []).filter((record) => contextIds.has(record.context_id) || revisionIds.has(record.removed_from_revision_id)).map((record) => record.lifecycle_id),
+      conversation_sessions: conversationSessions.map((session) => session.conversation_id),
+      conversation_messages: (records.conversation_messages || []).filter((message) => conversationIds.has(message.conversation_id)).map((message) => message.message_id),
+      conversation_turn_executions: (records.conversation_turn_executions || []).filter((turn) => conversationIds.has(turn.conversation_id)).map((turn) => turn.execution_id),
+      candidate_actions: (records.candidate_actions || []).filter((action) => conversationIds.has(action.conversation_id)).map((action) => action.action_id),
     });
   }
 
   function persistSourceHardDelete(database, sourceId) {
-    const stores = ["source_documents", "extraction_artifacts", "processing_runs", "context_proposals", "context_review_decisions", "candidate_working_models", "candidate_workspace_acceptances", "candidate_context_revisions", "candidate_context_lifecycle"];
+    const stores = ["source_documents", "extraction_artifacts", "processing_runs", "context_proposals", "context_review_decisions", "candidate_working_models", "candidate_workspace_acceptances", "candidate_context_revisions", "candidate_context_lifecycle", "conversation_sessions", "conversation_messages", "conversation_turn_executions", "candidate_actions"];
     return new Promise((resolve, reject) => {
       const transaction = database.transaction(stores, "readwrite");
       const records = {};
