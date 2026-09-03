@@ -45,6 +45,10 @@ class ModelDescriptor:
     discovery_source: str
     runtime_default: bool = False
     multimodal_readiness: str = NOT_MULTIMODAL
+    runtime_capability_basis: str | None = None
+    runtime_capabilities: dict[str, str] | None = None
+    adapter_version: str | None = None
+    delivery_method: str | None = None
 
     def to_public_dict(self) -> dict[str, Any]:
         result = asdict(self)
@@ -78,7 +82,21 @@ def deepseek_model_descriptors(model_ids: list[str]) -> list[ModelDescriptor]:
             # DeepSeek's 2026-08-21 official announcement names this exact model as
             # its experimental multimodal vision API model.  Chat Completions is kept
             # because it is the product's established PDF-page image route.
-            descriptors.append(ModelDescriptor("deepseek", model_id, f"DeepSeek · {model_id}", OPENAI_CHAT_COMPLETIONS, (TEXT, VISION), "official_contract", True, MULTIMODAL_VERIFIED))
+            descriptors.append(ModelDescriptor(
+                "deepseek", model_id, f"DeepSeek · {model_id}", OPENAI_CHAT_COMPLETIONS,
+                (TEXT, VISION), "qualification_2026-09-03", True, MULTIMODAL_VERIFIED,
+                "adapter_verified",
+                {
+                    "semantic_understanding": "supported",
+                    "candidate_model_structuring": "supported",
+                    "job_model_structuring": "unsupported",
+                    "model_merge": "unsupported",
+                    "ai_conversation": "unsupported",
+                    "vision": "supported",
+                },
+                "deepseek-candidate-pdf-v1",
+                "rendered_pdf_pages",
+            ))
         else:
             descriptors.append(ModelDescriptor("deepseek", model_id, f"DeepSeek · {model_id}", ACCOUNT_EXPERIMENTAL, (), "account_discovered"))
     return descriptors

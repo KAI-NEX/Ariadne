@@ -84,7 +84,6 @@
       requiredString(value.model, "proposal_model", errors);
       requiredString(value.prompt_version, "proposal_prompt_version", errors);
       requiredArray(value.items, "proposal_items", errors);
-      if (Array.isArray(value.items) && !value.items.length) errors.push("proposal_items_required");
       (value.items || []).forEach((item) => {
         validateCandidateItem(item, errors);
         if (item?.review_status !== "NEEDS_REVIEW") errors.push("proposal_item_must_need_review");

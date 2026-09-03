@@ -32,7 +32,11 @@ class CandidateContextProviderRegression(unittest.TestCase):
     def test_builds_json_mode_vision_payload(self) -> None:
         payload = build_deepseek_candidate_proposal_payload(SOURCE_ID, "deepseek-v4-flash-vision-exp", [("1", b"jpeg-bytes")])
         self.assertEqual(payload["response_format"], {"type": "json_object"})
+        self.assertEqual(payload["thinking"], {"type": "disabled"})
+        self.assertEqual(payload["max_tokens"], 8000)
         self.assertIn("json", payload["messages"][0]["content"][0]["text"].lower())
+        self.assertIn("No Markdown, prose, explanation, or reasoning outside JSON", payload["messages"][0]["content"][0]["text"])
+        self.assertIn("Omit optional subtitle, time, and ownership when absent", payload["messages"][0]["content"][0]["text"])
         self.assertEqual(payload["messages"][0]["content"][2]["type"], "image_url")
 
     def test_material_type_routes_to_distinct_grounded_prompts(self) -> None:
@@ -53,6 +57,11 @@ class CandidateContextProviderRegression(unittest.TestCase):
         self.assertEqual(proposal["review_status"], "NEEDS_REVIEW")
         self.assertEqual(proposal["items"][0]["review_status"], "NEEDS_REVIEW")
         self.assertEqual(proposal["usage"]["prompt_tokens"], 123)
+
+    def test_explicit_empty_items_is_a_valid_no_proposal_result(self) -> None:
+        proposal = extract_deepseek_candidate_proposal(self.response(json.dumps({"items": []})), SOURCE_ID, "run-1", "deepseek-v4-flash-vision-exp")
+        self.assertEqual(proposal["items"], [])
+        self.assertEqual(proposal["review_status"], "NEEDS_REVIEW")
 
     def test_empty_malformed_and_ungrounded_output_fail_closed(self) -> None:
         with self.assertRaisesRegex(CandidateProposalError, "empty_content"):

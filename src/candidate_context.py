@@ -13,31 +13,27 @@ from typing import Any
 
 
 CONTRACT_ID = "job-radar-candidate-context-v2-step1"
-PROMPT_VERSION = "candidate_item_proposal_v2_material_routed"
+PROMPT_VERSION = "candidate_item_proposal_v3_compact_no_thinking"
 ITEM_TYPES = {"WORK_EXPERIENCE", "PROJECT", "EDUCATION", "OTHER"}
 SUPPORT_RELATIONS = {"EXPLICIT_SOURCE", "AI_DERIVED"}
 REVIEW_STATUS = "NEEDS_REVIEW"
 MATERIAL_TYPES = {"Resume", "Portfolio", "Project", "Other"}
 MATERIAL_TYPE_GUIDANCE = {
     "Resume": (
-        "Treat the material as a resume. Prioritize explicitly stated work experience, projects, "
-        "and education. Preserve the source's role names, organizations, and dates; do not infer "
-        "seniority, impact, or ownership from formatting or position on the page."
+        "Resume: extract supported work, project, and education items. Preserve stated names and dates; "
+        "do not infer seniority, impact, or ownership."
     ),
     "Portfolio": (
-        "Treat the material as a portfolio. Focus on clearly demonstrated cases, the person's "
-        "explicitly stated role, process, deliverables, and outcomes. Create PROJECT items for "
-        "distinct cases, and never attribute team output to the person unless the source does."
+        "Portfolio: create PROJECT items for distinct cases. Keep only stated role, contribution, "
+        "deliverables, and outcomes; do not attribute team output to the person."
     ),
     "Project": (
-        "Treat the material as a project case study. Prefer one coherent PROJECT item per distinct "
-        "project, preserving the problem, scope, contribution, evidence, and unresolved outcomes. "
-        "Do not split process stages into separate experiences or invent business results."
+        "Project: create one coherent PROJECT item per distinct project, preserving stated scope, "
+        "contribution, evidence, and unresolved outcomes."
     ),
     "Other": (
-        "Treat the material as an uncategorized career source. Classify conservatively and create "
-        "WORK_EXPERIENCE, PROJECT, EDUCATION, or OTHER items only when the source explicitly supports "
-        "that classification. Keep ambiguous content as an uncertainty instead of guessing."
+        "Other: treat as an uncategorized career source. Classify conservatively and keep ambiguity "
+        "as an uncertainty."
     ),
 }
 
@@ -59,41 +55,39 @@ def normalized_material_type(material_type: str) -> str:
 
 
 def candidate_proposal_instruction(material_type: str = "Resume") -> str:
-    """Ask for the small V2 review contract, not Markdown or a resume schema."""
+    """Ask only for the compact, grounded review contract."""
     material_type = normalized_material_type(material_type)
     material_guidance = MATERIAL_TYPE_GUIDANCE[material_type]
-    routing_instruction = f"""Read the supplied career-material pages and return one JSON object only. Do not return Markdown or code fences.
+    return f"""Read the supplied career-material pages and produce Candidate Proposal JSON for human review.
+Material type: {material_type}. {material_guidance}
 
-Material type: {material_type}.
-{material_guidance}
-"""
-    return routing_instruction + """
+Output rules:
+- Return one valid JSON object only. No Markdown, prose, explanation, or reasoning outside JSON.
+- Do not write a resume summary, career advice, optimization advice, match score, or PROFILE item.
+- Use concise values. Summary <= 160 characters; each evidence excerpt <= 120 characters.
+- Include at most 3 key facts and 2 unresolved uncertainties per item.
+- Omit optional subtitle, time, and ownership when absent; do not emit null or empty optional fields.
+- Do not repeat filename, provider, model, or source metadata. source_document_id appears only inside source_refs.
+- Return only source-supported items. Never invent an item to avoid an empty result.
 
-Your task is to propose candidate experience items for human review. Return only items actually supported by the supplied material pages. Do not create a PROFILE item, capability score, career advice, job match, or any information absent from the source.
-
-For each WORK_EXPERIENCE, PROJECT, EDUCATION, or OTHER item, include a stable item_id, title, optional subtitle/time/ownership, a short summary, 3–5 important facts where available, source_refs with page location and short source excerpt, and open uncertainties when role, ownership, outcome, or fact is unclear. Every AI-created item must have review_status "NEEDS_REVIEW" and item_version 1. Use support_relation "EXPLICIT_SOURCE" for source-supported material; use "AI_DERIVED" only when explicitly marking a concise interpretation rather than a source fact.
-
-The JSON object must use exactly this top-level shape:
-{
+Use exactly this shape:
+{{
   "items": [
-    {
+    {{
       "item_id": "work-1",
       "item_type": "WORK_EXPERIENCE",
-      "title": "Original role or project name",
-      "subtitle": "Organization or program when source-supported",
-      "time": "Raw source date when present",
-      "summary": "Short AI understanding",
-      "facts": [{"fact_id": "work-1-fact-1", "label": "Role", "value": "source-supported statement"}],
-      "ownership": "Only if source-supported; otherwise null",
-      "source_refs": [{"source_ref_id": "work-1-ref-1", "source_document_id": "SOURCE_DOCUMENT_ID", "location": "p. 1", "excerpt_or_reference": "short source excerpt", "support_relation": "EXPLICIT_SOURCE"}],
-      "uncertainties": [{"uncertainty_id": "work-1-uncertain-1", "question": "What outcome resulted?", "affects": "outcome", "status": "OPEN"}],
+      "title": "source title",
+      "summary": "concise source-grounded description",
+      "facts": [{{"fact_id": "fact-1", "label": "Role", "value": "concise supported fact"}}],
+      "source_refs": [{{"source_ref_id": "ref-1", "source_document_id": "SOURCE_DOCUMENT_ID", "location": "p. 1", "excerpt_or_reference": "short excerpt", "support_relation": "EXPLICIT_SOURCE"}}],
+      "uncertainties": [{{"uncertainty_id": "u1", "question": "concise unresolved question", "affects": "outcome", "status": "OPEN"}}],
       "review_status": "NEEDS_REVIEW",
       "item_version": 1
-    }
+    }}
   ]
-}
+}}
 
-Replace SOURCE_DOCUMENT_ID with the supplied source document ID. The word json is intentional: return valid JSON even when information is sparse. If no supported experience item exists, return {"items": []}; do not invent one."""
+Replace SOURCE_DOCUMENT_ID with the supplied ID. Use EXPLICIT_SOURCE for direct evidence and AI_DERIVED only for a concise marked interpretation. Every item needs at least one short source_ref. For affects use only fact, ownership, outcome, or matching use; use status OPEN for unresolved questions. Use an empty uncertainties array when none exist. If nothing is supported, return {{"items": []}}."""
 
 
 def build_deepseek_candidate_proposal_payload(
@@ -113,6 +107,7 @@ def build_deepseek_candidate_proposal_payload(
         "model": model,
         "messages": [{"role": "user", "content": content}],
         "response_format": {"type": "json_object"},
+        "thinking": {"type": "disabled"},
         "temperature": 0,
         "max_tokens": 8000,
     }
@@ -141,7 +136,10 @@ def validate_candidate_proposal(raw: Any, source_document_id: str) -> tuple[dict
     if not isinstance(raw, dict):
         return None, ["candidate_proposal_not_object"]
     items = raw.get("items")
-    if not isinstance(items, list) or not items:
+    # The model instruction explicitly permits {"items": []} when the source
+    # contains no grounded candidate experience.  An empty proposal is a valid,
+    # review-only result; a missing or non-list value is not.
+    if not isinstance(items, list):
         return None, ["candidate_proposal_items_required"]
     errors: list[str] = []
     item_ids: set[str] = set()

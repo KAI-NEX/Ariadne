@@ -16,7 +16,13 @@ flash, pro, vision, unknown = descriptors
 assert flash.protocol == OPENAI_RESPONSES and flash.runtime_default
 assert pro.protocol == OPENAI_CHAT_COMPLETIONS
 assert vision.protocol == OPENAI_CHAT_COMPLETIONS and vision.capabilities == (TEXT, VISION)
-assert vision.multimodal_readiness == MULTIMODAL_VERIFIED and vision.discovery_source == "official_contract" and is_multimodal(vision)
+assert vision.multimodal_readiness == MULTIMODAL_VERIFIED and vision.discovery_source == "qualification_2026-09-03" and is_multimodal(vision)
+assert vision.runtime_capability_basis == "adapter_verified"
+assert vision.runtime_capabilities["candidate_model_structuring"] == "supported"
+assert vision.runtime_capabilities["job_model_structuring"] == "unsupported"
+assert vision.runtime_capabilities["model_merge"] == "unsupported"
+assert vision.runtime_capabilities["ai_conversation"] == "unsupported"
+assert vision.adapter_version == "deepseek-candidate-pdf-v1" and vision.delivery_method == "rendered_pdf_pages"
 assert not is_multimodal(flash) and not is_multimodal(pro)  # provider-level vision cannot leak into text models
 assert not is_multimodal(unknown)
 assert descriptor_for("deepseek-v4-pro", descriptors) == pro

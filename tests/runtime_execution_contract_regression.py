@@ -111,16 +111,19 @@ assert model.capabilities.vision == "supported"
 assert model.credential_ref == "provider:deepseek:default"
 
 known_descriptor = deepseek_model_descriptors(["deepseek-v4-flash-vision-exp"])[0]
-unverified_product = create_runtime_snapshot(
+verified_candidate_product = create_runtime_snapshot(
     {"mode": "model", "provider": "deepseek", "model": known_descriptor.model_id},
     model_descriptor=known_descriptor,
     snapshot_id="runtime-snapshot-known-model",
     captured_at="2026-09-01T12:02:00Z",
 )
-assert unverified_product.capabilities.vision == "supported"
-assert unverified_product.capabilities.local_ocr == "unverified"
-assert unverified_product.capabilities.semantic_understanding == "unverified"
-assert unverified_product.capabilities.ai_conversation == "unverified"
+assert verified_candidate_product.capabilities.vision == "supported"
+assert verified_candidate_product.capabilities.local_ocr == "unverified"
+assert verified_candidate_product.capabilities.semantic_understanding == "supported"
+assert verified_candidate_product.capabilities.candidate_model_structuring == "supported"
+assert verified_candidate_product.capabilities.job_model_structuring == "unsupported"
+assert verified_candidate_product.capabilities.model_merge == "unsupported"
+assert verified_candidate_product.capabilities.ai_conversation == "unsupported"
 
 serialized = serialize_runtime_snapshot(model)
 restored = deserialize_runtime_snapshot(serialized)

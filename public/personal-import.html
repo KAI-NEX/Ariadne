@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ariadne · 添加个人材料</title>
-    <link rel="stylesheet" href="/styles.css?v=personal-lifecycle-v3">
+    <link rel="stylesheet" href="/styles.css?v=model-e2e-stabilization-v1">
   </head>
   <body class="v1-body" data-v1-page="personal-import">
     <main class="v1-page-shell v1-import-shell">
@@ -20,6 +20,7 @@
       <section class="v1-import-card" aria-labelledby="personal-import-heading">
         <h2 id="personal-import-heading" class="sr-only">个人材料导入</h2>
         <div class="v1-sheet-body">
+          <p id="personal-runtime-summary" class="v1-runtime-summary" aria-live="polite"></p>
           <section>
             <p class="v1-field-label">材料类型</p>
             <div id="personal-import-types" class="v1-segmented" role="radiogroup" aria-label="材料类型">
@@ -27,6 +28,13 @@
               <button type="button" data-import-type="Portfolio" aria-pressed="false">作品集</button>
               <button type="button" data-import-type="Project" aria-pressed="false">项目</button>
               <button type="button" data-import-type="Other" aria-pressed="false">其他</button>
+            </div>
+          </section>
+          <section id="saved-candidate-sources" class="v1-saved-sources hidden" aria-labelledby="saved-candidate-sources-heading">
+            <p id="saved-candidate-sources-heading" class="v1-field-label">已保存在本机的 PDF</p>
+            <div id="saved-candidate-source-selector" class="v1-saved-source-selector">
+              <button id="saved-candidate-source-summary" class="v1-saved-source-trigger" type="button" aria-expanded="false" aria-controls="saved-candidate-source-list">选择已保存在本机的 PDF</button>
+              <div id="saved-candidate-source-list" class="v1-saved-source-list v1-saved-source-menu" aria-hidden="true" inert></div>
             </div>
           </section>
           <section class="v1-file-picker">
@@ -40,7 +48,7 @@
             <button id="replace-personal-file" type="button">替换</button>
           </section>
           <section id="personal-processing" class="v1-processing hidden" aria-live="polite">
-            <div class="v1-processing-orbit" aria-hidden="true"></div><div><p id="personal-processing-state">正在准备</p><small>仅本地读取、提取与确定规则；不调用模型服务商</small></div>
+            <div class="v1-processing-orbit" aria-hidden="true"></div><div><p id="personal-processing-state">正在准备</p><small id="personal-processing-boundary">仅本地读取、提取与确定规则；不调用模型服务商</small></div>
           </section>
           <button id="start-personal-processing" class="v1-primary-button v1-sheet-primary" type="button" disabled>开始本地提取</button>
         </div>
@@ -64,16 +72,35 @@
       <p>当前本地导入仅支持不超过 8 MB 的文档，请压缩后重试。</p>
       <button id="confirm-document-size-limit" class="v1-primary-button" type="button">确认</button>
     </dialog>
-    <script src="/runtime-capabilities.js?v=runtime-gate-v1"></script>
-    <script src="/runtime-capability-gate.js?v=runtime-gate-v1"></script>
+    <dialog id="candidate-model-failure-dialog" class="v1-error-dialog" aria-labelledby="candidate-model-failure-title">
+      <h2 id="candidate-model-failure-title">模型分析未完成</h2>
+      <p id="candidate-model-failure-copy">模型服务暂时无法完成分析；未保存任何模型提案。请稍后重试。</p>
+      <button id="confirm-candidate-model-failure" class="v1-dialog-dismiss" type="button">知道了</button>
+    </dialog>
+    <dialog id="candidate-model-consent-dialog" class="v1-model-consent-dialog" aria-labelledby="candidate-model-consent-title">
+      <h2 id="candidate-model-consent-title">确认发送个人材料</h2>
+      <p>这次操作会把当前文件内容发送到模型服务商进行候选人材料理解。</p>
+      <dl>
+        <div><dt>Provider</dt><dd id="candidate-model-consent-provider">DeepSeek</dd></div>
+        <div><dt>Model</dt><dd id="candidate-model-consent-model">deepseek-v4-flash-vision-exp</dd></div>
+      </dl>
+      <div class="v1-button-row">
+        <button id="cancel-candidate-model-consent" class="v1-tertiary-button" type="button">取消</button>
+        <button id="confirm-candidate-model-consent" class="v1-primary-button" type="button">确认并发送</button>
+      </div>
+    </dialog>
+    <script src="/runtime-capabilities.js?v=candidate-model-runtime-v1"></script>
+    <script src="/runtime-capability-gate.js?v=candidate-model-runtime-v1"></script>
     <script src="/truth-persistence-domain.js?v=source-storage-v1"></script>
     <script src="/raw-source-storage-domain.js?v=source-storage-v1"></script>
+    <script src="/candidate-context-domain.js?v=model-e2e-stabilization-v1"></script>
+    <script src="/candidate-model-runtime-domain.js?v=candidate-model-runtime-v1"></script>
     <script src="/local-context-lifecycle-domain.js?v=lifecycle-final-v1"></script>
     <script src="/local-candidate-extraction-domain.js?v=source-storage-v1"></script>
     <script src="/local-candidate-proposal-domain.js?v=personal-lifecycle-v1"></script>
     <script src="/local-candidate-review-domain.js?v=source-storage-v1"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
-    <script src="/v1-pages.js?v=source-storage-v1"></script>
+    <script src="/v1-pages.js?v=candidate-runtime-retest-ui-v1"></script>
   </body>
 </html>

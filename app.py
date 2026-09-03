@@ -42,6 +42,7 @@ from src.provider_runtime import (
     ProviderRuntimeError, connection_request, deepseek_model_descriptors, descriptor_for,
     is_multimodal, multimodal_connection_request, multimodal_smoke_passed, normalize_response, v1_selector_descriptors,
 )
+from src.candidate_model_runtime import CandidateModelRuntimeError, execute_candidate_model_request
 
 
 PROJECT_ROOT = Path(__file__).parent
@@ -864,6 +865,9 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/local-candidate-structure":
             self.structure_local_candidate_proposal()
             return
+        if parsed.path == "/api/candidate-model-structure":
+            self.structure_model_candidate_proposal()
+            return
         if parsed.path == "/api/career-document-extract":
             self.extract_career_document_candidate()
             return
@@ -918,6 +922,77 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             self.send_json(result["status"], {key: value for key, value in result.items() if key not in {"ok", "status"}})
             return
         self.send_json(HTTPStatus.OK, {key: value for key, value in result.items() if key not in {"ok", "status"}})
+
+    def structure_model_candidate_proposal(self) -> None:
+        """Execute the one qualified Candidate PDF adapter after explicit consent."""
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+            if content_length <= 0 or content_length > 12_000_000:
+                raise CandidateModelRuntimeError("candidate_model_request_size_invalid", "request")
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+
+            def provider_call(api_key: str, provider_payload: dict) -> tuple[int, dict]:
+                request = Request(
+                    DEEPSEEK_ENDPOINT,
+                    data=json.dumps(provider_payload, ensure_ascii=False).encode("utf-8"),
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urlopen(request, timeout=240) as response:  # noqa: S310 - fixed qualified Provider endpoint
+                    response_body = response.read(8_000_001)
+                    if len(response_body) > 8_000_000:
+                        raise CandidateModelRuntimeError("deepseek_response_too_large", "parsing", True, {"http_status": response.status, "response_content_length": len(response_body)})
+                    try:
+                        response_payload = json.loads(response_body.decode("utf-8"))
+                    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                        raise CandidateModelRuntimeError("deepseek_response_malformed", "parsing", True, {"http_status": response.status, "response_content_length": len(response_body), "response_json_parse": "failed"}) from error
+                    return response.status, response_payload
+
+            result = execute_candidate_model_request(
+                payload,
+                read_deepseek_key,
+                render_complete_pdf_pages,
+                provider_call,
+            )
+        except CandidateModelRuntimeError as error:
+            status = HTTPStatus.PRECONDITION_REQUIRED if error.failure_layer == "credential" else HTTPStatus.BAD_GATEWAY if error.failure_layer in {"provider", "transport"} else HTTPStatus.UNPROCESSABLE_ENTITY
+            diagnostic = {"error": error.code, "failure_layer": error.failure_layer, "network_call_made": error.network_call_made, "diagnostics": error.diagnostics}
+            print(f"candidate_model_failure_diagnostic {json.dumps(diagnostic, ensure_ascii=False, sort_keys=True)}", flush=True)
+            self.send_json(status, {
+                "error": error.code,
+                "failure_layer": error.failure_layer,
+                "network_call_made": error.network_call_made,
+                "diagnostics": error.diagnostics,
+                "persistence": "not_written",
+            })
+            return
+        except HTTPError as error:
+            layer = "credential" if error.code in {401, 403} else "model" if error.code == 404 else "provider"
+            self.send_json(HTTPStatus.BAD_GATEWAY, {
+                "error": "deepseek_provider_http_error",
+                "failure_layer": layer,
+                "provider_http_status": error.code,
+                "network_call_made": True,
+                "persistence": "not_written",
+            })
+            return
+        except (URLError, TimeoutError, OSError):
+            self.send_json(HTTPStatus.BAD_GATEWAY, {
+                "error": "deepseek_network_error",
+                "failure_layer": "transport",
+                "network_call_made": True,
+                "persistence": "not_written",
+            })
+            return
+        except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
+            self.send_json(HTTPStatus.BAD_REQUEST, {
+                "error": "candidate_model_request_invalid",
+                "failure_layer": "request",
+                "network_call_made": False,
+                "persistence": "not_written",
+            })
+            return
+        self.send_json(HTTPStatus.OK, result)
 
     def qwen_runtime_connection_check(self) -> None:
         """Forward one approved Qwen synthetic image check from the local process only."""

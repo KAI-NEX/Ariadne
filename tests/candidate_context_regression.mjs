@@ -9,6 +9,7 @@ const item = { item_id: "item-work-1", item_type: "WORK_EXPERIENCE", title: "Pro
 const proposal = { candidate_proposal_id: "proposal-1", source_document_id: "source-1", processing_run_id: "run-1", provider: "deepseek", model: "deepseek-v4-flash-vision-exp", prompt_version: "candidate-proposal-v1", items: [item] };
 
 assert.deepEqual(Domain.validateCandidateProposal(proposal), []);
+assert.deepEqual(Domain.validateCandidateProposal({ ...proposal, items: [] }), []);
 assert.ok(Domain.validateCandidateProposal({ ...proposal, items: [{ ...item, source_refs: [] }] }).includes("item_source_refs_required"));
 assert.ok(Domain.validateCandidateProposal({ ...proposal, items: [{ ...item, review_status: "CONFIRMED" }] }).includes("proposal_item_must_need_review"));
 

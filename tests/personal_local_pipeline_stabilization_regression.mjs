@@ -22,7 +22,7 @@ assert.match(pages, /candidateExecutionState = "READY"/);
 assert.match(pages, /candidateExecutionState = "PROCESSING"/);
 assert.match(pages, /candidateExecutionState = "COMPLETE"/);
 assert.match(pages, /模型导入尚不可用/);
-assert.match(pages, /dataset\.candidateImportRuntime = local \? "local" : "model-unavailable"/);
+assert.match(pages, /dataset\.candidateImportRuntime = local \? "local" : modelReady \? "model-ready" : "model-unavailable"/);
 
 for (const field of ["candidate-edit-title", "candidate-edit-subtitle", "candidate-edit-time", "candidate-edit-summary", "candidate-edit-facts"]) assert.match(detail, new RegExp(`id="${field}"`));
 assert.match(pages, /persistUserEdit\(database, canonicalRevision, itemId, editedItem\)/);

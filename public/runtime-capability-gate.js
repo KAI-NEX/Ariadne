@@ -10,6 +10,25 @@
   if (!Contract) throw new Error("runtime_execution_contract_required");
 
   const CURRENT_RUNTIME_STORAGE_KEY = "job-radar-selected-runtime";
+  const CANDIDATE_PDF_MODEL_ADAPTER = Object.freeze({
+    provider_id: "deepseek",
+    model_id: "deepseek-v4-flash-vision-exp",
+    protocol: "OPENAI_CHAT_COMPLETIONS",
+    capabilities: Object.freeze(["TEXT", "VISION"]),
+    multimodal_readiness: "VERIFIED",
+    discovery_source: "qualification_2026-09-03",
+    runtime_capability_basis: "adapter_verified",
+    runtime_capabilities: Object.freeze({
+      semantic_understanding: "supported",
+      candidate_model_structuring: "supported",
+      job_model_structuring: "unsupported",
+      model_merge: "unsupported",
+      ai_conversation: "unsupported",
+      vision: "supported",
+    }),
+    adapter_version: "deepseek-candidate-pdf-v1",
+    delivery_method: "rendered_pdf_pages",
+  });
   const OPERATION_CAPABILITIES = Object.freeze({
     candidate_import: Object.freeze({ local: "deterministic_structuring", model: "candidate_model_structuring" }),
     job_import: Object.freeze({ local: "deterministic_structuring", model: "job_model_structuring" }),
@@ -35,14 +54,24 @@
     let runtime;
     try { runtime = Contract.normalizeCurrentRuntime(currentRuntime); }
     catch (_error) { throw new RuntimeGateError("current_runtime_invalid"); }
+    const descriptor = runtime.mode === "model" ? modelDescriptorForRuntime(runtime) : null;
     const capabilities = runtime.mode === "local"
       ? Contract.resolveRuntimeCapability(runtime)
-      : Contract.resolveRuntimeCapability(runtime, {
-        provider_id: runtime.provider,
-        model_id: runtime.model,
-        discovery_source: "current_runtime_selection",
-      });
+      : Contract.resolveRuntimeCapability(runtime, descriptor);
     return Object.freeze({ runtime, capabilities });
+  }
+
+  function modelDescriptorForRuntime(runtime) {
+    const normalized = Contract.normalizeCurrentRuntime(runtime);
+    if (normalized.mode !== "model") return null;
+    if (normalized.provider === CANDIDATE_PDF_MODEL_ADAPTER.provider_id && normalized.model === CANDIDATE_PDF_MODEL_ADAPTER.model_id) {
+      return CANDIDATE_PDF_MODEL_ADAPTER;
+    }
+    return Object.freeze({
+      provider_id: normalized.provider,
+      model_id: normalized.model,
+      discovery_source: "current_runtime_selection",
+    });
   }
 
   function currentAuthority(storage = globalThis.localStorage) {
@@ -96,9 +125,11 @@
   return Object.freeze({
     CURRENT_RUNTIME_STORAGE_KEY,
     OPERATION_CAPABILITIES,
+    CANDIDATE_PDF_MODEL_ADAPTER,
     RuntimeGateError,
     readStoredRuntime,
     authorityFrom,
+    modelDescriptorForRuntime,
     currentAuthority,
     operationGate,
     requireOperation,

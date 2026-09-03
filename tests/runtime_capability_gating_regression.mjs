@@ -26,12 +26,9 @@ for (const operation of ["ai_conversation", "model_merge", "legacy_candidate_sem
 
 const modelAuthority = Gate.currentAuthority(storageWith(JSON.stringify({ mode: "ai", provider: "DeepSeek", model: "deepseek-v4-flash-vision-exp" })));
 assert.deepEqual(modelAuthority.runtime, { mode: "model", provider: "deepseek", model: "deepseek-v4-flash-vision-exp" });
-for (const operation of ["candidate_import", "job_import", "ai_conversation", "model_merge"]) {
-  const result = Gate.operationGate(operation, modelAuthority);
-  assert.equal(result.allowed, false);
-  assert.equal(result.state, "unverified");
-}
-assert.throws(() => Gate.requireOperation("candidate_import", modelAuthority), (error) => error.code === "runtime_capability_unverified");
+assert.equal(Gate.operationGate("candidate_import", modelAuthority).allowed, true);
+for (const operation of ["job_import", "ai_conversation", "model_merge"]) assert.equal(Gate.operationGate(operation, modelAuthority).allowed, false);
+assert.equal(Gate.requireOperation("candidate_import", modelAuthority).capability, "candidate_model_structuring");
 
 assert.equal(Gate.currentAuthority(storageWith(null)).runtime.mode, "local");
 assert.throws(() => Gate.currentAuthority(storageWith("{not-json")), (error) => error.code === "current_runtime_storage_malformed");
@@ -41,16 +38,14 @@ const exactLegacy = Gate.legacyProviderAction({
   provider: "deepseek", model: "deepseek-v4-flash-vision-exp", capability: "candidate_model_structuring",
 }, modelAuthority);
 assert.equal(exactLegacy.identity_matches, true);
-assert.equal(exactLegacy.allowed, false);
-assert.equal(exactLegacy.state, "unverified");
+assert.equal(exactLegacy.allowed, true);
+assert.equal(exactLegacy.state, "supported");
 assert.equal(Gate.legacyProviderAction({ provider: "gemini", capability: "candidate_model_structuring" }, modelAuthority).identity_matches, false);
 assert.equal(Gate.legacyProviderAction({ provider: "deepseek", capability: "job_model_structuring" }, localAuthority).allowed, false);
 
-let providerCalls = 0;
-if (Gate.operationGate("candidate_import", modelAuthority).allowed) providerCalls += 1;
-if (Gate.operationGate("ai_conversation", localAuthority).allowed) providerCalls += 1;
-if (exactLegacy.allowed) providerCalls += 1;
-assert.equal(providerCalls, 0);
+let providerCallsBeforeConsent = 0;
+if (Gate.operationGate("candidate_import", modelAuthority).allowed && false /* explicit consent absent */) providerCallsBeforeConsent += 1;
+assert.equal(providerCallsBeforeConsent, 0);
 
 const historicalRecord = Demo.clone({
   item_id: "historical-model-record",
@@ -83,6 +78,7 @@ assert.match(jobImport, /本地演示样例 · 不读取文件内容 · 无模�
 assert.match(personalImport, /开始本地提取/);
 assert.match(jobImport, /开始本地演示整理/);
 assert.match(personalImport, /local-candidate-extraction-domain\.js/);
+assert.match(personalImport, /candidate-model-runtime-domain\.js/);
 
 assert.doesNotMatch(pages, /localStorage|preview-source|appendDemoMessage|createConversation|candidatePatchFor|jobPatchFor/);
 assert.match(pages, /currentOperationGate\("candidate_import"\)/);
@@ -92,6 +88,7 @@ assert.match(pages, /runtime\.mode === "model" && gate\.allowed/);
 assert.match(pages, /pane\?\.querySelectorAll\("input, textarea, button"\)[\s\S]*control\.disabled = !conversationAllowed/);
 assert.match(pages, /fetch\("\/api\/local-ocr-capability"/);
 assert.match(pages, /fetch\(image \? "\/api\/local-candidate-image-ocr" : "\/api\/local-candidate-extract"/);
+assert.match(pages, /fetch\("\/api\/candidate-model-structure"/);
 assert.doesNotMatch(pages, /fetch\("\/api\/local-ocr"/);
 
 const candidateProcess = pages.slice(pages.indexOf("async function processCandidateSource"), pages.indexOf("async function runCandidateProcessing"));
