@@ -5,6 +5,7 @@
   const RuntimeGate = window.JobRadarRuntimeGate;
   const RuntimeExecution = window.AriadneRuntimeExecution;
   const Truth = window.AriadneTruthPersistence;
+  const RawSource = window.AriadneRawSourceStorage;
   const LocalContextLifecycle = window.AriadneLocalContextLifecycle;
   const LocalCandidate = window.AriadneLocalCandidateExtraction;
   const LocalCandidateProposal = window.AriadneLocalCandidateProposal;
@@ -35,6 +36,7 @@
   let candidateSelectionVersion = 0;
   let candidateReviewSessionTotal = 0;
   let candidateReviewSessionResolved = 0;
+  let candidateReviewSourceIds = [];
   let jobProcessingInProgress = false;
   let jobBatchAbortController = null;
   let jobExecutionState = "READY";
@@ -64,7 +66,7 @@
   function candidateTypeLabel(item) { return subtypeLabels[item?.item_subtype] || typeLabels[item?.item_type] || "其他经历"; }
   function candidateFactLabel(value) { return factLabels[value] || (/[\u3400-\u9fff]/.test(String(value || "")) ? value : "补充信息"); }
   function personalErrorCopy(error) {
-    const code = String(error?.message || error || "");
+    const code = String(error?.code || error?.message || error || "");
     const messages = {
       candidate_source_identity_required: "无法确认这张卡片对应的原始文件。",
       candidate_source_not_found: "原始文件已不存在，无需再次删除。",
@@ -74,6 +76,24 @@
       unsupported_document_type: "暂不支持这种文件格式。",
       invalid_document_size: "文件大小不符合本地导入要求。",
       document_read_failed: "无法读取这个本地文件。",
+      document_size_limit_exceeded: "当前本地导入仅支持不超过 8 MB 的文档；请压缩后重试。",
+      image_size_limit_exceeded: "当前本地导入仅支持不超过 5 MB 的图片；请压缩后重试。",
+      raw_source_reference_missing: "原始文件的本地引用不存在；操作已停止。",
+      raw_source_reference_invalid: "原始文件的本地引用无效；操作已停止。",
+      raw_source_reference_unsupported: "原始文件的本地引用无法由当前版本解析；操作已停止。",
+      raw_source_reference_mismatch: "原始文件的本地引用与来源身份不一致；操作已停止。",
+      raw_source_document_missing: "原始来源记录不存在；操作已停止。",
+      raw_source_document_not_canonical: "原始来源记录不是正式 SourceDocument；操作已停止。",
+      raw_source_payload_missing: "本地保存的原始文件不存在；操作已停止。",
+      raw_source_payload_invalid: "本地保存的原始文件无法读取；操作已停止。",
+      raw_source_payload_envelope_invalid: "本地保存的原始文件记录无效；操作已停止。",
+      raw_source_integrity_mismatch: "原始文件完整性校验失败；操作已停止。",
+      raw_source_resolver_unavailable: "原始文件解析能力不可用；操作已停止。",
+      raw_source_storage_unavailable: "浏览器本地来源存储不可用；操作已停止。",
+      raw_source_read_failed: "浏览器未能读取原始文件；操作已停止。",
+      raw_source_persistence_failed: "原始文件未能完整保存；没有记录为可持久恢复的来源。",
+      source_document_legacy_collision: "来源身份与旧版记录冲突；未覆盖任何已有资料。",
+      source_document_canonical_collision: "来源身份与已有正式记录冲突；未覆盖任何已有资料。",
     };
     return messages[code] || "操作未完成，请重试。";
   }
@@ -105,8 +125,8 @@
     if (!button) return gate;
     const local = gate.authority.runtime.mode === "local";
     document.body.dataset.candidateImportRuntime = local ? "local" : "model-unavailable";
-    button.textContent = !local ? "模型导入尚不可用" : candidateExecutionState === "COMPLETE" ? "本地提取已完成" : candidateExecutionState === "PROCESSING" ? "正在本地提取" : "开始本地提取";
-    button.disabled = candidateProcessingInProgress || candidateExecutionState === "COMPLETE" || !selectedCandidateSources.length || !gate.allowed;
+    button.textContent = !local ? "模型导入尚不可用" : candidateExecutionState === "COMPLETED_SOURCE" ? "确认" : candidateExecutionState === "COMPLETE" ? "本地提取已完成" : candidateExecutionState === "PROCESSING" ? "正在本地提取" : "开始本地提取";
+    button.disabled = candidateProcessingInProgress || candidateExecutionState === "COMPLETE" || candidateExecutionState === "COMPLETED_SOURCE" || !selectedCandidateSources.length || !gate.allowed;
     byId("personal-file-input").disabled = !local || candidateProcessingInProgress;
     byId("personal-dropzone").disabled = !local || candidateProcessingInProgress;
     byId("personal-dropzone").setAttribute("aria-disabled", String(!local || candidateProcessingInProgress));
@@ -676,19 +696,26 @@
     return `<article class="v1-review-card" data-proposal-id="${escapeHtml(proposal.proposal_id)}"><p class="v1-review-progress">第 ${position} / ${total} 条</p><h3>${escapeHtml(candidateTypeLabel(items[0]))} · ${escapeHtml(materialLabel)}</h3><p class="v1-review-note">来源：${escapeHtml(proposal.source_label || "本地文件")}${proposal.payload.manual_review_required ? " · 需要人工核对" : ""}</p>${notices.length ? `<p class="v1-review-warning">${escapeHtml(notices.join(" "))}</p>` : ""}${items.map((item, index) => proposalItemEditor(item, index, proposal.grounding_refs)).join("")}<p class="v1-review-note">确认会保存当前字段；如字段经过修改，系统会在内部记录为用户编辑。原始提案始终保留。</p><div class="v1-button-row"><button type="button" class="v1-primary-button" data-review-action="confirm">确认</button><button type="button" class="v1-tertiary-button" data-review-action="reject">拒绝</button></div></article>`;
   }
 
-  async function renderAwaitingCandidateReviews({ advance = false, reset = false } = {}) {
+  async function renderAwaitingCandidateReviews({ advance = false, reset = false, sourceIds } = {}) {
     if (!LocalCandidateReview || !byId("candidate-review-surface")) return;
+    if (sourceIds !== undefined) candidateReviewSourceIds = [...new Set(sourceIds || [])];
     const database = await Truth.openDatabase();
-    const sources = await LocalCandidateReview.getAll(database, "source_documents");
-    const sourceById = new Map(sources.map((source) => [source.source_document_id, source]));
-    let proposalRecords = await LocalCandidateReview.getAll(database, "context_proposals");
-    proposalRecords = await LocalCandidateReview.ensureItemProposalQueue(database, proposalRecords);
-    const proposals = proposalRecords.filter((proposal) => proposal.proposal_type === "CANDIDATE_CONTEXT" && proposal.status === "AWAITING_REVIEW" && proposal.payload?.contract_id === "ariadne-local-candidate-proposal-payload-v1").sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.proposal_id.localeCompare(b.proposal_id)).map((proposal) => ({ ...proposal, source_label: sourceById.get(proposal.source_document_ids[0])?.filename || null }));
-    database.close();
+    let proposals;
+    try {
+      const sources = await LocalCandidateReview.getAll(database, "source_documents");
+      const sourceById = new Map(sources.map((source) => [source.source_document_id, source]));
+      let proposalRecords = await LocalCandidateReview.getAll(database, "context_proposals");
+      proposalRecords = await LocalCandidateReview.ensureItemProposalQueue(database, proposalRecords);
+      proposals = proposalRecords.filter((proposal) => candidateReviewSourceIds.length && proposal.proposal_type === "CANDIDATE_CONTEXT" && proposal.status === "AWAITING_REVIEW" && proposal.payload?.contract_id === "ariadne-local-candidate-proposal-payload-v1" && proposal.source_document_ids?.some((sourceId) => candidateReviewSourceIds.includes(sourceId))).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.proposal_id.localeCompare(b.proposal_id)).map((proposal) => ({ ...proposal, source_label: sourceById.get(proposal.source_document_ids[0])?.filename || null }));
+      const proposalSourceIds = [...new Set(proposals.flatMap((proposal) => proposal.source_document_ids || []))];
+      if (proposalSourceIds.length && !RawSource) throw new Error("raw_source_resolver_unavailable");
+      for (const sourceId of proposalSourceIds) await RawSource.resolveRawSource(database, sourceId);
+    } finally { database.close(); }
     if (reset || !candidateReviewSessionTotal) { candidateReviewSessionTotal = proposals.length; candidateReviewSessionResolved = 0; }
     else if (advance) candidateReviewSessionResolved += 1;
     if (proposals.length > candidateReviewSessionTotal - candidateReviewSessionResolved) candidateReviewSessionTotal = candidateReviewSessionResolved + proposals.length;
     byId("candidate-review-surface").classList.toggle("hidden", !proposals.length);
+    byId("candidate-review-surface").dataset.rawSourceIntegrity = proposals.length ? "verified" : "not-applicable";
     byId("candidate-review-list").innerHTML = proposals.length ? proposalReviewMarkup(proposals[0], Math.min(candidateReviewSessionResolved + 1, candidateReviewSessionTotal), candidateReviewSessionTotal) : "";
     if (!proposals.length) { candidateReviewSessionTotal = 0; candidateReviewSessionResolved = 0; }
     return proposals;
@@ -745,6 +772,21 @@
     byId("personal-processing-state").textContent = label;
   }
 
+  function setCompletedSourceSheet(open) {
+    sheet(open, "completed-source-sheet");
+  }
+
+  function resetInvalidCandidateSelection() {
+    selectedCandidateSources = [];
+    candidateExecutionState = "READY";
+    byId("personal-file-input").value = "";
+    byId("personal-file-preview").classList.add("hidden");
+    byId("personal-page-message").textContent = "";
+    byId("personal-page-message").classList.remove("error");
+    byId("personal-processing")?.classList.add("hidden");
+    refreshCandidateImportGate();
+  }
+
   async function localOcrEnvironmentCapability() {
     const response = await fetch("/api/local-ocr-capability", { method: "POST" });
     const payload = await response.json();
@@ -779,7 +821,13 @@
 
   async function processCandidateSource(source, snapshot, database, signal) {
     const sourceDocument = LocalCandidate.sourceDocumentFor(source);
-    await LocalCandidate.persistCanonicalSource(database, sourceDocument);
+    let durableSource;
+    try {
+      durableSource = await LocalCandidate.persistCanonicalSource(database, sourceDocument, source.file);
+    } catch (error) {
+      return { sourceId: source.source_document_id, failed: true, error: String(error?.code || error?.message || "raw_source_persistence_failed").slice(0, 180) };
+    }
+    const sourceForExtraction = { ...source, file: durableSource.file };
     const startedAt = new Date().toISOString();
     let run = LocalCandidate.processingRunFor(source, snapshot.snapshot_id, "PENDING", startedAt);
     await Truth.persistRecord(database, "processing_runs", run);
@@ -787,7 +835,7 @@
     await Truth.persistRecord(database, "processing_runs", run);
     try {
       setCandidateExtractionState("EXTRACTING", `正在本地读取并提取：${source.file.name}`);
-      const result = await extractCandidateSource(source, snapshot, signal);
+      const result = await extractCandidateSource(sourceForExtraction, snapshot, signal);
       const artifact = LocalCandidate.artifactFor(source, run, result);
       await Truth.persistRecord(database, "extraction_artifacts", artifact);
       run = LocalCandidate.processingRunFor(source, snapshot.snapshot_id, "SUCCEEDED", startedAt, {
@@ -848,6 +896,11 @@
     const gate = refreshCandidateImportGate();
     if (!gate.allowed || gate.authority.runtime.mode !== "local") throw new Error(`runtime_capability_${gate.state}`);
     if (!RuntimeExecution || !Truth || !LocalCandidate || !LocalCandidateProposal) throw new Error("local_candidate_extraction_dependencies_unavailable");
+    const sources = selectedCandidateSources.filter((source) => ["NEW", "RETRY"].includes(source.import_state));
+    if (!sources.length) {
+      await renderAwaitingCandidateReviews({ reset: true, sourceIds: selectedCandidateSources.filter((source) => source.import_state === "PENDING_REVIEW").map((source) => source.source_document_id) });
+      return;
+    }
     candidateProcessingInProgress = true;
     candidateExecutionState = "PROCESSING";
     candidateBatchAbortController = new AbortController();
@@ -855,8 +908,6 @@
     byId("replace-personal-file").textContent = "取消本次提取";
     byId("personal-processing").classList.remove("hidden");
     setCandidateExtractionState("PREPARING", "正在验证本地执行环境");
-    const sources = selectedCandidateSources.filter((source) => ["NEW", "RETRY"].includes(source.import_state));
-    if (!sources.length) { await renderAwaitingCandidateReviews(); return; }
     const batchId = sources[0].batch_id;
     const batchCreatedAt = new Date().toISOString();
     let database = null;
@@ -928,10 +979,10 @@
       }));
       setCandidateExtractionState("READY_FOR_REVIEW", failures.length ? "本地提取完成，但部分文件失败" : "本地提取已完成");
       byId("personal-page-message").textContent = failures.length
-        ? `已生成本地提取与候选信息提案，但 ${failures.length} 个文件未能完成整理；尚未形成正式候选信息，未调用服务商或模型。`
+        ? `已有文件完成本地提取，但 ${failures.length} 个文件未能完成整理。${personalErrorCopy({ code: failures[0]?.error })} 尚未形成正式候选信息，未调用服务商或模型。`
         : `已根据本地确定规则生成 ${proposalCount} 条候选信息提案（${manualReviewCount} 条需人工处理）；均待人工审核，尚未形成正式候选信息，未调用服务商或模型。`;
       byId("personal-page-message").classList.toggle("error", failures.length > 0);
-      await renderAwaitingCandidateReviews({ reset: true });
+      await renderAwaitingCandidateReviews({ reset: true, sourceIds: sources.map((source) => source.source_document_id) });
     } finally {
       database?.close?.();
       candidateBatchAbortController = null;
@@ -947,22 +998,29 @@
   }
 
   function initPersonalImport() {
-    renderAwaitingCandidateReviews().catch(showPersonalError);
+    renderAwaitingCandidateReviews({ sourceIds: [] }).catch(showPersonalError);
     byId("candidate-review-list").addEventListener("click", (event) => {
       const button = event.target.closest("[data-review-action]");
       if (!button) return;
       const card = button.closest("[data-proposal-id]");
       reviewCandidateProposal(card.dataset.proposalId, button.dataset.reviewAction, card).catch(showPersonalError);
     });
+    const handleCandidateFiles = (files) => {
+      const selectionVersion = candidateSelectionVersion + 1;
+      acceptCandidateFiles(files).catch((error) => showPersonalError(error, selectionVersion));
+    };
     byId("personal-import-types").addEventListener("click", (event) => {
       const button = event.target.closest("[data-import-type]");
       if (!button) return;
       selectedCandidateType = button.dataset.importType;
       byId("personal-import-types").querySelectorAll("button").forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
-      if (selectedCandidateSources.length) acceptCandidateFiles(selectedCandidateSources.map((source) => source.file)).catch(showPersonalError);
+      if (selectedCandidateSources.length) handleCandidateFiles(selectedCandidateSources.map((source) => source.file));
     });
     const acceptCandidateFiles = async (files) => {
       const selectionVersion = ++candidateSelectionVersion;
+      setCompletedSourceSheet(false);
+      byId("personal-page-message").textContent = "";
+      byId("personal-page-message").classList.remove("error");
       const batchId = `batch-candidate-extraction-${crypto.randomUUID()}`;
       candidateExecutionState = "READY";
       const prepared = await Promise.all(Array.from(files || []).map((file) => LocalCandidate.prepareSource(file, batchId, selectedCandidateType)));
@@ -978,22 +1036,30 @@
           LocalCandidateReview.getAll(database, "candidate_context_lifecycle"),
         ]);
         records = { source_documents: sourceDocuments, context_proposals: proposals, processing_runs: runs, candidate_context_revisions: revisions, candidate_context_lifecycle: lifecycle };
+        const existingStates = unique.map((source) => ({ source, import_state: LocalCandidateReview.sourceImportState(source.source_document_id, records) }));
+        for (const item of existingStates.filter((entry) => ["PENDING_REVIEW", "ACTIVE", "COMPLETED"].includes(entry.import_state))) {
+          await LocalCandidate.persistCanonicalSource(database, LocalCandidate.sourceDocumentFor(item.source), item.source.file);
+        }
       } finally { database.close(); }
       if (selectionVersion !== candidateSelectionVersion) return;
       selectedCandidateSources = unique.map((source) => ({ ...source, import_state: LocalCandidateReview.sourceImportState(source.source_document_id, records) }));
       if (selectedCandidateSources[0]) showCandidateSource(selectedCandidateSources[0]);
       const pending = selectedCandidateSources.filter((source) => source.import_state === "PENDING_REVIEW");
       const active = selectedCandidateSources.filter((source) => source.import_state === "ACTIVE");
+      const completedSources = selectedCandidateSources.filter((source) => source.import_state === "COMPLETED");
       const actionable = selectedCandidateSources.filter((source) => ["NEW", "RETRY"].includes(source.import_state));
-      if (pending.length) await renderAwaitingCandidateReviews({ reset: true });
-      candidateExecutionState = actionable.length ? "READY" : "COMPLETE";
+      if (pending.length) await renderAwaitingCandidateReviews({ reset: true, sourceIds: pending.map((source) => source.source_document_id) });
+      else await renderAwaitingCandidateReviews({ reset: true, sourceIds: [] });
+      candidateExecutionState = actionable.length ? "READY" : completedSources.length && !active.length && !pending.length ? "COMPLETED_SOURCE" : "COMPLETE";
       if (pending.length && !actionable.length) byId("personal-page-message").textContent = "该文件已有待审核内容，已恢复审核队列。";
+      else if (completedSources.length && !actionable.length && !active.length) byId("personal-page-message").textContent = "该 PDF 已被读取。点击确认返回个人资料。";
       else if (active.length && !actionable.length) byId("personal-page-message").textContent = "该文件已导入，无需重复处理。";
-      else if (active.length || pending.length) byId("personal-page-message").textContent = `已跳过 ${active.length + pending.length} 个已导入或待审核文件；其余文件可以继续本地提取。`;
+      else if (active.length || pending.length || completedSources.length) byId("personal-page-message").textContent = `已跳过 ${active.length + pending.length + completedSources.length} 个已导入或待审核文件；其余文件可以继续本地提取。`;
       else byId("personal-page-message").textContent = "";
+      setCompletedSourceSheet(candidateExecutionState === "COMPLETED_SOURCE");
       refreshCandidateImportGate();
     };
-    installFileDropzone("personal-dropzone", "personal-file-input", (files) => acceptCandidateFiles(files).catch(showPersonalError));
+    installFileDropzone("personal-dropzone", "personal-file-input", handleCandidateFiles);
     byId("replace-personal-file").addEventListener("click", () => {
       if (candidateProcessingInProgress) {
         candidateBatchAbortController?.abort();
@@ -1004,12 +1070,31 @@
       byId("personal-file-input").click();
     });
     byId("start-personal-processing").addEventListener("click", () => runCandidateProcessing().catch(showPersonalError));
+    byId("confirm-completed-source").addEventListener("click", () => {
+      setCompletedSourceSheet(false);
+      if (!completeEmbeddedImport("personal", "personal-guide")) window.location.assign("/personal-information.html");
+    });
+    byId("document-size-limit-dialog").addEventListener("cancel", (event) => event.preventDefault());
+    byId("confirm-document-size-limit").addEventListener("click", () => {
+      byId("document-size-limit-dialog").close();
+      resetInvalidCandidateSelection();
+    });
     refreshCandidateImportGate();
   }
 
-  function showPersonalError(error) {
+  function showPersonalError(error, selectionVersion = candidateSelectionVersion) {
+    if (selectionVersion !== candidateSelectionVersion) return;
     candidateProcessingInProgress = false;
     if (candidateExecutionState === "PROCESSING") candidateExecutionState = "COMPLETE";
+    if (String(error?.code || error?.message || error || "") === "document_size_limit_exceeded") {
+      byId("personal-page-message").textContent = "";
+      byId("personal-page-message").classList.remove("error");
+      byId("personal-processing")?.classList.add("hidden");
+      refreshCandidateImportGate();
+      const dialog = byId("document-size-limit-dialog");
+      if (!dialog.open) dialog.showModal();
+      return;
+    }
     byId("personal-page-message").textContent = `无法整理材料：${personalErrorCopy(error)}`;
     byId("personal-page-message").classList.add("error");
     refreshCandidateImportGate();

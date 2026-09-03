@@ -14,8 +14,7 @@ const Local = require("../public/local-candidate-extraction-domain.js");
 const pages = fs.readFileSync(path.join(root, "public", "v1-pages.js"), "utf8");
 
 function file(name, text, type = "text/plain") {
-  const bytes = new TextEncoder().encode(text);
-  return { name, type, size: bytes.length, arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) };
+  return new File([new TextEncoder().encode(text)], name, { type });
 }
 
 const batchId = "batch-candidate-test";
@@ -41,11 +40,12 @@ const changedCurrentRuntime = Runtime.createRuntimeSnapshot({ mode: "local" }, {
 assert.notEqual(changedCurrentRuntime.snapshot_id, secondRun.runtime_snapshot_id);
 
 const source = Local.sourceDocumentFor(first, "2026-09-02T10:00:00Z");
-assert.equal(source.local_reference, null);
+assert.match(source.local_reference, /^indexeddb:\/\/job-radar-local-first-v1\/source_documents\/raw-source-payload-v1/);
+assert.equal(source.provenance.raw_source_recoverability, "DURABLE_BROWSER_LOCAL");
 assert.equal(source.authority, Truth.AUTHORITY.source);
 await assert.rejects(
-  Local.prepareSource({ ...first.file, size: Local.MAX_DOCUMENT_BYTES + 1 }, batchId, "Resume"),
-  /invalid_document_size/,
+  Local.prepareSource({ name: first.file.name, size: Local.MAX_DOCUMENT_BYTES + 1 }, batchId, "Resume"),
+  /document_size_limit_exceeded/,
 );
 
 const artifact = Local.artifactFor(first, { ...firstRun, status: "RUNNING", started_at: "2026-09-02T10:00:01Z" }, {
@@ -85,7 +85,7 @@ const legacyDatabase = {
     return { objectStore() { return { get() { const request = {}; queueMicrotask(() => { request.result = { source_document_id: first.source_document_id, file_blob: "legacy" }; request.onsuccess?.(); }); return request; } }; } };
   },
 };
-await assert.rejects(Local.persistCanonicalSource(legacyDatabase, source), /source_document_legacy_collision/);
+await assert.rejects(Local.persistCanonicalSource(legacyDatabase, source, first.file), /source_document_legacy_collision/);
 
 function memoryDatabase() {
   const specs = new Map(Truth.STORE_SPECS.map((spec) => [spec.name, spec]));
@@ -115,7 +115,10 @@ function memoryDatabase() {
 }
 
 const memoryDb = memoryDatabase();
-await Local.persistCanonicalSource(memoryDb, source);
+const durable = await Local.persistCanonicalSource(memoryDb, source, first.file);
+assert.equal(durable.metadata.content_hash, source.content_hash);
+assert.equal(memoryDb.records.get("source_documents").size, 2);
+assert.equal(Object.hasOwn(memoryDb.records.get("source_documents").get(source.source_document_id), "file_blob"), false);
 await Truth.persistRecord(memoryDb, "runtime_snapshots", snapshot);
 await Truth.persistRecord(memoryDb, "processing_runs", { ...firstRun, status: "SUCCEEDED", started_at: "2026-09-02T10:00:01Z", finished_at: "2026-09-02T10:00:03Z", output_artifact_ids: [artifact.artifact_id] });
 await Truth.persistRecord(memoryDb, "extraction_artifacts", artifact);

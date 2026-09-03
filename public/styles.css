@@ -544,6 +544,13 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-review-evidence { border-left: 2px solid #cbd4eb; color: #596273; font-size: 11px; line-height: 1.5; margin: 0; overflow-wrap: anywhere; padding-left: 10px; white-space: pre-wrap; }
 .v1-review-warning { color: #9a6226; font-size: 11px; margin: 0; }
 .v1-sheet-primary { width: 100%; }
+.v1-completed-source-sheet .v1-sheet-panel { bottom: 24px; border-bottom: 1px solid #e1e5ec; border-radius: 26px; max-width: 420px; }
+.v1-completed-source-sheet .v1-sheet-body { gap: 20px; padding: 28px 26px; }
+.v1-completed-source-sheet h2 { font-size: 20px; font-weight: 630; margin: 0; text-align: center; }
+.v1-error-dialog { background: #fafafd; border: 1px solid #e1e5ec; border-radius: 20px; box-shadow: 0 20px 70px rgba(31,34,42,.18); max-width: min(380px, calc(100vw - 40px)); padding: 26px; }
+.v1-error-dialog::backdrop { background: rgba(23,27,35,.32); }
+.v1-error-dialog p { color: var(--ink); font-size: 15px; line-height: 1.6; margin: 0; text-align: center; }
+.v1-error-dialog .v1-primary-button { display: block; margin: 20px auto 0; min-width: 110px; }
 .v1-paste-input label { color: #596171; font-size: 12px; }
 .v1-paste-input textarea { background: #fff; border: 1px solid var(--line); border-radius: 14px; display: block; margin-top: 9px; min-height: 130px; padding: 13px; resize: vertical; width: 100%; }
 #job-paste-input { overflow-y: auto; resize: none; }
@@ -660,6 +667,7 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-embedded-detail .v1-structured-pane::-webkit-scrollbar-track, .v1-embedded-detail[data-v1-page="personal-import"] .v1-page-shell::-webkit-scrollbar-track, .v1-embedded-detail[data-v1-page="job-import"] .v1-page-shell::-webkit-scrollbar-track { background: transparent; margin-block: 20px; }
 .v1-embedded-detail .v1-structured-pane::-webkit-scrollbar-thumb, .v1-embedded-detail[data-v1-page="personal-import"] .v1-page-shell::-webkit-scrollbar-thumb, .v1-embedded-detail[data-v1-page="job-import"] .v1-page-shell::-webkit-scrollbar-thumb { background: rgba(112,119,132,.48); background-clip: padding-box; border: 3px solid transparent; border-radius: 999px; }
 .v1-embedded-detail .v1-inline-message { display: none; }
+.v1-embedded-detail[data-v1-page="personal-import"] #personal-page-message.error { display: block; margin: 0 auto; max-width: 720px; }
 .v1-embedded-detail[data-v1-page="personal-import"], .v1-embedded-detail[data-v1-page="job-import"] { height: 100vh; min-height: 0; overflow: hidden; }
 .v1-embedded-detail[data-v1-page="personal-import"] .v1-page-shell, .v1-embedded-detail[data-v1-page="job-import"] .v1-page-shell { height: 100vh; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 24px 18px max(56px, env(safe-area-inset-bottom)); scroll-padding-bottom: 52px; scrollbar-color: rgba(112,119,132,.48) transparent; scrollbar-gutter: stable; scrollbar-width: thin; }
 .v1-embedded-detail[data-v1-page="personal-import"] .v1-import-intro, .v1-embedded-detail[data-v1-page="job-import"] .v1-import-intro { margin: 2px auto 20px; }

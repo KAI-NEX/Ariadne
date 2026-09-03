@@ -302,7 +302,9 @@ assert.match(pages, /await processCandidateSource\(source, snapshot, database, c
 assert.match(pages, /async function processCandidateSource\(source, snapshot, database, signal\)[\s\S]*persistCanonicalSource/);
 assert.match(pages, /LocalCandidate\.processingRunFor\(source, snapshot\.snapshot_id, "FAILED"/);
 assert.match(pages, /if \(result\.cancelled\) \{/);
-assert.equal((pages.match(/completeEmbeddedImport\("personal"/g) || []).length, 2);
+// Completion is reachable from proposal review, candidate removal, and the
+// re-import acknowledgement for a fully completed durable source.
+assert.equal((pages.match(/completeEmbeddedImport\("personal"/g) || []).length, 3);
 assert.match(pages.slice(pages.indexOf("async function reviewCandidateProposal"), pages.indexOf("function showCandidateSource")), /completeEmbeddedImport\("personal"/);
 assert.match(pages.slice(pages.indexOf("async function initCandidateDetail"), pages.indexOf("function jobCardMarkup")), /persistRemoval\(database, canonicalRevision, itemId\)[\s\S]*completeEmbeddedImport\("personal"/);
 assert.match(pages, /if \(!input\.disabled\) onFiles\(event\.dataTransfer\?\.files\)/);
@@ -314,7 +316,8 @@ assert.match(pages, /LocalContextLifecycle\.uniqueSources\(prepared\)/);
 assert.match(pages, /const sourceUrl = byId\("job-link-input"\)\?\.value\.trim\(\) \|\| null/);
 assert.match(pages, /import_type: "Document", source_url: sourceUrl/);
 assert.match(pages, /allowedExtensions: \["pdf", "png", "jpg", "jpeg", "docx"\]/);
-assert.match(pages, /installFileDropzone\("personal-dropzone", "personal-file-input", \(files\) => acceptCandidateFiles\(files\)\.catch\(showPersonalError\)\)/);
+assert.match(pages, /const handleCandidateFiles = \(files\) => \{[\s\S]*showPersonalError\(error, selectionVersion\)/);
+assert.match(pages, /installFileDropzone\("personal-dropzone", "personal-file-input", handleCandidateFiles\)/);
 assert.match(pages, /installFileDropzone\("job-dropzone", "job-file-input", \(files\) => acceptJobFiles\(files\)\.catch\(showJobError\)\)/);
 assert.match(pages, /onFiles\(event\.dataTransfer\?\.files\)/);
 assert.match(pages, /const batchSuffix = selectedJobSources\.length > 1 \? ` · 共 \$\{selectedJobSources\.length\} 个文件` : ""/);

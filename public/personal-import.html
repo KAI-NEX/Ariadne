@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ariadne · 添加个人材料</title>
-    <link rel="stylesheet" href="/styles.css?v=personal-lifecycle-v1">
+    <link rel="stylesheet" href="/styles.css?v=personal-lifecycle-v3">
   </head>
   <body class="v1-body" data-v1-page="personal-import">
     <main class="v1-page-shell v1-import-shell">
@@ -51,15 +51,29 @@
       </section>
       <p id="personal-page-message" class="v1-inline-message" aria-live="polite"></p>
     </main>
+    <section id="completed-source-sheet" class="v1-bottom-sheet v1-completed-source-sheet hidden" role="dialog" aria-modal="true" aria-labelledby="completed-source-title">
+      <div class="v1-sheet-backdrop" aria-hidden="true"></div>
+      <div class="v1-sheet-panel">
+        <div class="v1-sheet-body">
+          <h2 id="completed-source-title">该 PDF 已被读取</h2>
+          <button id="confirm-completed-source" class="v1-primary-button v1-sheet-primary" type="button">确认</button>
+        </div>
+      </div>
+    </section>
+    <dialog id="document-size-limit-dialog" class="v1-error-dialog" aria-label="文件大小提示">
+      <p>当前本地导入仅支持不超过 8 MB 的文档，请压缩后重试。</p>
+      <button id="confirm-document-size-limit" class="v1-primary-button" type="button">确认</button>
+    </dialog>
     <script src="/runtime-capabilities.js?v=runtime-gate-v1"></script>
     <script src="/runtime-capability-gate.js?v=runtime-gate-v1"></script>
-    <script src="/truth-persistence-domain.js?v=personal-lifecycle-v1"></script>
+    <script src="/truth-persistence-domain.js?v=source-storage-v1"></script>
+    <script src="/raw-source-storage-domain.js?v=source-storage-v1"></script>
     <script src="/local-context-lifecycle-domain.js?v=lifecycle-final-v1"></script>
-    <script src="/local-candidate-extraction-domain.js?v=slice-4a"></script>
+    <script src="/local-candidate-extraction-domain.js?v=source-storage-v1"></script>
     <script src="/local-candidate-proposal-domain.js?v=personal-lifecycle-v1"></script>
-    <script src="/local-candidate-review-domain.js?v=personal-lifecycle-v1"></script>
+    <script src="/local-candidate-review-domain.js?v=source-storage-v1"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
-    <script src="/v1-pages.js?v=personal-lifecycle-v1"></script>
+    <script src="/v1-pages.js?v=source-storage-v1"></script>
   </body>
 </html>

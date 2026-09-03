@@ -661,7 +661,8 @@ async function generateCareerIntelligence() {
 }
 
 async function renderAll() {
-  const [sources, entities, runs, allEvidence, corrections] = await Promise.all([getAll(SOURCE_DOCUMENTS), getAll(CAREER_ENTITIES), getAll(EXTRACTION_RUNS), getAll(CAREER_EVIDENCE), getAll(CORRECTION_MEMORY)]);
+  const [sourceRecords, entities, runs, allEvidence, corrections] = await Promise.all([getAll(SOURCE_DOCUMENTS), getAll(CAREER_ENTITIES), getAll(EXTRACTION_RUNS), getAll(CAREER_EVIDENCE), getAll(CORRECTION_MEMORY)]);
+  const sources = sourceRecords.filter((source) => source?.record_type !== "ARIADNE_CANONICAL_RAW_SOURCE_V1");
   if (selectedSourceId && !sources.some((source) => source.source_document_id === selectedSourceId)) selectedSourceId = null;
   const runBySource = new Map(runs.map((run) => [run.source_document_id, run]));
   byId("source-summary").innerHTML = sources.length ? sources.map((source) => {

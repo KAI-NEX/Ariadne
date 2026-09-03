@@ -3,11 +3,13 @@
 (function attachLocalCandidateExtraction(root, factory) {
   const truth = root.AriadneTruthPersistence
     || (typeof module === "object" && module.exports ? require("./truth-persistence-domain.js") : null);
-  const api = factory(truth);
+  const rawSource = root.AriadneRawSourceStorage
+    || (typeof module === "object" && module.exports ? require("./raw-source-storage-domain.js") : null);
+  const api = factory(truth, rawSource);
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.AriadneLocalCandidateExtraction = api;
-}(typeof globalThis !== "undefined" ? globalThis : this, function createLocalCandidateExtraction(Truth) {
-  if (!Truth) throw new Error("truth_persistence_required");
+}(typeof globalThis !== "undefined" ? globalThis : this, function createLocalCandidateExtraction(Truth, RawSource) {
+  if (!Truth || !RawSource) throw new Error("local_candidate_extraction_dependencies_required");
 
   const MAX_DOCUMENT_BYTES = 8_000_000;
   const MAX_IMAGE_BYTES = 5_000_000;
@@ -58,7 +60,8 @@
 
   function assertFileSize(file, mediaType) {
     const maximum = SOURCE_TYPE_BY_MIME[mediaType] === "IMAGE" ? MAX_IMAGE_BYTES : MAX_DOCUMENT_BYTES;
-    if (!Number.isFinite(file?.size) || file.size <= 0 || file.size > maximum) throw new LocalCandidateExtractionError("invalid_document_size");
+    if (!Number.isFinite(file?.size) || file.size <= 0) throw new LocalCandidateExtractionError("invalid_document_size");
+    if (file.size > maximum) throw new LocalCandidateExtractionError(SOURCE_TYPE_BY_MIME[mediaType] === "IMAGE" ? "image_size_limit_exceeded" : "document_size_limit_exceeded");
   }
 
   async function sha256File(file) {
@@ -106,9 +109,9 @@
       content_hash: source.content_hash,
       created_at: createdAt,
       material_type: "CANDIDATE",
-      local_reference: null,
+      local_reference: RawSource.localReferenceFor(source.source_document_id),
       batch_id: source.batch_id,
-      provenance: { supplied_by: "USER", captured_via: "PERSONAL_FILE_PICKER", raw_source_recoverability: "SAME_SESSION_ONLY" },
+      provenance: { supplied_by: "USER", captured_via: "PERSONAL_FILE_PICKER", raw_source_recoverability: "DURABLE_BROWSER_LOCAL" },
       authority: Truth.AUTHORITY.source,
     });
   }
@@ -197,15 +200,8 @@
     });
   }
 
-  async function persistCanonicalSource(database, sourceDocument) {
-    const existing = await readRecord(database, "source_documents", sourceDocument.source_document_id);
-    if (existing === null) return Truth.persistRecord(database, "source_documents", sourceDocument);
-    if (existing.contract_id !== "ariadne-source-document-v1") throw new LocalCandidateExtractionError("source_document_legacy_collision");
-    const validated = Truth.validateSourceDocument(existing);
-    if (validated.content_hash !== sourceDocument.content_hash || validated.material_type !== "CANDIDATE") {
-      throw new LocalCandidateExtractionError("source_document_canonical_collision");
-    }
-    return validated;
+  async function persistCanonicalSource(database, sourceDocument, file) {
+    return RawSource.persistDurableSource(database, sourceDocument, file);
   }
 
   return Object.freeze({
@@ -225,5 +221,6 @@
     artifactFor,
     readRecord,
     persistCanonicalSource,
+    resolveRawSource: RawSource.resolveRawSource,
   });
 }));

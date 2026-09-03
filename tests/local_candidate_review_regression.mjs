@@ -101,8 +101,30 @@ assert.equal(userEdit.revision.previous_revision_id, confirmed.revision.revision
 assert.equal(userEdit.revision.payload.items[0].title, "Principal Designer");
 assert.equal(userEdit.revision.payload.user_edits.at(-1).support_relation, "USER_CONFIRMED");
 assert.equal(confirmed.revision.payload.items[0].title, "Designer");
+
+const durableSource = Truth.validateSourceDocument({
+  contract_id: "ariadne-source-document-v1", source_document_id: sourceId, source_type: "PDF", filename: "completed.pdf", label: null,
+  mime_type: "application/pdf", content_hash: "sha256:completed-source", created_at: "2026-09-02T12:00:00Z", material_type: "CANDIDATE",
+  local_reference: "indexeddb://job-radar-local-first-v1/source_documents/raw-source-payload-v1%3A%3Asource-candidate-review", batch_id: "batch-completed",
+  provenance: { supplied_by: "USER", raw_source_recoverability: "DURABLE_BROWSER_LOCAL" }, authority: Truth.AUTHORITY.source,
+});
+const completedRecords = {
+  source_documents: [durableSource],
+  context_proposals: [{ ...proposal, status: "ACCEPTED" }],
+  processing_runs: [
+    { source_document_id: sourceId, operation_type: "CANDIDATE_LOCAL_EXTRACTION", status: "SUCCEEDED" },
+    { source_document_id: sourceId, operation_type: "CANDIDATE_LOCAL_DETERMINISTIC_STRUCTURING", status: "SUCCEEDED" },
+  ],
+  candidate_context_revisions: [confirmed.revision],
+  candidate_context_lifecycle: [],
+};
+assert.equal(Review.isFullyCompletedSource(sourceId, completedRecords), true);
+assert.equal(Review.sourceImportState(sourceId, completedRecords), "COMPLETED");
+assert.equal(Review.sourceImportState(sourceId, { ...completedRecords, context_proposals: [{ ...proposal, status: "AWAITING_REVIEW" }] }), "PENDING_REVIEW");
+assert.equal(Review.sourceImportState("missing-source", completedRecords), "NEW");
 const pages = fs.readFileSync(path.join(root, "public", "v1-pages.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "public", "personal-import.html"), "utf8");
+const styles = fs.readFileSync(path.join(root, "public", "styles.css"), "utf8");
 assert.match(html, /candidate-review-surface/);
 assert.match(pages, /persistDecision\(database, proposal, decision, acceptedPayload\)/);
 assert.match(pages, /activeConfirmedRevisions/);
@@ -117,10 +139,26 @@ const reviewMarkup = pages.slice(pages.indexOf("function proposalReviewMarkup"),
 assert.match(reviewMarkup, /data-review-action="confirm"/);
 assert.match(reviewMarkup, /data-review-action="reject"/);
 assert.doesNotMatch(reviewMarkup, /data-review-action="edit-confirm"/);
-assert.match(pages, /candidateExecutionState === "COMPLETE"/);
+assert.match(pages, /candidateExecutionState === "COMPLETED_SOURCE"/);
+assert.match(pages, /该 PDF 已被读取。点击确认返回个人资料。/);
+assert.match(html, /id="completed-source-sheet"/);
+assert.match(html, /id="confirm-completed-source"/);
+assert.match(html, /id="document-size-limit-dialog"/);
+assert.match(html, /id="confirm-document-size-limit"/);
+assert.match(pages, /setCompletedSourceSheet\(candidateExecutionState === "COMPLETED_SOURCE"\)/);
+assert.match(pages, /byId\("confirm-completed-source"\)\.addEventListener\("click"[\s\S]*completeEmbeddedImport\("personal", "personal-guide"\)/);
+assert.match(pages, /candidateReviewSourceIds/);
+assert.match(pages, /proposal\.source_document_ids\?\.some\(\(sourceId\) => candidateReviewSourceIds\.includes\(sourceId\)\)/);
 const candidateRun = pages.slice(pages.indexOf("async function runCandidateProcessing"), pages.indexOf("function initPersonal"));
-assert.ok(candidateRun.indexOf('candidateExecutionState = "PROCESSING"') < candidateRun.indexOf("processCandidateSource"));
+assert.ok(candidateRun.indexOf("const sources = selectedCandidateSources.filter") < candidateRun.indexOf('candidateExecutionState = "PROCESSING"'));
+assert.ok(candidateRun.indexOf("if (!sources.length)") < candidateRun.indexOf('setCandidateExtractionState("PREPARING"'));
 assert.match(candidateRun, /if \(candidateExecutionState === "PROCESSING"\) candidateExecutionState = "COMPLETE"/);
+assert.match(pages, /document_size_limit_exceeded: "当前本地导入仅支持不超过 8 MB 的文档；请压缩后重试。"/);
+assert.match(pages, /function showPersonalError\(error, selectionVersion = candidateSelectionVersion\) \{[\s\S]*byId\("personal-processing"\)\?\.classList\.add\("hidden"\)/);
+assert.match(pages, /document_size_limit_exceeded"\) \{[\s\S]*dialog\.showModal\(\)/);
+assert.match(pages, /confirm-document-size-limit"\)\.addEventListener\("click"[\s\S]*resetInvalidCandidateSelection\(\)/);
+assert.match(styles, /\.v1-embedded-detail\[data-v1-page="personal-import"\] #personal-page-message\.error \{ display: block;/);
+assert.match(styles, /\.v1-error-dialog \{[\s\S]*max-width: min\(380px/);
 const candidateAcceptStart = pages.indexOf("const acceptCandidateFiles");
 const candidateAccept = pages.slice(candidateAcceptStart, pages.indexOf('installFileDropzone("personal-dropzone"', candidateAcceptStart));
 assert.match(candidateAccept, /candidateExecutionState = "READY"/);

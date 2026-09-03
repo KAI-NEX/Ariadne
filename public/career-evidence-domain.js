@@ -203,6 +203,12 @@
     return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== "" && item != null).map(([key, item]) => [key, cleanObject(item)]));
   }
 
+  function exportableSourceDocuments(sourceDocuments) {
+    return (sourceDocuments || [])
+      .filter((source) => source?.record_type !== "ARIADNE_CANONICAL_RAW_SOURCE_V1")
+      .map(({ file_blob, extracted_pages, ...metadata }) => metadata);
+  }
+
   function buildCareerProfile(records, sourceDocuments, now) {
     const confirmed = confirmedEntities(records);
     const basicsEntity = confirmed.find((entity) => entity.entity_type === "basics");
@@ -256,7 +262,7 @@
         derived_evidence_ids: evidence.map((item) => item.evidence_id),
         known_limitations: [...new Set(confirmed.flatMap((entity) => entity.limitations || []))],
         source_document_ids: [...new Set(confirmed.flatMap((entity) => entity.source_document_ids || []))],
-        source_documents: (sourceDocuments || []).map(({ file_blob, extracted_pages, ...metadata }) => metadata),
+        source_documents: exportableSourceDocuments(sourceDocuments),
       },
     };
     return profile;
@@ -269,7 +275,7 @@
       exported_at: timestamp(now),
       entities: (records || []).filter((record) => record.contract_id === ENTITY_CONTRACT_ID),
       extraction_runs: extractionRuns || [],
-      source_documents: (sourceDocuments || []).map(({ file_blob, extracted_pages, ...metadata }) => metadata),
+      source_documents: exportableSourceDocuments(sourceDocuments),
     };
   }
 
@@ -280,7 +286,7 @@
       contract_id: EVIDENCE_CONTRACT_ID,
       exported_at: timestamp(now),
       evidence,
-      source_documents: (sourceDocuments || []).filter((source) => evidence.some((item) => item.source_document_ids.includes(source.source_document_id))).map(({ file_blob, extracted_pages, ...metadata }) => metadata),
+      source_documents: exportableSourceDocuments((sourceDocuments || []).filter((source) => evidence.some((item) => item.source_document_ids.includes(source.source_document_id)))),
     };
   }
 

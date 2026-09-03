@@ -3,11 +3,12 @@
 (function attachLocalCandidateReview(root, factory) {
   const truth = root.AriadneTruthPersistence || (typeof module === "object" && module.exports ? require("./truth-persistence-domain.js") : null);
   const lifecycle = root.AriadneLocalContextLifecycle || (typeof module === "object" && module.exports ? require("./local-context-lifecycle-domain.js") : null);
-  const api = factory(truth, lifecycle);
+  const rawSource = root.AriadneRawSourceStorage || (typeof module === "object" && module.exports ? require("./raw-source-storage-domain.js") : null);
+  const api = factory(truth, lifecycle, rawSource);
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.AriadneLocalCandidateReview = api;
-}(typeof globalThis !== "undefined" ? globalThis : this, function createLocalCandidateReview(Truth, Lifecycle) {
-  if (!Truth || !Lifecycle) throw new Error("candidate_review_dependencies_required");
+}(typeof globalThis !== "undefined" ? globalThis : this, function createLocalCandidateReview(Truth, Lifecycle, RawSource) {
+  if (!Truth || !Lifecycle || !RawSource) throw new Error("candidate_review_dependencies_required");
   const id = (prefix) => `${prefix}-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
   const now = () => new Date().toISOString();
 
@@ -180,12 +181,24 @@
     const proposals = (records.context_proposals || []).filter((proposal) => proposal.proposal_type === "CANDIDATE_CONTEXT" && proposal.source_document_ids?.includes(sourceId));
     const activeFromSource = activeConfirmedRevisions(records.candidate_context_revisions || [], records.candidate_context_lifecycle || []).some((revision) => revision.provenance?.source_document_ids?.includes(sourceId));
     const runs = (records.processing_runs || []).filter((run) => run.source_document_id === sourceId).sort((a, b) => String(b.finished_at || b.started_at || "").localeCompare(String(a.finished_at || a.started_at || "")));
-    return Lifecycle.deriveSourceState({
+    const state = Lifecycle.deriveSourceState({
       sourceExists,
       hasPending: proposals.some((proposal) => proposal.status === "AWAITING_REVIEW"),
       hasActive: activeFromSource || proposals.some((proposal) => ["ACCEPTED", "REJECTED"].includes(proposal.status)),
       lastRunStatus: runs[0]?.status || null,
     });
+    return state === "ACTIVE" && isFullyCompletedSource(sourceId, records) ? "COMPLETED" : state;
+  }
+
+  function isFullyCompletedSource(sourceId, records) {
+    const source = (records.source_documents || []).find((record) => record.source_document_id === sourceId);
+    if (!source?.local_reference) return false;
+    const proposals = (records.context_proposals || []).filter((proposal) => proposal.proposal_type === "CANDIDATE_CONTEXT" && proposal.source_document_ids?.includes(sourceId));
+    if (proposals.some((proposal) => proposal.status === "AWAITING_REVIEW")) return false;
+    const hasConfirmedRevision = latestConfirmedRevisions(records.candidate_context_revisions || []).some((revision) => revision.provenance?.source_document_ids?.includes(sourceId));
+    if (!hasConfirmedRevision) return false;
+    const succeededOperations = new Set((records.processing_runs || []).filter((run) => run.source_document_id === sourceId && run.status === "SUCCEEDED").map((run) => run.operation_type));
+    return succeededOperations.has("CANDIDATE_LOCAL_EXTRACTION") && succeededOperations.has("CANDIDATE_LOCAL_DETERMINISTIC_STRUCTURING");
   }
 
   function legacySourceIdFor(record) {
@@ -213,13 +226,14 @@
 
   function sourceHardDeletePlan(records, sourceId) {
     if (!String(sourceId || "").trim()) throw new Error("candidate_source_identity_required");
+    const sourceRecords = records.source_documents || [];
     const proposals = (records.context_proposals || []).filter((proposal) => proposal.source_document_ids?.includes(sourceId));
     const proposalIds = new Set(proposals.map((proposal) => proposal.proposal_id));
     const revisions = (records.candidate_context_revisions || []).filter((revision) => revision.provenance?.source_document_ids?.includes(sourceId));
     const revisionIds = new Set(revisions.map((revision) => revision.revision_id));
     const contextIds = new Set(revisions.map((revision) => revision.context_id));
     return Object.freeze({
-      source_documents: (records.source_documents || []).filter((source) => source.source_document_id === sourceId).map((source) => source.source_document_id),
+      source_documents: sourceRecords.filter((source) => source.source_document_id === sourceId || RawSource.isPayloadRecordFor(source, sourceId)).map((source) => source.source_document_id),
       extraction_artifacts: (records.extraction_artifacts || []).filter((artifact) => artifact.source_document_id === sourceId).map((artifact) => artifact.artifact_id),
       processing_runs: (records.processing_runs || []).filter((run) => run.source_document_id === sourceId).map((run) => run.run_id),
       context_proposals: proposals.map((proposal) => proposal.proposal_id),
@@ -256,5 +270,5 @@
     });
   }
 
-  return Object.freeze({ getAll, contextIdFor, latestRevision, latestConfirmedRevisions, candidateItemKey, removedItemKeys, activeConfirmedRevisions, splitPendingProposal, ensureItemProposalQueue, reviewDecision, editedPayload, outcomeFor, persistDecision, userEditOutcome, persistUserEdit, removalRecord, persistRemoval, sourceImportState, legacySourceIdFor, removeLegacyContext, hardDeleteLegacySource, sourceHardDeletePlan, persistSourceHardDelete });
+  return Object.freeze({ getAll, contextIdFor, latestRevision, latestConfirmedRevisions, candidateItemKey, removedItemKeys, activeConfirmedRevisions, splitPendingProposal, ensureItemProposalQueue, reviewDecision, editedPayload, outcomeFor, persistDecision, userEditOutcome, persistUserEdit, removalRecord, persistRemoval, sourceImportState, isFullyCompletedSource, legacySourceIdFor, removeLegacyContext, hardDeleteLegacySource, sourceHardDeletePlan, persistSourceHardDelete });
 }));

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const Truth = require("../public/truth-persistence-domain.js");
+const RawSource = require("../public/raw-source-storage-domain.js");
 const Review = require("../public/local-candidate-review-domain.js");
 
 const sourceA = "source-removal-a";
@@ -84,6 +85,8 @@ assert.deepEqual(Review.activeConfirmedRevisions(revisions, failedDatabase.recor
 const sourceDocuments = [
   { source_document_id: sourceA, batch_id: "batch-shared" },
   { source_document_id: sourceB, batch_id: "batch-shared" },
+  { source_document_id: RawSource.payloadRecordIdFor(sourceA), record_type: RawSource.RECORD_TYPE, canonical_source_document_id: sourceA },
+  { source_document_id: RawSource.payloadRecordIdFor(sourceB), record_type: RawSource.RECORD_TYPE, canonical_source_document_id: sourceB },
 ];
 const otherProposal = proposalFor("D", sourceB);
 const otherRevision = Review.outcomeFor({ proposal: otherProposal, decision: "CONFIRM", acceptedPayload: otherProposal.payload, currentRevision: null }).revision;
@@ -97,7 +100,7 @@ const hardDeleteRecords = {
   candidate_context_lifecycle: [removal],
 };
 const plan = Review.sourceHardDeletePlan(hardDeleteRecords, sourceA);
-assert.deepEqual(plan.source_documents, [sourceA]);
+assert.deepEqual(plan.source_documents, [sourceA, RawSource.payloadRecordIdFor(sourceA)]);
 assert.deepEqual(plan.extraction_artifacts, ["artifact-A"]);
 assert.deepEqual(plan.processing_runs, ["run-A"]);
 assert.deepEqual(plan.context_proposals.sort(), [proposalA.proposal_id, proposalB.proposal_id, proposalC.proposal_id].sort());
@@ -140,7 +143,7 @@ function sourceDatabase(records) {
 const hardDeleteDatabase = sourceDatabase(hardDeleteRecords);
 const persistedPlan = await Review.persistSourceHardDelete(hardDeleteDatabase, sourceA);
 assert.deepEqual(persistedPlan, plan);
-assert.deepEqual(hardDeleteDatabase.stored.source_documents.map((record) => record.source_document_id), [sourceB]);
+assert.deepEqual(hardDeleteDatabase.stored.source_documents.map((record) => record.source_document_id), [sourceB, RawSource.payloadRecordIdFor(sourceB)]);
 assert.deepEqual(hardDeleteDatabase.stored.extraction_artifacts.map((record) => record.source_document_id), [sourceB]);
 assert.deepEqual(hardDeleteDatabase.stored.context_proposals.map((record) => record.source_document_ids[0]), [sourceB]);
 assert.deepEqual(hardDeleteDatabase.stored.candidate_context_revisions.map((record) => record.provenance.source_document_ids[0]), [sourceB]);
