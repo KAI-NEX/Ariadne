@@ -14,8 +14,11 @@ from src.candidate_model_runtime import (
     CREDENTIAL_REF,
     DELIVERY_METHOD,
     MODEL_ID,
+    CandidateModelExecutionRegistry,
     CandidateModelRuntimeError,
+    candidate_model_operation_id,
     execute_candidate_model_request,
+    runtime_fingerprint,
 )
 from src.execution_contract import create_runtime_snapshot
 from src.provider_runtime import deepseek_model_descriptors
@@ -61,14 +64,24 @@ def source() -> dict:
 
 def request() -> dict:
     runtime = snapshot()
+    consent_id = "consent-candidate-model-test"
+    fingerprint = runtime_fingerprint(runtime)
+    operation_id = candidate_model_operation_id(SOURCE_ID, fingerprint, consent_id)
     return {
         "source_document": source(),
         "document_data_url": "data:application/pdf;base64," + base64.b64encode(PDF_BYTES).decode("ascii"),
-        "candidate_material_type": "Resume",
         "runtime_snapshot": runtime,
-        "processing_run_id": "run-candidate-model-test",
+        "processing_run_id": f"run-{operation_id}",
+        "operation_identity": {
+            "operation_id": operation_id,
+            "operation_type": "CANDIDATE_MODEL_STRUCTURING",
+            "source_document_id": SOURCE_ID,
+            "runtime_fingerprint": fingerprint,
+            "consent_id": consent_id,
+        },
         "consent": {
             "explicitly_confirmed": True,
+            "consent_id": consent_id,
             "source_document_id": SOURCE_ID,
             "provider": "deepseek",
             "model": MODEL_ID,
@@ -102,7 +115,7 @@ def valid_item() -> dict:
 
 
 def response(item: dict | None = None, *, model: str = MODEL_ID, content: str | None = None, finish_reason: str = "stop", reasoning_content: str | None = None, usage: dict | None = None) -> dict:
-    model_content = content if content is not None else json.dumps({"items": [item or valid_item()]})
+    model_content = content if content is not None else json.dumps({"material_type": "resume", "items": [item or valid_item()]})
     message = {"content": model_content}
     if reasoning_content is not None:
         message["reasoning_content"] = reasoning_content
@@ -123,6 +136,8 @@ class CandidateModelRuntimeRegression(unittest.TestCase):
             self.assertEqual(provider_payload["model"], MODEL_ID)
             self.assertEqual(provider_payload["thinking"], {"type": "disabled"})
             self.assertEqual(provider_payload["max_tokens"], 8000)
+            self.assertIn('"material_type": "resume"', provider_payload["messages"][0]["content"][0]["text"])
+            self.assertNotIn("candidate_material_type", payload)
             images = [part for message in provider_payload["messages"] for part in message["content"] if part["type"] == "image_url"]
             observations["images"] = len(images)
             observations["provider"] += 1
@@ -138,13 +153,16 @@ class CandidateModelRuntimeRegression(unittest.TestCase):
         self.assertEqual(result["delivery_method"], "rendered_pdf_pages")
         self.assertEqual(result["rendered_page_count"], 3)
         self.assertEqual(result["outbound_image_count"], 3)
+        self.assertEqual(result["operation_id"], request()["operation_identity"]["operation_id"])
+        self.assertEqual(result["candidate_proposal"]["material_type"], "resume")
         self.assertTrue(result["network_call_made"])
         self.assertEqual(result["candidate_proposal"]["review_status"], "NEEDS_REVIEW")
 
     def test_explicit_empty_items_completes_without_creating_a_false_proposal(self) -> None:
-        result, observations = self.execute(request(), response(content=json.dumps({"items": []})))
+        result, observations = self.execute(request(), response(content=json.dumps({"material_type": "other", "items": []})))
         self.assertEqual(observations, {"rendered": 1, "provider": 1, "images": 3})
         self.assertEqual(result["candidate_proposal"]["items"], [])
+        self.assertEqual(result["candidate_proposal"]["material_type"], "other")
 
     def test_length_finish_is_explicit_truncation_and_never_repairs_json(self) -> None:
         truncated = response(
@@ -215,6 +233,28 @@ class CandidateModelRuntimeRegression(unittest.TestCase):
                 request(), lambda: "synthetic-key-from-reader", lambda _pdf: [("1", b"image")],
                 lambda _key, _body: (_ for _ in ()).throw(URLError("synthetic-network-failure")),
             )
+
+    def test_operation_identity_and_single_flight_fail_closed(self) -> None:
+        payload = request()
+        payload["operation_identity"]["runtime_fingerprint"] = "sha256:" + "0" * 64
+        calls = {"render": 0, "provider": 0}
+        with self.assertRaisesRegex(CandidateModelRuntimeError, "candidate_model_operation_identity_invalid"):
+            execute_candidate_model_request(
+                payload, lambda: "synthetic-key-from-reader",
+                lambda _pdf: calls.__setitem__("render", 1) or [("1", b"image")],
+                lambda _key, _body: calls.__setitem__("provider", 1) or (200, response()),
+            )
+        self.assertEqual(calls, {"render": 0, "provider": 0})
+        registry = CandidateModelExecutionRegistry()
+        operation_id = request()["operation_identity"]["operation_id"]
+        self.assertEqual(registry.begin(operation_id, SOURCE_ID), ("CLAIMED", None))
+        self.assertEqual(registry.begin(operation_id, SOURCE_ID), ("ACTIVE", None))
+        self.assertTrue(registry.succeed(operation_id, {"operation_id": operation_id}))
+        self.assertEqual(registry.begin(operation_id, SOURCE_ID), ("COMPLETED", {"operation_id": operation_id}))
+        self.assertEqual(registry.forget_source(SOURCE_ID), 1)
+        self.assertEqual(registry.begin(operation_id, SOURCE_ID), ("CLAIMED", None))
+        self.assertEqual(registry.forget_source(SOURCE_ID), 1)
+        self.assertFalse(registry.succeed(operation_id, {"operation_id": operation_id}))
 
 
 if __name__ == "__main__":

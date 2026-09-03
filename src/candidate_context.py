@@ -1,7 +1,7 @@
 """Step 1 CandidateContext proposal contract and DeepSeek request boundary.
 
-This module validates an AI proposal before it can enter browser review.  It
-never confirms a candidate fact or writes browser persistence.
+This module validates an AI proposal before it can enter the browser working
+projection. It never confirms a candidate fact or writes browser persistence.
 """
 
 from __future__ import annotations
@@ -13,33 +13,15 @@ from typing import Any
 
 
 CONTRACT_ID = "job-radar-candidate-context-v2-step1"
-PROMPT_VERSION = "candidate_item_proposal_v3_compact_no_thinking"
+PROMPT_VERSION = "candidate_workspace_v1_auto_material"
 ITEM_TYPES = {"WORK_EXPERIENCE", "PROJECT", "EDUCATION", "OTHER"}
 SUPPORT_RELATIONS = {"EXPLICIT_SOURCE", "AI_DERIVED"}
 REVIEW_STATUS = "NEEDS_REVIEW"
-MATERIAL_TYPES = {"Resume", "Portfolio", "Project", "Other"}
-MATERIAL_TYPE_GUIDANCE = {
-    "Resume": (
-        "Resume: extract supported work, project, and education items. Preserve stated names and dates; "
-        "do not infer seniority, impact, or ownership."
-    ),
-    "Portfolio": (
-        "Portfolio: create PROJECT items for distinct cases. Keep only stated role, contribution, "
-        "deliverables, and outcomes; do not attribute team output to the person."
-    ),
-    "Project": (
-        "Project: create one coherent PROJECT item per distinct project, preserving stated scope, "
-        "contribution, evidence, and unresolved outcomes."
-    ),
-    "Other": (
-        "Other: treat as an uncategorized career source. Classify conservatively and keep ambiguity "
-        "as an uncertainty."
-    ),
-}
+MATERIAL_TYPES = {"resume", "portfolio", "project", "other"}
 
 
 class CandidateProposalError(ValueError):
-    """An input or provider response cannot safely become a review proposal."""
+    """An input or provider response cannot safely become a working proposal."""
 
 
 def utc_timestamp() -> str:
@@ -47,19 +29,16 @@ def utc_timestamp() -> str:
 
 
 def normalized_material_type(material_type: str) -> str:
-    """Keep the provider prompt on one of the four UI material contracts."""
-    normalized = str(material_type or "Resume").strip().title()
+    """Keep model-inferred material types on the bounded output enum."""
+    normalized = str(material_type or "").strip().lower()
     if normalized not in MATERIAL_TYPES:
         raise CandidateProposalError("unsupported_candidate_material_type")
     return normalized
 
 
-def candidate_proposal_instruction(material_type: str = "Resume") -> str:
-    """Ask only for the compact, grounded review contract."""
-    material_type = normalized_material_type(material_type)
-    material_guidance = MATERIAL_TYPE_GUIDANCE[material_type]
-    return f"""Read the supplied career-material pages and produce Candidate Proposal JSON for human review.
-Material type: {material_type}. {material_guidance}
+def candidate_proposal_instruction() -> str:
+    """Ask only for the compact, grounded working-proposal contract."""
+    return """Read the supplied career-material pages, infer the overall material type, and produce Candidate Proposal JSON for a non-authoritative working workspace.
 
 Output rules:
 - Return one valid JSON object only. No Markdown, prose, explanation, or reasoning outside JSON.
@@ -69,9 +48,12 @@ Output rules:
 - Omit optional subtitle, time, and ownership when absent; do not emit null or empty optional fields.
 - Do not repeat filename, provider, model, or source metadata. source_document_id appears only inside source_refs.
 - Return only source-supported items. Never invent an item to avoid an empty result.
+- Infer material_type as exactly one of resume, portfolio, project, or other.
+- Resume extracts supported work, project, and education items; portfolio emphasizes distinct cases; project keeps coherent projects; other stays conservative and preserves ambiguity.
 
 Use exactly this shape:
 {{
+  "material_type": "resume",
   "items": [
     {{
       "item_id": "work-1",
@@ -87,21 +69,20 @@ Use exactly this shape:
   ]
 }}
 
-Replace SOURCE_DOCUMENT_ID with the supplied ID. Use EXPLICIT_SOURCE for direct evidence and AI_DERIVED only for a concise marked interpretation. Every item needs at least one short source_ref. For affects use only fact, ownership, outcome, or matching use; use status OPEN for unresolved questions. Use an empty uncertainties array when none exist. If nothing is supported, return {{"items": []}}."""
+Replace SOURCE_DOCUMENT_ID with the supplied ID. Use EXPLICIT_SOURCE for direct evidence and AI_DERIVED only for a concise marked interpretation. Every item needs at least one short source_ref. For affects use only fact, ownership, outcome, or matching use; use status OPEN for unresolved questions. Use an empty uncertainties array when none exist. If nothing is supported, still return the inferred material_type with an empty items array."""
 
 
 def build_deepseek_candidate_proposal_payload(
-    source_document_id: str, model: str, rendered_pages: list[tuple[str, bytes]], material_type: str = "Resume",
+    source_document_id: str, model: str, rendered_pages: list[tuple[str, bytes]],
 ) -> dict[str, Any]:
     """Build a JSON-mode vision request for one already-consented career material."""
     if not source_document_id or not model or not rendered_pages:
         raise CandidateProposalError("candidate_proposal_request_incomplete")
-    material_type = normalized_material_type(material_type)
-    content: list[dict[str, Any]] = [{"type": "text", "text": candidate_proposal_instruction(material_type)}]
+    content: list[dict[str, Any]] = [{"type": "text", "text": candidate_proposal_instruction()}]
     for page_number, image_bytes in rendered_pages:
         if not image_bytes:
             raise CandidateProposalError("candidate_proposal_page_missing")
-        content.append({"type": "text", "text": f"{material_type} page {page_number}. Source document ID: {source_document_id}."})
+        content.append({"type": "text", "text": f"Career-material page {page_number}. Source document ID: {source_document_id}."})
         content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64.b64encode(image_bytes).decode('ascii')}"}})
     return {
         "model": model,
@@ -135,6 +116,10 @@ def validate_candidate_proposal(raw: Any, source_document_id: str) -> tuple[dict
     """Validate provider JSON locally and fail closed on any contract violation."""
     if not isinstance(raw, dict):
         return None, ["candidate_proposal_not_object"]
+    try:
+        material_type = normalized_material_type(raw.get("material_type"))
+    except CandidateProposalError:
+        return None, ["invalid_candidate_material_type"]
     items = raw.get("items")
     # The model instruction explicitly permits {"items": []} when the source
     # contains no grounded candidate experience.  An empty proposal is a valid,
@@ -196,13 +181,13 @@ def validate_candidate_proposal(raw: Any, source_document_id: str) -> tuple[dict
         normalized_items.append(item)
     if errors:
         return None, sorted(set(errors))
-    return {"contract_id": CONTRACT_ID, "items": normalized_items}, []
+    return {"contract_id": CONTRACT_ID, "material_type": material_type, "items": normalized_items}, []
 
 
 def extract_deepseek_candidate_proposal(
     provider_response: dict[str, Any], source_document_id: str, processing_run_id: str, model: str,
 ) -> dict[str, Any]:
-    """Parse JSON mode output and return a review-only proposal; never a confirmed context."""
+    """Parse JSON output into a non-authoritative proposal; never confirmed context."""
     try:
         content = provider_response["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as error:

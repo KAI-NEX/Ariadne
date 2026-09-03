@@ -42,6 +42,8 @@ AUTHORITY = {
     "execution": "EXECUTION_HISTORY",
     "proposal": "NON_AUTHORITATIVE_PROPOSAL",
     "review": "AUTHORITATIVE_USER_DECISION",
+    "working": "NON_AUTHORITATIVE_WORKING_MODEL",
+    "workspace_acceptance": "AUTHORITATIVE_WORKSPACE_ACCEPTANCE",
     "revision": "AUTHORITATIVE_CONFIRMED_CONTEXT",
     "lifecycle": "AUTHORITATIVE_USER_DECISION",
 }
@@ -52,7 +54,10 @@ FIELDS = {
     "batch": tuple(SCHEMA["$defs"]["processingBatch"]["required"]),
     "proposal": tuple(SCHEMA["$defs"]["proposal"]["required"]),
     "review": tuple(SCHEMA["$defs"]["reviewDecision"]["required"]),
+    "working": tuple(SCHEMA["$defs"]["candidateWorkingModel"]["required"]),
+    "workspace_acceptance": tuple(SCHEMA["$defs"]["candidateWorkspaceAcceptance"]["required"]),
     "revision": tuple(SCHEMA["$defs"]["contextRevision"]["required"]),
+    "workspace_revision": tuple(SCHEMA["$defs"]["workspaceContextRevision"]["required"]),
     "lifecycle": tuple(SCHEMA["$defs"]["candidateContextLifecycle"]["required"]),
 }
 
@@ -437,14 +442,80 @@ def validate_review_decision(review: Any) -> dict[str, Any]:
     }
 
 
+def validate_candidate_working_model(model: Any) -> dict[str, Any]:
+    value = _prepare(model, FIELDS["working"], "candidate_working_model")
+    if value["contract_id"] != "ariadne-candidate-working-model-v1":
+        raise TruthPersistenceError("candidate_working_model_contract_invalid")
+    if value["authority"] != AUTHORITY["working"]:
+        raise TruthPersistenceError("candidate_working_model_authority_invalid")
+    version = value["version"]
+    if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+        raise TruthPersistenceError("candidate_working_model_version_invalid")
+    previous_id = _nullable_string(value["previous_working_model_id"], "candidate_working_model_previous_id_invalid")
+    if (version == 1) != (previous_id is None):
+        raise TruthPersistenceError("candidate_working_model_lineage_invalid")
+    fingerprint = _required_string(value["fingerprint"], "candidate_working_model_fingerprint_invalid")
+    if not re.fullmatch(r"sha256:[a-f0-9]{64}", fingerprint):
+        raise TruthPersistenceError("candidate_working_model_fingerprint_invalid")
+    return {
+        "contract_id": value["contract_id"],
+        "working_model_id": _required_string(value["working_model_id"], "candidate_working_model_id_invalid"),
+        "source_document_id": _required_string(value["source_document_id"], "candidate_working_model_source_id_invalid"),
+        "processing_run_id": _required_string(value["processing_run_id"], "candidate_working_model_run_id_invalid"),
+        "runtime_snapshot_id": _required_string(value["runtime_snapshot_id"], "candidate_working_model_snapshot_id_invalid"),
+        "proposal_ids": _string_list(value["proposal_ids"], "candidate_working_model_proposal_ids_invalid", non_empty=True),
+        "version": version,
+        "previous_working_model_id": previous_id,
+        "fingerprint": fingerprint,
+        "created_at": _valid_iso(value["created_at"], "candidate_working_model_created_at_invalid"),
+        "payload": _clone(_plain_mapping(value["payload"], "candidate_working_model_payload_invalid")),
+        "authority": value["authority"],
+    }
+
+
+def validate_candidate_workspace_acceptance(acceptance: Any) -> dict[str, Any]:
+    value = _prepare(acceptance, FIELDS["workspace_acceptance"], "candidate_workspace_acceptance")
+    if value["contract_id"] != "ariadne-candidate-workspace-acceptance-v1":
+        raise TruthPersistenceError("candidate_workspace_acceptance_contract_invalid")
+    if value["authority"] != AUTHORITY["workspace_acceptance"]:
+        raise TruthPersistenceError("candidate_workspace_acceptance_authority_invalid")
+    version = value["working_model_version"]
+    if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+        raise TruthPersistenceError("candidate_workspace_acceptance_version_invalid")
+    fingerprint = _required_string(value["working_model_fingerprint"], "candidate_workspace_acceptance_fingerprint_invalid")
+    if not re.fullmatch(r"sha256:[a-f0-9]{64}", fingerprint):
+        raise TruthPersistenceError("candidate_workspace_acceptance_fingerprint_invalid")
+    return {
+        "contract_id": value["contract_id"],
+        "acceptance_id": _required_string(value["acceptance_id"], "candidate_workspace_acceptance_id_invalid"),
+        "context_id": _required_string(value["context_id"], "candidate_workspace_acceptance_context_id_invalid"),
+        "source_document_id": _required_string(value["source_document_id"], "candidate_workspace_acceptance_source_id_invalid"),
+        "processing_run_id": _required_string(value["processing_run_id"], "candidate_workspace_acceptance_run_id_invalid"),
+        "runtime_snapshot_id": _required_string(value["runtime_snapshot_id"], "candidate_workspace_acceptance_snapshot_id_invalid"),
+        "proposal_ids": _string_list(value["proposal_ids"], "candidate_workspace_acceptance_proposal_ids_invalid", non_empty=True),
+        "working_model_id": _required_string(value["working_model_id"], "candidate_workspace_acceptance_working_model_id_invalid"),
+        "working_model_version": version,
+        "working_model_fingerprint": fingerprint,
+        "accepted_at": _valid_iso(value["accepted_at"], "candidate_workspace_acceptance_timestamp_invalid"),
+        "confirmed_revision_id": _required_string(value["confirmed_revision_id"], "candidate_workspace_acceptance_revision_id_invalid"),
+        "previous_revision_id": _nullable_string(value["previous_revision_id"], "candidate_workspace_acceptance_previous_revision_id_invalid"),
+        "accepted_payload": _clone(_plain_mapping(value["accepted_payload"], "candidate_workspace_acceptance_payload_invalid")),
+        "authority": value["authority"],
+    }
+
+
 def validate_context_revision(revision: Any) -> dict[str, Any]:
-    value = _prepare(revision, FIELDS["revision"], "context_revision")
-    if value["contract_id"] != "ariadne-context-revision-v1":
+    contract_id = revision.get("contract_id") if isinstance(revision, Mapping) else None
+    workspace_route = contract_id == "ariadne-context-revision-v2"
+    value = _prepare(revision, FIELDS["workspace_revision"] if workspace_route else FIELDS["revision"], "context_revision")
+    if not workspace_route and value["contract_id"] != "ariadne-context-revision-v1":
         raise TruthPersistenceError("context_revision_contract_invalid")
     if value["context_type"] not in CONTEXT_TYPES:
         raise TruthPersistenceError("context_revision_type_invalid")
     if value["authority"] != AUTHORITY["revision"]:
         raise TruthPersistenceError("context_revision_authority_invalid")
+    if workspace_route and value["context_type"] != "CANDIDATE":
+        raise TruthPersistenceError("workspace_revision_type_invalid")
     version = value["version"]
     if not isinstance(version, int) or isinstance(version, bool) or version < 1:
         raise TruthPersistenceError("context_revision_version_invalid")
@@ -459,20 +530,24 @@ def validate_context_revision(revision: Any) -> dict[str, Any]:
         "processing_run_id": _required_string(provenance["processing_run_id"], "context_revision_run_id_invalid"),
         "runtime_snapshot_id": _required_string(provenance["runtime_snapshot_id"], "context_revision_snapshot_id_invalid"),
     }
-    return {
+    result = {
         "contract_id": value["contract_id"],
         "context_type": value["context_type"],
         "context_id": _required_string(value["context_id"], "context_revision_context_id_invalid"),
         "revision_id": _required_string(value["revision_id"], "context_revision_id_invalid"),
         "version": version,
         "previous_revision_id": previous_revision_id,
-        "confirmed_from_proposal_id": _required_string(value["confirmed_from_proposal_id"], "context_revision_proposal_id_invalid"),
-        "review_decision_id": _required_string(value["review_decision_id"], "context_revision_review_id_invalid"),
         "created_at": _valid_iso(value["created_at"], "context_revision_created_at_invalid"),
         "provenance": normalized_provenance,
         "payload": _clone(_plain_mapping(value["payload"], "context_revision_payload_invalid")),
         "authority": value["authority"],
     }
+    if workspace_route:
+        result["workspace_acceptance_id"] = _required_string(value["workspace_acceptance_id"], "context_revision_workspace_acceptance_id_invalid")
+    else:
+        result["confirmed_from_proposal_id"] = _required_string(value["confirmed_from_proposal_id"], "context_revision_proposal_id_invalid")
+        result["review_decision_id"] = _required_string(value["review_decision_id"], "context_revision_review_id_invalid")
+    return result
 
 
 def validate_candidate_context_lifecycle(record: Any) -> dict[str, Any]:
@@ -569,6 +644,73 @@ def apply_review_decision(input_value: Mapping[str, Any]) -> dict[str, Any]:
     return {"proposal": {**proposal, "status": "ACCEPTED"}, "review_decision": review, "revision": revision}
 
 
+def apply_workspace_acceptance(input_value: Mapping[str, Any]) -> dict[str, Any]:
+    value = _plain_mapping(input_value, "workspace_acceptance_application_malformed")
+    working = validate_candidate_working_model(value.get("working_model"))
+    proposals_raw = value.get("proposals")
+    if not isinstance(proposals_raw, list):
+        raise TruthPersistenceError("workspace_acceptance_proposal_set_invalid")
+    proposals = [validate_proposal(proposal) for proposal in proposals_raw]
+    if {proposal["proposal_id"] for proposal in proposals} != set(working["proposal_ids"]):
+        raise TruthPersistenceError("workspace_acceptance_proposal_set_invalid")
+    if any(
+        proposal["proposal_type"] != "CANDIDATE_CONTEXT"
+        or proposal["status"] != "AWAITING_REVIEW"
+        or proposal["payload"].get("contract_id") != "ariadne-model-candidate-proposal-payload-v1"
+        or working["source_document_id"] not in proposal["source_document_ids"]
+        or proposal["processing_run_id"] != working["processing_run_id"]
+        or proposal["runtime_snapshot_id"] != working["runtime_snapshot_id"]
+        for proposal in proposals
+    ):
+        raise TruthPersistenceError("workspace_acceptance_lineage_mismatch")
+    current_raw = value.get("current_revision")
+    current = None if current_raw is None else validate_context_revision(current_raw)
+    actual_version = current["version"] if current else 0
+    if value.get("expected_revision_version") != actual_version:
+        raise TruthPersistenceError("context_version_conflict")
+    context_id = _required_string(value.get("context_id"), "candidate_workspace_acceptance_context_id_invalid")
+    if current and (current["context_id"] != context_id or current["context_type"] != "CANDIDATE"):
+        raise TruthPersistenceError("context_revision_base_mismatch")
+    accepted_at = _valid_iso(value.get("accepted_at"), "candidate_workspace_acceptance_timestamp_invalid")
+    acceptance_id = _required_string(value.get("acceptance_id"), "candidate_workspace_acceptance_id_invalid")
+    revision_id = _required_string(value.get("revision_id"), "context_revision_id_invalid")
+    acceptance = validate_candidate_workspace_acceptance({
+        "contract_id": "ariadne-candidate-workspace-acceptance-v1",
+        "acceptance_id": acceptance_id,
+        "context_id": context_id,
+        "source_document_id": working["source_document_id"],
+        "processing_run_id": working["processing_run_id"],
+        "runtime_snapshot_id": working["runtime_snapshot_id"],
+        "proposal_ids": working["proposal_ids"],
+        "working_model_id": working["working_model_id"],
+        "working_model_version": working["version"],
+        "working_model_fingerprint": working["fingerprint"],
+        "accepted_at": accepted_at,
+        "confirmed_revision_id": revision_id,
+        "previous_revision_id": current["revision_id"] if current else None,
+        "accepted_payload": working["payload"],
+        "authority": AUTHORITY["workspace_acceptance"],
+    })
+    revision = validate_context_revision({
+        "contract_id": "ariadne-context-revision-v2",
+        "context_type": "CANDIDATE",
+        "context_id": context_id,
+        "revision_id": revision_id,
+        "version": actual_version + 1,
+        "previous_revision_id": current["revision_id"] if current else None,
+        "workspace_acceptance_id": acceptance_id,
+        "created_at": accepted_at,
+        "provenance": {
+            "source_document_ids": [working["source_document_id"]],
+            "processing_run_id": working["processing_run_id"],
+            "runtime_snapshot_id": working["runtime_snapshot_id"],
+        },
+        "payload": working["payload"],
+        "authority": AUTHORITY["revision"],
+    })
+    return {"working_model": working, "workspace_acceptance": acceptance, "revision": revision}
+
+
 def validate_for_store(store_name: str, value: Any) -> dict[str, Any]:
     validators: dict[str, Callable[[Any], dict[str, Any]]] = {
         "source_documents": validate_source_document,
@@ -578,6 +720,8 @@ def validate_for_store(store_name: str, value: Any) -> dict[str, Any]:
         "processing_batches": validate_processing_batch,
         "context_proposals": validate_proposal,
         "context_review_decisions": validate_review_decision,
+        "candidate_working_models": validate_candidate_working_model,
+        "candidate_workspace_acceptances": validate_candidate_workspace_acceptance,
         "candidate_context_revisions": validate_context_revision,
         "candidate_context_lifecycle": validate_candidate_context_lifecycle,
         "job_context_revisions": validate_context_revision,

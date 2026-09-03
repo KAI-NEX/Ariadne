@@ -42,7 +42,12 @@ from src.provider_runtime import (
     ProviderRuntimeError, connection_request, deepseek_model_descriptors, descriptor_for,
     is_multimodal, multimodal_connection_request, multimodal_smoke_passed, normalize_response, v1_selector_descriptors,
 )
-from src.candidate_model_runtime import CandidateModelRuntimeError, execute_candidate_model_request
+from src.candidate_model_runtime import (
+    CandidateModelExecutionRegistry,
+    CandidateModelRuntimeError,
+    execute_candidate_model_request,
+    validate_candidate_model_request,
+)
 
 
 PROJECT_ROOT = Path(__file__).parent
@@ -76,6 +81,7 @@ LEGACY_PROVIDER_ACTION_PATHS = frozenset({
     "/api/ai-career-ingest",
     "/api/vision-extract",
 })
+CANDIDATE_MODEL_EXECUTIONS = CandidateModelExecutionRegistry()
 
 
 # These patterns deliberately produce review candidates, never authoritative Job fields.
@@ -868,6 +874,9 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/candidate-model-structure":
             self.structure_model_candidate_proposal()
             return
+        if parsed.path == "/api/candidate-model-operation-state/delete":
+            self.delete_candidate_model_operation_state()
+            return
         if parsed.path == "/api/career-document-extract":
             self.extract_career_document_candidate()
             return
@@ -925,11 +934,26 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
 
     def structure_model_candidate_proposal(self) -> None:
         """Execute the one qualified Candidate PDF adapter after explicit consent."""
+        claimed_operation_id = None
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
             if content_length <= 0 or content_length > 12_000_000:
                 raise CandidateModelRuntimeError("candidate_model_request_size_invalid", "request")
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            validated_request = validate_candidate_model_request(payload)
+            claim_state, cached_result = CANDIDATE_MODEL_EXECUTIONS.begin(validated_request.operation_id, validated_request.source_document["source_document_id"])
+            if claim_state == "COMPLETED":
+                self.send_json(HTTPStatus.OK, cached_result)
+                return
+            if claim_state == "ACTIVE":
+                self.send_json(HTTPStatus.CONFLICT, {
+                    "error": "candidate_model_execution_in_progress",
+                    "failure_layer": "idempotency",
+                    "network_call_made": False,
+                    "persistence": "not_written",
+                })
+                return
+            claimed_operation_id = validated_request.operation_id
 
             def provider_call(api_key: str, provider_payload: dict) -> tuple[int, dict]:
                 request = Request(
@@ -955,6 +979,8 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                 provider_call,
             )
         except CandidateModelRuntimeError as error:
+            if claimed_operation_id:
+                CANDIDATE_MODEL_EXECUTIONS.fail(claimed_operation_id)
             status = HTTPStatus.PRECONDITION_REQUIRED if error.failure_layer == "credential" else HTTPStatus.BAD_GATEWAY if error.failure_layer in {"provider", "transport"} else HTTPStatus.UNPROCESSABLE_ENTITY
             diagnostic = {"error": error.code, "failure_layer": error.failure_layer, "network_call_made": error.network_call_made, "diagnostics": error.diagnostics}
             print(f"candidate_model_failure_diagnostic {json.dumps(diagnostic, ensure_ascii=False, sort_keys=True)}", flush=True)
@@ -967,6 +993,8 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             })
             return
         except HTTPError as error:
+            if claimed_operation_id:
+                CANDIDATE_MODEL_EXECUTIONS.fail(claimed_operation_id)
             layer = "credential" if error.code in {401, 403} else "model" if error.code == 404 else "provider"
             self.send_json(HTTPStatus.BAD_GATEWAY, {
                 "error": "deepseek_provider_http_error",
@@ -977,6 +1005,8 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             })
             return
         except (URLError, TimeoutError, OSError):
+            if claimed_operation_id:
+                CANDIDATE_MODEL_EXECUTIONS.fail(claimed_operation_id)
             self.send_json(HTTPStatus.BAD_GATEWAY, {
                 "error": "deepseek_network_error",
                 "failure_layer": "transport",
@@ -985,6 +1015,8 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             })
             return
         except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
+            if claimed_operation_id:
+                CANDIDATE_MODEL_EXECUTIONS.fail(claimed_operation_id)
             self.send_json(HTTPStatus.BAD_REQUEST, {
                 "error": "candidate_model_request_invalid",
                 "failure_layer": "request",
@@ -992,7 +1024,31 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                 "persistence": "not_written",
             })
             return
+        if not CANDIDATE_MODEL_EXECUTIONS.succeed(claimed_operation_id, result):
+            self.send_json(HTTPStatus.CONFLICT, {
+                "error": "candidate_model_processing_run_stale",
+                "failure_layer": "idempotency",
+                "network_call_made": True,
+                "persistence": "not_written",
+            })
+            return
         self.send_json(HTTPStatus.OK, result)
+
+    def delete_candidate_model_operation_state(self) -> None:
+        """Forget consent-scoped server idempotency state during source hard delete."""
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+            if content_length <= 0 or content_length > 1_000:
+                raise ValueError
+            body = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            source_id = str(body["source_document_id"]).strip()
+            if not source_id.startswith("source-candidate-") or len(source_id) > 180:
+                raise ValueError
+        except (KeyError, ValueError, UnicodeDecodeError, json.JSONDecodeError):
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": "candidate_model_source_invalid", "network_call_made": False})
+            return
+        cleared = CANDIDATE_MODEL_EXECUTIONS.forget_source(source_id)
+        self.send_json(HTTPStatus.OK, {"source_document_id": source_id, "operation_states_cleared": cleared, "network_call_made": False})
 
     def qwen_runtime_connection_check(self) -> None:
         """Forward one approved Qwen synthetic image check from the local process only."""

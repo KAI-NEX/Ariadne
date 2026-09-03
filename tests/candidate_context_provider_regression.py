@@ -39,27 +39,27 @@ class CandidateContextProviderRegression(unittest.TestCase):
         self.assertIn("Omit optional subtitle, time, and ownership when absent", payload["messages"][0]["content"][0]["text"])
         self.assertEqual(payload["messages"][0]["content"][2]["type"], "image_url")
 
-    def test_material_type_routes_to_distinct_grounded_prompts(self) -> None:
-        prompts = {material_type: candidate_proposal_instruction(material_type) for material_type in ["Resume", "Portfolio", "Project", "Other"]}
-        self.assertEqual(len(set(prompts.values())), 4)
-        self.assertIn("distinct cases", prompts["Portfolio"])
-        self.assertIn("one coherent PROJECT item", prompts["Project"])
-        self.assertIn("uncategorized career source", prompts["Other"])
-        payload = build_deepseek_candidate_proposal_payload(SOURCE_ID, "model", [("2", b"jpeg")], "Portfolio")
-        self.assertIn("Portfolio page 2", payload["messages"][0]["content"][1]["text"])
+    def test_material_type_is_model_inferred_on_a_bounded_enum(self) -> None:
+        prompt = candidate_proposal_instruction()
+        for material_type in ["resume", "portfolio", "project", "other"]:
+            self.assertIn(material_type, prompt)
+        self.assertIn('"material_type": "resume"', prompt)
+        payload = build_deepseek_candidate_proposal_payload(SOURCE_ID, "model", [("2", b"jpeg")])
+        self.assertIn("Career-material page 2", payload["messages"][0]["content"][1]["text"])
 
     def test_unsupported_material_type_fails_closed(self) -> None:
-        with self.assertRaisesRegex(CandidateProposalError, "unsupported_candidate_material_type"):
-            candidate_proposal_instruction("Unknown")
+        with self.assertRaisesRegex(CandidateProposalError, "invalid_candidate_material_type"):
+            extract_deepseek_candidate_proposal(self.response(json.dumps({"material_type": "unknown", "items": []})), SOURCE_ID, "run-1", "model")
 
     def test_valid_json_becomes_review_only_proposal(self) -> None:
-        proposal = extract_deepseek_candidate_proposal(self.response(json.dumps({"items": [VALID_ITEM]})), SOURCE_ID, "run-1", "deepseek-v4-flash-vision-exp")
+        proposal = extract_deepseek_candidate_proposal(self.response(json.dumps({"material_type": "resume", "items": [VALID_ITEM]})), SOURCE_ID, "run-1", "deepseek-v4-flash-vision-exp")
         self.assertEqual(proposal["review_status"], "NEEDS_REVIEW")
         self.assertEqual(proposal["items"][0]["review_status"], "NEEDS_REVIEW")
         self.assertEqual(proposal["usage"]["prompt_tokens"], 123)
+        self.assertEqual(proposal["material_type"], "resume")
 
     def test_explicit_empty_items_is_a_valid_no_proposal_result(self) -> None:
-        proposal = extract_deepseek_candidate_proposal(self.response(json.dumps({"items": []})), SOURCE_ID, "run-1", "deepseek-v4-flash-vision-exp")
+        proposal = extract_deepseek_candidate_proposal(self.response(json.dumps({"material_type": "other", "items": []})), SOURCE_ID, "run-1", "deepseek-v4-flash-vision-exp")
         self.assertEqual(proposal["items"], [])
         self.assertEqual(proposal["review_status"], "NEEDS_REVIEW")
 
@@ -70,7 +70,7 @@ class CandidateContextProviderRegression(unittest.TestCase):
             extract_deepseek_candidate_proposal(self.response("not json"), SOURCE_ID, "run-1", "model")
         ungrounded = {**VALID_ITEM, "source_refs": []}
         with self.assertRaisesRegex(CandidateProposalError, "contract_failed"):
-            extract_deepseek_candidate_proposal(self.response(json.dumps({"items": [ungrounded]})), SOURCE_ID, "run-1", "model")
+            extract_deepseek_candidate_proposal(self.response(json.dumps({"material_type": "resume", "items": [ungrounded]})), SOURCE_ID, "run-1", "model")
 
 
 if __name__ == "__main__":

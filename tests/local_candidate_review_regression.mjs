@@ -162,6 +162,6 @@ assert.match(styles, /\.v1-error-dialog \{[\s\S]*max-width: min\(380px/);
 const candidateAcceptStart = pages.indexOf("const acceptCandidateFiles");
 const candidateAccept = pages.slice(candidateAcceptStart, pages.indexOf('installFileDropzone("personal-dropzone"', candidateAcceptStart));
 assert.match(candidateAccept, /candidateExecutionState = "READY"/);
-assert.match(pages, /button\.disabled = candidateProcessingInProgress \|\| candidateExecutionState === "COMPLETE"/);
+assert.match(pages, /button\.disabled = candidateProcessingInProgress \|\| \(!modelReady && candidateExecutionState === "COMPLETE"\)/);
 assert.doesNotMatch(pages.slice(pages.indexOf("function proposalReviewMarkup"), pages.indexOf("function initPersonalImport")), /candidateDuplicateScore|mergeCandidateRecords|\/api\/(?:deepseek|qwen|gemini)/);
 console.log("local_candidate_review_contract=pass");

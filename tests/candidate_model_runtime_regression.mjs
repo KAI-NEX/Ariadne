@@ -54,11 +54,17 @@ const sourceDocument = Truth.validateSourceDocument({
   material_type: "CANDIDATE", local_reference: `indexeddb://job-radar-local-first-v1/source_documents/raw-source-payload-v1%3A%3A${sourceId}`,
   batch_id: source.batch_id, provenance: { supplied_by: "USER", raw_source_recoverability: "DURABLE_BROWSER_LOCAL" }, authority: Truth.AUTHORITY.source,
 });
-const pending = CandidateModel.processingRunFor(source, snapshot.snapshot_id, "PENDING", "2026-09-03T09:01:00Z", { run_id: "run-candidate-model-js-test" });
+const consent = CandidateModel.consentFor(source, snapshot, "2026-09-03T09:00:30Z", "consent-candidate-model-js-test");
+const operationIdentity = await CandidateModel.operationIdentityFor(source, snapshot, consent);
+assert.deepEqual(await CandidateModel.operationIdentityFor(source, snapshot, consent), operationIdentity);
+assert.notEqual((await CandidateModel.operationIdentityFor(source, snapshot, CandidateModel.consentFor(source, snapshot, "2026-09-03T09:00:30Z", "different-consent"))).operation_id, operationIdentity.operation_id);
+const pending = CandidateModel.processingRunFor(source, snapshot.snapshot_id, "PENDING", "2026-09-03T09:01:00Z", { run_id: `run-${operationIdentity.operation_id}` });
 const running = CandidateModel.processingRunFor(source, snapshot.snapshot_id, "RUNNING", "2026-09-03T09:01:00Z", { run_id: pending.run_id, started_at: "2026-09-03T09:01:00Z" });
-const consent = CandidateModel.consentFor(source, snapshot, "2026-09-03T09:00:30Z");
-const request = CandidateModel.requestFor({ source, sourceDocument, documentDataUrl: "data:application/pdf;base64,JVBERi0=", snapshot, run: running, consent, candidateMaterialType: "Resume" });
+const request = CandidateModel.requestFor({ source, sourceDocument, documentDataUrl: "data:application/pdf;base64,JVBERi0=", snapshot, run: running, consent, operationIdentity });
 assert.equal(request.consent.explicitly_confirmed, true);
+assert.equal(request.operation_identity.operation_id, operationIdentity.operation_id);
+assert.equal(request.processing_run_id, `run-${operationIdentity.operation_id}`);
+assert(!("candidate_material_type" in request));
 assert.equal(request.source_document.local_reference, sourceDocument.local_reference);
 assert(!JSON.stringify(snapshot).includes("Bearer"));
 
@@ -66,6 +72,7 @@ const sourceRef = { source_ref_id: "ref-1", source_document_id: sourceId, locati
 const candidateProposal = {
   candidate_proposal_id: "provider-proposal-1", source_document_id: sourceId, processing_run_id: running.run_id,
   provider: "deepseek", model: CandidateModel.MODEL_ID, prompt_version: CandidateModel.PROMPT_VERSION, review_status: "NEEDS_REVIEW",
+  material_type: "resume",
   items: [{
     item_id: "work-1", item_type: "WORK_EXPERIENCE", title: "Product Designer", subtitle: "Synthetic Studio", time: "2024",
     summary: "Designed a documented product flow.", facts: [{ fact_id: "fact-1", label: "Role", value: "Product Designer" }], ownership: null,
@@ -77,23 +84,35 @@ const result = {
   adapter_version: CandidateModel.ADAPTER_VERSION, delivery_method: CandidateModel.DELIVERY_METHOD,
   runtime_snapshot_id: snapshot.snapshot_id, source_document_id: sourceId, content_hash: source.content_hash,
   processing_run_id: running.run_id, rendered_page_count: 3, outbound_image_count: 3,
-  provider_response_id: "response-synthetic-1", candidate_proposal: candidateProposal, network_call_made: true,
+  operation_id: operationIdentity.operation_id, provider_response_id: "response-synthetic-1", candidate_proposal: candidateProposal, network_call_made: true,
 };
-const proposals = CandidateModel.proposalsFor({ source, run: running, result, candidateMaterialType: "Resume" });
+const proposals = CandidateModel.proposalsFor({ source, run: running, result, operationIdentity });
 assert.equal(proposals.length, 1);
 assert.equal(proposals[0].status, "AWAITING_REVIEW");
 assert.equal(proposals[0].authority, Truth.AUTHORITY.proposal);
 assert.equal(proposals[0].payload.items[0].content_origin, "MODEL_PROPOSAL");
 assert.equal(proposals[0].payload.items[0].review_status, "NEEDS_REVIEW");
+assert.equal(proposals[0].payload.candidate_material_type, "resume");
+assert.equal(proposals[0].payload.candidate_material_type_source, "MODEL_INFERRED");
+assert.equal(proposals[0].payload.working_projection, true);
+assert.deepEqual(proposals[0].payload.provenance_layers, ["SOURCE_EVIDENCE", "MODEL_INFERRED"]);
 assert.equal(proposals[0].grounding_refs[0].source_document_id, sourceId);
-
-const originalProposal = structuredClone(proposals[0]);
-assert.equal(originalProposal.status, "AWAITING_REVIEW");
-assert.equal(originalProposal.payload.items[0].review_status, "NEEDS_REVIEW");
-const humanConfirmed = Review.outcomeFor({ proposal: proposals[0], decision: "CONFIRM", acceptedPayload: proposals[0].payload, currentRevision: null });
-assert.equal(humanConfirmed.revision.payload.items[0].content_origin, "MODEL_PROPOSAL");
-assert.equal(humanConfirmed.revision.confirmed_from_proposal_id, proposals[0].proposal_id);
-assert.equal(originalProposal.status, "AWAITING_REVIEW");
+assert.equal(CandidateModel.workingCardsFor(proposals)[0].authority, Truth.AUTHORITY.proposal);
+const workingModel = await CandidateModel.candidateWorkingModelFor(proposals, null, "2026-09-03T09:04:00Z");
+assert.equal(workingModel.authority, Truth.AUTHORITY.working);
+assert.equal(workingModel.version, 1);
+assert.deepEqual(workingModel.proposal_ids, proposals.map((proposal) => proposal.proposal_id));
+const editedWorkingModel = await CandidateModel.editedCandidateWorkingModel(workingModel, "work-1", { title: "Senior Product Designer", subtitle: "Synthetic Studio", time: "2024", summary: "User clarified the role.", facts: ["Senior Product Designer"] }, "2026-09-03T09:05:00Z");
+assert.equal(editedWorkingModel.version, 2);
+assert.equal(editedWorkingModel.previous_working_model_id, workingModel.working_model_id);
+assert.equal(editedWorkingModel.payload.items[0].content_origin, "USER_EDITED");
+assert.equal(editedWorkingModel.payload.items[0].working_provenance.support_relation, "USER_EDITED");
+const confirmedWorkingModel = await CandidateModel.editedCandidateWorkingModel(workingModel, "work-1", { title: "Senior Product Designer", subtitle: "Synthetic Studio", time: "2024", summary: "User confirmed the role.", facts: ["Senior Product Designer"] }, "2026-09-03T09:05:30Z", "USER_CONFIRMED");
+assert.equal(confirmedWorkingModel.payload.items[0].content_origin, "USER_CONFIRMED");
+assert.equal(confirmedWorkingModel.payload.items[0].working_provenance.support_relation, "USER_CONFIRMED");
+const workspaceOutcome = Truth.applyWorkspaceAcceptance({ working_model: editedWorkingModel, proposals, current_revision: null, expected_revision_version: 0, context_id: "candidate-workspace-context-synthetic", acceptance_id: "candidate-workspace-acceptance-synthetic", revision_id: "candidate-workspace-revision-synthetic", accepted_at: "2026-09-03T09:06:00Z" });
+assert.equal(workspaceOutcome.revision.workspace_acceptance_id, workspaceOutcome.workspace_acceptance.acceptance_id);
+assert(!("review_decision_id" in workspaceOutcome.revision));
 
 const stored = { processing_runs: new Map([[running.run_id, running]]), context_proposals: new Map() };
 const database = {
@@ -119,11 +138,26 @@ const database = {
     return transaction;
   },
 };
+await assert.rejects(
+  CandidateModel.persistSuccessfulResult(database, running, proposals, undefined, () => false),
+  /candidate_model_processing_run_stale/,
+);
+assert.equal(stored.context_proposals.size, 0);
+assert.equal(stored.processing_runs.get(running.run_id).status, "RUNNING");
 const succeeded = await CandidateModel.persistSuccessfulResult(database, running, proposals);
 assert.equal(succeeded.status, "SUCCEEDED");
 assert.deepEqual(succeeded.proposal_ids, proposals.map((proposal) => proposal.proposal_id));
 assert.equal(stored.context_proposals.size, 1);
 assert.equal(stored.processing_runs.get(running.run_id).status, "SUCCEEDED");
+const deletePlan = Review.sourceHardDeletePlan({
+  source_documents: [sourceDocument], extraction_artifacts: [], processing_runs: [succeeded], context_proposals: proposals,
+  context_review_decisions: [], candidate_working_models: [workingModel, editedWorkingModel], candidate_workspace_acceptances: [workspaceOutcome.workspace_acceptance], candidate_context_revisions: [workspaceOutcome.revision], candidate_context_lifecycle: [],
+}, sourceId);
+assert.deepEqual(deletePlan.processing_runs, [running.run_id]);
+assert.deepEqual(deletePlan.context_proposals, proposals.map((proposal) => proposal.proposal_id));
+assert.deepEqual(deletePlan.candidate_working_models, [workingModel.working_model_id, editedWorkingModel.working_model_id]);
+assert.deepEqual(deletePlan.candidate_workspace_acceptances, [workspaceOutcome.workspace_acceptance.acceptance_id]);
+assert.deepEqual(deletePlan.candidate_context_revisions, [workspaceOutcome.revision.revision_id]);
 
 const cancelledController = new AbortController();
 cancelledController.abort();
@@ -139,29 +173,63 @@ assert.equal(failed.status, "FAILED");
 assert.deepEqual(failed.proposal_ids, []);
 assert.equal(failed.error_code, "model_output_truncated");
 
+let claimPresent = false;
+const claimDatabase = {
+  transaction(storeNames) {
+    assert.deepEqual(storeNames, ["processing_runs"]);
+    const transaction = { objectStore() { return { add() {
+      const request = {};
+      queueMicrotask(() => {
+        if (claimPresent) {
+          request.error = { name: "ConstraintError" };
+          request.onerror?.({ preventDefault() {}, stopPropagation() {} });
+        } else claimPresent = true;
+        transaction.oncomplete?.();
+      });
+      return request;
+    } }; } };
+    return transaction;
+  },
+};
+assert.equal(await CandidateModel.claimProcessingRun(claimDatabase, pending), true);
+assert.equal(await CandidateModel.claimProcessingRun(claimDatabase, pending), false);
+
+const duplicateItem = { ...candidateProposal.items[0], item_id: "provider-random-duplicate" };
+const deduped = CandidateModel.proposalsFor({ source, run: running, operationIdentity, result: { ...result, candidate_proposal: { ...candidateProposal, items: [candidateProposal.items[0], duplicateItem] } } });
+assert.equal(deduped.length, 1);
+const distinctRole = { ...candidateProposal.items[0], item_id: "work-2", title: "Design Lead", time: "2025", facts: [{ fact_id: "fact-2", label: "Role", value: "Design Lead" }] };
+const distinct = CandidateModel.proposalsFor({ source, run: running, operationIdentity, result: { ...result, candidate_proposal: { ...candidateProposal, items: [candidateProposal.items[0], distinctRole] } } });
+assert.equal(distinct.length, 2);
+assert.notEqual(distinct[0].proposal_id, distinct[1].proposal_id);
+
 for (const invalidResult of [
   { ...result, model: "wrong-model" },
   { ...result, rendered_page_count: 3, outbound_image_count: 1 },
   { ...result, candidate_proposal: { ...candidateProposal, items: [{ ...candidateProposal.items[0], source_refs: [] }] } },
-]) assert.throws(() => CandidateModel.proposalsFor({ source, run: running, result: invalidResult, candidateMaterialType: "Resume" }));
+]) assert.throws(() => CandidateModel.proposalsFor({ source, run: running, result: invalidResult, operationIdentity }));
 
 const pages = fs.readFileSync(path.join(root, "public", "v1-pages.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "public", "personal-import.html"), "utf8");
-const modelRun = pages.slice(pages.indexOf("async function runCandidateModelProcessing"), pages.indexOf("function initPersonal"));
-const consentFlow = pages.slice(pages.indexOf("async function openCandidateModelConsent"), pages.indexOf("async function runCandidateModelProcessing"));
+const server = fs.readFileSync(path.join(root, "app.py"), "utf8");
+const modelRun = pages.slice(pages.indexOf("async function executeCandidateModelProcessing"), pages.indexOf("function initPersonal"));
+const consentFlow = pages.slice(pages.indexOf("async function openCandidateModelConsent"), pages.indexOf("function runCandidateModelProcessing"));
 assert.match(html, /id="candidate-model-consent-dialog"/);
 assert.match(html, /id="candidate-model-failure-dialog"/);
 assert.match(html, /id="confirm-candidate-model-failure" class="v1-dialog-dismiss" type="button">知道了</);
 assert.match(html, /deepseek-v4-flash-vision-exp/);
 assert.match(html, /这次操作会把当前文件内容发送到模型服务商进行候选人材料理解。/);
 assert.doesNotMatch(html, /candidate-model-consent-source|candidate-model-consent-outbound|v1-model-consent-note/);
-assert.ok(pages.indexOf("function openCandidateModelConsent") < pages.indexOf("async function runCandidateModelProcessing"));
+assert.ok(pages.indexOf("function openCandidateModelConsent") < pages.indexOf("function runCandidateModelProcessing"));
 assert.ok(consentFlow.indexOf("RawSource.resolveRawSource") < consentFlow.indexOf("dialog.showModal()"));
 assert.doesNotMatch(consentFlow, /fetch\(|candidate-model-structure/);
 assert.ok(modelRun.indexOf("RawSource.resolveRawSource") < modelRun.indexOf('fetch("/api/candidate-model-structure"'));
 assert.ok(modelRun.indexOf('"PENDING"') < modelRun.indexOf("RawSource.sourceDocumentForId"));
 assert.ok(modelRun.indexOf('status: "RUNNING"') < 0 || modelRun.indexOf('"RUNNING"') < modelRun.indexOf('fetch("/api/candidate-model-structure"'));
 assert.match(modelRun, /CandidateModel\.persistSuccessfulResult/);
+assert.match(modelRun, /CandidateModel\.claimProcessingRun/);
+assert.match(modelRun, /renderCandidateWorkingWorkspace/);
+assert.match(modelRun, /isCurrentOperation/);
+assert.doesNotMatch(modelRun, /persistDecision|candidate_context_revisions|context_review_decisions/);
 assert.match(modelRun, /Truth\.cancelProcessingRun/);
 assert.match(modelRun, /candidateModelAttemptGeneration/);
 assert.match(modelRun, /error\.candidateModelExecution = true/);
@@ -173,10 +241,92 @@ const styles = fs.readFileSync(path.join(root, "public", "styles.css"), "utf8");
 assert.match(styles, /\.v1-dialog-dismiss \{[\s\S]*background: transparent;[\s\S]*border: 0;/);
 assert.match(styles, /\.v1-dialog-dismiss:hover \{[\s\S]*rgba\(82,111,218,\.08\)/);
 assert.match(styles, /\.v1-dialog-dismiss:focus-visible \{[\s\S]*outline: 2px solid #526fda/);
-assert.match(styles, /\.v1-saved-source-menu \{[\s\S]*position: absolute;[\s\S]*transition: opacity 200ms ease/);
+assert.match(html, /class="runtime-selector v1-saved-source-trigger"/);
+assert.match(html, /class="runtime-menu v1-saved-source-list v1-saved-source-menu"/);
+assert.match(html, /id="saved-candidate-sources"[\s\S]*id="personal-dropzone"/);
+assert.doesNotMatch(html, /use-new-candidate-source|use-saved-candidate-source|上传新文件|选择已保存 PDF/);
+assert.doesNotMatch(pages, /candidateSourceMode|setCandidateSourceMode|use-new-candidate-source|use-saved-candidate-source/);
+assert.doesNotMatch(styles, /candidate-source-mode|v1-source-mode-action/);
+assert.match(styles, /\.v1-saved-source-menu \{ z-index: 30; \}/);
+assert.match(styles, /data-candidate-import-runtime="model-ready"\][\s\S]*#personal-file-preview/);
+const savedSourceSelection = pages.slice(pages.indexOf("async function selectSavedCandidatePdf"), pages.indexOf("function proposalItemEditor"));
+const uploadedSourceSelection = pages.slice(pages.indexOf("const acceptCandidateFiles"), pages.indexOf("installFileDropzone"));
+assert.match(savedSourceSelection, /selectedCandidateSources = \[\{/);
+assert.doesNotMatch(savedSourceSelection, /renderCandidateWorkingWorkspace/);
+assert.match(uploadedSourceSelection, /selectedCandidateSources = unique\.map/);
+assert.doesNotMatch(uploadedSourceSelection, /renderCandidateWorkingWorkspace/);
+assert.match(uploadedSourceSelection, /if \(modelReady && selectedFiles\.length !== 1\) throw new Error\("candidate_model_pdf_required"\)/);
+assert.match(html, /id="candidate-ai-workspace"/);
+assert.doesNotMatch(html, /id="candidate-workspace-source-selector"/);
+assert.doesNotMatch(html, /id="candidate-workspace-back"/);
+assert.doesNotMatch(html, /id="candidate-workspace-close"/);
+assert.match(html, /id="candidate-workspace-left-scroll"/);
+assert.match(html, /id="candidate-workspace-history"/);
+assert.match(html, /id="candidate-card-detail"/);
+assert.match(html, /id="candidate-workspace-save"[^>]*>保存到个人资料</);
+assert.match(html, /id="candidate-workspace-close-dialog"/);
+assert.match(html, /id="candidate-card-unsaved-dialog"/);
+assert.match(html, /当前的修改尚未保存，是否保存后返回？/);
+assert.doesNotMatch(html, /保存已编辑内容？/);
+assert.match(html, /id="candidate-card-unsaved-save"[^>]*>是</);
+assert.match(html, /id="candidate-card-unsaved-discard"[^>]*>否</);
+assert.match(html, /id="candidate-understanding-events"/);
+assert.match(html, /id="candidate-clarification-list"/);
+assert.match(html, /id="candidate-workspace-composer"/);
+assert.match(html, /placeholder="告诉 Ariadne 哪里需要调整"/);
+assert.doesNotMatch(html, /SYSTEM|grounding|source-scoped|非权威 Working Cards/);
+assert.match(pages, /data-entry-type="EXECUTION_EVENT"/);
+assert.match(pages, /data-entry-type="CLARIFYING_QUESTION"/);
+assert.match(pages, /CandidateModel\.editedCandidateWorkingModel/);
+assert.match(pages, /Truth\.persistCandidateWorkingModel/);
+assert.match(pages, /Truth\.applyWorkspaceAcceptance/);
+assert.match(pages, /Truth\.persistWorkspaceAcceptance/);
+assert.match(pages, /candidate_working_model_stale/);
+assert.match(pages, /function requestCandidateWorkspaceExit\(destination\)[\s\S]*candidateWorkspaceEditDirty[\s\S]*dialog\.showModal\(\)/);
+assert.match(pages, /job-radar-v1-import-view-state/);
+assert.match(pages, /job-radar-v1-workspace-back/);
+assert.match(pages, /job-radar-v1-workspace-close/);
+assert.match(pages, /function beginCandidateWorkspaceView\(\)/);
+assert.match(pages, /workspaceViewIsCurrent\(workspaceViewGeneration\)/);
+assert.match(pages, /function applyCandidateWorkspaceCorrection\(content\)/);
+assert.match(pages, /function requestCandidateCardBack\(\)/);
+assert.match(pages, /candidate-card-unsaved-dialog/);
+assert.doesNotMatch(pages, /请先保存或取消当前卡片修改。/);
+assert.match(pages, /function candidateWorkspaceFactLabel\(value\)[\s\S]*?"公司机构"/);
+assert.match(pages, /candidate-card-detail-facts[\s\S]*candidateWorkspaceFactLabel\(fact\.label\)/);
+assert.match(pages, /USER_CONFIRMED/);
+assert.match(pages, /normalizedDisplayValue/);
+assert.match(html, /id="candidate-card-back"[^>]*aria-label="返回全部卡片"/);
+assert.doesNotMatch(html, /← 返回全部卡片/);
+assert.doesNotMatch(html, /返回导入/);
+assert.match(styles, /\.v1-candidate-pane\.is-detail \.v1-candidate-pane-footer \{ display: none; \}/);
+assert.match(styles, /\.v1-detail-overlay\.is-import-workspace \.v1-detail-overlay-close::before/);
+assert.match(styles, /\.v1-embedded-detail\[data-v1-page="personal-import"\]\.v1-workspace-view \.v1-candidate-workspace-shell \{[^}]*background: transparent;[^}]*box-shadow: none;/);
+assert.match(styles, /\.v1-workspace-pane-header \{ padding: 22px 24px 14px; \}/);
+assert.doesNotMatch(styles, /\.v1-workspace-pane-header \{ border-bottom:/);
+assert.match(styles, /\.v1-candidate-pane-footer \{[^}]*padding: 12px 24px 18px;/);
+assert.match(styles, /\.v1-candidate-pane-footer \{[^}]*justify-content: flex-start;/);
+assert.doesNotMatch(styles, /\.v1-candidate-pane-footer \{[^}]*border-top:/);
+assert.match(styles, /\.v1-workspace-composer-field:focus-within \{[^}]*border-color: #526fda;[^}]*box-shadow:/);
+assert.match(styles, /\.v1-workspace-composer textarea \{[^}]*background: transparent;[^}]*border: 0;[^}]*outline: 0;/);
+assert.match(styles, /\.v1-workspace-composer button \{ align-self: center; \}/);
+assert.match(styles, /#candidate-workspace-composer textarea \{[^}]*line-height: 20px;[^}]*padding: 11px;/);
+assert.match(styles, /#candidate-card-detail \.v1-workspace-back-icon::before \{[^}]*display: block;[^}]*position: static;/);
+assert.match(styles, /#candidate-card-detail-facts > div \{[^}]*grid-template-columns: 64px minmax\(0,1fr\);/);
+assert.match(styles, /#candidate-card-detail-facts small \{ white-space: nowrap; \}/);
+assert.doesNotMatch(pages.slice(pages.indexOf("async function saveCandidateWorkspaceToProfile"), pages.indexOf("function setSavedCandidateSourceMenu")), /applyReviewDecision|persistReviewOutcome|context_review_decisions/);
+assert.doesNotMatch(html, /<small>本机来源<\/small>/);
+assert.match(styles, /\.v1-saved-source-trigger\.runtime-selector, \.v1-saved-source-menu\.runtime-menu \{ width: 100%; \}/);
 assert.match(styles, /#candidate-model-failure-dialog p \{ text-align: left; \}/);
-assert.match(styles, /\.v1-model-consent-dialog \.v1-button-row \{ justify-content: flex-start; \}/);
+assert.match(styles, /\.v1-model-consent-dialog \.v1-button-row \{ justify-content: space-between; \}/);
+assert.match(styles, /\.v1-candidate-workspace-layer \{[^}]*position: fixed;[^}]*z-index: 90;/);
+assert.match(styles, /\.v1-candidate-workspace-panels \{[^}]*gap: 12px;[^}]*grid-template-columns: minmax\(0,1\.4fr\) minmax\(340px,1fr\);/);
+assert.match(styles, /\.v1-candidate-pane,\.v1-ariadne-pane \{[^}]*border-radius: 22px;[^}]*overflow: hidden;/);
+assert.match(styles, /\.v1-workspace-scroll-region,\.v1-workspace-history \{[^}]*overflow-y: auto;/);
 assert.doesNotMatch(modelRun, /processCandidateSource|processCandidateProposal|local-candidate-structure|career_evidence|Demo\./);
 assert.equal((modelRun.match(/fetch\("\/api\/candidate-model-structure"/g) || []).length, 1);
+assert.match(server, /CANDIDATE_MODEL_EXECUTIONS\.begin\(validated_request\.operation_id, validated_request\.source_document\["source_document_id"\]\)/);
+assert.match(server, /candidate-model-operation-state\/delete/);
+assert.match(pages, /fetch\("\/api\/candidate-model-operation-state\/delete"/);
 
 console.log("candidate_model_runtime_browser_contract=pass");

@@ -9,8 +9,10 @@ from __future__ import annotations
 import base64
 import binascii
 import hashlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock
 from typing import Any, Callable
 
 from src.candidate_context import (
@@ -47,10 +49,58 @@ class CandidateModelRuntimeError(ValueError):
 class CandidateModelRequest:
     source_document: dict[str, Any]
     pdf_bytes: bytes
-    candidate_material_type: str
     processing_run_id: str
+    operation_id: str
     runtime_snapshot: dict[str, Any]
     consent_confirmed_at: str
+
+
+class CandidateModelExecutionRegistry:
+    """Process-local single-flight registry with no source or credential logging."""
+
+    def __init__(self) -> None:
+        self._lock = Lock()
+        self._active: set[str] = set()
+        self._completed: dict[str, dict[str, Any]] = {}
+        self._source_by_operation: dict[str, str] = {}
+        self._invalidated: set[str] = set()
+
+    def begin(self, operation_id: str, source_document_id: str) -> tuple[str, dict[str, Any] | None]:
+        with self._lock:
+            if operation_id in self._completed:
+                return "COMPLETED", self._completed[operation_id]
+            if operation_id in self._active:
+                return "ACTIVE", None
+            self._active.add(operation_id)
+            self._source_by_operation[operation_id] = source_document_id
+            return "CLAIMED", None
+
+    def succeed(self, operation_id: str, result: dict[str, Any]) -> bool:
+        with self._lock:
+            self._active.discard(operation_id)
+            if operation_id in self._invalidated:
+                self._invalidated.discard(operation_id)
+                self._source_by_operation.pop(operation_id, None)
+                return False
+            self._completed[operation_id] = result
+            return True
+
+    def fail(self, operation_id: str) -> None:
+        with self._lock:
+            self._active.discard(operation_id)
+            self._invalidated.discard(operation_id)
+            self._source_by_operation.pop(operation_id, None)
+
+    def forget_source(self, source_document_id: str) -> int:
+        with self._lock:
+            operation_ids = {operation_id for operation_id, source_id in self._source_by_operation.items() if source_id == source_document_id}
+            for operation_id in operation_ids:
+                if operation_id in self._active:
+                    self._invalidated.add(operation_id)
+                else:
+                    self._source_by_operation.pop(operation_id, None)
+                self._completed.pop(operation_id, None)
+            return len(operation_ids)
 
 
 def _required_string(value: Any, code: str, maximum: int = 512) -> str:
@@ -131,7 +181,7 @@ def _decode_pdf(data_url: Any, source: dict[str, Any]) -> bytes:
     return pdf_bytes
 
 
-def _validate_consent(value: Any, source: dict[str, Any], snapshot: dict[str, Any]) -> str:
+def _validate_consent(value: Any, source: dict[str, Any], snapshot: dict[str, Any]) -> tuple[str, str]:
     if not isinstance(value, dict) or value.get("explicitly_confirmed") is not True:
         raise CandidateModelRuntimeError("candidate_model_consent_required", "consent")
     if (
@@ -141,7 +191,40 @@ def _validate_consent(value: Any, source: dict[str, Any], snapshot: dict[str, An
         or value.get("delivery_method") != snapshot["delivery_method"]
     ):
         raise CandidateModelRuntimeError("candidate_model_consent_mismatch", "consent")
-    return _required_string(value.get("confirmed_at"), "candidate_model_consent_invalid", 64)
+    return (
+        _required_string(value.get("confirmed_at"), "candidate_model_consent_invalid", 64),
+        _required_string(value.get("consent_id"), "candidate_model_consent_invalid", 180),
+    )
+
+
+def runtime_fingerprint(snapshot: dict[str, Any]) -> str:
+    fields = {
+        key: snapshot.get(key)
+        for key in ("mode", "provider", "model", "protocol", "adapter_version", "prompt_version", "schema_version", "delivery_method")
+    }
+    encoded = json.dumps(fields, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+def candidate_model_operation_id(source_id: str, fingerprint: str, consent_id: str) -> str:
+    identity = f"{source_id}|CANDIDATE_MODEL_STRUCTURING|{fingerprint}|{consent_id}".encode("utf-8")
+    return "candidate-model-op-" + hashlib.sha256(identity).hexdigest()
+
+
+def _validate_operation(value: Any, source: dict[str, Any], snapshot: dict[str, Any], consent_id: str) -> str:
+    if not isinstance(value, dict):
+        raise CandidateModelRuntimeError("candidate_model_operation_identity_invalid", "request")
+    fingerprint = runtime_fingerprint(snapshot)
+    expected = candidate_model_operation_id(source["source_document_id"], fingerprint, consent_id)
+    if (
+        value.get("operation_id") != expected
+        or value.get("operation_type") != "CANDIDATE_MODEL_STRUCTURING"
+        or value.get("source_document_id") != source["source_document_id"]
+        or value.get("runtime_fingerprint") != fingerprint
+        or value.get("consent_id") != consent_id
+    ):
+        raise CandidateModelRuntimeError("candidate_model_operation_identity_invalid", "request")
+    return expected
 
 
 def validate_candidate_model_request(payload: Any) -> CandidateModelRequest:
@@ -149,13 +232,13 @@ def validate_candidate_model_request(payload: Any) -> CandidateModelRequest:
         raise CandidateModelRuntimeError("candidate_model_request_invalid", "request")
     snapshot = _validate_snapshot(payload.get("runtime_snapshot"))
     source = _validate_source(payload.get("source_document"))
-    consent_at = _validate_consent(payload.get("consent"), source, snapshot)
+    consent_at, consent_id = _validate_consent(payload.get("consent"), source, snapshot)
     run_id = _required_string(payload.get("processing_run_id"), "candidate_model_processing_run_required", 160)
-    material_type = _required_string(payload.get("candidate_material_type"), "candidate_model_material_type_invalid", 32)
-    if material_type not in {"Resume", "Portfolio", "Project", "Other"}:
-        raise CandidateModelRuntimeError("candidate_model_material_type_invalid", "request")
+    operation_id = _validate_operation(payload.get("operation_identity"), source, snapshot, consent_id)
+    if run_id != f"run-{operation_id}":
+        raise CandidateModelRuntimeError("candidate_model_operation_identity_invalid", "request")
     pdf_bytes = _decode_pdf(payload.get("document_data_url"), source)
-    return CandidateModelRequest(source, pdf_bytes, material_type, run_id, snapshot, consent_at)
+    return CandidateModelRequest(source, pdf_bytes, run_id, operation_id, snapshot, consent_at)
 
 
 def resolve_credential(credential_ref: str, reader: Callable[[], str | None]) -> str:
@@ -220,7 +303,7 @@ def execute_candidate_model_request(
     if not rendered_pages or any(not page_number or not image for page_number, image in rendered_pages):
         raise CandidateModelRuntimeError("candidate_model_pdf_render_failed", "delivery")
     provider_payload = build_deepseek_candidate_proposal_payload(
-        request.source_document["source_document_id"], MODEL_ID, rendered_pages, request.candidate_material_type,
+        request.source_document["source_document_id"], MODEL_ID, rendered_pages,
     )
     http_status, provider_response = provider_call(credential, provider_payload)
     diagnostics = response_diagnostics(provider_response, http_status)
@@ -263,11 +346,12 @@ def execute_candidate_model_request(
         "source_document_id": request.source_document["source_document_id"],
         "content_hash": request.source_document["content_hash"],
         "processing_run_id": request.processing_run_id,
+        "operation_id": request.operation_id,
         "rendered_page_count": len(rendered_pages),
         "outbound_image_count": len(rendered_pages),
         "provider_response_id": provider_response.get("id"),
         "usage": provider_response.get("usage") if isinstance(provider_response.get("usage"), dict) else {},
         "candidate_proposal": candidate_proposal,
         "network_call_made": True,
-        "persistence": "browser_review_required",
+        "persistence": "browser_working_projection_required",
     }

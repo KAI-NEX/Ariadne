@@ -29,12 +29,15 @@ from src.truth_persistence import (  # noqa: E402
     SOURCE_TYPES,
     STORE_SPECS,
     TruthPersistenceError,
+    apply_workspace_acceptance,
     apply_review_decision,
     cancel_processing_run,
     cancel_proposal,
     validate_cancelled_workflow_state,
     validate_context_revision,
     validate_candidate_context_lifecycle,
+    validate_candidate_working_model,
+    validate_candidate_workspace_acceptance,
     validate_execution_chain,
     validate_extraction_artifact,
     validate_for_store,
@@ -49,7 +52,7 @@ from src.truth_persistence import (  # noqa: E402
 
 assert CONTRACT_ID == SCHEMA["x-contract-id"]
 assert DB_NAME == SCHEMA["x-indexeddb-name"]
-assert DB_VERSION == SCHEMA["x-indexeddb-version"] == 12
+assert DB_VERSION == SCHEMA["x-indexeddb-version"] == 13
 assert STORE_SPECS == tuple((item["name"], item["keyPath"], item["lifecycle"]) for item in SCHEMA["x-stores"])
 assert NEW_STORE_SPECS == tuple(item for item in STORE_SPECS if item[2] == "new")
 assert SOURCE_TYPES == tuple(SCHEMA["$defs"]["sourceDocument"]["properties"]["source_type"]["enum"])
@@ -63,6 +66,8 @@ assert CONTEXT_TYPES == tuple(SCHEMA["$defs"]["contextRevision"]["properties"]["
 assert CANDIDATE_CONTEXT_LIFECYCLE_STATES == ("REMOVED",)
 assert FIELDS["source"] == tuple(SCHEMA["$defs"]["sourceDocument"]["required"])
 assert FIELDS["proposal"] == tuple(SCHEMA["$defs"]["proposal"]["required"])
+assert FIELDS["working"] == tuple(SCHEMA["$defs"]["candidateWorkingModel"]["required"])
+assert FIELDS["workspace_acceptance"] == tuple(SCHEMA["$defs"]["candidateWorkspaceAcceptance"]["required"])
 assert "never retroactively rewritten" in SCHEMA["x-status-semantics"]["processing_run"]
 
 
@@ -161,6 +166,11 @@ proposal = {
     "authority": AUTHORITY["proposal"],
 }
 assert validate_proposal(proposal)["authority"] == "NON_AUTHORITATIVE_PROPOSAL"
+workspace_proposal = validate_proposal({
+    **proposal,
+    "proposal_id": "proposal-candidate-model-workspace-1",
+    "payload": {"contract_id": "ariadne-model-candidate-proposal-payload-v1", "items": [{"item_id": "work-1", "review_status": "NEEDS_REVIEW"}]},
+})
 chain = validate_execution_chain({"runtime_snapshot": snapshot, "processing_run": run, "proposal": proposal, "source_documents": [source]})
 assert chain["proposal"]["proposal_id"] == proposal["proposal_id"]
 expect_error(
@@ -248,6 +258,81 @@ expect_error(
         "expected_version": 0,
         "context_id": "candidate-context-invalid",
         "revision_id": "candidate-context-invalid-v1",
+    }),
+)
+
+working_model = validate_candidate_working_model({
+    "contract_id": "ariadne-candidate-working-model-v1",
+    "working_model_id": "candidate-working-v1",
+    "source_document_id": source["source_document_id"],
+    "processing_run_id": run["run_id"],
+    "runtime_snapshot_id": snapshot.snapshot_id,
+    "proposal_ids": [workspace_proposal["proposal_id"]],
+    "version": 1,
+    "previous_working_model_id": None,
+    "fingerprint": f"sha256:{'a' * 64}",
+    "created_at": "2026-09-02T01:02:00Z",
+    "payload": {"contract_id": "ariadne-candidate-working-payload-v1", "material_type": "resume", "items": [{"item_id": "work-1", "title": "User-ready card"}]},
+    "authority": AUTHORITY["working"],
+})
+workspace_outcome = apply_workspace_acceptance({
+    "working_model": working_model,
+    "proposals": [workspace_proposal],
+    "current_revision": None,
+    "expected_revision_version": 0,
+    "context_id": "candidate-workspace-context-1",
+    "acceptance_id": "candidate-workspace-acceptance-1",
+    "revision_id": "candidate-workspace-revision-1",
+    "accepted_at": "2026-09-02T01:03:00Z",
+})
+assert validate_candidate_workspace_acceptance(workspace_outcome["workspace_acceptance"])["working_model_id"] == working_model["working_model_id"]
+assert workspace_outcome["revision"]["contract_id"] == "ariadne-context-revision-v2"
+assert workspace_outcome["revision"]["workspace_acceptance_id"] == workspace_outcome["workspace_acceptance"]["acceptance_id"]
+assert "review_decision_id" not in workspace_outcome["revision"]
+expect_error(
+    "workspace_acceptance_lineage_mismatch",
+    lambda: apply_workspace_acceptance({
+        "working_model": {**working_model, "proposal_ids": [proposal["proposal_id"]]},
+        "proposals": [proposal],
+        "current_revision": None,
+        "expected_revision_version": 0,
+        "context_id": "candidate-workspace-local-route-forbidden",
+        "acceptance_id": "candidate-workspace-local-route-forbidden",
+        "revision_id": "candidate-workspace-local-route-forbidden",
+        "accepted_at": "2026-09-02T01:03:00Z",
+    }),
+)
+working_model_v2 = validate_candidate_working_model({
+    **working_model,
+    "working_model_id": "candidate-working-v2",
+    "version": 2,
+    "previous_working_model_id": working_model["working_model_id"],
+    "fingerprint": f"sha256:{'b' * 64}",
+    "created_at": "2026-09-02T01:04:00Z",
+})
+workspace_outcome_v2 = apply_workspace_acceptance({
+    "working_model": working_model_v2,
+    "proposals": [workspace_proposal],
+    "current_revision": workspace_outcome["revision"],
+    "expected_revision_version": 1,
+    "context_id": workspace_outcome["revision"]["context_id"],
+    "acceptance_id": "candidate-workspace-acceptance-2",
+    "revision_id": "candidate-workspace-revision-2",
+    "accepted_at": "2026-09-02T01:04:30Z",
+})
+assert workspace_outcome_v2["revision"]["version"] == 2
+assert workspace_outcome_v2["revision"]["previous_revision_id"] == workspace_outcome["revision"]["revision_id"]
+expect_error(
+    "context_version_conflict",
+    lambda: apply_workspace_acceptance({
+        "working_model": working_model,
+        "proposals": [workspace_proposal],
+        "current_revision": None,
+        "expected_revision_version": 1,
+        "context_id": "candidate-workspace-context-1",
+        "acceptance_id": "candidate-workspace-acceptance-conflict",
+        "revision_id": "candidate-workspace-revision-conflict",
+        "accepted_at": "2026-09-02T01:03:00Z",
     }),
 )
 

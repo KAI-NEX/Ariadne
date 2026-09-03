@@ -302,9 +302,9 @@ assert.match(pages, /await processCandidateSource\(source, snapshot, database, c
 assert.match(pages, /async function processCandidateSource\(source, snapshot, database, signal\)[\s\S]*persistCanonicalSource/);
 assert.match(pages, /LocalCandidate\.processingRunFor\(source, snapshot\.snapshot_id, "FAILED"/);
 assert.match(pages, /if \(result\.cancelled\) \{/);
-// Completion is reachable from proposal review, candidate removal, and the
-// re-import acknowledgement for a fully completed durable source.
-assert.equal((pages.match(/completeEmbeddedImport\("personal"/g) || []).length, 3);
+// Completion is reachable from proposal review, candidate removal, durable-source
+// acknowledgement, and the accepted Candidate Workspace publication path.
+assert.equal((pages.match(/completeEmbeddedImport\("personal"/g) || []).length, 4);
 assert.match(pages.slice(pages.indexOf("async function reviewCandidateProposal"), pages.indexOf("function showCandidateSource")), /completeEmbeddedImport\("personal"/);
 assert.match(pages.slice(pages.indexOf("async function initCandidateDetail"), pages.indexOf("function jobCardMarkup")), /persistRemoval\(database, canonicalRevision, itemId\)[\s\S]*completeEmbeddedImport\("personal"/);
 assert.match(pages, /if \(!input\.disabled\) onFiles\(event\.dataTransfer\?\.files\)/);

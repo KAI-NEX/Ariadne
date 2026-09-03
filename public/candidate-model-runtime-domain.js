@@ -13,13 +13,36 @@
   const MODEL_ID = "deepseek-v4-flash-vision-exp";
   const PROTOCOL = "OPENAI_CHAT_COMPLETIONS";
   const ADAPTER_VERSION = "deepseek-candidate-pdf-v1";
-  const PROMPT_VERSION = "candidate_item_proposal_v3_compact_no_thinking";
+  const PROMPT_VERSION = "candidate_workspace_v1_auto_material";
   const SCHEMA_VERSION = "job-radar-candidate-context-v2-step1";
   const DELIVERY_METHOD = "rendered_pdf_pages";
   const CREDENTIAL_REF = "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision";
   const PAYLOAD_CONTRACT_ID = "ariadne-model-candidate-proposal-payload-v1";
   const id = (prefix) => `${prefix}-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
   const now = () => new Date().toISOString();
+
+  function canonicalJson(value) {
+    if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+    if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+    return JSON.stringify(value);
+  }
+
+  async function sha256(value) {
+    const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+
+  async function runtimeFingerprint(snapshot) {
+    const fields = Object.fromEntries(["mode", "provider", "model", "protocol", "adapter_version", "prompt_version", "schema_version", "delivery_method"].map((key) => [key, snapshot[key]]));
+    return `sha256:${await sha256(canonicalJson(fields))}`;
+  }
+
+  async function operationIdentityFor(source, snapshot, consent) {
+    const fingerprint = await runtimeFingerprint(snapshot);
+    const operationType = "CANDIDATE_MODEL_STRUCTURING";
+    const operationId = `candidate-model-op-${await sha256(`${source.source_document_id}|${operationType}|${fingerprint}|${consent.consent_id}`)}`;
+    return Object.freeze({ operation_id: operationId, operation_type: operationType, source_document_id: source.source_document_id, runtime_fingerprint: fingerprint, consent_id: consent.consent_id });
+  }
 
   function abortError() {
     if (typeof DOMException === "function") return new DOMException("candidate_model_cancelled", "AbortError");
@@ -65,6 +88,27 @@
     });
   }
 
+  function claimProcessingRun(database, pendingRun) {
+    return new Promise((resolve, reject) => {
+      const transaction = database.transaction(["processing_runs"], "readwrite");
+      let claimed = true;
+      let failure = null;
+      const request = transaction.objectStore("processing_runs").add(structuredClone(pendingRun));
+      request.onerror = (event) => {
+        if (request.error?.name === "ConstraintError") {
+          event?.preventDefault?.();
+          event?.stopPropagation?.();
+          claimed = false;
+          return;
+        }
+        failure = request.error || new Error("candidate_model_processing_run_claim_failed");
+      };
+      transaction.oncomplete = () => resolve(claimed);
+      transaction.onerror = () => reject(failure || transaction.error || new Error("candidate_model_processing_run_claim_failed"));
+      transaction.onabort = () => reject(failure || transaction.error || new Error("candidate_model_processing_run_claim_aborted"));
+    });
+  }
+
   function truthRef(ref) {
     return {
       source_document_id: ref.source_document_id,
@@ -74,7 +118,10 @@
   }
 
   function itemFor(item) {
-    const subtype = { WORK_EXPERIENCE: "work_experience", PROJECT: "project", EDUCATION: "education", OTHER: "custom_section" }[item.item_type] || "custom_section";
+    const otherLabels = (item.facts || []).map((fact) => `${fact.label} ${fact.value}`.toLowerCase()).join(" ");
+    const subtype = item.item_type === "OTHER" && /award|honou?r|奖|荣誉/.test(otherLabels) ? "award"
+      : item.item_type === "OTHER" && /skill|能力|技能|工具/.test(otherLabels) ? "skill_group"
+        : { WORK_EXPERIENCE: "work_experience", PROJECT: "project", EDUCATION: "education", OTHER: "custom_section" }[item.item_type] || "custom_section";
     return {
       item_id: item.item_id,
       item_type: item.item_type,
@@ -87,18 +134,69 @@
       ownership: item.ownership || null,
       grounding_refs: (item.source_refs || []).map(truthRef),
       confidence: "low",
-      warnings: ["model_generated_needs_review"],
+      warnings: ["model_inferred_non_authoritative"],
       uncertainties: structuredClone(item.uncertainties || []),
       review_status: "NEEDS_REVIEW",
       content_origin: "MODEL_PROPOSAL",
     };
   }
 
-  function proposalsFor({ source, run, result, candidateMaterialType }) {
+  const normalizedText = (value) => String(value || "").trim().toLocaleLowerCase().replace(/\s+/g, " ");
+  function factValue(item, labels) {
+    const match = (item.facts || []).find((fact) => labels.some((label) => normalizedText(fact.label).includes(label)));
+    return normalizedText(match?.value);
+  }
+  function exactContentIdentity(item) {
+    return canonicalJson({ item_type: item.item_type, item_subtype: item.item_subtype, title: normalizedText(item.title), subtitle: normalizedText(item.subtitle), time: normalizedText(item.time), summary: normalizedText(item.summary), facts: (item.facts || []).map((fact) => [normalizedText(fact.label), normalizedText(fact.value)]).sort(), grounding: (item.grounding_refs || []).map((ref) => [normalizedText(ref.location), normalizedText(ref.excerpt_or_reference)]).sort() });
+  }
+  function semanticIdentity(item) {
+    const common = { type: item.item_type, subtype: item.item_subtype, title: normalizedText(item.title), time: normalizedText(item.time) };
+    if (item.item_type === "WORK_EXPERIENCE") return canonicalJson({ ...common, organization: normalizedText(item.subtitle) || factValue(item, ["organization", "company", "组织", "公司"]), role: factValue(item, ["role", "title", "职位", "角色"]) || normalizedText(item.title) });
+    if (item.item_type === "PROJECT") return canonicalJson({ ...common, ownership: normalizedText(item.ownership), organization: normalizedText(item.subtitle) });
+    if (item.item_type === "EDUCATION") return canonicalJson({ ...common, institution: normalizedText(item.subtitle) });
+    if (item.item_subtype === "award") return canonicalJson({ ...common, issuer: normalizedText(item.subtitle) || factValue(item, ["issuer", "awarder", "颁发", "机构"]) });
+    if (item.item_subtype === "skill_group") return canonicalJson({ ...common, capability: factValue(item, ["skill", "capability", "能力", "技能"]), evidence: normalizedText(item.summary) });
+    return canonicalJson(common);
+  }
+  function ambiguityIdentity(item) {
+    return `${item.item_type}|${normalizedText(item.title)}|${normalizedText(item.subtitle)}`;
+  }
+  function dedupeItems(items) {
+    const accepted = [];
+    const exact = new Map();
+    const semantic = new Map();
+    for (const original of items) {
+      const item = structuredClone(original);
+      const exactKey = exactContentIdentity(item);
+      const semanticKey = semanticIdentity(item);
+      const duplicate = exact.get(exactKey) || semantic.get(semanticKey);
+      if (duplicate) {
+        duplicate.grounding_refs = [...duplicate.grounding_refs, ...(item.grounding_refs || [])].filter((ref, index, refs) => refs.findIndex((candidate) => canonicalJson(candidate) === canonicalJson(ref)) === index);
+        duplicate.uncertainties = [...duplicate.uncertainties, ...(item.uncertainties || [])].filter((uncertainty, index, values) => values.findIndex((candidate) => candidate.question === uncertainty.question) === index);
+        duplicate.dedupe_state = "deduplicated";
+        continue;
+      }
+      item.dedupe_state = "unique";
+      const ambiguous = accepted.find((candidate) => ambiguityIdentity(candidate) === ambiguityIdentity(item)
+        && semanticIdentity(candidate) !== semanticKey
+        && (!normalizedText(candidate.time) || !normalizedText(item.time) || !normalizedText(candidate.subtitle) || !normalizedText(item.subtitle)));
+      if (ambiguous) {
+        ambiguous.dedupe_state = "needs_resolution";
+        item.dedupe_state = "needs_resolution";
+      }
+      accepted.push(item);
+      exact.set(exactKey, item);
+      semantic.set(semanticKey, item);
+    }
+    return accepted;
+  }
+
+  function proposalsFor({ source, run, result, operationIdentity }) {
     assertPdfSource(source);
     if (result?.provider !== PROVIDER_ID || result?.model !== MODEL_ID || result?.protocol !== PROTOCOL
       || result?.adapter_version !== ADAPTER_VERSION || result?.delivery_method !== DELIVERY_METHOD
       || result?.runtime_snapshot_id !== run.runtime_snapshot_id || result?.processing_run_id !== run.run_id
+      || result?.operation_id !== operationIdentity?.operation_id
       || result?.source_document_id !== source.source_document_id || result?.content_hash !== source.content_hash
       || result?.network_call_made !== true || !Number.isInteger(result?.rendered_page_count) || result.rendered_page_count < 1
       || result.outbound_image_count !== result.rendered_page_count) {
@@ -112,15 +210,22 @@
       || modelProposal.review_status !== "NEEDS_REVIEW") {
       throw new Error("candidate_model_proposal_contract_failed");
     }
-    return modelProposal.items.map((modelItem) => {
-      const item = itemFor(modelItem);
+    if (!["resume", "portfolio", "project", "other"].includes(modelProposal.material_type)) throw new Error("candidate_model_material_type_invalid");
+    const groundedItems = modelProposal.items.map(itemFor);
+    groundedItems.forEach((item) => {
+      if (!item.grounding_refs.length || item.grounding_refs.some((ref) => ref.source_document_id !== source.source_document_id)) {
+        throw new Error("candidate_model_grounding_validation_failed");
+      }
+    });
+    const dedupedItems = dedupeItems(groundedItems);
+    return dedupedItems.map((item, index) => {
       const grounding = item.grounding_refs;
       if (!grounding.length || grounding.some((ref) => ref.source_document_id !== source.source_document_id)) {
         throw new Error("candidate_model_grounding_validation_failed");
       }
       return Truth.validateProposal({
         contract_id: "ariadne-context-proposal-v1",
-        proposal_id: id("proposal-candidate-model-item"),
+        proposal_id: `${operationIdentity.operation_id}-proposal-${index + 1}`,
         proposal_type: "CANDIDATE_CONTEXT",
         source_document_ids: [source.source_document_id],
         processing_run_id: run.run_id,
@@ -137,24 +242,112 @@
           delivery_method: DELIVERY_METHOD,
           provider_response_id: result.provider_response_id || null,
           rendered_page_count: result.rendered_page_count,
-          candidate_material_type: String(candidateMaterialType || "Resume").toLowerCase(),
-          candidate_material_type_source: "USER_SELECTED",
+          operation_id: operationIdentity.operation_id,
+          candidate_material_type: modelProposal.material_type,
+          candidate_material_type_source: "MODEL_INFERRED",
           items: [item],
-          manual_review_required: true,
+          manual_review_required: false,
+          working_projection: true,
+          provenance_layers: ["SOURCE_EVIDENCE", "MODEL_INFERRED"],
           unstructured_evidence_reason: null,
         },
         grounding_refs: grounding,
-        warnings: ["MODEL_OUTPUT_REQUIRES_HUMAN_REVIEW"],
+        warnings: ["MODEL_OUTPUT_NON_AUTHORITATIVE"],
         uncertainties: structuredClone(item.uncertainties),
         authority: Truth.AUTHORITY.proposal,
       });
     });
   }
 
-  function consentFor(source, snapshot, confirmedAt = now()) {
+  function workingCardsFor(proposals) {
+    const modelProposals = (proposals || []).filter((proposal) => proposal?.payload?.contract_id === PAYLOAD_CONTRACT_ID && proposal.authority === Truth.AUTHORITY.proposal);
+    const sourceIds = new Set(modelProposals.flatMap((proposal) => proposal.source_document_ids || []));
+    if (sourceIds.size > 1) throw new Error("candidate_working_projection_source_scope_required");
+    return dedupeItems(modelProposals.flatMap((proposal) => proposal.payload.items || [])).map((item) => Object.freeze({
+      ...item,
+      authority: Truth.AUTHORITY.proposal,
+      workspace_state: "WORKING_PROPOSAL",
+      source_document_id: [...sourceIds][0] || null,
+    }));
+  }
+
+  async function candidateWorkingModelFor(proposals, previousModel = null, createdAt = now()) {
+    const modelProposals = (proposals || []).map(Truth.validateProposal).filter((proposal) => proposal.payload?.contract_id === PAYLOAD_CONTRACT_ID);
+    if (!modelProposals.length) throw new Error("candidate_working_model_proposals_required");
+    const cards = workingCardsFor(modelProposals).map((card) => {
+      const item = structuredClone(card);
+      delete item.authority;
+      delete item.workspace_state;
+      delete item.source_document_id;
+      return item;
+    });
+    const sourceIds = new Set(modelProposals.flatMap((proposal) => proposal.source_document_ids));
+    const runIds = new Set(modelProposals.map((proposal) => proposal.processing_run_id));
+    const snapshotIds = new Set(modelProposals.map((proposal) => proposal.runtime_snapshot_id));
+    if (sourceIds.size !== 1 || runIds.size !== 1 || snapshotIds.size !== 1) throw new Error("candidate_working_model_lineage_invalid");
+    const previous = previousModel ? Truth.validateCandidateWorkingModel(previousModel) : null;
+    const sourceDocumentId = [...sourceIds][0];
+    if (previous && previous.source_document_id !== sourceDocumentId) throw new Error("candidate_working_model_source_mismatch");
+    const payload = {
+      contract_id: "ariadne-candidate-working-payload-v1",
+      material_type: modelProposals[0].payload.candidate_material_type,
+      items: cards,
+    };
+    const fingerprint = `sha256:${await sha256(canonicalJson(payload))}`;
+    const version = (previous?.version || 0) + 1;
+    return Truth.validateCandidateWorkingModel({
+      contract_id: "ariadne-candidate-working-model-v1",
+      working_model_id: `${sourceDocumentId}-working-v${version}-${fingerprint.slice(7, 19)}`,
+      source_document_id: sourceDocumentId,
+      processing_run_id: [...runIds][0],
+      runtime_snapshot_id: [...snapshotIds][0],
+      proposal_ids: modelProposals.map((proposal) => proposal.proposal_id),
+      version,
+      previous_working_model_id: previous?.working_model_id || null,
+      fingerprint,
+      created_at: createdAt,
+      payload,
+      authority: Truth.AUTHORITY.working,
+    });
+  }
+
+  async function editedCandidateWorkingModel(currentModel, itemId, patch, createdAt = now(), supportRelation = "USER_EDITED") {
+    const current = Truth.validateCandidateWorkingModel(currentModel);
+    if (!["USER_EDITED", "USER_CONFIRMED"].includes(supportRelation)) throw new Error("candidate_working_edit_support_relation_invalid");
+    const items = structuredClone(current.payload.items || []);
+    const index = items.findIndex((item) => item.item_id === itemId);
+    if (index < 0) throw new Error("candidate_working_item_not_found");
+    const title = String(patch?.title || "").trim();
+    if (!title) throw new Error("candidate_working_edit_title_required");
+    const original = items[index];
+    items[index] = {
+      ...original,
+      title,
+      subtitle: String(patch.subtitle || "").trim() || null,
+      time: String(patch.time || "").trim() || null,
+      summary: String(patch.summary || "").trim() || null,
+      facts: (patch.facts || []).map((value, factIndex) => ({ fact_id: original.facts?.[factIndex]?.fact_id || `working-fact-${factIndex + 1}`, label: original.facts?.[factIndex]?.label || "用户补充", value: String(value).trim() })).filter((fact) => fact.value),
+      content_origin: supportRelation,
+      working_provenance: { support_relation: supportRelation, updated_at: createdAt, paths: [`/items/${index}`] },
+    };
+    const payload = { ...structuredClone(current.payload), items };
+    const fingerprint = `sha256:${await sha256(canonicalJson(payload))}`;
+    return Truth.validateCandidateWorkingModel({
+      ...current,
+      working_model_id: `${current.source_document_id}-working-v${current.version + 1}-${fingerprint.slice(7, 19)}`,
+      version: current.version + 1,
+      previous_working_model_id: current.working_model_id,
+      fingerprint,
+      created_at: createdAt,
+      payload,
+    });
+  }
+
+  function consentFor(source, snapshot, confirmedAt = now(), consentId = id("consent-candidate-model")) {
     assertPdfSource(source);
     return Object.freeze({
       explicitly_confirmed: true,
+      consent_id: consentId,
       source_document_id: source.source_document_id,
       provider: snapshot.provider,
       model: snapshot.model,
@@ -163,20 +356,20 @@
     });
   }
 
-  function requestFor({ source, sourceDocument, documentDataUrl, snapshot, run, consent, candidateMaterialType }) {
+  function requestFor({ source, sourceDocument, documentDataUrl, snapshot, run, consent, operationIdentity }) {
     assertPdfSource(source);
     if (!sourceDocument?.local_reference || !documentDataUrl?.startsWith("data:application/pdf;base64,")) throw new Error("candidate_model_source_not_resolved");
     return Object.freeze({
       source_document: structuredClone(sourceDocument),
       document_data_url: documentDataUrl,
-      candidate_material_type: candidateMaterialType,
       runtime_snapshot: structuredClone(snapshot),
       processing_run_id: run.run_id,
       consent: structuredClone(consent),
+      operation_identity: structuredClone(operationIdentity),
     });
   }
 
-  function persistSuccessfulResult(database, runningRun, proposals, signal) {
+  function persistSuccessfulResult(database, runningRun, proposals, signal, isActive = () => true) {
     if (signal?.aborted) return Promise.reject(abortError());
     const succeeded = processingRunFor({ source_document_id: runningRun.source_document_id, batch_id: runningRun.batch_id }, runningRun.runtime_snapshot_id, "SUCCEEDED", runningRun.started_at, {
       run_id: runningRun.run_id,
@@ -197,6 +390,7 @@
             throw new Error("candidate_model_processing_run_stale");
           }
           if (signal?.aborted) throw abortError();
+          if (!isActive()) throw new Error("candidate_model_processing_run_stale");
           proposals.forEach((proposal) => transaction.objectStore("context_proposals").add(structuredClone(proposal)));
           transaction.objectStore("processing_runs").put(structuredClone(succeeded));
         } catch (error) { contractError = error; transaction.abort(); }
@@ -220,8 +414,14 @@
     PAYLOAD_CONTRACT_ID,
     assertEligibleGate,
     assertPdfSource,
+    runtimeFingerprint,
+    operationIdentityFor,
     processingRunFor,
+    claimProcessingRun,
     proposalsFor,
+    workingCardsFor,
+    candidateWorkingModelFor,
+    editedCandidateWorkingModel,
     consentFor,
     requestFor,
     persistSuccessfulResult,

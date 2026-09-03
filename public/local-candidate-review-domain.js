@@ -238,13 +238,15 @@
       processing_runs: (records.processing_runs || []).filter((run) => run.source_document_id === sourceId).map((run) => run.run_id),
       context_proposals: proposals.map((proposal) => proposal.proposal_id),
       context_review_decisions: (records.context_review_decisions || []).filter((review) => proposalIds.has(review.proposal_id)).map((review) => review.review_id),
+      candidate_working_models: (records.candidate_working_models || []).filter((model) => model.source_document_id === sourceId).map((model) => model.working_model_id),
+      candidate_workspace_acceptances: (records.candidate_workspace_acceptances || []).filter((acceptance) => acceptance.source_document_id === sourceId).map((acceptance) => acceptance.acceptance_id),
       candidate_context_revisions: [...revisionIds],
       candidate_context_lifecycle: (records.candidate_context_lifecycle || []).filter((record) => contextIds.has(record.context_id) || revisionIds.has(record.removed_from_revision_id)).map((record) => record.lifecycle_id),
     });
   }
 
   function persistSourceHardDelete(database, sourceId) {
-    const stores = ["source_documents", "extraction_artifacts", "processing_runs", "context_proposals", "context_review_decisions", "candidate_context_revisions", "candidate_context_lifecycle"];
+    const stores = ["source_documents", "extraction_artifacts", "processing_runs", "context_proposals", "context_review_decisions", "candidate_working_models", "candidate_workspace_acceptances", "candidate_context_revisions", "candidate_context_lifecycle"];
     return new Promise((resolve, reject) => {
       const transaction = database.transaction(stores, "readwrite");
       const records = {};

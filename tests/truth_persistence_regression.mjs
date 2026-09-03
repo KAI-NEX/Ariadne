@@ -24,7 +24,10 @@ assert.deepEqual([...Truth.FIELDS.run], schema.$defs.processingRun.required);
 assert.deepEqual([...Truth.FIELDS.batch], schema.$defs.processingBatch.required);
 assert.deepEqual([...Truth.FIELDS.proposal], schema.$defs.proposal.required);
 assert.deepEqual([...Truth.FIELDS.review], schema.$defs.reviewDecision.required);
+assert.deepEqual([...Truth.FIELDS.working], schema.$defs.candidateWorkingModel.required);
+assert.deepEqual([...Truth.FIELDS.workspace_acceptance], schema.$defs.candidateWorkspaceAcceptance.required);
 assert.deepEqual([...Truth.FIELDS.revision], schema.$defs.contextRevision.required);
+assert.deepEqual([...Truth.FIELDS.workspace_revision], schema.$defs.workspaceContextRevision.required);
 assert.deepEqual([...Truth.FIELDS.lifecycle], schema.$defs.candidateContextLifecycle.required);
 assert.deepEqual([...Truth.SOURCE_TYPES], schema.$defs.sourceDocument.properties.source_type.enum);
 assert.deepEqual([...Truth.MATERIAL_TYPES], schema.$defs.sourceDocument.properties.material_type.enum);
@@ -131,6 +134,7 @@ const proposal = {
   authority: Truth.AUTHORITY.proposal,
 };
 assert.equal(Truth.validateProposal(proposal).authority, "NON_AUTHORITATIVE_PROPOSAL");
+const workspaceProposal = Truth.validateProposal({ ...proposal, proposal_id: "proposal-candidate-model-workspace-1", payload: { contract_id: "ariadne-model-candidate-proposal-payload-v1", items: [{ item_id: "work-1", review_status: "NEEDS_REVIEW" }] } });
 assert.equal(Truth.validateExecutionChain({ runtime_snapshot: localSnapshot, processing_run: run, proposal, source_documents: [source] }).proposal.proposal_id, proposal.proposal_id);
 assert.throws(
   () => Truth.validateExecutionChain({ runtime_snapshot: { ...localSnapshot, snapshot_id: "runtime-snapshot-other" }, processing_run: run, proposal, source_documents: [source] }),
@@ -210,6 +214,45 @@ assert.throws(
 assert.throws(
   () => Truth.applyReviewDecision({ proposal: { ...proposal, grounding_refs: [] }, review_decision: confirm, current_revision: null, expected_version: 0, context_id: "candidate-context-invalid", revision_id: "candidate-context-invalid-v1" }),
   (error) => error.code === "proposal_grounding_refs_invalid",
+);
+
+const workingModel = Truth.validateCandidateWorkingModel({
+  contract_id: "ariadne-candidate-working-model-v1",
+  working_model_id: "candidate-working-v1",
+  source_document_id: source.source_document_id,
+  processing_run_id: run.run_id,
+  runtime_snapshot_id: localSnapshot.snapshot_id,
+  proposal_ids: [workspaceProposal.proposal_id],
+  version: 1,
+  previous_working_model_id: null,
+  fingerprint: `sha256:${"a".repeat(64)}`,
+  created_at: "2026-09-02T01:02:00Z",
+  payload: { contract_id: "ariadne-candidate-working-payload-v1", material_type: "resume", items: [{ item_id: "work-1", title: "User-ready card" }] },
+  authority: Truth.AUTHORITY.working,
+});
+const workspaceOutcome = Truth.applyWorkspaceAcceptance({
+  working_model: workingModel,
+  proposals: [workspaceProposal],
+  current_revision: null,
+  expected_revision_version: 0,
+  context_id: "candidate-workspace-context-1",
+  acceptance_id: "candidate-workspace-acceptance-1",
+  revision_id: "candidate-workspace-revision-1",
+  accepted_at: "2026-09-02T01:03:00Z",
+});
+assert.equal(workspaceOutcome.workspace_acceptance.authority, Truth.AUTHORITY.workspace_acceptance);
+assert.equal(workspaceOutcome.workspace_acceptance.working_model_fingerprint, workingModel.fingerprint);
+assert.equal(workspaceOutcome.revision.contract_id, "ariadne-context-revision-v2");
+assert.equal(workspaceOutcome.revision.workspace_acceptance_id, workspaceOutcome.workspace_acceptance.acceptance_id);
+assert.equal(workspaceOutcome.revision.previous_revision_id, null);
+assert(!("review_decision_id" in workspaceOutcome.revision));
+assert.throws(
+  () => Truth.applyWorkspaceAcceptance({ working_model: { ...workingModel, proposal_ids: [proposal.proposal_id] }, proposals: [proposal], current_revision: null, expected_revision_version: 0, context_id: "candidate-workspace-local-route-forbidden", acceptance_id: "candidate-workspace-local-route-forbidden", revision_id: "candidate-workspace-local-route-forbidden", accepted_at: "2026-09-02T01:03:00Z" }),
+  (error) => error.code === "workspace_acceptance_lineage_mismatch",
+);
+assert.throws(
+  () => Truth.applyWorkspaceAcceptance({ ...workspaceOutcome, working_model: workingModel, proposals: [workspaceProposal], current_revision: null, expected_revision_version: 1, context_id: "candidate-workspace-context-1", acceptance_id: "candidate-workspace-acceptance-conflict", revision_id: "candidate-workspace-revision-conflict", accepted_at: "2026-09-02T01:03:00Z" }),
+  (error) => error.code === "context_version_conflict",
 );
 
 const jobSource = { ...source, source_document_id: "source-job-1", material_type: "JOB", filename: "job.md", source_type: "MARKDOWN", content_hash: "sha256:job-1" };
@@ -407,13 +450,33 @@ await assert.rejects(Truth.persistRecord(memoryDb, "runtime_snapshots", localSna
 await Truth.persistRecord(memoryDb, "extraction_artifacts", artifact);
 await Truth.persistRecord(memoryDb, "processing_runs", run);
 await Truth.persistRecord(memoryDb, "context_proposals", proposal);
+await Truth.persistRecord(memoryDb, "context_proposals", workspaceProposal);
 assert.equal(memoryDb.records.get("context_proposals").get(proposal.proposal_id).authority, "NON_AUTHORITATIVE_PROPOSAL");
 assert.equal(memoryDb.records.get("candidate_context_revisions").size, 0); // Persisted Proposal is still not authoritative.
+await Truth.persistRecord(memoryDb, "candidate_working_models", workingModel);
+assert.equal(memoryDb.records.get("candidate_context_revisions").size, 0); // Working Model is still not authoritative.
+const reviewCountBeforeWorkspaceAcceptance = memoryDb.records.get("context_review_decisions").size;
+await Truth.persistWorkspaceAcceptance(memoryDb, workspaceOutcome);
+assert(memoryDb.records.get("candidate_workspace_acceptances").has(workspaceOutcome.workspace_acceptance.acceptance_id));
+assert(memoryDb.records.get("candidate_context_revisions").has(workspaceOutcome.revision.revision_id));
+assert.equal(memoryDb.records.get("context_review_decisions").size, reviewCountBeforeWorkspaceAcceptance); // Workspace acceptance never fabricates item reviews.
+const newerWorkingModel = Truth.validateCandidateWorkingModel({ ...workingModel, working_model_id: "candidate-working-v2", version: 2, previous_working_model_id: workingModel.working_model_id, fingerprint: `sha256:${"b".repeat(64)}`, created_at: "2026-09-02T01:04:00Z" });
+await Truth.persistCandidateWorkingModel(memoryDb, newerWorkingModel);
+const parallelWorkingModel = Truth.validateCandidateWorkingModel({ ...newerWorkingModel, working_model_id: "candidate-working-v2-parallel", fingerprint: `sha256:${"c".repeat(64)}` });
+await assert.rejects(Truth.persistCandidateWorkingModel(memoryDb, parallelWorkingModel), (error) => error.code === "candidate_working_model_stale");
+const workspaceOutcomeV2 = Truth.applyWorkspaceAcceptance({ working_model: newerWorkingModel, proposals: [workspaceProposal], current_revision: workspaceOutcome.revision, expected_revision_version: 1, context_id: workspaceOutcome.revision.context_id, acceptance_id: "candidate-workspace-acceptance-2", revision_id: "candidate-workspace-revision-2", accepted_at: "2026-09-02T01:04:30Z" });
+await Truth.persistWorkspaceAcceptance(memoryDb, workspaceOutcomeV2);
+assert.equal(workspaceOutcomeV2.revision.version, 2);
+assert.equal(workspaceOutcomeV2.revision.previous_revision_id, workspaceOutcome.revision.revision_id);
+assert.equal(memoryDb.records.get("context_review_decisions").size, reviewCountBeforeWorkspaceAcceptance);
+const staleWorkspaceOutcome = Truth.applyWorkspaceAcceptance({ working_model: workingModel, proposals: [workspaceProposal], current_revision: null, expected_revision_version: 0, context_id: "candidate-workspace-stale", acceptance_id: "candidate-workspace-acceptance-stale", revision_id: "candidate-workspace-revision-stale", accepted_at: "2026-09-02T01:05:00Z" });
+await assert.rejects(Truth.persistWorkspaceAcceptance(memoryDb, staleWorkspaceOutcome), (error) => error.code === "candidate_working_model_stale");
+assert.equal(memoryDb.records.get("candidate_workspace_acceptances").has(staleWorkspaceOutcome.workspace_acceptance.acceptance_id), false);
 const persistedCancellationCandidate = { ...proposal, proposal_id: "proposal-cancelled-after-persist" };
 await Truth.persistRecord(memoryDb, "context_proposals", persistedCancellationCandidate);
 await Truth.persistRecord(memoryDb, "context_proposals", Truth.cancelProposal(persistedCancellationCandidate));
 assert.equal(memoryDb.records.get("context_proposals").get(persistedCancellationCandidate.proposal_id).status, "CANCELLED_BY_USER");
-assert.equal(memoryDb.records.get("candidate_context_revisions").size, 0);
+assert.equal(memoryDb.records.get("candidate_context_revisions").size, 2);
 const cancelledPersistenceReview = { ...confirm, review_id: "review-cancelled-persistence", proposal_id: persistedCancellationCandidate.proposal_id };
 const cancelledPersistenceOutcome = {
   proposal: { ...persistedCancellationCandidate, status: "ACCEPTED" },
@@ -427,13 +490,13 @@ const cancelledPersistenceOutcome = {
   },
 };
 await assert.rejects(Truth.persistReviewOutcome(memoryDb, cancelledPersistenceOutcome), (error) => error.code === "proposal_not_reviewable");
-assert.equal(memoryDb.records.get("candidate_context_revisions").size, 0);
+assert.equal(memoryDb.records.get("candidate_context_revisions").size, 2);
 await Truth.persistRecord(memoryDb, "processing_batches", currentSourceCancelledBatch);
 await Truth.persistRecord(memoryDb, "processing_runs", inFlightAfterWorkflowCancel);
 await Truth.persistRecord(memoryDb, "processing_runs", lateSucceededRun);
 assert.equal(memoryDb.records.get("processing_batches").get(currentSourceCancelledBatch.batch_id).status, "CANCELLED");
 assert.equal(memoryDb.records.get("processing_runs").get(lateSucceededRun.run_id).status, "SUCCEEDED");
-assert.equal(memoryDb.records.get("candidate_context_revisions").size, 0);
+assert.equal(memoryDb.records.get("candidate_context_revisions").size, 2);
 await Truth.persistReviewOutcome(memoryDb, confirmed);
 assert(memoryDb.records.get("context_review_decisions").has(confirm.review_id));
 assert(memoryDb.records.get("candidate_context_revisions").has(confirmed.revision.revision_id));
@@ -461,15 +524,15 @@ const persistedRejectedOutcome = Truth.applyReviewDecision({ proposal: persisted
 await Truth.persistRecord(memoryDb, "context_proposals", persistedRejectionProposal);
 await Truth.persistReviewOutcome(memoryDb, persistedRejectedOutcome);
 assert(memoryDb.records.get("context_review_decisions").has(persistedRejectionDecision.review_id));
-assert.equal(memoryDb.records.get("candidate_context_revisions").size, 1); // Reject creates no revision.
+assert.equal(memoryDb.records.get("candidate_context_revisions").size, 3); // Reject creates no revision.
 await Truth.persistRecord(memoryDb, "processing_batches", cancelledBatch);
 assert.equal(memoryDb.records.get("processing_batches").get(cancelledBatch.batch_id).status, "CANCELLED");
-assert.equal(memoryDb.records.get("candidate_context_revisions").size, 1); // Prior success remains; cancelled/not-started sources create no revision and cause no rollback.
+assert.equal(memoryDb.records.get("candidate_context_revisions").size, 3); // Prior successes remain; cancelled/not-started sources create no revision and cause no rollback.
 
 const openers = ["v1-demo-domain.js", "career-evidence.js", "local-first.js", "career-profile.js", "local-jobs.js"];
 for (const filename of openers) {
   const sourceText = fs.readFileSync(path.join(root, "public", filename), "utf8");
-  assert.match(sourceText, /const DB_VERSION = 12;/, `${filename} must open IndexedDB v12`);
+  assert.match(sourceText, /const DB_VERSION = 13;/, `${filename} must open IndexedDB v13`);
   for (const spec of Truth.NEW_STORE_SPECS) {
     assert(sourceText.includes(`"${spec.name}"`), `${filename} must add ${spec.name}`);
     assert(sourceText.includes(`"${spec.keyPath}"`), `${filename} must use ${spec.keyPath}`);

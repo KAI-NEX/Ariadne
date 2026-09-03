@@ -10,7 +10,7 @@
 
   const CONTRACT_ID = "ariadne-truth-persistence-v1";
   const DB_NAME = "job-radar-local-first-v1";
-  const DB_VERSION = 12;
+  const DB_VERSION = 13;
   const STORE_SPECS = Object.freeze([
     Object.freeze({ name: "source_documents", keyPath: "source_document_id", lifecycle: "reused" }),
     Object.freeze({ name: "runtime_snapshots", keyPath: "snapshot_id", lifecycle: "new" }),
@@ -19,6 +19,8 @@
     Object.freeze({ name: "processing_batches", keyPath: "batch_id", lifecycle: "new" }),
     Object.freeze({ name: "context_proposals", keyPath: "proposal_id", lifecycle: "new" }),
     Object.freeze({ name: "context_review_decisions", keyPath: "review_id", lifecycle: "new" }),
+    Object.freeze({ name: "candidate_working_models", keyPath: "working_model_id", lifecycle: "new" }),
+    Object.freeze({ name: "candidate_workspace_acceptances", keyPath: "acceptance_id", lifecycle: "new" }),
     Object.freeze({ name: "candidate_context_revisions", keyPath: "revision_id", lifecycle: "new" }),
     Object.freeze({ name: "candidate_context_lifecycle", keyPath: "lifecycle_id", lifecycle: "new" }),
     Object.freeze({ name: "job_context_revisions", keyPath: "revision_id", lifecycle: "new" }),
@@ -39,6 +41,8 @@
     "runtime_snapshots",
     "extraction_artifacts",
     "context_review_decisions",
+    "candidate_working_models",
+    "candidate_workspace_acceptances",
     "candidate_context_revisions",
     "candidate_context_lifecycle",
     "job_context_revisions",
@@ -49,6 +53,8 @@
     execution: "EXECUTION_HISTORY",
     proposal: "NON_AUTHORITATIVE_PROPOSAL",
     review: "AUTHORITATIVE_USER_DECISION",
+    working: "NON_AUTHORITATIVE_WORKING_MODEL",
+    workspace_acceptance: "AUTHORITATIVE_WORKSPACE_ACCEPTANCE",
     revision: "AUTHORITATIVE_CONFIRMED_CONTEXT",
     lifecycle: "AUTHORITATIVE_USER_DECISION",
   });
@@ -69,7 +75,10 @@
     batch: Object.freeze(["contract_id", "batch_id", "operation_type", "source_document_ids", "completed_source_ids", "cancelled_source_id", "not_started_source_ids", "status", "created_at", "finished_at", "cancelled_at", "cancel_reason", "authority"]),
     proposal: Object.freeze(["contract_id", "proposal_id", "proposal_type", "source_document_ids", "processing_run_id", "runtime_snapshot_id", "status", "created_at", "payload", "grounding_refs", "warnings", "uncertainties", "authority"]),
     review: Object.freeze(["contract_id", "review_id", "proposal_id", "decision", "reviewed_at", "accepted_payload", "authority"]),
+    working: Object.freeze(["contract_id", "working_model_id", "source_document_id", "processing_run_id", "runtime_snapshot_id", "proposal_ids", "version", "previous_working_model_id", "fingerprint", "created_at", "payload", "authority"]),
+    workspace_acceptance: Object.freeze(["contract_id", "acceptance_id", "context_id", "source_document_id", "processing_run_id", "runtime_snapshot_id", "proposal_ids", "working_model_id", "working_model_version", "working_model_fingerprint", "accepted_at", "confirmed_revision_id", "previous_revision_id", "accepted_payload", "authority"]),
     revision: Object.freeze(["contract_id", "context_type", "context_id", "revision_id", "version", "previous_revision_id", "confirmed_from_proposal_id", "review_decision_id", "created_at", "provenance", "payload", "authority"]),
+    workspace_revision: Object.freeze(["contract_id", "context_type", "context_id", "revision_id", "version", "previous_revision_id", "workspace_acceptance_id", "created_at", "provenance", "payload", "authority"]),
     lifecycle: Object.freeze(["contract_id", "lifecycle_id", "context_id", "item_id", "state", "removed_from_revision_id", "removed_at", "reason", "authority"]),
   });
 
@@ -407,33 +416,96 @@
     });
   }
 
+  function validateCandidateWorkingModel(model) {
+    const value = prepare(model, FIELDS.working, "candidate_working_model");
+    if (value.contract_id !== "ariadne-candidate-working-model-v1") throw new TruthPersistenceError("candidate_working_model_contract_invalid");
+    if (value.authority !== AUTHORITY.working) throw new TruthPersistenceError("candidate_working_model_authority_invalid");
+    if (!Number.isInteger(value.version) || value.version < 1) throw new TruthPersistenceError("candidate_working_model_version_invalid");
+    const previousWorkingModelId = value.previous_working_model_id === null ? null : requiredString(value.previous_working_model_id, "candidate_working_model_previous_id_invalid");
+    if ((value.version === 1) !== (previousWorkingModelId === null)) throw new TruthPersistenceError("candidate_working_model_lineage_invalid");
+    const fingerprint = requiredString(value.fingerprint, "candidate_working_model_fingerprint_invalid");
+    if (!/^sha256:[a-f0-9]{64}$/.test(fingerprint)) throw new TruthPersistenceError("candidate_working_model_fingerprint_invalid");
+    return Object.freeze({
+      contract_id: value.contract_id,
+      working_model_id: requiredString(value.working_model_id, "candidate_working_model_id_invalid"),
+      source_document_id: requiredString(value.source_document_id, "candidate_working_model_source_id_invalid"),
+      processing_run_id: requiredString(value.processing_run_id, "candidate_working_model_run_id_invalid"),
+      runtime_snapshot_id: requiredString(value.runtime_snapshot_id, "candidate_working_model_snapshot_id_invalid"),
+      proposal_ids: stringArray(value.proposal_ids, "candidate_working_model_proposal_ids_invalid", { nonEmpty: true }),
+      version: value.version,
+      previous_working_model_id: previousWorkingModelId,
+      fingerprint,
+      created_at: validIso(value.created_at, "candidate_working_model_created_at_invalid"),
+      payload: plainObject(value.payload, "candidate_working_model_payload_invalid"),
+      authority: value.authority,
+    });
+  }
+
+  function validateCandidateWorkspaceAcceptance(acceptance) {
+    const value = prepare(acceptance, FIELDS.workspace_acceptance, "candidate_workspace_acceptance");
+    if (value.contract_id !== "ariadne-candidate-workspace-acceptance-v1") throw new TruthPersistenceError("candidate_workspace_acceptance_contract_invalid");
+    if (value.authority !== AUTHORITY.workspace_acceptance) throw new TruthPersistenceError("candidate_workspace_acceptance_authority_invalid");
+    if (!Number.isInteger(value.working_model_version) || value.working_model_version < 1) throw new TruthPersistenceError("candidate_workspace_acceptance_version_invalid");
+    const fingerprint = requiredString(value.working_model_fingerprint, "candidate_workspace_acceptance_fingerprint_invalid");
+    if (!/^sha256:[a-f0-9]{64}$/.test(fingerprint)) throw new TruthPersistenceError("candidate_workspace_acceptance_fingerprint_invalid");
+    return Object.freeze({
+      contract_id: value.contract_id,
+      acceptance_id: requiredString(value.acceptance_id, "candidate_workspace_acceptance_id_invalid"),
+      context_id: requiredString(value.context_id, "candidate_workspace_acceptance_context_id_invalid"),
+      source_document_id: requiredString(value.source_document_id, "candidate_workspace_acceptance_source_id_invalid"),
+      processing_run_id: requiredString(value.processing_run_id, "candidate_workspace_acceptance_run_id_invalid"),
+      runtime_snapshot_id: requiredString(value.runtime_snapshot_id, "candidate_workspace_acceptance_snapshot_id_invalid"),
+      proposal_ids: stringArray(value.proposal_ids, "candidate_workspace_acceptance_proposal_ids_invalid", { nonEmpty: true }),
+      working_model_id: requiredString(value.working_model_id, "candidate_workspace_acceptance_working_model_id_invalid"),
+      working_model_version: value.working_model_version,
+      working_model_fingerprint: fingerprint,
+      accepted_at: validIso(value.accepted_at, "candidate_workspace_acceptance_timestamp_invalid"),
+      confirmed_revision_id: requiredString(value.confirmed_revision_id, "candidate_workspace_acceptance_revision_id_invalid"),
+      previous_revision_id: value.previous_revision_id === null ? null : requiredString(value.previous_revision_id, "candidate_workspace_acceptance_previous_revision_id_invalid"),
+      accepted_payload: plainObject(value.accepted_payload, "candidate_workspace_acceptance_payload_invalid"),
+      authority: value.authority,
+    });
+  }
+
+  function normalizedRevisionProvenance(value) {
+    const provenance = plainObject(value, "context_revision_provenance_invalid");
+    if (JSON.stringify(Object.keys(provenance).sort()) !== JSON.stringify(["processing_run_id", "runtime_snapshot_id", "source_document_ids"])) throw new TruthPersistenceError("context_revision_provenance_shape_invalid");
+    return {
+      source_document_ids: stringArray(provenance.source_document_ids, "context_revision_source_ids_invalid", { nonEmpty: true }),
+      processing_run_id: requiredString(provenance.processing_run_id, "context_revision_run_id_invalid"),
+      runtime_snapshot_id: requiredString(provenance.runtime_snapshot_id, "context_revision_snapshot_id_invalid"),
+    };
+  }
+
   function validateContextRevision(revision) {
-    const value = prepare(revision, FIELDS.revision, "context_revision");
-    if (value.contract_id !== "ariadne-context-revision-v1") throw new TruthPersistenceError("context_revision_contract_invalid");
+    const contractId = revision?.contract_id;
+    const workspaceRoute = contractId === "ariadne-context-revision-v2";
+    const value = prepare(revision, workspaceRoute ? FIELDS.workspace_revision : FIELDS.revision, "context_revision");
+    if (!workspaceRoute && value.contract_id !== "ariadne-context-revision-v1") throw new TruthPersistenceError("context_revision_contract_invalid");
     if (!CONTEXT_TYPES.includes(value.context_type)) throw new TruthPersistenceError("context_revision_type_invalid");
+    if (workspaceRoute && value.context_type !== "CANDIDATE") throw new TruthPersistenceError("workspace_revision_type_invalid");
     if (value.authority !== AUTHORITY.revision) throw new TruthPersistenceError("context_revision_authority_invalid");
     if (!Number.isInteger(value.version) || value.version < 1) throw new TruthPersistenceError("context_revision_version_invalid");
     const previousRevisionId = value.previous_revision_id === null ? null : requiredString(value.previous_revision_id, "context_revision_previous_id_invalid");
     if ((value.version === 1) !== (previousRevisionId === null)) throw new TruthPersistenceError("context_revision_linkage_invalid");
-    const provenance = plainObject(value.provenance, "context_revision_provenance_invalid");
-    if (JSON.stringify(Object.keys(provenance).sort()) !== JSON.stringify(["processing_run_id", "runtime_snapshot_id", "source_document_ids"])) throw new TruthPersistenceError("context_revision_provenance_shape_invalid");
-    provenance.source_document_ids = stringArray(provenance.source_document_ids, "context_revision_source_ids_invalid", { nonEmpty: true });
-    provenance.processing_run_id = requiredString(provenance.processing_run_id, "context_revision_run_id_invalid");
-    provenance.runtime_snapshot_id = requiredString(provenance.runtime_snapshot_id, "context_revision_snapshot_id_invalid");
-    return Object.freeze({
+    const base = {
       contract_id: value.contract_id,
       context_type: value.context_type,
       context_id: requiredString(value.context_id, "context_revision_context_id_invalid"),
       revision_id: requiredString(value.revision_id, "context_revision_id_invalid"),
       version: value.version,
       previous_revision_id: previousRevisionId,
-      confirmed_from_proposal_id: requiredString(value.confirmed_from_proposal_id, "context_revision_proposal_id_invalid"),
-      review_decision_id: requiredString(value.review_decision_id, "context_revision_review_id_invalid"),
       created_at: validIso(value.created_at, "context_revision_created_at_invalid"),
-      provenance,
+      provenance: normalizedRevisionProvenance(value.provenance),
       payload: plainObject(value.payload, "context_revision_payload_invalid"),
       authority: value.authority,
-    });
+    };
+    if (workspaceRoute) base.workspace_acceptance_id = requiredString(value.workspace_acceptance_id, "context_revision_workspace_acceptance_id_invalid");
+    else {
+      base.confirmed_from_proposal_id = requiredString(value.confirmed_from_proposal_id, "context_revision_proposal_id_invalid");
+      base.review_decision_id = requiredString(value.review_decision_id, "context_revision_review_id_invalid");
+    }
+    return Object.freeze(base);
   }
 
   function validateCandidateContextLifecycle(record) {
@@ -513,6 +585,62 @@
     return Object.freeze({ proposal: Object.freeze({ ...proposal, status: "ACCEPTED" }), review_decision: review, revision });
   }
 
+  function applyWorkspaceAcceptance(input) {
+    const workingModel = validateCandidateWorkingModel(input?.working_model);
+    const proposals = (input?.proposals || []).map(validateProposal);
+    if (!proposals.length || proposals.length !== workingModel.proposal_ids.length) throw new TruthPersistenceError("workspace_acceptance_proposal_set_invalid");
+    const proposalIds = new Set(proposals.map((proposal) => proposal.proposal_id));
+    if (workingModel.proposal_ids.some((proposalId) => !proposalIds.has(proposalId))) throw new TruthPersistenceError("workspace_acceptance_proposal_set_invalid");
+    if (proposals.some((proposal) => proposal.proposal_type !== "CANDIDATE_CONTEXT" || proposal.status !== "AWAITING_REVIEW"
+      || proposal.payload?.contract_id !== "ariadne-model-candidate-proposal-payload-v1" || !proposal.source_document_ids.includes(workingModel.source_document_id)
+      || proposal.processing_run_id !== workingModel.processing_run_id || proposal.runtime_snapshot_id !== workingModel.runtime_snapshot_id)) {
+      throw new TruthPersistenceError("workspace_acceptance_lineage_mismatch");
+    }
+    const current = input?.current_revision === null || input?.current_revision === undefined ? null : validateContextRevision(input.current_revision);
+    const actualVersion = current?.version || 0;
+    if (!Number.isInteger(input?.expected_revision_version) || input.expected_revision_version !== actualVersion) throw new TruthPersistenceError("context_version_conflict");
+    const acceptedAt = validIso(input?.accepted_at, "candidate_workspace_acceptance_timestamp_invalid");
+    const contextId = requiredString(input?.context_id, "candidate_workspace_acceptance_context_id_invalid");
+    if (current && (current.context_id !== contextId || current.context_type !== "CANDIDATE")) throw new TruthPersistenceError("context_revision_base_mismatch");
+    const acceptanceId = requiredString(input?.acceptance_id, "candidate_workspace_acceptance_id_invalid");
+    const revisionId = requiredString(input?.revision_id, "context_revision_id_invalid");
+    const acceptance = validateCandidateWorkspaceAcceptance({
+      contract_id: "ariadne-candidate-workspace-acceptance-v1",
+      acceptance_id: acceptanceId,
+      context_id: contextId,
+      source_document_id: workingModel.source_document_id,
+      processing_run_id: workingModel.processing_run_id,
+      runtime_snapshot_id: workingModel.runtime_snapshot_id,
+      proposal_ids: workingModel.proposal_ids,
+      working_model_id: workingModel.working_model_id,
+      working_model_version: workingModel.version,
+      working_model_fingerprint: workingModel.fingerprint,
+      accepted_at: acceptedAt,
+      confirmed_revision_id: revisionId,
+      previous_revision_id: current?.revision_id || null,
+      accepted_payload: workingModel.payload,
+      authority: AUTHORITY.workspace_acceptance,
+    });
+    const revision = validateContextRevision({
+      contract_id: "ariadne-context-revision-v2",
+      context_type: "CANDIDATE",
+      context_id: contextId,
+      revision_id: revisionId,
+      version: actualVersion + 1,
+      previous_revision_id: current?.revision_id || null,
+      workspace_acceptance_id: acceptanceId,
+      created_at: acceptedAt,
+      provenance: {
+        source_document_ids: [workingModel.source_document_id],
+        processing_run_id: workingModel.processing_run_id,
+        runtime_snapshot_id: workingModel.runtime_snapshot_id,
+      },
+      payload: workingModel.payload,
+      authority: AUTHORITY.revision,
+    });
+    return Object.freeze({ working_model: workingModel, workspace_acceptance: acceptance, revision });
+  }
+
   function validateForStore(storeName, value) {
     const validators = {
       source_documents: validateSourceDocument,
@@ -522,6 +650,8 @@
       processing_batches: validateProcessingBatch,
       context_proposals: validateProposal,
       context_review_decisions: validateReviewDecision,
+      candidate_working_models: validateCandidateWorkingModel,
+      candidate_workspace_acceptances: validateCandidateWorkspaceAcceptance,
       candidate_context_revisions: validateContextRevision,
       candidate_context_lifecycle: validateCandidateContextLifecycle,
       job_context_revisions: validateContextRevision,
@@ -561,6 +691,8 @@
   }
 
   function persistRecord(database, storeName, record) {
+    if (storeName === "candidate_working_models") return persistCandidateWorkingModel(database, record);
+    if (storeName === "candidate_workspace_acceptances") return Promise.reject(new TruthPersistenceError("workspace_acceptance_specialized_persistence_required"));
     const validated = validateForStore(storeName, record);
     return new Promise((resolve, reject) => {
       const transaction = database.transaction(storeName, "readwrite");
@@ -570,6 +702,33 @@
       transaction.oncomplete = () => resolve(validated);
       transaction.onerror = () => reject(transaction.error || new TruthPersistenceError("persistence_write_failed"));
       transaction.onabort = () => reject(transaction.error || new TruthPersistenceError("persistence_write_aborted"));
+    });
+  }
+
+  function persistCandidateWorkingModel(database, model) {
+    const workingModel = validateCandidateWorkingModel(model);
+    return new Promise((resolve, reject) => {
+      const transaction = database.transaction("candidate_working_models", "readwrite");
+      let contractError = null;
+      const store = transaction.objectStore("candidate_working_models");
+      const request = store.getAll();
+      request.onsuccess = () => {
+        try {
+          const models = (request.result || []).map(validateCandidateWorkingModel).filter((entry) => entry.source_document_id === workingModel.source_document_id).sort((left, right) => right.version - left.version);
+          const head = models[0] || null;
+          const expectedVersion = (head?.version || 0) + 1;
+          const expectedPreviousId = head?.working_model_id || null;
+          if (workingModel.version !== expectedVersion || workingModel.previous_working_model_id !== expectedPreviousId) throw new TruthPersistenceError("candidate_working_model_stale");
+          store.add(clone(workingModel));
+        } catch (error) {
+          contractError = error;
+          transaction.abort();
+        }
+      };
+      request.onerror = () => { contractError = new TruthPersistenceError("candidate_working_model_read_failed"); transaction.abort(); };
+      transaction.oncomplete = () => resolve(workingModel);
+      transaction.onerror = () => reject(contractError || transaction.error || new TruthPersistenceError("candidate_working_model_persistence_failed"));
+      transaction.onabort = () => reject(contractError || transaction.error || new TruthPersistenceError("candidate_working_model_persistence_aborted"));
     });
   }
 
@@ -649,6 +808,71 @@
     });
   }
 
+  function persistWorkspaceAcceptance(database, outcome) {
+    const workingModel = validateCandidateWorkingModel(outcome?.working_model);
+    const acceptance = validateCandidateWorkspaceAcceptance(outcome?.workspace_acceptance);
+    const revision = validateContextRevision(outcome?.revision);
+    if (revision.contract_id !== "ariadne-context-revision-v2" || revision.workspace_acceptance_id !== acceptance.acceptance_id
+      || acceptance.confirmed_revision_id !== revision.revision_id || acceptance.context_id !== revision.context_id
+      || acceptance.previous_revision_id !== revision.previous_revision_id || acceptance.source_document_id !== workingModel.source_document_id
+      || acceptance.processing_run_id !== workingModel.processing_run_id || acceptance.runtime_snapshot_id !== workingModel.runtime_snapshot_id
+      || canonicalJson(acceptance.proposal_ids) !== canonicalJson(workingModel.proposal_ids)
+      || acceptance.working_model_id !== workingModel.working_model_id || acceptance.working_model_version !== workingModel.version
+      || acceptance.working_model_fingerprint !== workingModel.fingerprint || canonicalJson(acceptance.accepted_payload) !== canonicalJson(workingModel.payload)
+      || canonicalJson(revision.payload) !== canonicalJson(workingModel.payload)
+      || canonicalJson(revision.provenance) !== canonicalJson({ source_document_ids: [workingModel.source_document_id], processing_run_id: workingModel.processing_run_id, runtime_snapshot_id: workingModel.runtime_snapshot_id })) {
+      throw new TruthPersistenceError("workspace_acceptance_outcome_linkage_mismatch");
+    }
+    const storeNames = ["context_proposals", "candidate_working_models", "candidate_workspace_acceptances", "candidate_context_revisions"];
+    return new Promise((resolve, reject) => {
+      const transaction = database.transaction(storeNames, "readwrite");
+      let contractError = null;
+      let workingReady = false;
+      let proposalsReady = false;
+      let revisionReady = false;
+      let writeStarted = false;
+      const abortWith = (error) => { if (!contractError) contractError = error; transaction.abort(); };
+      const writeWhenReady = () => {
+        if (writeStarted || !workingReady || !proposalsReady || !revisionReady) return;
+        writeStarted = true;
+        transaction.objectStore("candidate_workspace_acceptances").add(clone(acceptance));
+        transaction.objectStore("candidate_context_revisions").add(clone(revision));
+      };
+      const workingRequest = transaction.objectStore("candidate_working_models").getAll();
+      workingRequest.onsuccess = () => {
+        try {
+          const models = (workingRequest.result || []).map(validateCandidateWorkingModel).filter((model) => model.source_document_id === workingModel.source_document_id).sort((a, b) => b.version - a.version);
+          const head = models[0];
+          if (!head || head.working_model_id !== workingModel.working_model_id || head.version !== workingModel.version || head.fingerprint !== workingModel.fingerprint) throw new TruthPersistenceError("candidate_working_model_stale");
+          workingReady = true;
+          writeWhenReady();
+        } catch (error) { abortWith(error); }
+      };
+      workingRequest.onerror = () => abortWith(new TruthPersistenceError("candidate_working_model_read_failed"));
+      const proposalRequest = transaction.objectStore("context_proposals").getAll();
+      proposalRequest.onsuccess = () => {
+        try {
+          const persisted = new Map((proposalRequest.result || []).map((proposal) => [proposal.proposal_id, validateProposal(proposal)]));
+          if (acceptance.proposal_ids.some((proposalId) => !persisted.has(proposalId))) throw new TruthPersistenceError("workspace_acceptance_proposal_not_persisted");
+          proposalsReady = true;
+          writeWhenReady();
+        } catch (error) { abortWith(error); }
+      };
+      proposalRequest.onerror = () => abortWith(new TruthPersistenceError("workspace_acceptance_proposal_read_failed"));
+      const revisionRequest = transaction.objectStore("candidate_context_revisions").getAll();
+      revisionRequest.onsuccess = () => {
+        const current = (revisionRequest.result || []).map(validateContextRevision).filter((item) => item.context_id === revision.context_id).sort((a, b) => b.version - a.version)[0] || null;
+        if (revision.version !== (current?.version || 0) + 1 || revision.previous_revision_id !== (current?.revision_id || null)) return abortWith(new TruthPersistenceError("context_version_conflict"));
+        revisionReady = true;
+        writeWhenReady();
+      };
+      revisionRequest.onerror = () => abortWith(new TruthPersistenceError("context_revision_read_failed"));
+      transaction.oncomplete = () => resolve(Object.freeze({ working_model: workingModel, workspace_acceptance: acceptance, revision }));
+      transaction.onerror = () => reject(contractError || transaction.error || new TruthPersistenceError("persistence_workspace_acceptance_failed"));
+      transaction.onabort = () => reject(contractError || transaction.error || new TruthPersistenceError("persistence_workspace_acceptance_aborted"));
+    });
+  }
+
   return Object.freeze({
     CONTRACT_ID,
     DB_NAME,
@@ -679,15 +903,20 @@
     cancelProposal,
     validateCancelledWorkflowState,
     validateReviewDecision,
+    validateCandidateWorkingModel,
+    validateCandidateWorkspaceAcceptance,
     validateContextRevision,
     validateCandidateContextLifecycle,
     validateRuntimeSnapshotRecord,
     validateExecutionChain,
     applyReviewDecision,
+    applyWorkspaceAcceptance,
     validateForStore,
     ensureTruthStores,
     openDatabase,
     persistRecord,
+    persistCandidateWorkingModel,
     persistReviewOutcome,
+    persistWorkspaceAcceptance,
   });
 }));

@@ -20,8 +20,8 @@
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
   const typeLabels = { WORK_EXPERIENCE: "工作经历", PROJECT: "项目", EDUCATION: "教育经历", OTHER: "其他" };
   const subtypeLabels = { work_experience: "工作经历", project: "项目经历", education: "教育经历", custom_section: "其他经历", skill_group: "核心能力", award: "获奖经历", language: "语言能力" };
-  const materialTypeLabels = { resume: "简历", portfolio: "作品集", project_description: "项目说明", other: "其他材料" };
-  const factLabels = { rawDate: "日期", achievements: "成果", responsibilities: "职责", summary: "摘要", location: "地点", area: "专业", score: "成绩", result: "结果", awarder: "颁发方", keywords: "核心能力", section: "分类", category: "分类", organization: "组织", role: "角色", context: "背景", outputs: "产出", outcomes: "结果" };
+  const materialTypeLabels = { resume: "简历", portfolio: "作品集", project: "项目材料", project_description: "项目说明", other: "其他材料" };
+  const factLabels = { rawDate: "日期", date: "时间", time: "时间", achievements: "成果", responsibilities: "职责", summary: "摘要", location: "地点", area: "专业", major: "专业", degree: "专业", score: "成绩", result: "结果", awarder: "颁发方", issuer: "颁发方", keywords: "核心能力", skills: "核心能力", section: "分类", category: "分类", organization: "公司 / 机构", institution: "学校", school: "学校", company: "公司 / 机构", role: "角色", title: "角色", project: "项目", context: "背景", outputs: "产出", outcomes: "结果" };
   const sourceTypeLabels = { SANITIZED_FIXTURE: "本地测试资料", BROWSER_FILE_METADATA: "浏览器本地文件", PASTED_TEXT_METADATA: "本地粘贴文本" };
   let selectedCandidateSources = [];
   let selectedCandidateType = "Resume";
@@ -38,6 +38,16 @@
   let candidateModelAttemptGeneration = 0;
   let candidateConsentSelectionVersion = null;
   let candidateConsentRuntimeIdentity = null;
+  let candidateConsentId = null;
+  let activeCandidateModelOperation = null;
+  let activeCandidateWorkingModel = null;
+  let activeCandidateWorkspaceItemId = null;
+  let candidateWorkspaceEditDirty = false;
+  let candidateWorkspaceExitIntent = null;
+  let candidateWorkspacePreviousFocus = null;
+  let candidateWorkspaceViewGeneration = 0;
+  let candidateWorkspaceViewIntent = "import";
+  let candidateWorkspaceConversation = [];
   let candidateReviewSessionTotal = 0;
   let candidateReviewSessionResolved = 0;
   let candidateReviewSourceIds = [];
@@ -68,7 +78,10 @@
   }
 
   function candidateTypeLabel(item) { return subtypeLabels[item?.item_subtype] || typeLabels[item?.item_type] || "其他经历"; }
-  function candidateFactLabel(value) { return factLabels[value] || (/[\u3400-\u9fff]/.test(String(value || "")) ? value : "补充信息"); }
+  function candidateFactLabel(value) { return factLabels[value] || factLabels[String(value || "").trim().toLowerCase()] || (/[\u3400-\u9fff]/.test(String(value || "")) ? value : "补充信息"); }
+  function candidateWorkspaceFactLabel(value) {
+    return ["organization", "company"].includes(String(value || "").trim().toLowerCase()) ? "公司机构" : candidateFactLabel(value);
+  }
   function personalErrorCopy(error) {
     const code = String(error?.code || error?.message || error || "");
     const messages = {
@@ -152,10 +165,11 @@
     const modelReady = gate.allowed && gate.authority.runtime.mode === "model";
     document.body.dataset.candidateImportRuntime = local ? "local" : modelReady ? "model-ready" : "model-unavailable";
     button.textContent = modelReady
-      ? candidateExecutionState === "PROCESSING" ? "正在使用 DeepSeek 分析" : candidateExecutionState === "COMPLETE" ? "等待人工审核" : "使用 DeepSeek 分析"
+      ? candidateExecutionState === "PROCESSING" ? "正在使用 DeepSeek 分析" : candidateExecutionState === "COMPLETE" ? "查看工作区" : "使用 DeepSeek 分析"
       : !local ? "模型导入尚不可用" : candidateExecutionState === "COMPLETED_SOURCE" ? "确认" : candidateExecutionState === "COMPLETE" ? "本地提取已完成" : candidateExecutionState === "PROCESSING" ? "正在本地提取" : "开始本地提取";
     const modelSourceIneligible = modelReady && (selectedCandidateSources.length !== 1 || selectedCandidateSources[0]?.source_type !== "PDF");
-    button.disabled = candidateProcessingInProgress || candidateExecutionState === "COMPLETE" || candidateExecutionState === "COMPLETED_SOURCE" || !selectedCandidateSources.length || !gate.allowed || modelSourceIneligible;
+    button.disabled = candidateProcessingInProgress || (!modelReady && candidateExecutionState === "COMPLETE") || candidateExecutionState === "COMPLETED_SOURCE" || !selectedCandidateSources.length || !gate.allowed || modelSourceIneligible;
+    button.classList.toggle("hidden", modelReady && candidateExecutionState === "PROCESSING");
     byId("personal-file-input").disabled = (!local && !modelReady) || candidateProcessingInProgress;
     byId("personal-file-input").multiple = !modelReady;
     byId("personal-file-input").accept = modelReady ? ".pdf,application/pdf" : ".pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,image/png,image/jpeg";
@@ -163,9 +177,9 @@
     byId("personal-dropzone").setAttribute("aria-disabled", String((!local && !modelReady) || candidateProcessingInProgress));
     byId("personal-import-types").querySelectorAll("button").forEach((item) => { item.disabled = (!local && !modelReady) || candidateProcessingInProgress; });
     byId("personal-runtime-summary").textContent = modelReady
-      ? `当前运行：${runtimeLabel(gate.authority.runtime)}。仅在你确认后发送当前 PDF 的全部渲染页面；结果只会进入人工审核。`
+      ? ""
       : local ? "当前运行：本地确定规则。材料不会发送给模型服务商。" : unavailableCopy(gate, "个人材料语义结构化");
-    byId("personal-processing-boundary").textContent = modelReady ? "仅本机保存原始 PDF；确认后发送完整渲染页面，模型结果必须人工审核" : "仅本地读取、提取与确定规则；不调用模型服务商";
+    byId("personal-processing-boundary").textContent = modelReady ? "正在处理当前 PDF；模型结果只进入非权威工作区" : "仅本地读取、提取与确定规则；不调用模型服务商";
     setRuntimeGateMessage("personal-page-message", gate.allowed ? "" : unavailableCopy(gate, "个人材料语义结构化"));
     return gate;
   }
@@ -371,7 +385,7 @@
       <section class="v1-detail-overlay-surface" role="dialog" aria-modal="true" aria-label="资料详情" tabindex="-1">
         <div class="v1-detail-overlay-preview" aria-hidden="true"></div>
         <div class="v1-detail-overlay-content">
-          <header><button class="v1-detail-overlay-close" type="button" aria-label="关闭详情"></button><p></p><button class="v1-detail-overlay-edit" type="button" aria-label="编辑当前内容">编辑</button></header>
+          <header><button class="v1-detail-overlay-close" type="button" aria-label="关闭详情"></button><p></p><span class="v1-detail-overlay-header-actions"><button class="v1-detail-overlay-edit" type="button" aria-label="编辑当前内容">编辑</button><button class="v1-detail-overlay-workspace-close hidden" type="button" aria-label="关闭添加个人材料">×</button></span></header>
           <iframe title="本地资料详情"></iframe>
         </div>
       </section>
@@ -384,6 +398,7 @@
     const title = content.querySelector("header p");
     const closeButton = overlay.querySelector(".v1-detail-overlay-close");
     const editButton = overlay.querySelector(".v1-detail-overlay-edit");
+    const workspaceCloseButton = overlay.querySelector(".v1-detail-overlay-workspace-close");
     const frame = overlay.querySelector("iframe");
     const surfaceControls = window.JobRadarFloatingWindow?.mount(surface, {
       dragHandle: content.querySelector("header"),
@@ -396,6 +411,14 @@
     let closing = false;
     let revealTimer = null;
     let afterClose = null;
+
+    function setImportOverlayView(view = "import") {
+      const workspace = view === "workspace";
+      overlay.classList.toggle("is-import-workspace", workspace);
+      closeButton.setAttribute("aria-label", workspace ? "返回导入" : "关闭添加个人材料");
+      title.textContent = workspace ? "候选人信息" : "添加个人材料";
+      workspaceCloseButton.classList.toggle("hidden", !workspace);
+    }
 
     function targetRect() {
       const compact = window.innerWidth < 760;
@@ -429,6 +452,7 @@
       preview.replaceChildren(clone);
       title.textContent = card.querySelector("h3, b")?.textContent || "资料详情";
       overlay.dataset.overlayKind = isImport ? "import" : "detail";
+      if (isImport) setImportOverlayView("import");
       surface.setAttribute("aria-label", isImport ? title.textContent : "资料详情");
       frame.title = isImport ? title.textContent : "资料详情";
       overlay.classList.remove("hidden", "is-content-ready", "is-closing");
@@ -466,6 +490,7 @@
       preview.replaceChildren();
       overlay.classList.add("hidden");
       overlay.classList.remove("is-content-ready", "is-closing");
+      overlay.classList.remove("is-import-workspace");
       delete overlay.dataset.overlayKind;
       overlay.setAttribute("aria-hidden", "true");
       document.body.classList.remove("v1-detail-overlay-open");
@@ -509,12 +534,24 @@
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { window.location.assign(card.href); return; }
       openOverlay(card);
     });
-    closeButton.addEventListener("click", closeOverlay);
+    closeButton.addEventListener("click", () => {
+      if (overlay.classList.contains("is-import-workspace")) {
+        frame.contentWindow?.postMessage({ type: "job-radar-v1-workspace-back" }, window.location.origin);
+        return;
+      }
+      closeOverlay();
+    });
+    workspaceCloseButton.addEventListener("click", () => frame.contentWindow?.postMessage({ type: "job-radar-v1-workspace-close" }, window.location.origin));
     editButton.addEventListener("click", () => frame.contentWindow?.postMessage({ type: "job-radar-v1-open-detail-edit" }, window.location.origin));
     backdrop.addEventListener("click", closeOverlay);
     document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeOverlay(); });
     window.addEventListener("message", (event) => {
-      if (event.origin !== window.location.origin || event.source !== frame.contentWindow || event.data?.type !== "job-radar-v1-import-complete") return;
+      if (event.origin !== window.location.origin || event.source !== frame.contentWindow) return;
+      if (event.data?.type === "job-radar-v1-import-view-state") {
+        if (overlay.dataset.overlayKind === "import") setImportOverlayView(event.data.view);
+        return;
+      }
+      if (event.data?.type !== "job-radar-v1-import-complete") return;
       const { library, sourceKey } = event.data;
       if ((library === "personal" && page !== "personal") || (library === "jd" && page !== "jd")) return;
       afterClose = async () => {
@@ -706,38 +743,326 @@
     window.requestAnimationFrame(playPendingCardReturn);
   }
 
-  function candidateRecords(sourceDocuments, proposals, runs, revisions, lifecycle) {
-    return { source_documents: sourceDocuments, context_proposals: proposals, processing_runs: runs, candidate_context_revisions: revisions, candidate_context_lifecycle: lifecycle };
+  function candidateRecords(sourceDocuments, proposals, runs, revisions, lifecycle, workingModels, workspaceAcceptances) {
+    return {
+      source_documents: sourceDocuments,
+      context_proposals: proposals,
+      processing_runs: runs,
+      candidate_context_revisions: revisions,
+      candidate_context_lifecycle: lifecycle,
+      candidate_working_models: workingModels,
+      candidate_workspace_acceptances: workspaceAcceptances,
+    };
   }
 
   function modelSourceImportState(sourceId, records) {
     const proposals = (records.context_proposals || []).filter((proposal) => proposal.proposal_type === "CANDIDATE_CONTEXT"
       && proposal.payload?.contract_id === CandidateModel?.PAYLOAD_CONTRACT_ID
       && proposal.source_document_ids?.includes(sourceId));
-    if (proposals.some((proposal) => proposal.status === "AWAITING_REVIEW")) return "PENDING_REVIEW";
-    if (proposals.some((proposal) => ["ACCEPTED", "REJECTED"].includes(proposal.status))) return "COMPLETE";
+    if (proposals.length) return "WORKSPACE";
     const runs = (records.processing_runs || []).filter((run) => run.source_document_id === sourceId && run.operation_type === "CANDIDATE_MODEL_STRUCTURING");
-    if (runs.some((run) => run.status === "SUCCEEDED")) return "COMPLETE";
+    if (runs.some((run) => run.status === "SUCCEEDED")) return "WORKSPACE";
     return runs.some((run) => run.status === "FAILED" || run.status === "CANCELLED") ? "RETRY" : "NEW";
   }
 
   async function readCandidateRecords(database) {
-    const [sourceDocuments, proposals, runs, revisions, lifecycle] = await Promise.all([
+    const [sourceDocuments, proposals, runs, revisions, lifecycle, workingModels, workspaceAcceptances] = await Promise.all([
       LocalCandidateReview.getAll(database, "source_documents"),
       LocalCandidateReview.getAll(database, "context_proposals"),
       LocalCandidateReview.getAll(database, "processing_runs"),
       LocalCandidateReview.getAll(database, "candidate_context_revisions"),
       LocalCandidateReview.getAll(database, "candidate_context_lifecycle"),
+      LocalCandidateReview.getAll(database, "candidate_working_models"),
+      LocalCandidateReview.getAll(database, "candidate_workspace_acceptances"),
     ]);
-    return candidateRecords(sourceDocuments, proposals, runs, revisions, lifecycle);
+    return candidateRecords(sourceDocuments, proposals, runs, revisions, lifecycle, workingModels, workspaceAcceptances);
+  }
+
+  function workingCardMarkup(item) {
+    const stateClass = item.dedupe_state === "needs_resolution" ? " needs-resolution" : "";
+    const stateLabel = item.dedupe_state === "needs_resolution" ? '<span class="v1-working-state needs-resolution">需要确认</span>' : "";
+    return `<button class="v1-working-card${stateClass}" type="button" data-working-item="${escapeHtml(item.item_id)}"><span><small>${escapeHtml(candidateTypeLabel(item))}</small><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml([item.subtitle, item.time].filter(Boolean).join(" · "))}</span></span>${stateLabel}<span class="v1-working-chevron" aria-hidden="true">›</span></button>`;
+  }
+
+  function latestCandidateWorkingModel(records, sourceId) {
+    return (records.candidate_working_models || []).filter((model) => model.source_document_id === sourceId).sort((left, right) => right.version - left.version)[0] || null;
+  }
+
+  function setCandidateWorkspaceProgress(steps, currentIndex = steps.length - 1) {
+    byId("candidate-understanding-events").innerHTML = steps.map((step, index) => `<li data-entry-type="EXECUTION_EVENT" class="${index < currentIndex ? "is-complete" : index === currentIndex ? "is-current" : "is-upcoming"}"><span aria-hidden="true"></span>${escapeHtml(step)}</li>`).join("");
+  }
+
+  function beginCandidateWorkspaceView() {
+    candidateWorkspaceViewIntent = "workspace";
+    candidateWorkspaceViewGeneration += 1;
+    return candidateWorkspaceViewGeneration;
+  }
+
+  function workspaceViewIsCurrent(generation) {
+    return candidateWorkspaceViewIntent === "workspace" && generation === candidateWorkspaceViewGeneration;
+  }
+
+  function setCandidateWorkspaceShellView(view) {
+    document.body.classList.toggle("v1-workspace-view", view === "workspace");
+    if (isEmbeddedDetail && window.parent !== window) {
+      window.parent.postMessage({ type: "job-radar-v1-import-view-state", view }, window.location.origin);
+    }
+  }
+
+  const normalizedDisplayValue = (value) => String(value || "").trim().toLocaleLowerCase().replace(/[\s\p{P}\p{S}]+/gu, "");
+
+  function renderCandidateWorkspaceConversation() {
+    const target = byId("candidate-workspace-conversation");
+    if (!target) return;
+    target.innerHTML = candidateWorkspaceConversation.map((message) => `<p class="v1-conversation-message ${message.role === "USER" ? "user" : "assistant"}">${escapeHtml(message.content)}</p>`).join("");
+  }
+
+  function workspaceItemPatch(item, text) {
+    const content = String(text || "").trim();
+    const alias = content.match(/^(.+?)\s*就是\s*(.+?)(?:[，,。！!]?\s*(?:不需要重复(?:写)?|不要重复|请不要重复))?[。！!]?$/u);
+    const directEdit = content.match(/^(?:把|将)\s*(.+?)\s*(?:改为|改成)\s*(.+?)[。！!]?$/u);
+    const aliasLeft = alias?.[1]?.trim();
+    const aliasRight = alias?.[2]?.trim();
+    const replacement = alias ? (/[a-z]{2,}/i.test(aliasLeft) && !/[a-z]{2,}/i.test(aliasRight) ? `${aliasRight}（${aliasLeft.toUpperCase()}）` : `${aliasLeft}（${aliasRight}）`) : directEdit?.[2]?.trim();
+    const targets = alias ? [alias[1].trim(), alias[2].trim()] : directEdit ? [directEdit[1].trim()] : [];
+    if (!replacement || !targets.every(Boolean)) return null;
+    const shouldReplace = (value) => targets.some((target) => normalizedDisplayValue(value).includes(normalizedDisplayValue(target)));
+    const replaceValue = (value) => shouldReplace(value) ? replacement : value;
+    const factValues = (item.facts || []).map((fact) => replaceValue(fact.value));
+    const changed = shouldReplace(item.title) || shouldReplace(item.subtitle) || shouldReplace(item.time) || shouldReplace(item.summary) || factValues.some((value, index) => value !== item.facts[index].value);
+    if (!changed) return null;
+    return {
+      patch: { title: replaceValue(item.title), subtitle: replaceValue(item.subtitle), time: replaceValue(item.time), summary: replaceValue(item.summary), facts: factValues },
+      supportRelation: alias ? "USER_CONFIRMED" : "USER_EDITED",
+      acknowledgement: alias ? `已将${alias[1].trim()}与${alias[2].trim()}视为同一机构，并更新相关卡片。` : "已更新相关 Working Card。",
+    };
+  }
+
+  function showCandidateWorkspaceLayer(sourceName, processing = false) {
+    const workspace = byId("candidate-ai-workspace");
+    if (!workspace) return;
+    if (workspace.classList.contains("hidden")) candidateWorkspacePreviousFocus = document.activeElement;
+    byId("candidate-working-source").textContent = sourceName || "当前 PDF";
+    byId("candidate-workspace-processing").classList.toggle("hidden", !processing);
+    byId("candidate-card-list").classList.toggle("hidden", processing);
+    byId("candidate-card-detail").classList.add("hidden");
+    byId("candidate-workspace-save").disabled = true;
+    byId("candidate-workspace-save-status").textContent = "";
+    byId("candidate-ai-workspace").querySelector(".v1-candidate-pane")?.classList.remove("is-detail");
+    workspace.classList.remove("hidden");
+    setCandidateWorkspaceShellView("workspace");
+    document.body.classList.add("v1-workspace-open");
+    window.requestAnimationFrame(() => workspace.focus());
+  }
+
+  function renderCandidateWorkspaceCardDetail(itemId) {
+    const item = activeCandidateWorkingModel?.payload?.items?.find((entry) => entry.item_id === itemId);
+    if (!item) return;
+    activeCandidateWorkspaceItemId = itemId;
+    byId("candidate-ai-workspace").querySelector(".v1-candidate-pane")?.classList.add("is-detail");
+    byId("candidate-card-list").classList.add("hidden");
+    byId("candidate-card-detail").classList.remove("hidden");
+    byId("candidate-card-read").classList.remove("hidden");
+    byId("candidate-card-edit").classList.remove("hidden");
+    byId("candidate-card-edit-form").classList.add("hidden");
+    byId("candidate-card-edit-form").setAttribute("aria-hidden", "true");
+    candidateWorkspaceEditDirty = false;
+    byId("candidate-card-detail-kind").textContent = candidateTypeLabel(item);
+    byId("candidate-card-detail-title").textContent = item.title;
+    byId("candidate-card-detail-meta").textContent = [item.subtitle, item.time].filter(Boolean).join(" · ");
+    byId("candidate-card-detail-summary").textContent = item.summary || "暂无摘要";
+    const seen = new Set([item.title, item.subtitle, item.time, item.summary].map(normalizedDisplayValue).filter(Boolean));
+    const visibleFacts = (item.facts || []).filter((fact) => {
+      const value = normalizedDisplayValue(fact.value);
+      if (!value || seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    });
+    byId("candidate-card-detail-facts").innerHTML = visibleFacts.map((fact) => `<div><small>${escapeHtml(candidateWorkspaceFactLabel(fact.label))}</small><p>${escapeHtml(fact.value)}</p></div>`).join("") || "<p>暂无补充事实</p>";
+  }
+
+  async function renderCandidateWorkingWorkspace(sourceId, options = {}) {
+    const workspace = byId("candidate-ai-workspace");
+    if (!workspace || !sourceId) return [];
+    const viewGeneration = options.viewGeneration ?? beginCandidateWorkspaceView();
+    if (!workspaceViewIsCurrent(viewGeneration)) return [];
+    const database = await Truth.openDatabase();
+    let records;
+    try { records = await readCandidateRecords(database); } finally { database.close(); }
+    const source = records.source_documents.find((record) => record.source_document_id === sourceId);
+    const workingModel = options.workingModel || latestCandidateWorkingModel(records, sourceId);
+    if (!workingModel) throw new Error("candidate_working_model_missing");
+    activeCandidateWorkingModel = Truth.validateCandidateWorkingModel(workingModel);
+    const cards = activeCandidateWorkingModel.payload.items || [];
+    const groupOrder = ["work_experience", "project", "education", "skill_group", "award", "custom_section"];
+    const grouped = new Map(groupOrder.map((key) => [key, []]));
+    cards.forEach((card) => (grouped.get(card.item_subtype) || grouped.get("custom_section")).push(card));
+    if (!workspaceViewIsCurrent(viewGeneration)) return [];
+    showCandidateWorkspaceLayer(source?.filename || "当前 PDF", false);
+    byId("candidate-working-groups").innerHTML = [...grouped.entries()].filter(([, items]) => items.length).map(([type, items]) => `<section class="v1-working-group"><h3>${escapeHtml(subtypeLabels[type] || "其他经历")}</h3>${items.map(workingCardMarkup).join("")}</section>`).join("") || '<p class="v1-conversation-empty">模型未发现可形成 Working Card 的候选信息。</p>';
+    setCandidateWorkspaceProgress(["材料已准备", "PDF 已读取", "DeepSeek 已完成理解", `已生成 ${cards.length} 张候选卡片`]);
+    const questions = cards.flatMap((card) => card.uncertainties || []).filter((uncertainty) => uncertainty.status === "OPEN");
+    byId("candidate-clarification-list").innerHTML = questions.length ? `<h3>有几处信息可以稍后确认</h3>${questions.map((uncertainty) => `<p data-entry-type="CLARIFYING_QUESTION">${escapeHtml(uncertainty.question)}</p>`).join("")}` : '<p data-entry-type="CLARIFYING_QUESTION_EMPTY">当前没有需要补充的问题。</p>';
+    const accepted = records.candidate_workspace_acceptances.some((event) => event.working_model_id === activeCandidateWorkingModel.working_model_id);
+    byId("candidate-workspace-save").disabled = !cards.length || accepted;
+    byId("candidate-workspace-save-status").textContent = accepted ? "这版候选人信息已保存。" : "";
+    renderCandidateWorkspaceConversation();
+    byId("candidate-review-surface").classList.add("hidden");
+    return cards;
+  }
+
+  function enterCandidateWorkspaceEdit() {
+    const item = activeCandidateWorkingModel?.payload?.items?.find((entry) => entry.item_id === activeCandidateWorkspaceItemId);
+    if (!item) return;
+    byId("candidate-working-edit-title").value = item.title || "";
+    byId("candidate-working-edit-subtitle").value = item.subtitle || "";
+    byId("candidate-working-edit-time").value = item.time || "";
+    byId("candidate-working-edit-summary").value = item.summary || "";
+    byId("candidate-working-edit-facts").value = (item.facts || []).map((fact) => fact.value).join("\n");
+    byId("candidate-card-read").classList.add("hidden");
+    byId("candidate-card-edit").classList.add("hidden");
+    byId("candidate-card-edit-form").classList.remove("hidden");
+    byId("candidate-card-edit-form").setAttribute("aria-hidden", "false");
+    byId("candidate-workspace-save").dataset.beforeEditDisabled = String(byId("candidate-workspace-save").disabled);
+    byId("candidate-workspace-save").disabled = true;
+    byId("candidate-workspace-save-status").textContent = "";
+    candidateWorkspaceEditDirty = false;
+    byId("candidate-working-edit-title").focus();
+  }
+
+  function cancelCandidateWorkspaceEdit() {
+    const wasDisabled = byId("candidate-workspace-save").dataset.beforeEditDisabled === "true";
+    renderCandidateWorkspaceCardDetail(activeCandidateWorkspaceItemId);
+    byId("candidate-workspace-save").disabled = wasDisabled;
+    byId("candidate-workspace-save-status").textContent = wasDisabled ? "这版候选人信息已保存。" : "";
+  }
+
+  async function persistCandidateWorkspaceEdit() {
+    if (byId("candidate-card-edit-form").classList.contains("hidden")) return activeCandidateWorkingModel;
+    const next = await CandidateModel.editedCandidateWorkingModel(activeCandidateWorkingModel, activeCandidateWorkspaceItemId, {
+      title: byId("candidate-working-edit-title").value,
+      subtitle: byId("candidate-working-edit-subtitle").value,
+      time: byId("candidate-working-edit-time").value,
+      summary: byId("candidate-working-edit-summary").value,
+      facts: byId("candidate-working-edit-facts").value.split("\n").map((value) => value.trim()).filter(Boolean),
+    });
+    const database = await Truth.openDatabase();
+    try { await Truth.persistCandidateWorkingModel(database, next); }
+    finally { database.close(); }
+    activeCandidateWorkingModel = next;
+    candidateWorkspaceEditDirty = false;
+    await renderCandidateWorkingWorkspace(next.source_document_id, { workingModel: next, viewGeneration: candidateWorkspaceViewGeneration });
+    renderCandidateWorkspaceCardDetail(activeCandidateWorkspaceItemId);
+    return next;
+  }
+
+  function returnToCandidateCardList() {
+    byId("candidate-card-detail").classList.add("hidden");
+    byId("candidate-card-list").classList.remove("hidden");
+    byId("candidate-ai-workspace").querySelector(".v1-candidate-pane")?.classList.remove("is-detail");
+    activeCandidateWorkspaceItemId = null;
+    candidateWorkspaceEditDirty = false;
+  }
+
+  function requestCandidateCardBack() {
+    const editOpen = !byId("candidate-card-edit-form").classList.contains("hidden");
+    if (!editOpen) return returnToCandidateCardList();
+    if (!candidateWorkspaceEditDirty) return cancelCandidateWorkspaceEdit();
+    const dialog = byId("candidate-card-unsaved-dialog");
+    if (!dialog.open) dialog.showModal();
+    return undefined;
+  }
+
+  async function applyCandidateWorkspaceCorrection(content) {
+    const userMessage = String(content || "").trim();
+    if (!userMessage || !activeCandidateWorkingModel) return;
+    candidateWorkspaceConversation.push({ role: "USER", content: userMessage });
+    renderCandidateWorkspaceConversation();
+    const items = activeCandidateWorkingModel.payload.items || [];
+    const activeItem = items.find((item) => item.item_id === activeCandidateWorkspaceItemId);
+    const activeTarget = activeItem ? { item: activeItem, update: workspaceItemPatch(activeItem, userMessage) } : null;
+    const target = activeItem ? (activeTarget?.update ? activeTarget : null) : items.map((item) => ({ item, update: workspaceItemPatch(item, userMessage) })).find((entry) => entry.update);
+    if (!target) {
+      candidateWorkspaceConversation.push({ role: "ASSISTANT", content: activeItem ? "我会针对当前卡片修改；请用“把…改为…”或“…就是…”说明具体字段。" : "我还无法确定需要修改哪张卡片；请点开目标卡片，或用“把…改为…”说明具体字段。" });
+      renderCandidateWorkspaceConversation();
+      return;
+    }
+    const next = await CandidateModel.editedCandidateWorkingModel(activeCandidateWorkingModel, target.item.item_id, target.update.patch, new Date().toISOString(), target.update.supportRelation);
+    const database = await Truth.openDatabase();
+    try { await Truth.persistCandidateWorkingModel(database, next); }
+    finally { database.close(); }
+    activeCandidateWorkingModel = next;
+    candidateWorkspaceConversation.push({ role: "ASSISTANT", content: target.update.acknowledgement });
+    await renderCandidateWorkingWorkspace(next.source_document_id, { workingModel: next, viewGeneration: candidateWorkspaceViewGeneration });
+    if (activeCandidateWorkspaceItemId === target.item.item_id) renderCandidateWorkspaceCardDetail(target.item.item_id);
+    renderCandidateWorkspaceConversation();
+  }
+
+  function closeCandidateWorkspaceLayer(destination = "import") {
+    candidateWorkspaceViewIntent = destination;
+    candidateWorkspaceViewGeneration += 1;
+    byId("candidate-ai-workspace").classList.add("hidden");
+    setCandidateWorkspaceShellView("import");
+    document.body.classList.remove("v1-workspace-open");
+    activeCandidateWorkspaceItemId = null;
+    candidateWorkspaceEditDirty = false;
+    if (destination === "profile") {
+      if (!completeEmbeddedImport("personal", "personal-guide")) window.location.assign("/personal-information.html");
+      return;
+    }
+    candidateWorkspacePreviousFocus?.focus?.();
+  }
+
+  function requestCandidateWorkspaceExit(destination) {
+    const editOpen = !byId("candidate-card-edit-form").classList.contains("hidden");
+    if (!editOpen || !candidateWorkspaceEditDirty) return closeCandidateWorkspaceLayer(destination);
+    candidateWorkspaceExitIntent = destination;
+    const dialog = byId("candidate-workspace-close-dialog");
+    if (!dialog.open) dialog.showModal();
+    return undefined;
+  }
+
+  async function saveCandidateWorkspaceToProfile() {
+    if (!byId("candidate-card-edit-form").classList.contains("hidden")) return;
+    const workingModel = Truth.validateCandidateWorkingModel(activeCandidateWorkingModel);
+    const database = await Truth.openDatabase();
+    try {
+      const records = await readCandidateRecords(database);
+      const contextId = `candidate-workspace-context-${workingModel.source_document_id}`;
+      const currentRevision = records.candidate_context_revisions.filter((revision) => revision.context_id === contextId).sort((left, right) => right.version - left.version)[0] || null;
+      const proposals = records.context_proposals.filter((proposal) => workingModel.proposal_ids.includes(proposal.proposal_id));
+      const acceptedAt = new Date().toISOString();
+      const outcome = Truth.applyWorkspaceAcceptance({
+        working_model: workingModel,
+        proposals,
+        current_revision: currentRevision,
+        expected_revision_version: currentRevision?.version || 0,
+        context_id: contextId,
+        acceptance_id: `workspace-acceptance-${crypto.randomUUID()}`,
+        revision_id: `candidate-workspace-revision-${crypto.randomUUID()}`,
+        accepted_at: acceptedAt,
+      });
+      await Truth.persistWorkspaceAcceptance(database, outcome);
+      byId("candidate-workspace-save-status").textContent = "已保存到个人资料。";
+      byId("candidate-workspace-save").disabled = true;
+    } catch (error) {
+      if (["candidate_working_model_stale", "context_version_conflict"].includes(String(error?.code || error?.message))) {
+        byId("candidate-workspace-save-status").textContent = "内容已更新，请重新查看后再保存。";
+        return;
+      }
+      throw error;
+    } finally { database.close(); }
+    await delay(360);
+    closeCandidateWorkspaceLayer("profile");
   }
 
   function setSavedCandidateSourceMenu(open) {
     const selector = byId("saved-candidate-source-selector");
-    const trigger = byId("saved-candidate-source-summary");
+    const trigger = byId("saved-candidate-source-trigger");
     const list = byId("saved-candidate-source-list");
     if (!selector || !trigger || !list) return;
     selector.classList.toggle("is-open", open);
+    list.classList.toggle("is-open", open);
     trigger.setAttribute("aria-expanded", String(open));
     list.setAttribute("aria-hidden", String(!open));
     list.inert = !open;
@@ -761,8 +1086,8 @@
         && source.material_type === "CANDIDATE" && source.source_type === "PDF" && source.mime_type === "application/pdf" && source.local_reference);
     } finally { database.close(); }
     const selected = selectedCandidateSources.find((item) => sources.some((source) => source.source_document_id === item.source_document_id));
-    byId("saved-candidate-source-summary").textContent = selected ? `已选：${selected.filename || selected.file?.name}` : "选择已保存在本机的 PDF";
-    byId("saved-candidate-source-list").innerHTML = sources.map((source) => `<button type="button" class="v1-saved-source-button" data-saved-candidate-source="${escapeHtml(source.source_document_id)}" aria-pressed="${selectedCandidateSources.some((item) => item.source_document_id === source.source_document_id)}"><span>${escapeHtml(source.filename)}</span><small>本机来源</small></button>`).join("");
+    byId("saved-candidate-source-summary").textContent = selected ? selected.filename || selected.file?.name : "选择已保存在本机的 PDF";
+    byId("saved-candidate-source-list").innerHTML = sources.map((source, index) => `<button type="button" class="runtime-menu-item v1-saved-source-button" style="--runtime-menu-index:${index + 1}" role="option" data-saved-candidate-source="${escapeHtml(source.source_document_id)}" aria-selected="${selectedCandidateSources.some((item) => item.source_document_id === source.source_document_id)}"><span>${escapeHtml(source.filename)}</span></button>`).join("");
     section.classList.toggle("hidden", !sources.length);
   }
 
@@ -784,18 +1109,16 @@
         content_hash: sourceDocument.content_hash,
         source_document_id: sourceDocument.source_document_id,
         batch_id: `batch-candidate-model-${crypto.randomUUID()}`,
-        candidate_material_type: LocalCandidate.CANDIDATE_MATERIAL_TYPES[selectedCandidateType],
-        candidate_material_type_source: "USER_SELECTED",
         import_state: modelSourceImportState(sourceId, records),
       }];
     } finally { database.close(); }
     setCompletedSourceSheet(false);
-    byId("personal-page-message").textContent = selectedCandidateSources[0].import_state === "PENDING_REVIEW" ? "该 PDF 已有模型提案，已恢复人工审核。" : "";
+    byId("personal-page-message").textContent = "";
     byId("personal-page-message").classList.remove("error");
-    candidateExecutionState = selectedCandidateSources[0].import_state === "PENDING_REVIEW" ? "COMPLETE" : "READY";
+    candidateExecutionState = "READY";
     showCandidateSource(selectedCandidateSources[0]);
     setSavedCandidateSourceMenu(false);
-    await renderAwaitingCandidateReviews({ reset: true, sourceIds: selectedCandidateSources[0].import_state === "PENDING_REVIEW" ? [sourceId] : [] });
+    await renderAwaitingCandidateReviews({ reset: true, sourceIds: [] });
     await renderSavedCandidatePdfSources();
   }
 
@@ -836,7 +1159,7 @@
       const sourceById = new Map(sources.map((source) => [source.source_document_id, source]));
       let proposalRecords = await LocalCandidateReview.getAll(database, "context_proposals");
       proposalRecords = await LocalCandidateReview.ensureItemProposalQueue(database, proposalRecords);
-      const reviewContracts = new Set(["ariadne-local-candidate-proposal-payload-v1", CandidateModel?.PAYLOAD_CONTRACT_ID]);
+      const reviewContracts = new Set(["ariadne-local-candidate-proposal-payload-v1"]);
       proposals = proposalRecords.filter((proposal) => candidateReviewSourceIds.length && proposal.proposal_type === "CANDIDATE_CONTEXT" && proposal.status === "AWAITING_REVIEW" && reviewContracts.has(proposal.payload?.contract_id) && proposal.source_document_ids?.some((sourceId) => candidateReviewSourceIds.includes(sourceId))).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.proposal_id.localeCompare(b.proposal_id)).map((proposal) => ({ ...proposal, source_label: sourceById.get(proposal.source_document_ids[0])?.filename || null }));
       const proposalSourceIds = [...new Set(proposals.flatMap((proposal) => proposal.source_document_ids || []))];
       if (proposalSourceIds.length && !RawSource) throw new Error("raw_source_resolver_unavailable");
@@ -1138,8 +1461,7 @@
     const selectedRuntimeIdentity = runtimeIdentity(gate.authority.runtime);
     if (candidateProcessingInProgress || selectedCandidateSources.length !== 1) throw new Error("candidate_model_pdf_required");
     const source = CandidateModel.assertPdfSource(selectedCandidateSources[0]);
-    if (!["NEW", "RETRY"].includes(source.import_state)) {
-      if (source.import_state === "PENDING_REVIEW") return renderAwaitingCandidateReviews({ reset: true, sourceIds: [source.source_document_id] });
+    if (!["NEW", "RETRY", "WORKSPACE"].includes(source.import_state)) {
       throw new Error("candidate_model_processing_not_actionable");
     }
     const database = await Truth.openDatabase();
@@ -1153,6 +1475,7 @@
     }
     candidateConsentSelectionVersion = selectionVersion;
     candidateConsentRuntimeIdentity = selectedRuntimeIdentity;
+    candidateConsentId = `consent-candidate-model-${crypto.randomUUID()}`;
     byId("candidate-model-consent-provider").textContent = "DeepSeek";
     byId("candidate-model-consent-model").textContent = CandidateModel.MODEL_ID;
     const dialog = byId("candidate-model-consent-dialog");
@@ -1160,7 +1483,18 @@
     return undefined;
   }
 
-  async function runCandidateModelProcessing(gate, confirmedAt) {
+  function runCandidateModelProcessing(gate, confirmedAt, consentId) {
+    if (activeCandidateModelOperation?.consentId === consentId) return activeCandidateModelOperation.promise;
+    const promise = executeCandidateModelProcessing(gate, confirmedAt, consentId);
+    activeCandidateModelOperation = { consentId, promise };
+    promise.then(
+      () => { if (activeCandidateModelOperation?.promise === promise) activeCandidateModelOperation = null; },
+      () => { if (activeCandidateModelOperation?.promise === promise) activeCandidateModelOperation = null; },
+    );
+    return promise;
+  }
+
+  async function executeCandidateModelProcessing(gate, confirmedAt, consentId) {
     CandidateModel.assertEligibleGate(gate);
     if (!RuntimeExecution || !Truth || !RawSource || !LocalCandidate || !CandidateModel) throw new Error("candidate_model_runtime_dependencies_unavailable");
     const source = CandidateModel.assertPdfSource(selectedCandidateSources[0]);
@@ -1173,14 +1507,19 @@
       schemaVersion: CandidateModel.SCHEMA_VERSION,
       deliveryMethod: CandidateModel.DELIVERY_METHOD,
     });
-    const consent = CandidateModel.consentFor(source, snapshot, confirmedAt);
+    const consent = CandidateModel.consentFor(source, snapshot, confirmedAt, consentId);
+    const operationIdentity = await CandidateModel.operationIdentityFor(source, snapshot, consent);
     const attemptGeneration = ++candidateModelAttemptGeneration;
+    const workspaceViewGeneration = beginCandidateWorkspaceView();
+    candidateWorkspaceConversation = [];
     const abortController = new AbortController();
     candidateProcessingInProgress = true;
     candidateExecutionState = "PROCESSING";
     candidateBatchAbortController = abortController;
     byId("replace-personal-file").textContent = "取消本次分析";
-    byId("personal-processing").classList.remove("hidden");
+    showCandidateWorkspaceLayer(source.file.name, true);
+    setCandidateWorkspaceProgress(["正在准备材料", "正在读取 PDF", "等待 DeepSeek 理解", "整理候选卡片"], 0);
+    byId("candidate-clarification-list").innerHTML = '<p data-entry-type="CLARIFYING_QUESTION_EMPTY">完成理解后，需要补充的问题会显示在这里。</p>';
     setCandidateExtractionState("PREPARING", "正在校验本机保存的原始 PDF");
     refreshCandidateImportGate();
     let database = null;
@@ -1188,8 +1527,8 @@
     try {
       database = await Truth.openDatabase();
       await Truth.persistRecord(database, "runtime_snapshots", snapshot);
-      run = CandidateModel.processingRunFor(source, snapshot.snapshot_id, "PENDING");
-      await Truth.persistRecord(database, "processing_runs", run);
+      run = CandidateModel.processingRunFor(source, snapshot.snapshot_id, "PENDING", new Date().toISOString(), { run_id: `run-${operationIdentity.operation_id}` });
+      if (!await CandidateModel.claimProcessingRun(database, run)) return;
       const sourceDocument = await RawSource.sourceDocumentForId(database, source.source_document_id);
       const resolved = await RawSource.resolveRawSource(database, source.source_document_id);
       if (abortController.signal.aborted) throw Object.assign(new Error("candidate_model_cancelled"), { name: "AbortError" });
@@ -1197,6 +1536,7 @@
       run = CandidateModel.processingRunFor(source, snapshot.snapshot_id, "RUNNING", startedAt, { run_id: run.run_id, started_at: startedAt });
       await Truth.persistRecord(database, "processing_runs", run);
       setCandidateExtractionState("EXTRACTING", "正在准备完整 PDF 渲染页面");
+      setCandidateWorkspaceProgress(["材料已准备", "正在读取 PDF", "等待 DeepSeek 理解", "整理候选卡片"], 1);
       const documentDataUrl = await LocalCandidate.readAsDataURL(resolved.file, sourceDocument.mime_type);
       if (abortController.signal.aborted) throw Object.assign(new Error("candidate_model_cancelled"), { name: "AbortError" });
       const request = CandidateModel.requestFor({
@@ -1206,9 +1546,10 @@
         snapshot,
         run,
         consent,
-        candidateMaterialType: selectedCandidateType,
+        operationIdentity,
       });
       setCandidateExtractionState("STRUCTURING", `正在使用 DeepSeek 分析：${source.file.name}`);
+      setCandidateWorkspaceProgress(["材料已准备", "PDF 已读取", "DeepSeek 正在理解材料", "整理候选卡片"], 2);
       const response = await fetch("/api/candidate-model-structure", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1224,14 +1565,29 @@
         throw error;
       }
       if (abortController.signal.aborted) throw Object.assign(new Error("candidate_model_cancelled"), { name: "AbortError" });
-      const proposals = CandidateModel.proposalsFor({ source: { ...source, file: resolved.file }, run, result, candidateMaterialType: selectedCandidateType });
-      await CandidateModel.persistSuccessfulResult(database, run, proposals, abortController.signal);
+      const proposals = CandidateModel.proposalsFor({ source: { ...source, file: resolved.file }, run, result, operationIdentity });
+      const isCurrentOperation = () => attemptGeneration === candidateModelAttemptGeneration && selectedCandidateSources[0]?.source_document_id === source.source_document_id;
+      await CandidateModel.persistSuccessfulResult(database, run, proposals, abortController.signal, isCurrentOperation);
+      const records = await readCandidateRecords(database);
+      const previousWorkingModel = latestCandidateWorkingModel(records, source.source_document_id);
+      const workingModel = proposals.length ? await CandidateModel.candidateWorkingModelFor(proposals, previousWorkingModel) : null;
+      if (!isCurrentOperation()) throw new Error("candidate_model_processing_run_stale");
+      if (workingModel) await Truth.persistCandidateWorkingModel(database, workingModel);
       if (attemptGeneration === candidateModelAttemptGeneration) {
-        candidateExecutionState = "COMPLETE";
-        setCandidateExtractionState("READY_FOR_REVIEW", proposals.length ? "DeepSeek 模型提案已生成，等待人工审核" : "模型未发现可供审核的候选信息");
-        byId("personal-page-message").textContent = proposals.length ? `已生成 ${proposals.length} 条非权威模型提案；只有人工确认后才会形成候选信息。` : "模型未发现可供审核的候选信息；没有形成正式候选信息。";
+        candidateExecutionState = workingModel ? "COMPLETE" : "READY";
+        setCandidateExtractionState("READY_FOR_REVIEW", proposals.length ? "Candidate Working Cards 已生成" : "模型未发现可形成卡片的候选信息");
+        byId("personal-page-message").textContent = "";
         byId("personal-page-message").classList.remove("error");
-        await renderAwaitingCandidateReviews({ reset: true, sourceIds: [source.source_document_id] });
+        await renderAwaitingCandidateReviews({ reset: true, sourceIds: [] });
+        if (workingModel && workspaceViewIsCurrent(workspaceViewGeneration)) await renderCandidateWorkingWorkspace(source.source_document_id, { workingModel, viewGeneration: workspaceViewGeneration });
+        else if (!workingModel && workspaceViewIsCurrent(workspaceViewGeneration)) {
+          activeCandidateWorkingModel = null;
+          showCandidateWorkspaceLayer(source.file.name, false);
+          byId("candidate-working-groups").innerHTML = '<p class="v1-conversation-empty">模型没有发现可形成卡片的候选信息。</p>';
+          setCandidateWorkspaceProgress(["材料已准备", "PDF 已读取", "DeepSeek 已完成理解", "没有发现可形成卡片的信息"]);
+          byId("candidate-clarification-list").innerHTML = '<p data-entry-type="CLARIFYING_QUESTION_EMPTY">当前没有需要补充的问题。</p>';
+          byId("candidate-workspace-save-status").textContent = "没有可保存的候选人信息。";
+        }
       }
     } catch (error) {
       if (database && run && ["PENDING", "RUNNING"].includes(run.status)) {
@@ -1248,12 +1604,15 @@
       if (attemptGeneration === candidateModelAttemptGeneration) candidateExecutionState = "READY";
       if (error?.name === "AbortError") {
         if (attemptGeneration === candidateModelAttemptGeneration) {
+          closeCandidateWorkspaceLayer("import");
           setCandidateExtractionState("CANCELLED", "已取消本次模型分析");
           byId("personal-page-message").textContent = "本次模型分析已取消；没有保存新的模型提案。";
           byId("personal-page-message").classList.remove("error");
         }
         return;
       }
+      if (String(error?.message || error) === "candidate_model_processing_run_stale") return;
+      if (attemptGeneration === candidateModelAttemptGeneration && workspaceViewIsCurrent(workspaceViewGeneration)) closeCandidateWorkspaceLayer("import");
       error.candidateModelExecution = true;
       throw error;
     } finally {
@@ -1276,6 +1635,11 @@
   function initPersonalImport() {
     renderAwaitingCandidateReviews({ sourceIds: [] }).catch(showPersonalError);
     renderSavedCandidatePdfSources().catch(showPersonalError);
+    window.addEventListener("message", (event) => {
+      if (!isEmbeddedDetail || event.origin !== window.location.origin || event.source !== window.parent) return;
+      if (event.data?.type === "job-radar-v1-workspace-back") requestCandidateWorkspaceExit("import");
+      if (event.data?.type === "job-radar-v1-workspace-close") requestCandidateWorkspaceExit("profile");
+    });
     byId("candidate-review-list").addEventListener("click", (event) => {
       const button = event.target.closest("[data-review-action]");
       if (!button) return;
@@ -1293,7 +1657,7 @@
       byId("personal-import-types").querySelectorAll("button").forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
       if (selectedCandidateSources.length) handleCandidateFiles(selectedCandidateSources.map((source) => source.file));
     });
-    byId("saved-candidate-source-summary").addEventListener("click", () => {
+    byId("saved-candidate-source-trigger").addEventListener("click", () => {
       const selector = byId("saved-candidate-source-selector");
       setSavedCandidateSourceMenu(!selector.classList.contains("is-open"));
     });
@@ -1302,7 +1666,15 @@
       if (selector && !selector.contains(event.target)) setSavedCandidateSourceMenu(false);
     });
     byId("saved-candidate-source-selector").addEventListener("keydown", (event) => {
-      if (event.key === "Escape") setSavedCandidateSourceMenu(false);
+      if (event.key === "Escape") { setSavedCandidateSourceMenu(false); byId("saved-candidate-source-trigger").focus(); }
+      if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+        event.preventDefault();
+        setSavedCandidateSourceMenu(true);
+        const options = [...byId("saved-candidate-source-list").querySelectorAll('[role="option"]')];
+        if (!options.length) return;
+        const current = options.indexOf(document.activeElement);
+        options[(current + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length].focus();
+      }
     });
     byId("saved-candidate-source-list").addEventListener("click", (event) => {
       const button = event.target.closest("[data-saved-candidate-source]");
@@ -1316,6 +1688,7 @@
       if (modelReady) CandidateModel.assertEligibleGate(gate);
       const selectedFiles = Array.from(files || []);
       if (modelReady && selectedFiles.length !== 1) throw new Error("candidate_model_pdf_required");
+      closeCandidateWorkspaceLayer("import");
       setCompletedSourceSheet(false);
       byId("personal-page-message").textContent = "";
       byId("personal-page-message").classList.remove("error");
@@ -1346,8 +1719,8 @@
       const actionable = selectedCandidateSources.filter((source) => ["NEW", "RETRY"].includes(source.import_state));
       if (pending.length) await renderAwaitingCandidateReviews({ reset: true, sourceIds: pending.map((source) => source.source_document_id) });
       else await renderAwaitingCandidateReviews({ reset: true, sourceIds: [] });
-      candidateExecutionState = actionable.length ? "READY" : !modelReady && completedSources.length && !active.length && !pending.length ? "COMPLETED_SOURCE" : "COMPLETE";
-      if (pending.length && !actionable.length) byId("personal-page-message").textContent = modelReady ? "该 PDF 已有模型提案，已恢复人工审核。" : "该文件已有待审核内容，已恢复审核队列。";
+      candidateExecutionState = modelReady ? "READY" : actionable.length ? "READY" : completedSources.length && !active.length && !pending.length ? "COMPLETED_SOURCE" : "COMPLETE";
+      if (pending.length && !actionable.length) byId("personal-page-message").textContent = "该文件已有待审核内容，已恢复审核队列。";
       else if (completedSources.length && !actionable.length && !active.length) byId("personal-page-message").textContent = "该 PDF 已被读取。点击确认返回个人资料。";
       else if (active.length && !actionable.length) byId("personal-page-message").textContent = "该文件已导入，无需重复处理。";
       else if (active.length || pending.length || completedSources.length) byId("personal-page-message").textContent = `已跳过 ${active.length + pending.length + completedSources.length} 个已导入或待审核文件；其余文件可以继续${modelReady ? "模型分析" : "本地提取"}。`;
@@ -1368,7 +1741,12 @@
     });
     byId("start-personal-processing").addEventListener("click", () => {
       const gate = refreshCandidateImportGate();
-      const operation = gate.authority.runtime.mode === "model" ? openCandidateModelConsent() : runCandidateProcessing();
+      const sourceId = selectedCandidateSources[0]?.source_document_id;
+      const operation = gate.authority.runtime.mode === "model"
+        ? candidateExecutionState === "COMPLETE" && activeCandidateWorkingModel?.source_document_id === sourceId
+          ? renderCandidateWorkingWorkspace(sourceId, { workingModel: activeCandidateWorkingModel })
+          : openCandidateModelConsent()
+        : runCandidateProcessing();
       Promise.resolve(operation).catch(showPersonalError);
     });
     byId("confirm-completed-source").addEventListener("click", () => {
@@ -1396,11 +1774,69 @@
         }
         const confirmedAt = new Date().toISOString();
         byId("candidate-model-consent-dialog").close();
-        runCandidateModelProcessing(gate, confirmedAt).catch(showPersonalError);
+        runCandidateModelProcessing(gate, confirmedAt, candidateConsentId).catch(showPersonalError);
       } catch (error) {
         byId("candidate-model-consent-dialog").close();
         showPersonalError(error);
       }
+    });
+    byId("candidate-working-groups").addEventListener("click", (event) => {
+      const card = event.target.closest("[data-working-item]");
+      if (card) renderCandidateWorkspaceCardDetail(card.dataset.workingItem);
+    });
+    byId("candidate-card-back").addEventListener("click", requestCandidateCardBack);
+    byId("candidate-card-edit").addEventListener("click", enterCandidateWorkspaceEdit);
+    byId("candidate-card-edit-form").addEventListener("input", () => { candidateWorkspaceEditDirty = true; });
+    byId("candidate-working-cancel-edit").addEventListener("click", cancelCandidateWorkspaceEdit);
+    byId("candidate-card-edit-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      persistCandidateWorkspaceEdit().catch(showPersonalError);
+    });
+    byId("candidate-card-unsaved-dialog").addEventListener("cancel", (event) => { event.preventDefault(); byId("candidate-card-unsaved-dialog").close(); });
+    byId("candidate-card-unsaved-save").addEventListener("click", () => {
+      persistCandidateWorkspaceEdit().then(() => byId("candidate-card-unsaved-dialog").close()).catch(showPersonalError);
+    });
+    byId("candidate-card-unsaved-discard").addEventListener("click", () => {
+      byId("candidate-card-unsaved-dialog").close();
+      cancelCandidateWorkspaceEdit();
+    });
+    byId("candidate-workspace-composer").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const input = byId("candidate-workspace-message");
+      const content = input.value.trim();
+      if (!content) return;
+      input.value = "";
+      applyCandidateWorkspaceCorrection(content).catch(showPersonalError);
+    });
+    byId("candidate-workspace-save").addEventListener("click", () => saveCandidateWorkspaceToProfile().catch(showPersonalError));
+    byId("candidate-workspace-continue-editing").addEventListener("click", () => byId("candidate-workspace-close-dialog").close());
+    byId("candidate-workspace-discard-close").addEventListener("click", () => {
+      byId("candidate-workspace-close-dialog").close();
+      closeCandidateWorkspaceLayer(candidateWorkspaceExitIntent || "import");
+    });
+    byId("candidate-workspace-save-draft-close").addEventListener("click", () => {
+      persistCandidateWorkspaceEdit().then(() => {
+        byId("candidate-workspace-close-dialog").close();
+        closeCandidateWorkspaceLayer(candidateWorkspaceExitIntent || "import");
+      }).catch(showPersonalError);
+    });
+    byId("candidate-workspace-close-dialog").addEventListener("cancel", (event) => {
+      event.preventDefault();
+      byId("candidate-workspace-close-dialog").close();
+    });
+    byId("candidate-ai-workspace").addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        requestCandidateWorkspaceExit("import");
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = [...byId("candidate-ai-workspace").querySelectorAll('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex="0"]')].filter((element) => !element.closest(".hidden"));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     });
     refreshCandidateImportGate();
   }
@@ -1626,6 +2062,14 @@
       scopeButtons.forEach((control) => { control.disabled = true; });
       const sourceId = sourceIdFor(activeCandidate, canonicalRevision);
       try {
+        if (scope === "source" && canonicalRevision && String(sourceId || "").startsWith("source-candidate-")) {
+          const response = await fetch("/api/candidate-model-operation-state/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ source_document_id: sourceId }),
+          });
+          if (!response.ok) throw new Error("candidate_model_operation_state_delete_failed");
+        }
         if (canonicalRevision) {
           const database = await Truth.openDatabase();
           try {
