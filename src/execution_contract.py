@@ -20,6 +20,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RUNTIME_SNAPSHOT_SCHEMA_PATH = PROJECT_ROOT / "data" / "runtime_snapshot_v1.schema.json"
 RUNTIME_SNAPSHOT_SCHEMA = json.loads(RUNTIME_SNAPSHOT_SCHEMA_PATH.read_text(encoding="utf-8"))
 SNAPSHOT_FIELDS = tuple(RUNTIME_SNAPSHOT_SCHEMA["required"])
+SNAPSHOT_OPTIONAL_FIELDS = tuple(name for name in RUNTIME_SNAPSHOT_SCHEMA["properties"] if name not in SNAPSHOT_FIELDS)
 CAPABILITY_NAMES = tuple(RUNTIME_SNAPSHOT_SCHEMA["properties"]["capabilities"]["required"])
 CAPABILITY_STATES = tuple(RUNTIME_SNAPSHOT_SCHEMA["$defs"]["capabilityState"]["enum"])
 
@@ -82,6 +83,10 @@ class RuntimeSnapshot:
     adapter_version: str | None
     prompt_version: str | None
     schema_version: str | None
+    operation: str | None
+    capability_basis: str | None
+    action_schema_version: str | None
+    request_config_version: str | None
     delivery_method: str | None
     credential_ref: str | None
 
@@ -304,6 +309,10 @@ def create_runtime_snapshot(
     adapter_version: str | None = None,
     prompt_version: str | None = None,
     schema_version: str | None = None,
+    operation: str | None = None,
+    capability_basis: str | None = None,
+    action_schema_version: str | None = None,
+    request_config_version: str | None = None,
     delivery_method: str | None = None,
     environment_capabilities: Mapping[str, Any] | None = None,
 ) -> RuntimeSnapshot:
@@ -324,6 +333,10 @@ def create_runtime_snapshot(
         "adapter_version": adapter_version if adapter_version is not None else _descriptor_optional(descriptor, "adapter_version"),
         "prompt_version": prompt_version,
         "schema_version": schema_version,
+        "operation": operation,
+        "capability_basis": capability_basis if capability_basis is not None else _descriptor_optional(descriptor, "runtime_capability_basis"),
+        "action_schema_version": action_schema_version,
+        "request_config_version": request_config_version,
         "delivery_method": delivery_method if delivery_method is not None else _descriptor_optional(descriptor, "delivery_method", "document_delivery"),
         "credential_ref": credential_ref,
     }
@@ -346,7 +359,7 @@ def validate_runtime_snapshot(snapshot: RuntimeSnapshot | Mapping[str, Any]) -> 
     """Validate shape, identity, capability consistency and the secret boundary."""
     payload = snapshot.to_dict() if isinstance(snapshot, RuntimeSnapshot) else dict(_plain_mapping(snapshot, "runtime_snapshot_malformed"))
     _assert_no_secret_like(payload)
-    if set(payload) != set(SNAPSHOT_FIELDS):
+    if not set(SNAPSHOT_FIELDS).issubset(payload) or set(payload) - set(RUNTIME_SNAPSHOT_SCHEMA["properties"]):
         raise ExecutionContractError("runtime_snapshot_shape_invalid")
 
     snapshot_id = _optional_string(payload["snapshot_id"], "runtime_snapshot_id_invalid", 128)
@@ -388,6 +401,10 @@ def validate_runtime_snapshot(snapshot: RuntimeSnapshot | Mapping[str, Any]) -> 
         adapter_version=_optional_string(payload["adapter_version"], "runtime_snapshot_adapter_version_invalid"),
         prompt_version=_optional_string(payload["prompt_version"], "runtime_snapshot_prompt_version_invalid"),
         schema_version=_optional_string(payload["schema_version"], "runtime_snapshot_schema_version_invalid"),
+        operation=_optional_string(payload.get("operation"), "runtime_snapshot_operation_invalid"),
+        capability_basis=_optional_string(payload.get("capability_basis"), "runtime_snapshot_capability_basis_invalid"),
+        action_schema_version=_optional_string(payload.get("action_schema_version"), "runtime_snapshot_action_schema_version_invalid"),
+        request_config_version=_optional_string(payload.get("request_config_version"), "runtime_snapshot_request_config_version_invalid"),
         delivery_method=_optional_string(payload["delivery_method"], "runtime_snapshot_delivery_method_invalid"),
         credential_ref=credential_ref,
     )

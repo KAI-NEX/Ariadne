@@ -31,6 +31,7 @@
     "delivery_method",
     "credential_ref",
   ]);
+  const SNAPSHOT_OPTIONAL_FIELDS = Object.freeze(["operation", "capability_basis", "action_schema_version", "request_config_version"]);
   const LOCAL_CAPABILITY_NAMES = Object.freeze(["local_extraction", "local_ocr", "deterministic_structuring"]);
   const MODEL_CAPABILITY_NAMES = Object.freeze(CAPABILITY_NAMES.filter((name) => !LOCAL_CAPABILITY_NAMES.includes(name)));
   const SUPPORTED = "supported";
@@ -255,6 +256,10 @@
       adapter_version: options.adapterVersion ?? descriptorOptional(descriptor, "adapter_version"),
       prompt_version: options.promptVersion ?? null,
       schema_version: options.schemaVersion ?? null,
+      operation: options.operation ?? null,
+      capability_basis: options.capabilityBasis ?? descriptorOptional(descriptor, "runtime_capability_basis"),
+      action_schema_version: options.actionSchemaVersion ?? null,
+      request_config_version: options.requestConfigVersion ?? null,
       delivery_method: options.deliveryMethod ?? descriptorOptional(descriptor, "delivery_method", "document_delivery"),
       credential_ref: options.credentialRef ?? null,
     });
@@ -270,8 +275,9 @@
   function validateRuntimeSnapshot(snapshot) {
     const payload = plainObject(snapshot, "runtime_snapshot_malformed");
     assertNoSecretLike(payload);
-    const fields = Object.keys(payload).sort();
-    if (JSON.stringify(fields) !== JSON.stringify([...SNAPSHOT_FIELDS].sort())) throw new ExecutionContractError("runtime_snapshot_shape_invalid");
+    const fields = Object.keys(payload);
+    if (SNAPSHOT_FIELDS.some((field) => !Object.hasOwn(payload, field))
+      || fields.some((field) => !SNAPSHOT_FIELDS.includes(field) && !SNAPSHOT_OPTIONAL_FIELDS.includes(field))) throw new ExecutionContractError("runtime_snapshot_shape_invalid");
     const snapshotId = optionalString(payload.snapshot_id, "runtime_snapshot_id_invalid", 128);
     if (!snapshotId || !SNAPSHOT_ID_PATTERN.test(snapshotId)) throw new ExecutionContractError("runtime_snapshot_id_invalid");
     const capturedAt = validateCapturedAt(payload.captured_at);
@@ -302,6 +308,10 @@
       adapter_version: optionalString(payload.adapter_version, "runtime_snapshot_adapter_version_invalid"),
       prompt_version: optionalString(payload.prompt_version, "runtime_snapshot_prompt_version_invalid"),
       schema_version: optionalString(payload.schema_version, "runtime_snapshot_schema_version_invalid"),
+      operation: optionalString(payload.operation, "runtime_snapshot_operation_invalid"),
+      capability_basis: optionalString(payload.capability_basis, "runtime_snapshot_capability_basis_invalid"),
+      action_schema_version: optionalString(payload.action_schema_version, "runtime_snapshot_action_schema_version_invalid"),
+      request_config_version: optionalString(payload.request_config_version, "runtime_snapshot_request_config_version_invalid"),
       delivery_method: optionalString(payload.delivery_method, "runtime_snapshot_delivery_method_invalid"),
       credential_ref: credentialRef,
     };
@@ -326,6 +336,7 @@
     CAPABILITY_NAMES,
     CAPABILITY_STATES,
     SNAPSHOT_FIELDS,
+    SNAPSHOT_OPTIONAL_FIELDS,
     LOCAL_RUNTIME_CAPABILITY,
     ExecutionContractError,
     normalizeCurrentRuntime,

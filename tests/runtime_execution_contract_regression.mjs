@@ -108,6 +108,30 @@ assert.equal(unverified.capabilities.local_ocr, "unverified");
 assert.equal(unverified.capabilities.semantic_understanding, "unverified");
 assert.equal(unverified.capabilities.ai_conversation, "unverified");
 
+const conversationDescriptor = {
+  provider_id: "deepseek", model_id: "deepseek-v4-pro", protocol: "OPENAI_CHAT_COMPLETIONS",
+  capabilities: ["TEXT", "STRUCTURED_JSON"], discovery_source: "qualification_2026-09-03",
+  runtime_capability_basis: "adapter_verified", adapter_version: "deepseek-candidate-conversation-v1",
+  runtime_capabilities: {
+    semantic_understanding: "supported", candidate_model_structuring: "unsupported",
+    job_model_structuring: "unsupported", model_merge: "unsupported", ai_conversation: "supported", vision: "unsupported",
+  },
+};
+const conversationSnapshot = Runtime.createRuntimeSnapshot(
+  { mode: "model", provider: "deepseek", model: "deepseek-v4-pro" },
+  {
+    modelDescriptor: conversationDescriptor, snapshotId: "runtime-snapshot-candidate-conversation",
+    capturedAt: "2026-09-03T07:00:00Z", operation: "CANDIDATE_CONVERSATION_TURN",
+    capabilityBasis: "adapter_verified", actionSchemaVersion: "ariadne-candidate-conversation-action-v1",
+    requestConfigVersion: "deepseek-candidate-conversation-request-v1",
+  },
+);
+assert.equal(conversationSnapshot.capabilities.ai_conversation, "supported");
+assert.equal(conversationSnapshot.operation, "CANDIDATE_CONVERSATION_TURN");
+assert.equal(conversationSnapshot.action_schema_version, "ariadne-candidate-conversation-action-v1");
+const legacySnapshot = Object.fromEntries(Object.entries(conversationSnapshot).filter(([key]) => Runtime.SNAPSHOT_FIELDS.includes(key)));
+assert.equal(Runtime.validateRuntimeSnapshot(legacySnapshot).operation, null);
+
 for (const [provider, selectedModel] of [["qwen", "qwen3.8-max"], ["gemini", "gemini-3.7-flash"]]) {
   const connected = Runtime.createRuntimeSnapshot(
     { mode: "ai", provider, model: selectedModel },

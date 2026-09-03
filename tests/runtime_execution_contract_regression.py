@@ -125,6 +125,25 @@ assert verified_candidate_product.capabilities.job_model_structuring == "unsuppo
 assert verified_candidate_product.capabilities.model_merge == "unsupported"
 assert verified_candidate_product.capabilities.ai_conversation == "unsupported"
 
+conversation_descriptor = deepseek_model_descriptors(["deepseek-v4-pro"])[0]
+verified_conversation = create_runtime_snapshot(
+    {"mode": "model", "provider": "deepseek", "model": conversation_descriptor.model_id},
+    model_descriptor=conversation_descriptor,
+    snapshot_id="runtime-snapshot-candidate-conversation",
+    captured_at="2026-09-03T07:00:00Z",
+    operation="CANDIDATE_CONVERSATION_TURN",
+    capability_basis="adapter_verified",
+    action_schema_version="ariadne-candidate-conversation-action-v1",
+    request_config_version="deepseek-candidate-conversation-request-v1",
+)
+assert verified_conversation.capabilities.ai_conversation == "supported"
+assert verified_conversation.capabilities.candidate_model_structuring == "unsupported"
+assert verified_conversation.operation == "CANDIDATE_CONVERSATION_TURN"
+assert verified_conversation.action_schema_version == "ariadne-candidate-conversation-action-v1"
+assert verified_conversation.request_config_version == "deepseek-candidate-conversation-request-v1"
+legacy_snapshot = {key: value for key, value in verified_conversation.to_dict().items() if key in SNAPSHOT_FIELDS}
+assert validate_runtime_snapshot(legacy_snapshot).operation is None
+
 serialized = serialize_runtime_snapshot(model)
 restored = deserialize_runtime_snapshot(serialized)
 assert restored == model

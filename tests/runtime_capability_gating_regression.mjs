@@ -30,6 +30,12 @@ assert.equal(Gate.operationGate("candidate_import", modelAuthority).allowed, tru
 for (const operation of ["job_import", "ai_conversation", "model_merge"]) assert.equal(Gate.operationGate(operation, modelAuthority).allowed, false);
 assert.equal(Gate.requireOperation("candidate_import", modelAuthority).capability, "candidate_model_structuring");
 
+const conversationAuthority = Gate.authorityFrom({ mode: "model", provider: "deepseek", model: "deepseek-v4-pro" });
+assert.equal(Gate.operationGate("ai_conversation", conversationAuthority).allowed, true);
+assert.equal(Gate.operationGate("candidate_import", conversationAuthority).allowed, false);
+assert.equal(conversationAuthority.capabilities.vision, "unsupported");
+assert.equal(Gate.modelDescriptorForRuntime(conversationAuthority.runtime), Gate.CANDIDATE_CONVERSATION_MODEL_ADAPTER);
+
 assert.equal(Gate.currentAuthority(storageWith(null)).runtime.mode, "local");
 assert.throws(() => Gate.currentAuthority(storageWith("{not-json")), (error) => error.code === "current_runtime_storage_malformed");
 assert.throws(() => Gate.authorityFrom({ mode: "hybrid" }), (error) => error.code === "current_runtime_invalid");

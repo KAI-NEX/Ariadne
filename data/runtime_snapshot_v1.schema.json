@@ -89,6 +89,24 @@
       "type": ["string", "null"],
       "maxLength": 128
     },
+    "operation": {
+      "type": ["string", "null"],
+      "maxLength": 128,
+      "description": "The bounded product operation executed under this immutable runtime identity."
+    },
+    "capability_basis": {
+      "type": ["string", "null"],
+      "maxLength": 128,
+      "description": "The evidence vocabulary that authorizes the claimed product capability."
+    },
+    "action_schema_version": {
+      "type": ["string", "null"],
+      "maxLength": 128
+    },
+    "request_config_version": {
+      "type": ["string", "null"],
+      "maxLength": 128
+    },
     "delivery_method": {
       "type": ["string", "null"],
       "maxLength": 128

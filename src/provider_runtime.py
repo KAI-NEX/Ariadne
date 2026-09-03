@@ -9,7 +9,7 @@ silently treated as a generic OpenAI chat model.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, Callable
 
 
 OPENAI_CHAT_COMPLETIONS = "OPENAI_CHAT_COMPLETIONS"
@@ -77,7 +77,21 @@ def deepseek_model_descriptors(model_ids: list[str]) -> list[ModelDescriptor]:
         if model_id == "deepseek-v4-flash":
             descriptors.append(ModelDescriptor("deepseek", model_id, f"DeepSeek · {model_id}", OPENAI_RESPONSES, (TEXT,), "official_contract", True))
         elif model_id == "deepseek-v4-pro":
-            descriptors.append(ModelDescriptor("deepseek", model_id, f"DeepSeek · {model_id}", OPENAI_CHAT_COMPLETIONS, (TEXT, STRUCTURED_JSON), "official_contract"))
+            descriptors.append(ModelDescriptor(
+                "deepseek", model_id, f"DeepSeek · {model_id}", OPENAI_CHAT_COMPLETIONS,
+                (TEXT, STRUCTURED_JSON), "qualification_2026-09-03", False, NOT_MULTIMODAL,
+                "adapter_verified",
+                {
+                    "semantic_understanding": "supported",
+                    "candidate_model_structuring": "unsupported",
+                    "job_model_structuring": "unsupported",
+                    "model_merge": "unsupported",
+                    "ai_conversation": "supported",
+                    "vision": "unsupported",
+                },
+                "deepseek-candidate-conversation-v1",
+                None,
+            ))
         elif model_id == "deepseek-v4-flash-vision-exp":
             # DeepSeek's 2026-08-21 official announcement names this exact model as
             # its experimental multimodal vision API model.  Chat Completions is kept
@@ -117,6 +131,23 @@ def descriptor_for(model_id: str, descriptors: list[ModelDescriptor]) -> ModelDe
         if descriptor.model_id == model_id:
             return descriptor
     raise ProviderRuntimeError("deepseek_model_unavailable", "model")
+
+
+def resolve_credential_reference(
+    credential_ref: str,
+    expected_ref: str,
+    reader: Callable[[], str | None],
+    *,
+    invalid_code: str = "credential_reference_invalid",
+    missing_code: str = "credential_not_configured",
+) -> str:
+    """Resolve one opaque handle without logging or serializing its secret value."""
+    if credential_ref != expected_ref:
+        raise ProviderRuntimeError(invalid_code, "credential")
+    credential = reader()
+    if not credential:
+        raise ProviderRuntimeError(missing_code, "credential")
+    return credential
 
 
 def connection_request(descriptor: ModelDescriptor) -> ConnectionRequest:

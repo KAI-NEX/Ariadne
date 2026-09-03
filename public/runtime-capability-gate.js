@@ -29,6 +29,25 @@
     adapter_version: "deepseek-candidate-pdf-v1",
     delivery_method: "rendered_pdf_pages",
   });
+  const CANDIDATE_CONVERSATION_MODEL_ADAPTER = Object.freeze({
+    provider_id: "deepseek",
+    model_id: "deepseek-v4-pro",
+    protocol: "OPENAI_CHAT_COMPLETIONS",
+    capabilities: Object.freeze(["TEXT", "STRUCTURED_JSON"]),
+    multimodal_readiness: "NOT_MULTIMODAL",
+    discovery_source: "qualification_2026-09-03",
+    runtime_capability_basis: "adapter_verified",
+    runtime_capabilities: Object.freeze({
+      semantic_understanding: "supported",
+      candidate_model_structuring: "unsupported",
+      job_model_structuring: "unsupported",
+      model_merge: "unsupported",
+      ai_conversation: "supported",
+      vision: "unsupported",
+    }),
+    adapter_version: "deepseek-candidate-conversation-v1",
+    delivery_method: null,
+  });
   const OPERATION_CAPABILITIES = Object.freeze({
     candidate_import: Object.freeze({ local: "deterministic_structuring", model: "candidate_model_structuring" }),
     job_import: Object.freeze({ local: "deterministic_structuring", model: "job_model_structuring" }),
@@ -66,6 +85,9 @@
     if (normalized.mode !== "model") return null;
     if (normalized.provider === CANDIDATE_PDF_MODEL_ADAPTER.provider_id && normalized.model === CANDIDATE_PDF_MODEL_ADAPTER.model_id) {
       return CANDIDATE_PDF_MODEL_ADAPTER;
+    }
+    if (normalized.provider === CANDIDATE_CONVERSATION_MODEL_ADAPTER.provider_id && normalized.model === CANDIDATE_CONVERSATION_MODEL_ADAPTER.model_id) {
+      return CANDIDATE_CONVERSATION_MODEL_ADAPTER;
     }
     return Object.freeze({
       provider_id: normalized.provider,
@@ -126,6 +148,7 @@
     CURRENT_RUNTIME_STORAGE_KEY,
     OPERATION_CAPABILITIES,
     CANDIDATE_PDF_MODEL_ADAPTER,
+    CANDIDATE_CONVERSATION_MODEL_ADAPTER,
     RuntimeGateError,
     readStoredRuntime,
     authorityFrom,

@@ -23,7 +23,7 @@ from src.candidate_context import (
     extract_deepseek_candidate_proposal,
 )
 from src.execution_contract import ExecutionContractError, validate_runtime_snapshot
-from src.provider_runtime import OPENAI_CHAT_COMPLETIONS
+from src.provider_runtime import OPENAI_CHAT_COMPLETIONS, ProviderRuntimeError, resolve_credential_reference
 
 
 PROVIDER_ID = "deepseek"
@@ -242,12 +242,14 @@ def validate_candidate_model_request(payload: Any) -> CandidateModelRequest:
 
 
 def resolve_credential(credential_ref: str, reader: Callable[[], str | None]) -> str:
-    if credential_ref != CREDENTIAL_REF:
-        raise CandidateModelRuntimeError("candidate_model_credential_reference_invalid", "credential")
-    credential = reader()
-    if not credential:
-        raise CandidateModelRuntimeError("deepseek_key_not_configured", "credential")
-    return credential
+    try:
+        return resolve_credential_reference(
+            credential_ref, CREDENTIAL_REF, reader,
+            invalid_code="candidate_model_credential_reference_invalid",
+            missing_code="deepseek_key_not_configured",
+        )
+    except ProviderRuntimeError as error:
+        raise CandidateModelRuntimeError(error.code, error.failure_layer) from error
 
 
 def response_diagnostics(provider_response: Any, http_status: int | None = None) -> dict[str, Any]:

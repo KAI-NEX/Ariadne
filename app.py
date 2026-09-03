@@ -48,6 +48,12 @@ from src.candidate_model_runtime import (
     execute_candidate_model_request,
     validate_candidate_model_request,
 )
+from src.candidate_conversation_runtime import (
+    CandidateConversationExecutionRegistry,
+    CandidateConversationRuntimeError,
+    execute_candidate_conversation_request,
+    validate_candidate_conversation_request,
+)
 
 
 PROJECT_ROOT = Path(__file__).parent
@@ -82,6 +88,7 @@ LEGACY_PROVIDER_ACTION_PATHS = frozenset({
     "/api/vision-extract",
 })
 CANDIDATE_MODEL_EXECUTIONS = CandidateModelExecutionRegistry()
+CANDIDATE_CONVERSATION_EXECUTIONS = CandidateConversationExecutionRegistry()
 
 
 # These patterns deliberately produce review candidates, never authoritative Job fields.
@@ -310,6 +317,24 @@ def read_deepseek_key() -> str | None:
         timeout=15,
     )
     return result.stdout.strip() if result.returncode == 0 and result.stdout.strip() else None
+
+
+def call_deepseek_chat_completions(api_key: str, payload: dict, *, response_limit: int, timeout: int = 240) -> tuple[int, dict]:
+    """Shared fixed-endpoint transport; callers own operation-specific normalization."""
+    request = Request(
+        DEEPSEEK_ENDPOINT,
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    with urlopen(request, timeout=timeout) as response:  # noqa: S310 - fixed Provider endpoint
+        response_body = response.read(response_limit + 1)
+        if len(response_body) > response_limit:
+            raise ValueError("provider_response_too_large")
+        try:
+            return response.status, json.loads(response_body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValueError("provider_response_malformed") from error
 
 
 def deepseek_runtime_models() -> dict:
@@ -877,6 +902,12 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/candidate-model-operation-state/delete":
             self.delete_candidate_model_operation_state()
             return
+        if parsed.path == "/api/candidate-conversation-turn":
+            self.run_candidate_conversation_turn()
+            return
+        if parsed.path == "/api/candidate-conversation-turn/cancel":
+            self.cancel_candidate_conversation_turn()
+            return
         if parsed.path == "/api/career-document-extract":
             self.extract_career_document_candidate()
             return
@@ -956,21 +987,11 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             claimed_operation_id = validated_request.operation_id
 
             def provider_call(api_key: str, provider_payload: dict) -> tuple[int, dict]:
-                request = Request(
-                    DEEPSEEK_ENDPOINT,
-                    data=json.dumps(provider_payload, ensure_ascii=False).encode("utf-8"),
-                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                    method="POST",
-                )
-                with urlopen(request, timeout=240) as response:  # noqa: S310 - fixed qualified Provider endpoint
-                    response_body = response.read(8_000_001)
-                    if len(response_body) > 8_000_000:
-                        raise CandidateModelRuntimeError("deepseek_response_too_large", "parsing", True, {"http_status": response.status, "response_content_length": len(response_body)})
-                    try:
-                        response_payload = json.loads(response_body.decode("utf-8"))
-                    except (UnicodeDecodeError, json.JSONDecodeError) as error:
-                        raise CandidateModelRuntimeError("deepseek_response_malformed", "parsing", True, {"http_status": response.status, "response_content_length": len(response_body), "response_json_parse": "failed"}) from error
-                    return response.status, response_payload
+                try:
+                    return call_deepseek_chat_completions(api_key, provider_payload, response_limit=8_000_000)
+                except ValueError as error:
+                    code = "deepseek_response_too_large" if str(error) == "provider_response_too_large" else "deepseek_response_malformed"
+                    raise CandidateModelRuntimeError(code, "parsing", True) from error
 
             result = execute_candidate_model_request(
                 payload,
@@ -1033,6 +1054,100 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             })
             return
         self.send_json(HTTPStatus.OK, result)
+
+    def run_candidate_conversation_turn(self) -> None:
+        """Run one qualified Candidate turn without UI or persistence semantics."""
+        execution_id = None
+        generation = None
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+            if content_length <= 0 or content_length > 2_000_000:
+                raise CandidateConversationRuntimeError("REQUEST_SIZE_INVALID", "request")
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            validated = validate_candidate_conversation_request(payload)
+            execution_id, generation = validated.execution_id, validated.generation
+            if not CANDIDATE_CONVERSATION_EXECUTIONS.begin(execution_id, generation):
+                self.send_json(HTTPStatus.CONFLICT, {
+                    "error": "TURN_ALREADY_ACTIVE", "failure_layer": "generation",
+                    "network_call_made": False, "persistence": "not_written",
+                })
+                return
+
+            def provider_call(api_key: str, provider_payload: dict) -> tuple[int, dict]:
+                try:
+                    return call_deepseek_chat_completions(api_key, provider_payload, response_limit=2_000_000)
+                except ValueError as error:
+                    raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "parsing", True) from error
+
+            result = execute_candidate_conversation_request(payload, read_deepseek_key, provider_call)
+            if not CANDIDATE_CONVERSATION_EXECUTIONS.accept(execution_id, generation):
+                self.send_json(HTTPStatus.CONFLICT, {
+                    "error": "CANCELLED_TURN", "failure_layer": "generation",
+                    "network_call_made": True, "persistence": "not_written",
+                    "provider_request_may_have_completed": True,
+                })
+                return
+        except CandidateConversationRuntimeError as error:
+            if execution_id and generation:
+                CANDIDATE_CONVERSATION_EXECUTIONS.fail(execution_id, generation)
+            status = HTTPStatus.PRECONDITION_REQUIRED if error.failure_layer == "credential" else HTTPStatus.BAD_GATEWAY if error.failure_layer in {"provider", "transport"} else HTTPStatus.UNPROCESSABLE_ENTITY
+            self.send_json(status, {
+                "error": error.code, "failure_layer": error.failure_layer,
+                "network_call_made": error.network_call_made, "diagnostics": error.diagnostics,
+                "persistence": "not_written",
+            })
+            return
+        except HTTPError as error:
+            if execution_id and generation:
+                CANDIDATE_CONVERSATION_EXECUTIONS.fail(execution_id, generation)
+            layer = "credential" if error.code in {401, 403} else "model" if error.code == 404 else "provider"
+            self.send_json(HTTPStatus.BAD_GATEWAY, {
+                "error": "PROVIDER_HTTP_ERROR", "failure_layer": layer,
+                "provider_http_status": error.code, "network_call_made": True,
+                "persistence": "not_written",
+            })
+            return
+        except (URLError, TimeoutError, OSError):
+            if execution_id and generation:
+                CANDIDATE_CONVERSATION_EXECUTIONS.fail(execution_id, generation)
+            self.send_json(HTTPStatus.BAD_GATEWAY, {
+                "error": "PROVIDER_TRANSPORT_ERROR", "failure_layer": "transport",
+                "network_call_made": True, "persistence": "not_written",
+            })
+            return
+        except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
+            if execution_id and generation:
+                CANDIDATE_CONVERSATION_EXECUTIONS.fail(execution_id, generation)
+            self.send_json(HTTPStatus.BAD_REQUEST, {
+                "error": "REQUEST_INVALID", "failure_layer": "request",
+                "network_call_made": False, "persistence": "not_written",
+            })
+            return
+        self.send_json(HTTPStatus.OK, result)
+
+    def cancel_candidate_conversation_turn(self) -> None:
+        """Invalidate one generation; this does not promise Provider-side abort."""
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+            if content_length <= 0 or content_length > 2_000:
+                raise ValueError
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            if set(payload) != {"execution_id", "generation"}:
+                raise ValueError
+            execution_id = str(payload["execution_id"]).strip()
+            generation = str(payload["generation"]).strip()
+            if not execution_id or not generation:
+                raise ValueError
+        except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": "TURN_CANCEL_REQUEST_INVALID", "network_call_made": False})
+            return
+        invalidated = CANDIDATE_CONVERSATION_EXECUTIONS.cancel(execution_id, generation)
+        self.send_json(HTTPStatus.OK, {
+            "execution_id": execution_id, "generation": generation,
+            "state": "CANCELLED" if invalidated else "NOT_ACTIVE",
+            "working_mutation": "NONE", "provider_abort_guaranteed": False,
+            "persistence": "not_written", "network_call_made": False,
+        })
 
     def delete_candidate_model_operation_state(self) -> None:
         """Forget consent-scoped server idempotency state during source hard delete."""

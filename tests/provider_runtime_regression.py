@@ -7,6 +7,7 @@ from src.provider_runtime import (
     MULTIMODAL_VERIFIED, OPENAI_CHAT_COMPLETIONS, OPENAI_RESPONSES, ProviderRuntimeError,
     ModelDescriptor, TEXT, VISION, connection_request, deepseek_model_descriptors, descriptor_for, is_multimodal,
     multimodal_connection_request, multimodal_smoke_passed, normalize_response, v1_selector_descriptors,
+    resolve_credential_reference,
 )
 
 descriptors = deepseek_model_descriptors([
@@ -15,6 +16,10 @@ descriptors = deepseek_model_descriptors([
 flash, pro, vision, unknown = descriptors
 assert flash.protocol == OPENAI_RESPONSES and flash.runtime_default
 assert pro.protocol == OPENAI_CHAT_COMPLETIONS
+assert pro.runtime_capability_basis == "adapter_verified"
+assert pro.runtime_capabilities["ai_conversation"] == "supported"
+assert pro.runtime_capabilities["candidate_model_structuring"] == "unsupported"
+assert pro.adapter_version == "deepseek-candidate-conversation-v1" and pro.delivery_method is None
 assert vision.protocol == OPENAI_CHAT_COMPLETIONS and vision.capabilities == (TEXT, VISION)
 assert vision.multimodal_readiness == MULTIMODAL_VERIFIED and vision.discovery_source == "qualification_2026-09-03" and is_multimodal(vision)
 assert vision.runtime_capability_basis == "adapter_verified"
@@ -26,6 +31,7 @@ assert vision.adapter_version == "deepseek-candidate-pdf-v1" and vision.delivery
 assert not is_multimodal(flash) and not is_multimodal(pro)  # provider-level vision cannot leak into text models
 assert not is_multimodal(unknown)
 assert descriptor_for("deepseek-v4-pro", descriptors) == pro
+assert resolve_credential_reference("keychain://synthetic", "keychain://synthetic", lambda: "synthetic-secret") == "synthetic-secret"
 assert v1_selector_descriptors(descriptors) == [vision]  # only the model-level official vision model is visible
 verified = ModelDescriptor("fixture", "verified-vision", "Fixture vision", OPENAI_CHAT_COMPLETIONS, (TEXT, VISION), "fixture", False, MULTIMODAL_VERIFIED)
 assert v1_selector_descriptors([flash, verified]) == [verified]
