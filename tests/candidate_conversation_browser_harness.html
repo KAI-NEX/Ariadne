@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ariadne Synthetic Response Resolution</title>
+    <style>
+      body { font: 16px/1.5 system-ui, sans-serif; margin: 2rem; max-width: 48rem; }
+      article, form, #conversation { border: 1px solid #ccc; border-radius: 12px; margin-block: 1rem; padding: 1rem; }
+      input { box-sizing: border-box; padding: .65rem; width: 100%; }
+      button { margin-top: .75rem; padding: .6rem 1rem; }
+      [data-role="ASSISTANT"] { color: #14532d; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Candidate Conversation Response Resolution</h1>
+      <p id="status" aria-live="polite">Preparing synthetic Candidate…</p>
+      <article aria-label="Synthetic Candidate Card">
+        <small>EDUCATION · Working v<span id="working-version">1</span></small>
+        <h2 id="card-title">Loading…</h2>
+        <p>Synthetic browser-only data</p>
+      </article>
+      <div id="conversation" aria-live="polite"></div>
+      <form id="composer">
+        <label for="message">Correction</label>
+        <input id="message" value="Royal College of Art RCA → Royal College of Art">
+        <button type="submit">Send synthetic correction</button>
+      </form>
+    </main>
+    <script src="/runtime-capabilities.js"></script>
+    <script src="/runtime-capability-gate.js"></script>
+    <script src="/truth-persistence-domain.js"></script>
+    <script src="/raw-source-storage-domain.js"></script>
+    <script src="/candidate-context-domain.js"></script>
+    <script src="/candidate-model-runtime-domain.js"></script>
+    <script src="/local-candidate-extraction-domain.js"></script>
+    <script src="/candidate-conversation-contract-manifest.js"></script>
+    <script src="/candidate-conversation-domain.js"></script>
+    <script src="/candidate-conversation-persistence-domain.js"></script>
+    <script src="/candidate-conversation-context-compiler.js"></script>
+    <script src="/candidate-workspace-conversation-runtime.js"></script>
+    <script src="/synthetic-browser-seed.js"></script>
+    <script src="/synthetic-browser-harness.js"></script>
+  </body>
+</html>

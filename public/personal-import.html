@@ -88,6 +88,7 @@
                 <ol id="candidate-understanding-events" class="v1-understanding-events"></ol>
                 <div id="candidate-clarification-list" class="v1-clarification-list"></div>
                 <div id="candidate-workspace-conversation" class="v1-workspace-conversation" aria-live="polite"></div>
+                <p id="candidate-workspace-conversation-status" class="v1-conversation-empty" aria-live="polite"></p>
               </div>
               <form id="candidate-workspace-composer" class="v1-conversation-form v1-workspace-composer">
                 <label class="sr-only" for="candidate-workspace-message">告诉 Ariadne 哪里需要调整</label>
@@ -157,8 +158,13 @@
     <script src="/local-candidate-extraction-domain.js?v=source-storage-v1"></script>
     <script src="/local-candidate-proposal-domain.js?v=personal-lifecycle-v1"></script>
     <script src="/local-candidate-review-domain.js?v=candidate-workspace-authority-v1"></script>
+    <script src="/candidate-conversation-contract-manifest.js?v=candidate-conversation-resolution-v1"></script>
+    <script src="/candidate-conversation-domain.js?v=candidate-conversation-resolution-v1"></script>
+    <script src="/candidate-conversation-persistence-domain.js?v=candidate-conversation-slice-a-v1"></script>
+    <script src="/candidate-conversation-context-compiler.js?v=candidate-conversation-slice-a-v1"></script>
+    <script src="/candidate-workspace-conversation-runtime.js?v=candidate-conversation-route-contract-v2"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
-    <script src="/v1-pages.js?v=candidate-workspace-shell-v1"></script>
+    <script src="/v1-pages.js?v=candidate-conversation-slice-a-v1"></script>
   </body>
 </html>

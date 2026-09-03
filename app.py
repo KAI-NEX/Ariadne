@@ -60,6 +60,7 @@ PROJECT_ROOT = Path(__file__).parent
 DATA_PATH = PROJECT_ROOT / "data" / "jd-001.json"
 DATABASE_PATH = PROJECT_ROOT / "data" / "job_radar.db"
 SCHEMA_PATH = PROJECT_ROOT / "data" / "schema.sql"
+CONVERSATION_CONTRACT_MANIFEST_PATH = PROJECT_ROOT / "data" / "candidate_conversation_contract_v1.json"
 PUBLIC_PATH = PROJECT_ROOT / "public"
 OCR_SCRIPT_PATH = PROJECT_ROOT / "src" / "extraction" / "ocr_with_vision.swift"
 PDF_TEXT_SCRIPT_PATH = PROJECT_ROOT / "src" / "extraction" / "extract_pdf_text.swift"
@@ -808,6 +809,9 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802 - required by the standard library
         parsed = urlparse(self.path)
+        if parsed.path == "/candidate-conversation-contract-manifest.js":
+            self.candidate_conversation_contract_manifest()
+            return
         if parsed.path == "/api/runtime-options":
             self.runtime_options()
             return
@@ -841,6 +845,22 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             self.get_job(parsed.path.removeprefix("/api/jobs/"))
             return
         super().do_GET()
+
+    def candidate_conversation_contract_manifest(self) -> None:
+        """Expose the canonical JSON manifest as a browser bootstrap value."""
+        manifest = json.loads(CONVERSATION_CONTRACT_MANIFEST_PATH.read_text(encoding="utf-8"))
+        encoded = json.dumps(manifest, ensure_ascii=False, separators=(",", ":"))
+        body = (
+            '"use strict";(function(root){function freeze(value){if(value&&typeof value==="object")'
+            '{Object.values(value).forEach(freeze);Object.freeze(value);}return value;}'
+            f'root.AriadneCandidateConversationContractManifest=freeze({encoded});'
+            '}(typeof globalThis!=="undefined"?globalThis:this));'
+        ).encode("utf-8")
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "application/javascript; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def get_local_ocr_evidence(self, filename: str) -> None:
         safe_name = Path(filename).name

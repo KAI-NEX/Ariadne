@@ -1,0 +1,345 @@
+{
+  "manifest_version": "ariadne-candidate-conversation-contract-manifest-v1",
+  "semantic_action_version": "ariadne-semantic-candidate-action-v1",
+  "canonical_action_version": "ariadne-candidate-conversation-action-v1",
+  "actions": [
+    "NO_CHANGE",
+    "PATCH_ITEM",
+    "PATCH_MULTIPLE_ITEMS",
+    "ASK_CLARIFICATION",
+    "EXPLAIN"
+  ],
+  "unsupported_actions": [
+    "CREATE_ITEM",
+    "REMOVE_ITEM",
+    "MERGE_ITEMS",
+    "DELETE_ITEM"
+  ],
+  "canonical_operations": [
+    "SET_ITEM_FIELD",
+    "CLEAR_ITEM_FIELD",
+    "SET_FACT_VALUE",
+    "SET_UNCERTAINTY_STATUS"
+  ],
+  "canonical_item_fields": [
+    "title",
+    "subtitle",
+    "time",
+    "summary",
+    "ownership"
+  ],
+  "canonical_clearable_item_fields": [
+    "subtitle",
+    "time",
+    "ownership"
+  ],
+  "uncertainty_statuses": [
+    "OPEN",
+    "RESOLVED",
+    "DISMISSED"
+  ],
+  "limits": {
+    "human_message": 8000,
+    "message": 4000,
+    "clarification": 4000,
+    "patches": 32,
+    "changes_per_patch": 32,
+    "reason": 2000,
+    "identifier": 256
+  },
+  "canonical_keys": {
+    "top_level": [
+      "contract_id",
+      "action",
+      "message",
+      "observed_working_model",
+      "patches",
+      "clarification"
+    ],
+    "observed_working_model": [
+      "candidate_context_id",
+      "working_model_id",
+      "version",
+      "fingerprint"
+    ],
+    "patch": [
+      "target_item_id",
+      "operations",
+      "reason",
+      "origin",
+      "evidence_refs"
+    ],
+    "operations": {
+      "SET_ITEM_FIELD": [
+        "operation",
+        "field",
+        "value"
+      ],
+      "CLEAR_ITEM_FIELD": [
+        "operation",
+        "field"
+      ],
+      "SET_FACT_VALUE": [
+        "operation",
+        "fact_id",
+        "value"
+      ],
+      "SET_UNCERTAINTY_STATUS": [
+        "operation",
+        "uncertainty_id",
+        "status"
+      ]
+    }
+  },
+  "semantic_contract": {
+    "top_level_required": [
+      "action"
+    ],
+    "top_level_optional": [
+      "message",
+      "patches",
+      "clarification",
+      "no_change_basis"
+    ],
+    "patch_required": [
+      "changes"
+    ],
+    "patch_optional": [
+      "target_item_id"
+    ],
+    "change_required": [
+      "intent",
+      "concept"
+    ],
+    "change_optional": [
+      "value",
+      "reference_id"
+    ],
+    "no_change_basis_required": [
+      "target_item_id",
+      "concept",
+      "value"
+    ],
+    "no_change_basis_optional": [],
+    "intents": [
+      "SET",
+      "CLEAR",
+      "SET_STATUS"
+    ],
+    "concepts": [
+      "institution_name",
+      "organization_name",
+      "role_title",
+      "time_range",
+      "summary",
+      "work_arrangement",
+      "location",
+      "ownership",
+      "uncertainty_status"
+    ],
+    "concept_aliases": {
+      "institution": "institution_name",
+      "school": "institution_name",
+      "school_name": "institution_name",
+      "organization": "organization_name",
+      "company": "organization_name",
+      "company_name": "organization_name",
+      "role": "role_title",
+      "job_title": "role_title",
+      "date_range": "time_range",
+      "period": "time_range"
+    },
+    "key_aliases": {
+      "top_level": {
+        "patch": "patches"
+      },
+      "patch": {
+        "target": "target_item_id"
+      },
+      "change": {
+        "concept_name": "concept"
+      }
+    },
+    "defaults": {
+      "patches": [],
+      "clarification": null
+    },
+    "action_shapes": {
+      "PATCH_ITEM": {
+        "message": "REQUIRED_NONEMPTY_STRING",
+        "clarification": "OMITTED_OR_NULL",
+        "patches": { "minimum": 1, "maximum": 1 },
+        "no_change_basis": "OMITTED"
+      },
+      "PATCH_MULTIPLE_ITEMS": {
+        "message": "REQUIRED_NONEMPTY_STRING",
+        "clarification": "OMITTED_OR_NULL",
+        "patches": { "minimum": 2, "maximum": 32 },
+        "no_change_basis": "OMITTED"
+      },
+      "ASK_CLARIFICATION": {
+        "message": "OPTIONAL_STRING_EMPTY_ALLOWED",
+        "clarification": "REQUIRED_NONEMPTY_STRING",
+        "patches": { "minimum": 0, "maximum": 0 },
+        "no_change_basis": "OMITTED"
+      },
+      "EXPLAIN": {
+        "message": "REQUIRED_NONEMPTY_STRING",
+        "clarification": "OMITTED_OR_NULL",
+        "patches": { "minimum": 0, "maximum": 0 },
+        "no_change_basis": "OMITTED"
+      },
+      "NO_CHANGE": {
+        "message": "REQUIRED_NONEMPTY_STRING",
+        "clarification": "OMITTED_OR_NULL",
+        "patches": { "minimum": 0, "maximum": 0 },
+        "no_change_basis": "REQUIRED_CURRENT_VALUE_ASSERTION"
+      }
+    },
+    "allow_single_patch_object": true
+  },
+  "concept_mappings": [
+    {
+      "concept": "institution_name",
+      "item_types": [
+        "EDUCATION"
+      ],
+      "item_subtypes": [
+        "education",
+        "degree"
+      ],
+      "destination": {
+        "kind": "ITEM_FIELD",
+        "field": "title"
+      },
+      "allowed_intents": [
+        "SET"
+      ]
+    },
+    {
+      "concept": "organization_name",
+      "item_types": [
+        "WORK",
+        "WORK_EXPERIENCE"
+      ],
+      "item_subtypes": [
+        "employment",
+        "work_experience"
+      ],
+      "destination": {
+        "kind": "ITEM_FIELD",
+        "field": "subtitle"
+      },
+      "allowed_intents": [
+        "SET",
+        "CLEAR"
+      ]
+    },
+    {
+      "concept": "role_title",
+      "item_types": [
+        "WORK",
+        "WORK_EXPERIENCE"
+      ],
+      "item_subtypes": [
+        "employment",
+        "work_experience"
+      ],
+      "destination": {
+        "kind": "ITEM_FIELD",
+        "field": "title"
+      },
+      "allowed_intents": [
+        "SET"
+      ]
+    },
+    {
+      "concept": "time_range",
+      "item_types": [
+        "*"
+      ],
+      "destination": {
+        "kind": "ITEM_FIELD",
+        "field": "time"
+      },
+      "allowed_intents": [
+        "SET",
+        "CLEAR"
+      ]
+    },
+    {
+      "concept": "summary",
+      "item_types": [
+        "*"
+      ],
+      "destination": {
+        "kind": "ITEM_FIELD",
+        "field": "summary"
+      },
+      "allowed_intents": [
+        "SET"
+      ]
+    },
+    {
+      "concept": "ownership",
+      "item_types": [
+        "*"
+      ],
+      "destination": {
+        "kind": "ITEM_FIELD",
+        "field": "ownership"
+      },
+      "allowed_intents": [
+        "SET",
+        "CLEAR"
+      ]
+    },
+    {
+      "concept": "location",
+      "item_types": [
+        "*"
+      ],
+      "destination": {
+        "kind": "FACT_BY_LABEL",
+        "labels": [
+          "location",
+          "地点",
+          "所在地"
+        ]
+      },
+      "allowed_intents": [
+        "SET"
+      ]
+    },
+    {
+      "concept": "work_arrangement",
+      "item_types": [
+        "*"
+      ],
+      "destination": {
+        "kind": "FACT_BY_LABEL",
+        "labels": [
+          "work arrangement",
+          "employment type",
+          "工作方式",
+          "工作性质"
+        ]
+      },
+      "allowed_intents": [
+        "SET"
+      ]
+    },
+    {
+      "concept": "uncertainty_status",
+      "item_types": [
+        "*"
+      ],
+      "destination": {
+        "kind": "UNCERTAINTY_BY_ID"
+      },
+      "allowed_intents": [
+        "SET_STATUS"
+      ]
+    }
+  ]
+}

@@ -11,6 +11,7 @@ import json
 import hashlib
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from threading import Lock
 from typing import Any, Callable, Mapping
 from urllib.parse import quote
@@ -24,8 +25,7 @@ PROVIDER_ID = "deepseek"
 MODEL_ID = "deepseek-v4-pro"
 PROTOCOL = OPENAI_CHAT_COMPLETIONS
 ADAPTER_VERSION = "deepseek-candidate-conversation-v1"
-PROMPT_VERSION = "candidate-conversation-prompt-v1"
-ACTION_SCHEMA_VERSION = "ariadne-candidate-conversation-action-v1"
+PROMPT_VERSION = "candidate-conversation-semantic-prompt-v1"
 REQUEST_CONFIG_VERSION = "deepseek-candidate-conversation-request-v1"
 CAPABILITY_BASIS = "adapter_verified"
 CREDENTIAL_REF = "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision"
@@ -33,15 +33,29 @@ OPERATION = "CANDIDATE_CONVERSATION_TURN"
 CONTRACT_ID = "ariadne-candidate-conversation-v1"
 SUBJECT_TYPE = "CANDIDATE"
 
-ACTIONS = {"NO_CHANGE", "PATCH_ITEM", "PATCH_MULTIPLE_ITEMS", "ASK_CLARIFICATION", "EXPLAIN"}
-UNSUPPORTED_ACTIONS = {"CREATE_ITEM", "REMOVE_ITEM", "MERGE_ITEMS"}
-OPERATIONS = {"SET_ITEM_FIELD", "CLEAR_ITEM_FIELD", "SET_FACT_VALUE", "SET_UNCERTAINTY_STATUS"}
-ITEM_FIELDS = {"title", "subtitle", "time", "summary", "ownership"}
-CLEARABLE_ITEM_FIELDS = {"subtitle", "time", "ownership"}
-UNCERTAINTY_STATUSES = {"OPEN", "RESOLVED", "DISMISSED"}
-TOP_LEVEL_KEYS = {"contract_id", "action", "message", "observed_working_model", "patches", "clarification"}
-OBSERVED_KEYS = {"candidate_context_id", "working_model_id", "version", "fingerprint"}
-PATCH_KEYS = {"target_item_id", "operations", "reason", "origin", "evidence_refs"}
+CONTRACT_MANIFEST_PATH = Path(__file__).resolve().parents[1] / "data" / "candidate_conversation_contract_v1.json"
+CONTRACT_MANIFEST = json.loads(CONTRACT_MANIFEST_PATH.read_text(encoding="utf-8"))
+ACTION_SCHEMA_VERSION = CONTRACT_MANIFEST["canonical_action_version"]
+SEMANTIC_ACTION_SCHEMA_VERSION = CONTRACT_MANIFEST["semantic_action_version"]
+ACTIONS = set(CONTRACT_MANIFEST["actions"])
+UNSUPPORTED_ACTIONS = set(CONTRACT_MANIFEST["unsupported_actions"])
+OPERATIONS = set(CONTRACT_MANIFEST["canonical_operations"])
+ITEM_FIELDS = set(CONTRACT_MANIFEST["canonical_item_fields"])
+CLEARABLE_ITEM_FIELDS = set(CONTRACT_MANIFEST["canonical_clearable_item_fields"])
+UNCERTAINTY_STATUSES = set(CONTRACT_MANIFEST["uncertainty_statuses"])
+TOP_LEVEL_KEYS = set(CONTRACT_MANIFEST["canonical_keys"]["top_level"])
+OBSERVED_KEYS = set(CONTRACT_MANIFEST["canonical_keys"]["observed_working_model"])
+PATCH_KEYS = set(CONTRACT_MANIFEST["canonical_keys"]["patch"])
+OPERATION_KEYS = {name: set(keys) for name, keys in CONTRACT_MANIFEST["canonical_keys"]["operations"].items()}
+LIMITS = CONTRACT_MANIFEST["limits"]
+SEMANTIC_CONTRACT = CONTRACT_MANIFEST["semantic_contract"]
+SEMANTIC_ACTIONS = set(CONTRACT_MANIFEST["actions"])
+SEMANTIC_INTENTS = set(SEMANTIC_CONTRACT["intents"])
+SEMANTIC_CONCEPTS = set(SEMANTIC_CONTRACT["concepts"])
+DIAGNOSTIC_STAGES = {
+    "PROVIDER_ENVELOPE", "MODEL_IDENTITY", "FINISH_REASON", "JSON_PARSE", "SEMANTIC_SCHEMA",
+    "RESOLUTION", "CANONICAL_SCHEMA", "SEMANTIC_GUARD", "STALE", "AUTHORITY", "PERSISTENCE",
+}
 MULTI_INTENT_PATTERNS = (
     re.compile(r"(?:所有|全部|每一个|每个|统一这些|这些都|两项|这两|多个|跨(?:卡片|项目))"),
     re.compile(r"\b(?:all|every|both|multiple|across\s+(?:items|cards))\b", re.IGNORECASE),
@@ -57,6 +71,21 @@ class CandidateConversationRuntimeError(ValueError):
         self.failure_layer = failure_layer
         self.network_call_made = network_call_made
         self.diagnostics = diagnostics or {}
+
+
+def _diagnostic(stage: str, code: str, field_category: str | None = None, action_type: Any = None) -> dict[str, Any]:
+    if stage not in DIAGNOSTIC_STAGES:
+        raise ValueError("unsupported_candidate_conversation_diagnostic_stage")
+    result: dict[str, Any] = {"stage": stage, "error_code": code}
+    if field_category is not None:
+        result["field_category"] = field_category
+    if action_type in ACTIONS or action_type in UNSUPPORTED_ACTIONS:
+        result["action_type"] = action_type
+    return result
+
+
+def _failure(code: str, layer: str, stage: str, field_category: str | None = None, action_type: Any = None) -> CandidateConversationRuntimeError:
+    return CandidateConversationRuntimeError(code, layer, diagnostics=_diagnostic(stage, code, field_category, action_type))
 
 
 @dataclass(frozen=True)
@@ -255,7 +284,7 @@ def validate_candidate_conversation_request(payload: Any) -> CandidateConversati
     if request.get("contract_id") != f"{CONTRACT_ID}-runtime-request-v1":
         raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation")
     conversation = _validate_conversation(request.get("conversation"))
-    human_message = _string(request.get("human_message"), "HUMAN_MESSAGE_INVALID")
+    human_message = _string(request.get("human_message"), "HUMAN_MESSAGE_INVALID", LIMITS["human_message"])
     try:
         working_model = validate_candidate_working_model(request.get("working_model"))
     except TruthPersistenceError as error:
@@ -302,43 +331,45 @@ def _validate_operation(value: Any, item: Mapping[str, Any]) -> dict[str, Any]:
     if operation_type not in OPERATIONS:
         raise CandidateConversationRuntimeError("UNSUPPORTED_OPERATION", "contract_validation")
     if operation_type == "SET_ITEM_FIELD":
-        _exact(operation, {"operation", "field", "value"})
+        _exact(operation, OPERATION_KEYS[operation_type], "ACTION_OPERATION_SHAPE_INVALID")
         if operation.get("field") not in ITEM_FIELDS:
             raise CandidateConversationRuntimeError("INVALID_OPERATION_TARGET", "contract_validation")
-        _string(operation.get("value"))
+        _string(operation.get("value"), "ACTION_OPERATION_SHAPE_INVALID", LIMITS["message"])
     elif operation_type == "CLEAR_ITEM_FIELD":
-        _exact(operation, {"operation", "field"})
+        _exact(operation, OPERATION_KEYS[operation_type], "ACTION_OPERATION_SHAPE_INVALID")
         if operation.get("field") not in CLEARABLE_ITEM_FIELDS:
             raise CandidateConversationRuntimeError("INVALID_OPERATION_TARGET", "contract_validation")
     elif operation_type == "SET_FACT_VALUE":
-        _exact(operation, {"operation", "fact_id", "value"})
-        _string(operation.get("value"))
-        if operation.get("fact_id") not in {fact.get("fact_id") for fact in item.get("facts") or [] if isinstance(fact, Mapping)}:
+        _exact(operation, OPERATION_KEYS[operation_type], "ACTION_OPERATION_SHAPE_INVALID")
+        _string(operation.get("value"), "ACTION_OPERATION_SHAPE_INVALID", LIMITS["message"])
+        fact_id = _string(operation.get("fact_id"), "INVALID_OPERATION_TARGET", LIMITS["identifier"])
+        if fact_id not in {fact.get("fact_id") for fact in item.get("facts") or [] if isinstance(fact, Mapping)}:
             raise CandidateConversationRuntimeError("INVALID_OPERATION_TARGET", "contract_validation")
     else:
-        _exact(operation, {"operation", "uncertainty_id", "status"})
+        _exact(operation, OPERATION_KEYS[operation_type], "ACTION_OPERATION_SHAPE_INVALID")
         if operation.get("status") not in UNCERTAINTY_STATUSES:
-            raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation")
-        if operation.get("uncertainty_id") not in {entry.get("uncertainty_id") for entry in item.get("uncertainties") or [] if isinstance(entry, Mapping)}:
+            raise CandidateConversationRuntimeError("ACTION_OPERATION_SHAPE_INVALID", "contract_validation")
+        uncertainty_id = _string(operation.get("uncertainty_id"), "INVALID_OPERATION_TARGET", LIMITS["identifier"])
+        if uncertainty_id not in {entry.get("uncertainty_id") for entry in item.get("uncertainties") or [] if isinstance(entry, Mapping)}:
             raise CandidateConversationRuntimeError("INVALID_OPERATION_TARGET", "contract_validation")
     return dict(operation)
 
 
 def _validate_patch(value: Any, item_by_id: dict[str, Mapping[str, Any]]) -> dict[str, Any]:
-    patch = _exact(value, PATCH_KEYS)
-    target = _string(patch.get("target_item_id"), "INVALID_TARGET", 256)
+    patch = _exact(value, PATCH_KEYS, "ACTION_PATCH_SHAPE_INVALID")
+    target = _string(patch.get("target_item_id"), "INVALID_TARGET", LIMITS["identifier"])
     item = item_by_id.get(target)
     if item is None:
         raise CandidateConversationRuntimeError("INVALID_TARGET", "contract_validation")
     operations = patch.get("operations")
-    if not isinstance(operations, list) or not 1 <= len(operations) <= 32:
-        raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation")
-    _string(patch.get("reason"), maximum=2000)
+    if not isinstance(operations, list) or not 1 <= len(operations) <= LIMITS["changes_per_patch"]:
+        raise CandidateConversationRuntimeError("ACTION_PATCH_SHAPE_INVALID", "contract_validation")
+    _string(patch.get("reason"), "ACTION_PATCH_SHAPE_INVALID", LIMITS["reason"])
     if patch.get("origin") != "MODEL_PROPOSAL":
-        raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation")
+        raise CandidateConversationRuntimeError("ACTION_PATCH_SHAPE_INVALID", "contract_validation")
     evidence_refs = patch.get("evidence_refs")
     if not isinstance(evidence_refs, list) or any(not isinstance(ref, str) or not ref.strip() for ref in evidence_refs):
-        raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation")
+        raise CandidateConversationRuntimeError("ACTION_PATCH_SHAPE_INVALID", "contract_validation")
     if any(ref not in _source_ref_ids(item) for ref in evidence_refs):
         raise CandidateConversationRuntimeError("INVALID_EVIDENCE_REF", "grounding")
     return {
@@ -351,18 +382,20 @@ def _validate_patch(value: Any, item_by_id: dict[str, Mapping[str, Any]]) -> dic
 
 
 def validate_candidate_action(raw_action: Any, request: CandidateConversationRequest) -> dict[str, Any]:
-    action = _exact(raw_action, TOP_LEVEL_KEYS)
+    action = _exact(raw_action, TOP_LEVEL_KEYS, "ACTION_TOP_LEVEL_SHAPE_INVALID")
     if action.get("contract_id") != ACTION_SCHEMA_VERSION:
-        raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation", True)
+        raise CandidateConversationRuntimeError("ACTION_TOP_LEVEL_SHAPE_INVALID", "contract_validation", True)
     action_type = action.get("action")
     if action_type in UNSUPPORTED_ACTIONS or action_type not in ACTIONS:
         raise CandidateConversationRuntimeError("UNSUPPORTED_ACTION", "contract_validation", True)
-    if not isinstance(action.get("message"), str) or not isinstance(action.get("patches"), list):
-        raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation", True)
+    if not isinstance(action.get("message"), str) or len(action["message"].strip()) > LIMITS["message"]:
+        raise CandidateConversationRuntimeError("ACTION_MESSAGE_SHAPE_INVALID", "contract_validation", True)
+    if not isinstance(action.get("patches"), list) or len(action["patches"]) > LIMITS["patches"]:
+        raise CandidateConversationRuntimeError("ACTION_PATCH_SHAPE_INVALID", "contract_validation", True)
     clarification = action.get("clarification")
-    if clarification is not None and (not isinstance(clarification, str) or not clarification.strip()):
-        raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation", True)
-    observed = _exact(action.get("observed_working_model"), OBSERVED_KEYS)
+    if clarification is not None and (not isinstance(clarification, str) or not clarification.strip() or len(clarification.strip()) > LIMITS["clarification"]):
+        raise CandidateConversationRuntimeError("ACTION_CLARIFICATION_SHAPE_INVALID", "contract_validation", True)
+    observed = _exact(action.get("observed_working_model"), OBSERVED_KEYS, "ACTION_TOP_LEVEL_SHAPE_INVALID")
     expected_observed = {key: request.observation[key] for key in OBSERVED_KEYS}
     if dict(observed) != expected_observed:
         raise CandidateConversationRuntimeError("STALE_WORKING_OBSERVATION", "stale", True)
@@ -373,19 +406,19 @@ def validate_candidate_action(raw_action: Any, request: CandidateConversationReq
     patches = [_validate_patch(patch, item_by_id) for patch in action["patches"]]
     targets = {patch["target_item_id"] for patch in patches}
     if action_type in {"NO_CHANGE", "ASK_CLARIFICATION", "EXPLAIN"} and patches:
-        raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation", True)
+        raise CandidateConversationRuntimeError("ACTION_CARDINALITY_INVALID", "contract_validation", True)
     if action_type == "PATCH_ITEM" and (len(targets) != 1 or not patches):
-        raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation", True)
+        raise CandidateConversationRuntimeError("ACTION_CARDINALITY_INVALID", "contract_validation", True)
     if action_type == "PATCH_MULTIPLE_ITEMS" and (len(targets) < 2 or len(patches) < 2):
-        raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation", True)
+        raise CandidateConversationRuntimeError("ACTION_CARDINALITY_INVALID", "contract_validation", True)
     if action_type == "PATCH_MULTIPLE_ITEMS" and not _has_explicit_multi_intent(request.human_message):
         raise CandidateConversationRuntimeError("IMPLICIT_MULTI_VIOLATION", "intent", True)
     if action_type == "ASK_CLARIFICATION" and clarification is None:
-        raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation", True)
+        raise CandidateConversationRuntimeError("ACTION_CLARIFICATION_SHAPE_INVALID", "contract_validation", True)
     if action_type != "ASK_CLARIFICATION" and clarification is not None:
-        raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation", True)
+        raise CandidateConversationRuntimeError("ACTION_CLARIFICATION_SHAPE_INVALID", "contract_validation", True)
     if action_type != "ASK_CLARIFICATION" and not action["message"].strip():
-        raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation", True)
+        raise CandidateConversationRuntimeError("ACTION_MESSAGE_SHAPE_INVALID", "contract_validation", True)
 
     focus = request.observation["focus"]
     if focus["type"] == "ITEM_DRAFT" and any(target != focus["item_id"] for target in targets):
@@ -398,23 +431,306 @@ def validate_candidate_action(raw_action: Any, request: CandidateConversationReq
     return normalized
 
 
+def _semantic_object(
+    value: Any,
+    required: set[str],
+    optional: set[str],
+    aliases: Mapping[str, str],
+    category: str,
+    action_type: Any = None,
+) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        raise _failure("SEMANTIC_SCHEMA_INVALID", "contract_validation", "SEMANTIC_SCHEMA", category, action_type)
+    normalized: dict[str, Any] = {}
+    for raw_key, raw_value in value.items():
+        key = aliases.get(raw_key, raw_key)
+        if key not in required | optional or key in normalized:
+            raise _failure("SEMANTIC_SCHEMA_INVALID", "contract_validation", "SEMANTIC_SCHEMA", category, action_type)
+        normalized[key] = raw_value
+    if not required.issubset(normalized):
+        raise _failure("SEMANTIC_SCHEMA_INVALID", "contract_validation", "SEMANTIC_SCHEMA", category, action_type)
+    return normalized
+
+
+def validate_semantic_candidate_action(raw_action: Any) -> dict[str, Any]:
+    """Validate and apply only manifest-declared representation normalization."""
+    top_required = set(SEMANTIC_CONTRACT["top_level_required"])
+    top_optional = set(SEMANTIC_CONTRACT["top_level_optional"])
+    top_aliases = SEMANTIC_CONTRACT["key_aliases"]["top_level"]
+    action_hint = raw_action.get("action") if isinstance(raw_action, Mapping) else None
+    action = _semantic_object(raw_action, top_required, top_optional, top_aliases, "semantic_action.top_level", action_hint)
+    action_type = action.get("action")
+    if action_type in UNSUPPORTED_ACTIONS or action_type not in SEMANTIC_ACTIONS:
+        raise _failure("UNSUPPORTED_ACTION", "contract_validation", "SEMANTIC_GUARD", "semantic_action.action", action_type)
+    action_shape = SEMANTIC_CONTRACT["action_shapes"][action_type]
+
+    message = action.get("message", "")
+    clarification = action.get("clarification", SEMANTIC_CONTRACT["defaults"]["clarification"])
+    patches_value = action.get("patches", SEMANTIC_CONTRACT["defaults"]["patches"])
+    no_change_basis_value = action.get("no_change_basis")
+    if isinstance(patches_value, Mapping) and SEMANTIC_CONTRACT["allow_single_patch_object"]:
+        patches_value = [patches_value]
+    if not isinstance(message, str) or len(message.strip()) > LIMITS["message"]:
+        raise _failure("ACTION_MESSAGE_SHAPE_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.message", action_type)
+    if action_shape["message"] == "REQUIRED_NONEMPTY_STRING" and not message.strip():
+        raise _failure("ACTION_MESSAGE_SHAPE_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.message", action_type)
+    if clarification is not None and (not isinstance(clarification, str) or not clarification.strip() or len(clarification.strip()) > LIMITS["clarification"]):
+        raise _failure("ACTION_CLARIFICATION_SHAPE_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.clarification", action_type)
+    if not isinstance(patches_value, list) or len(patches_value) > LIMITS["patches"]:
+        raise _failure("ACTION_PATCH_SHAPE_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.patches", action_type)
+
+    no_change_basis = None
+    if action_shape["no_change_basis"] == "REQUIRED_CURRENT_VALUE_ASSERTION":
+        no_change_basis = _semantic_object(
+            no_change_basis_value,
+            set(SEMANTIC_CONTRACT["no_change_basis_required"]),
+            set(SEMANTIC_CONTRACT["no_change_basis_optional"]),
+            {},
+            "semantic_action.no_change_basis",
+            action_type,
+        )
+        target = _string(no_change_basis.get("target_item_id"), "INVALID_TARGET", LIMITS["identifier"])
+        concept_value = no_change_basis.get("concept")
+        if not isinstance(concept_value, str) or not concept_value.strip():
+            raise _failure("NO_CHANGE_BASIS_SHAPE_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.no_change_basis.concept", action_type)
+        concept = SEMANTIC_CONTRACT["concept_aliases"].get(concept_value.strip(), concept_value.strip())
+        if concept not in SEMANTIC_CONCEPTS:
+            raise _failure("UNKNOWN_CONCEPT", "contract_validation", "RESOLUTION", "semantic_action.no_change_basis.concept", action_type)
+        no_change_basis = {"target_item_id": target, "concept": concept, "value": _string(no_change_basis.get("value"), "NO_CHANGE_BASIS_SHAPE_INVALID", LIMITS["message"])}
+    elif no_change_basis_value is not None or "no_change_basis" in action:
+        raise _failure("NO_CHANGE_BASIS_SHAPE_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.no_change_basis", action_type)
+
+    patch_required = set(SEMANTIC_CONTRACT["patch_required"])
+    patch_optional = set(SEMANTIC_CONTRACT["patch_optional"])
+    patch_aliases = SEMANTIC_CONTRACT["key_aliases"]["patch"]
+    change_required = set(SEMANTIC_CONTRACT["change_required"])
+    change_optional = set(SEMANTIC_CONTRACT["change_optional"])
+    change_aliases = SEMANTIC_CONTRACT["key_aliases"]["change"]
+    patches: list[dict[str, Any]] = []
+    for patch_value in patches_value:
+        semantic_patch = _semantic_object(patch_value, patch_required, patch_optional, patch_aliases, "semantic_action.patch", action_type)
+        target = semantic_patch.get("target_item_id")
+        if target is not None:
+            semantic_patch["target_item_id"] = _string(target, "INVALID_TARGET", LIMITS["identifier"])
+        changes_value = semantic_patch.get("changes")
+        if not isinstance(changes_value, list) or not 1 <= len(changes_value) <= LIMITS["changes_per_patch"]:
+            raise _failure("ACTION_PATCH_SHAPE_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.patch.changes", action_type)
+        changes: list[dict[str, Any]] = []
+        for change_value in changes_value:
+            change = _semantic_object(change_value, change_required, change_optional, change_aliases, "semantic_action.change", action_type)
+            intent = change.get("intent")
+            concept_value = change.get("concept")
+            if intent not in SEMANTIC_INTENTS:
+                raise _failure("UNSUPPORTED_MUTATION", "contract_validation", "SEMANTIC_GUARD", "semantic_action.change.intent", action_type)
+            if not isinstance(concept_value, str) or not concept_value.strip():
+                raise _failure("SEMANTIC_SCHEMA_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.change.concept", action_type)
+            concept = SEMANTIC_CONTRACT["concept_aliases"].get(concept_value.strip(), concept_value.strip())
+            if concept not in SEMANTIC_CONCEPTS:
+                raise _failure("UNKNOWN_CONCEPT", "contract_validation", "RESOLUTION", "semantic_action.change.concept", action_type)
+            normalized_change: dict[str, Any] = {"intent": intent, "concept": concept}
+            if intent == "SET":
+                normalized_change["value"] = _string(change.get("value"), "SEMANTIC_SCHEMA_INVALID", LIMITS["message"])
+                if "reference_id" in change:
+                    raise _failure("SEMANTIC_SCHEMA_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.change.reference_id", action_type)
+            elif intent == "CLEAR":
+                if "value" in change or "reference_id" in change:
+                    raise _failure("SEMANTIC_SCHEMA_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.change.clear", action_type)
+            else:
+                normalized_change["value"] = _string(change.get("value"), "SEMANTIC_SCHEMA_INVALID", 64)
+                normalized_change["reference_id"] = _string(change.get("reference_id"), "INVALID_OPERATION_TARGET", LIMITS["identifier"])
+            changes.append(normalized_change)
+        semantic_patch["changes"] = changes
+        patches.append(semantic_patch)
+
+    patch_shape = action_shape["patches"]
+    if not patch_shape["minimum"] <= len(patches) <= patch_shape["maximum"]:
+        raise _failure("ACTION_CARDINALITY_INVALID", "contract_validation", "SEMANTIC_GUARD", "semantic_action.cardinality", action_type)
+    if action_type == "ASK_CLARIFICATION" and clarification is None:
+        raise _failure("ACTION_CLARIFICATION_SHAPE_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.clarification", action_type)
+    if action_type != "ASK_CLARIFICATION" and clarification is not None:
+        raise _failure("ACTION_CLARIFICATION_SHAPE_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.clarification", action_type)
+    return {
+        "action": action_type,
+        "message": message.strip(),
+        "patches": patches,
+        "clarification": clarification.strip() if isinstance(clarification, str) else None,
+        "no_change_basis": no_change_basis,
+    }
+
+
+_AUTHORITY_ESCALATION = re.compile(
+    r"(?:已保存到个人资料|已确认|已写入正式资料|confirmed\s+profile|saved\s+to\s+(?:the\s+)?profile)",
+    re.IGNORECASE,
+)
+
+
+def _canonical_clarification(request: CandidateConversationRequest, copy: str) -> dict[str, Any]:
+    return validate_candidate_action({
+        "contract_id": ACTION_SCHEMA_VERSION,
+        "action": "ASK_CLARIFICATION",
+        "message": "",
+        "observed_working_model": {key: request.observation[key] for key in OBSERVED_KEYS},
+        "patches": [],
+        "clarification": copy,
+    }, request)
+
+
+def _matching_concept_mappings(item: Mapping[str, Any], concept: str) -> list[Mapping[str, Any]]:
+    item_type = str(item.get("item_type") or "")
+    item_subtype = str(item.get("item_subtype") or "")
+    matches = []
+    for mapping in CONTRACT_MANIFEST["concept_mappings"]:
+        if mapping.get("concept") != concept:
+            continue
+        item_types = mapping.get("item_types") or []
+        item_subtypes = mapping.get("item_subtypes") or []
+        if "*" not in item_types and item_type not in item_types:
+            continue
+        if item_subtypes and item_subtype not in item_subtypes:
+            continue
+        matches.append(mapping)
+    return matches
+
+
+def _resolve_semantic_change(change: Mapping[str, Any], item: Mapping[str, Any], action_type: str) -> dict[str, Any] | None:
+    mappings = _matching_concept_mappings(item, str(change["concept"]))
+    if not mappings:
+        raise _failure("CONCEPT_MAPPING_NOT_FOUND", "contract_validation", "RESOLUTION", "semantic_action.change.concept", action_type)
+    if len(mappings) != 1:
+        return None
+    mapping = mappings[0]
+    intent = change["intent"]
+    if intent not in mapping["allowed_intents"]:
+        raise _failure("UNSUPPORTED_MUTATION", "contract_validation", "SEMANTIC_GUARD", "semantic_action.change.intent", action_type)
+    destination = mapping["destination"]
+    if destination["kind"] == "ITEM_FIELD":
+        field = destination["field"]
+        if intent == "SET":
+            return {"operation": "SET_ITEM_FIELD", "field": field, "value": change["value"]}
+        if field not in CLEARABLE_ITEM_FIELDS:
+            raise _failure("UNSUPPORTED_MUTATION", "contract_validation", "SEMANTIC_GUARD", "semantic_action.change.intent", action_type)
+        return {"operation": "CLEAR_ITEM_FIELD", "field": field}
+    if destination["kind"] == "FACT_BY_LABEL":
+        labels = {str(label).strip().casefold() for label in destination["labels"]}
+        facts = [fact for fact in item.get("facts") or [] if isinstance(fact, Mapping) and str(fact.get("label") or "").strip().casefold() in labels]
+        if not facts:
+            raise _failure("CONCEPT_MAPPING_NOT_FOUND", "contract_validation", "RESOLUTION", "semantic_action.change.concept", action_type)
+        if len(facts) != 1:
+            return None
+        fact_id = facts[0].get("fact_id")
+        if not isinstance(fact_id, str) or not fact_id.strip():
+            raise _failure("INVALID_OPERATION_TARGET", "contract_validation", "SEMANTIC_GUARD", "semantic_action.change.reference", action_type)
+        return {"operation": "SET_FACT_VALUE", "fact_id": fact_id, "value": change["value"]}
+    reference_id = change.get("reference_id")
+    if change.get("value") not in UNCERTAINTY_STATUSES:
+        raise _failure("INVALID_UNCERTAINTY_STATUS", "contract_validation", "SEMANTIC_GUARD", "semantic_action.change.value", action_type)
+    if reference_id not in {entry.get("uncertainty_id") for entry in item.get("uncertainties") or [] if isinstance(entry, Mapping)}:
+        raise _failure("INVALID_OPERATION_TARGET", "contract_validation", "SEMANTIC_GUARD", "semantic_action.change.reference", action_type)
+    return {"operation": "SET_UNCERTAINTY_STATUS", "uncertainty_id": reference_id, "status": change["value"]}
+
+
+def _assert_no_change_basis(basis: Mapping[str, Any], item_by_id: Mapping[str, Mapping[str, Any]], request: CandidateConversationRequest) -> None:
+    target = basis["target_item_id"]
+    item = item_by_id.get(target)
+    if item is None:
+        raise _failure("INVALID_TARGET", "contract_validation", "SEMANTIC_GUARD", "semantic_action.no_change_basis.target", "NO_CHANGE")
+    focus = request.observation["focus"]
+    if focus["type"] in {"ITEM", "ITEM_DRAFT"} and target != focus["item_id"]:
+        raise _failure("FOCUS_VIOLATION", "focus", "SEMANTIC_GUARD", "semantic_action.no_change_basis.target", "NO_CHANGE")
+    operation = _resolve_semantic_change({"intent": "SET", "concept": basis["concept"], "value": basis["value"]}, item, "NO_CHANGE")
+    if operation is None:
+        raise _failure("NO_CHANGE_BASIS_UNRESOLVED", "contract_validation", "SEMANTIC_GUARD", "semantic_action.no_change_basis", "NO_CHANGE")
+    if operation["operation"] == "SET_ITEM_FIELD":
+        current_value = item.get(operation["field"])
+        expected_value = operation["value"]
+    elif operation["operation"] == "SET_FACT_VALUE":
+        current_value = next((fact.get("value") for fact in item.get("facts") or [] if isinstance(fact, Mapping) and fact.get("fact_id") == operation["fact_id"]), None)
+        expected_value = operation["value"]
+    else:
+        current_value = next((entry.get("status") for entry in item.get("uncertainties") or [] if isinstance(entry, Mapping) and entry.get("uncertainty_id") == operation["uncertainty_id"]), None)
+        expected_value = operation["status"]
+    if not isinstance(current_value, str) or current_value.strip() != str(expected_value).strip():
+        raise _failure("NO_CHANGE_STATE_MISMATCH", "contract_validation", "SEMANTIC_GUARD", "semantic_action.no_change_basis", "NO_CHANGE")
+
+
+def resolve_semantic_candidate_action(raw_action: Any, request: CandidateConversationRequest) -> dict[str, Any]:
+    semantic = validate_semantic_candidate_action(raw_action)
+    action_type = semantic["action"]
+    user_copy = semantic["clarification"] if action_type == "ASK_CLARIFICATION" else semantic["message"]
+    if _AUTHORITY_ESCALATION.search(user_copy or ""):
+        raise _failure("AUTHORITY_COPY_INVALID", "authority", "AUTHORITY", "semantic_action.user_copy", action_type)
+    if action_type == "PATCH_MULTIPLE_ITEMS" and not _has_explicit_multi_intent(request.human_message):
+        raise _failure("IMPLICIT_MULTI_VIOLATION", "intent", "SEMANTIC_GUARD", "semantic_action.cardinality", action_type)
+
+    item_by_id = {str(item.get("item_id")): item for item in request.working_model["payload"].get("items") or [] if isinstance(item, Mapping)}
+    if request.draft is not None:
+        item_by_id[request.draft["item_id"]] = request.draft["item"]
+    if action_type == "NO_CHANGE":
+        _assert_no_change_basis(semantic["no_change_basis"], item_by_id, request)
+    canonical_patches: list[dict[str, Any]] = []
+    for semantic_patch in semantic["patches"]:
+        target = semantic_patch.get("target_item_id")
+        if target is None:
+            focus = request.observation["focus"]
+            if focus["type"] in {"ITEM", "ITEM_DRAFT"}:
+                target = focus["item_id"]
+            elif len(item_by_id) == 1:
+                target = next(iter(item_by_id))
+            else:
+                return _canonical_clarification(request, "请明确要修改哪一张 Candidate Card。")
+        item = item_by_id.get(target)
+        if item is None:
+            raise _failure("INVALID_TARGET", "contract_validation", "SEMANTIC_GUARD", "semantic_action.patch.target", action_type)
+        operations: list[dict[str, Any]] = []
+        for change in semantic_patch["changes"]:
+            operation = _resolve_semantic_change(change, item, action_type)
+            if operation is None:
+                return _canonical_clarification(request, "请确认这项信息应更新到哪个现有字段。")
+            operations.append(operation)
+        canonical_patches.append({
+            "target_item_id": target,
+            "operations": operations,
+            "reason": "Resolved from a bounded semantic candidate action.",
+            "origin": "MODEL_PROPOSAL",
+            "evidence_refs": [],
+        })
+
+    canonical = {
+        "contract_id": ACTION_SCHEMA_VERSION,
+        "action": action_type,
+        "message": semantic["message"],
+        "observed_working_model": {key: request.observation[key] for key in OBSERVED_KEYS},
+        "patches": canonical_patches,
+        "clarification": semantic["clarification"],
+    }
+    return validate_candidate_action(canonical, request)
+
+
+def semantic_prompt_schema_fragment() -> str:
+    fragment = {
+        "schema_version": SEMANTIC_ACTION_SCHEMA_VERSION,
+        "actions": CONTRACT_MANIFEST["actions"],
+        "unsupported_actions": CONTRACT_MANIFEST["unsupported_actions"],
+        "shape": CONTRACT_MANIFEST["semantic_contract"],
+        "concepts": CONTRACT_MANIFEST["semantic_contract"]["concepts"],
+        "concept_aliases": CONTRACT_MANIFEST["semantic_contract"]["concept_aliases"],
+    }
+    return json.dumps(fragment, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+
 def candidate_conversation_prompt() -> str:
-    """Frozen prompt guard paired with the local validator."""
-    return f"""You are Ariadne's Candidate Working Model conversation action planner.
-Return exactly one JSON object and no Markdown or reasoning. The action contract_id is {ACTION_SCHEMA_VERSION}.
-Allowed actions only: NO_CHANGE, PATCH_ITEM, PATCH_MULTIPLE_ITEMS, ASK_CLARIFICATION, EXPLAIN.
-Never create, remove, or merge items. Never invent an item, fact, uncertainty, or evidence ID.
-Use PATCH_MULTIPLE_ITEMS only when the literal human message explicitly requests all/every/both/multiple items. If more than one target is plausible without explicit multi intent, return ASK_CLARIFICATION.
-ITEM focus normally permits only its active item. ITEM_DRAFT permits only that draft item.
-Patches are non-authoritative proposals. origin must be MODEL_PROPOSAL. evidence_refs may be empty and otherwise must use only IDs present in the input.
-Use only typed operations:
-- {{"operation":"SET_ITEM_FIELD","field":"title|subtitle|time|summary|ownership","value":"non-empty string"}}
-- {{"operation":"CLEAR_ITEM_FIELD","field":"subtitle|time|ownership"}}
-- {{"operation":"SET_FACT_VALUE","fact_id":"existing fact_id","value":"non-empty string"}}
-- {{"operation":"SET_UNCERTAINTY_STATUS","uncertainty_id":"existing uncertainty_id","status":"OPEN|RESOLVED|DISMISSED"}}
-Return exactly these top-level keys: contract_id, action, message, observed_working_model, patches, clarification.
-Each patch has exactly: target_item_id, operations, reason, origin, evidence_refs.
-NO_CHANGE, EXPLAIN, and ASK_CLARIFICATION have patches=[]. Every action except ASK_CLARIFICATION requires a non-empty user-facing message. ASK_CLARIFICATION requires clarification. All other clarification values are null."""
+    """Semantic model-facing contract; storage bindings remain local."""
+    return f"""You are Ariadne's Candidate conversation semantic action planner.
+Return exactly one JSON object and no Markdown or reasoning.
+Follow this versioned semantic schema exactly: {semantic_prompt_schema_fragment()}
+Use only exact item_id values present in the input when a target is clear. Never guess a Card by nearest name. If no unique target is clear, return ASK_CLARIFICATION.
+Express changes only as semantic intent + concept + desired value. Do not output storage fields, fact IDs, contract IDs, Working observation echoes, origin, authority, provenance, or evidence_refs.
+Use PATCH_MULTIPLE_ITEMS only when the literal human message explicitly requests all/every/both/multiple items. Otherwise ambiguity must return ASK_CLARIFICATION.
+The final USER message is the current turn intent and overrides history. History only supplies context; it never proves that the current request was already applied.
+Compare that final USER message against the current value in the supplied Candidate Working item. If a clear requested desired value differs from that current value, return PATCH_ITEM or ASK_CLARIFICATION, never NO_CHANGE.
+NO_CHANGE is allowed only when a current value already satisfies the final USER request. Its required no_change_basis must name the exact target_item_id, manifest concept, and current value that proves this. Do not use NO_CHANGE when that proof is unavailable.
+Never create, remove, merge, or delete items. Never invent IDs. Explain-only requests return EXPLAIN; already-satisfied requests return NO_CHANGE.
+System-owned fields and canonical typed mutations are bound and validated locally."""
 
 
 def _model_input(request: CandidateConversationRequest) -> dict[str, Any]:
@@ -488,30 +804,34 @@ def response_diagnostics(provider_response: Any, http_status: int | None = None)
 def normalize_candidate_conversation_response(provider_response: Any, request: CandidateConversationRequest, http_status: int = 200) -> tuple[dict[str, Any], dict[str, Any]]:
     diagnostics = response_diagnostics(provider_response, http_status)
     if http_status != 200:
-        raise CandidateConversationRuntimeError("PROVIDER_HTTP_ERROR", "provider", True, diagnostics)
+        raise CandidateConversationRuntimeError("PROVIDER_HTTP_ERROR", "provider", True, {**diagnostics, **_diagnostic("PROVIDER_ENVELOPE", "PROVIDER_HTTP_ERROR")})
     if not isinstance(provider_response, Mapping):
-        raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "parsing", True, diagnostics)
+        raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "parsing", True, {**diagnostics, **_diagnostic("PROVIDER_ENVELOPE", "MALFORMED_RESPONSE")})
     if provider_response.get("model") != MODEL_ID:
-        raise CandidateConversationRuntimeError("WRONG_RETURNED_MODEL", "model", True, diagnostics)
+        raise CandidateConversationRuntimeError("WRONG_RETURNED_MODEL", "model", True, {**diagnostics, **_diagnostic("MODEL_IDENTITY", "WRONG_RETURNED_MODEL")})
     choices = provider_response.get("choices")
     if not isinstance(choices, list) or not choices or not isinstance(choices[0], Mapping):
-        raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "parsing", True, diagnostics)
+        raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "parsing", True, {**diagnostics, **_diagnostic("PROVIDER_ENVELOPE", "MALFORMED_RESPONSE")})
     if choices[0].get("finish_reason") == "length":
-        raise CandidateConversationRuntimeError("TRUNCATED_OUTPUT", "model_output", True, diagnostics)
+        raise CandidateConversationRuntimeError("TRUNCATED_OUTPUT", "model_output", True, {**diagnostics, **_diagnostic("FINISH_REASON", "TRUNCATED_OUTPUT")})
     if choices[0].get("finish_reason") != "stop":
-        raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "model_output", True, diagnostics)
+        raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "model_output", True, {**diagnostics, **_diagnostic("FINISH_REASON", "MALFORMED_RESPONSE")})
     message = choices[0].get("message")
     content = message.get("content") if isinstance(message, Mapping) else None
     if not isinstance(content, str) or not content.strip():
-        raise CandidateConversationRuntimeError("EMPTY_RESPONSE", "parsing", True, diagnostics)
+        raise CandidateConversationRuntimeError("EMPTY_RESPONSE", "parsing", True, {**diagnostics, **_diagnostic("JSON_PARSE", "EMPTY_RESPONSE")})
     try:
         raw_action = json.loads(content)
     except json.JSONDecodeError as error:
-        raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "parsing", True, diagnostics) from error
+        raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "parsing", True, {**diagnostics, **_diagnostic("JSON_PARSE", "MALFORMED_RESPONSE")}) from error
     try:
-        action = validate_candidate_action(raw_action, request)
+        action = resolve_semantic_candidate_action(raw_action, request)
     except CandidateConversationRuntimeError as error:
-        raise CandidateConversationRuntimeError(error.code, error.failure_layer, True, diagnostics) from error
+        error_diagnostics = error.diagnostics
+        if not error_diagnostics:
+            stage = "STALE" if error.code == "STALE_WORKING_OBSERVATION" else "CANONICAL_SCHEMA" if error.code.startswith("ACTION_") else "SEMANTIC_GUARD"
+            error_diagnostics = _diagnostic(stage, error.code)
+        raise CandidateConversationRuntimeError(error.code, error.failure_layer, True, {**diagnostics, **error_diagnostics}) from error
     usage = provider_response.get("usage") if isinstance(provider_response.get("usage"), Mapping) else {}
     return action, dict(usage)
 

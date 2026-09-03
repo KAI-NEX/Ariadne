@@ -11,6 +11,8 @@
   const LocalCandidateProposal = window.AriadneLocalCandidateProposal;
   const LocalCandidateReview = window.AriadneLocalCandidateReview;
   const CandidateModel = window.AriadneCandidateModelRuntime;
+  const CandidateConversationPersistence = window.AriadneCandidateConversationPersistence;
+  const CandidateWorkspaceConversationRuntime = window.AriadneCandidateWorkspaceConversationRuntime;
   const LocalJobLifecycle = window.AriadneLocalJobLifecycle;
   const page = document.body.dataset.v1Page;
   const isEmbeddedDetail = new URLSearchParams(window.location.search).get("embed") === "1";
@@ -48,6 +50,8 @@
   let candidateWorkspaceViewGeneration = 0;
   let candidateWorkspaceViewIntent = "import";
   let candidateWorkspaceConversation = [];
+  let activeCandidateConversationSession = null;
+  let candidateConversationTurnActive = false;
   let candidateReviewSessionTotal = 0;
   let candidateReviewSessionResolved = 0;
   let candidateReviewSourceIds = [];
@@ -784,6 +788,13 @@
     return `<button class="v1-working-card${stateClass}" type="button" data-working-item="${escapeHtml(item.item_id)}"><span><small>${escapeHtml(candidateTypeLabel(item))}</small><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml([item.subtitle, item.time].filter(Boolean).join(" · "))}</span></span>${stateLabel}<span class="v1-working-chevron" aria-hidden="true">›</span></button>`;
   }
 
+  function candidateWorkingGroupsMarkup(cards) {
+    const groupOrder = ["work_experience", "project", "education", "skill_group", "award", "custom_section"];
+    const grouped = new Map(groupOrder.map((key) => [key, []]));
+    cards.forEach((card) => (grouped.get(card.item_subtype) || grouped.get("custom_section")).push(card));
+    return [...grouped.entries()].filter(([, items]) => items.length).map(([type, items]) => `<section class="v1-working-group"><h3>${escapeHtml(subtypeLabels[type] || "其他经历")}</h3>${items.map(workingCardMarkup).join("")}</section>`).join("") || '<p class="v1-conversation-empty">模型未发现可形成 Working Card 的候选信息。</p>';
+  }
+
   function latestCandidateWorkingModel(records, sourceId) {
     return (records.candidate_working_models || []).filter((model) => model.source_document_id === sourceId).sort((left, right) => right.version - left.version)[0] || null;
   }
@@ -814,7 +825,31 @@
   function renderCandidateWorkspaceConversation() {
     const target = byId("candidate-workspace-conversation");
     if (!target) return;
-    target.innerHTML = candidateWorkspaceConversation.map((message) => `<p class="v1-conversation-message ${message.role === "USER" ? "user" : "assistant"}">${escapeHtml(message.content)}</p>`).join("");
+    target.innerHTML = candidateWorkspaceConversation.length
+      ? candidateWorkspaceConversation.map((message) => `<p class="v1-conversation-message ${message.role === "USER" ? "user" : "assistant"}">${escapeHtml(message.text ?? message.content)}</p>`).join("")
+      : '<p class="v1-conversation-empty">你可以告诉 Ariadne 哪些内容需要调整。</p>';
+  }
+
+  function setCandidateConversationExecutionState(copy = "", active = candidateConversationTurnActive) {
+    const status = byId("candidate-workspace-conversation-status");
+    const submit = byId("candidate-workspace-composer")?.querySelector('button[type="submit"]');
+    if (status) status.textContent = copy;
+    if (submit) submit.disabled = active;
+  }
+
+  async function restoreCandidateWorkspaceConversation(sourceId) {
+    if (!CandidateWorkspaceConversationRuntime || !CandidateConversationPersistence) throw new Error("candidate_conversation_runtime_dependencies_unavailable");
+    const database = await Truth.openDatabase();
+    try {
+      const session = await CandidateWorkspaceConversationRuntime.resolveSession(database, sourceId);
+      const restored = await CandidateConversationPersistence.restoreConversation(database, session.conversation_id);
+      activeCandidateConversationSession = restored.session;
+      candidateWorkspaceConversation = restored.messages;
+      renderCandidateWorkspaceConversation();
+      const hasActiveTurn = restored.turns.some((turn) => CandidateConversationPersistence.ACTIVE_STATES.includes(turn.state));
+      setCandidateConversationExecutionState(hasActiveTurn ? "正在理解…" : "", candidateConversationTurnActive || hasActiveTurn);
+      return restored;
+    } finally { database.close(); }
   }
 
   function workspaceItemPatch(item, text) {
@@ -894,12 +929,10 @@
     if (!workingModel) throw new Error("candidate_working_model_missing");
     activeCandidateWorkingModel = Truth.validateCandidateWorkingModel(workingModel);
     const cards = activeCandidateWorkingModel.payload.items || [];
-    const groupOrder = ["work_experience", "project", "education", "skill_group", "award", "custom_section"];
-    const grouped = new Map(groupOrder.map((key) => [key, []]));
-    cards.forEach((card) => (grouped.get(card.item_subtype) || grouped.get("custom_section")).push(card));
+    await restoreCandidateWorkspaceConversation(sourceId);
     if (!workspaceViewIsCurrent(viewGeneration)) return [];
     showCandidateWorkspaceLayer(source?.filename || "当前 PDF", false);
-    byId("candidate-working-groups").innerHTML = [...grouped.entries()].filter(([, items]) => items.length).map(([type, items]) => `<section class="v1-working-group"><h3>${escapeHtml(subtypeLabels[type] || "其他经历")}</h3>${items.map(workingCardMarkup).join("")}</section>`).join("") || '<p class="v1-conversation-empty">模型未发现可形成 Working Card 的候选信息。</p>';
+    byId("candidate-working-groups").innerHTML = candidateWorkingGroupsMarkup(cards);
     setCandidateWorkspaceProgress(["材料已准备", "PDF 已读取", "DeepSeek 已完成理解", `已生成 ${cards.length} 张候选卡片`]);
     const questions = cards.flatMap((card) => card.uncertainties || []).filter((uncertainty) => uncertainty.status === "OPEN");
     byId("candidate-clarification-list").innerHTML = questions.length ? `<h3>有几处信息可以稍后确认</h3>${questions.map((uncertainty) => `<p data-entry-type="CLARIFYING_QUESTION">${escapeHtml(uncertainty.question)}</p>`).join("")}` : '<p data-entry-type="CLARIFYING_QUESTION_EMPTY">当前没有需要补充的问题。</p>';
@@ -954,6 +987,93 @@
     await renderCandidateWorkingWorkspace(next.source_document_id, { workingModel: next, viewGeneration: candidateWorkspaceViewGeneration });
     renderCandidateWorkspaceCardDetail(activeCandidateWorkspaceItemId);
     return next;
+  }
+
+  async function callCandidateConversationRuntime(request) {
+    const response = await fetch("/api/candidate-conversation-turn", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+    const result = await response.json().catch(() => ({ error: "MALFORMED_RESPONSE" }));
+    if (!response.ok) {
+      const error = new Error(result.error || "CANDIDATE_CONVERSATION_FAILED");
+      error.code = result.error || "CANDIDATE_CONVERSATION_FAILED";
+      error.failure_layer = result.failure_layer || "runtime";
+      error.network_call_made = result.network_call_made === true;
+      throw error;
+    }
+    return result;
+  }
+
+  async function submitCandidateWorkspaceConversation(content) {
+    const humanMessage = String(content || "").trim();
+    if (!humanMessage || !activeCandidateWorkingModel || candidateConversationTurnActive) return;
+    if (activeCandidateWorkspaceItemId) throw new Error("candidate_conversation_list_focus_required");
+    if (!CandidateWorkspaceConversationRuntime || !CandidateConversationPersistence) throw new Error("candidate_conversation_runtime_dependencies_unavailable");
+    const sourceId = activeCandidateWorkingModel.source_document_id;
+    const viewGeneration = candidateWorkspaceViewGeneration;
+    let terminalCopy = "";
+    let database = null;
+    candidateConversationTurnActive = true;
+    setCandidateConversationExecutionState("正在理解…", true);
+    try {
+      database = await Truth.openDatabase();
+      const session = activeCandidateConversationSession?.source_document_id === sourceId
+        ? activeCandidateConversationSession
+        : await CandidateWorkspaceConversationRuntime.resolveSession(database, sourceId);
+      activeCandidateConversationSession = session;
+      const snapshot = CandidateWorkspaceConversationRuntime.createRuntimeSnapshot();
+      const outcome = await CandidateWorkspaceConversationRuntime.executeListTurn({
+        database,
+        session,
+        human_message: humanMessage,
+        runtime_snapshot: snapshot,
+        call_runtime: callCandidateConversationRuntime,
+        on_user_persisted: async () => {
+          const restored = await CandidateConversationPersistence.restoreConversation(database, session.conversation_id);
+          if (!workspaceViewIsCurrent(viewGeneration)) return;
+          candidateWorkspaceConversation = restored.messages;
+          renderCandidateWorkspaceConversation();
+        },
+      });
+      const restored = await CandidateConversationPersistence.restoreConversation(database, session.conversation_id);
+      if (!workspaceViewIsCurrent(viewGeneration)) return outcome;
+      candidateWorkspaceConversation = restored.messages;
+      renderCandidateWorkspaceConversation();
+      if (outcome.status === "STALE") {
+        terminalCopy = "候选人信息已发生变化，请基于最新内容重试。";
+        activeCandidateWorkingModel = outcome.working_model;
+        byId("candidate-working-groups").innerHTML = candidateWorkingGroupsMarkup(outcome.working_model.payload.items || []);
+        return outcome;
+      }
+      const durableHead = await CandidateWorkspaceConversationRuntime.latestWorkingModel(database, sourceId);
+      activeCandidateWorkingModel = durableHead;
+      if (activeCandidateWorkspaceItemId === null) {
+        await renderCandidateWorkingWorkspace(sourceId, { workingModel: durableHead, viewGeneration });
+      } else {
+        byId("candidate-working-groups").innerHTML = candidateWorkingGroupsMarkup(durableHead.payload.items || []);
+      }
+      return outcome;
+    } catch (error) {
+      terminalCopy = String(error?.code || error?.message) === "STALE_WORKING_OBSERVATION"
+        ? "候选人信息已发生变化，请基于最新内容重试。"
+        : "这次没有完成，请重试。";
+      if (database && activeCandidateConversationSession?.conversation_id) {
+        try {
+          const restored = await CandidateConversationPersistence.restoreConversation(database, activeCandidateConversationSession.conversation_id);
+          if (workspaceViewIsCurrent(viewGeneration)) {
+            candidateWorkspaceConversation = restored.messages;
+            renderCandidateWorkspaceConversation();
+          }
+        } catch (_restoreError) { /* Preserve the safe failure copy. */ }
+      }
+      return null;
+    } finally {
+      database?.close?.();
+      candidateConversationTurnActive = false;
+      if (workspaceViewIsCurrent(viewGeneration)) setCandidateConversationExecutionState(terminalCopy, false);
+    }
   }
 
   function returnToCandidateCardList() {
@@ -1512,6 +1632,7 @@
     const attemptGeneration = ++candidateModelAttemptGeneration;
     const workspaceViewGeneration = beginCandidateWorkspaceView();
     candidateWorkspaceConversation = [];
+    activeCandidateConversationSession = null;
     const abortController = new AbortController();
     candidateProcessingInProgress = true;
     candidateExecutionState = "PROCESSING";
@@ -1804,9 +1925,10 @@
       event.preventDefault();
       const input = byId("candidate-workspace-message");
       const content = input.value.trim();
-      if (!content) return;
+      if (!content || candidateConversationTurnActive) return;
       input.value = "";
-      applyCandidateWorkspaceCorrection(content).catch(showPersonalError);
+      if (activeCandidateWorkspaceItemId) applyCandidateWorkspaceCorrection(content).catch(showPersonalError);
+      else submitCandidateWorkspaceConversation(content);
     });
     byId("candidate-workspace-save").addEventListener("click", () => saveCandidateWorkspaceToProfile().catch(showPersonalError));
     byId("candidate-workspace-continue-editing").addEventListener("click", () => byId("candidate-workspace-close-dialog").close());

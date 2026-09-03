@@ -11,6 +11,11 @@ const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const Truth = require("../public/truth-persistence-domain.js");
 const Conversation = require("../public/candidate-conversation-domain.js");
+const manifest = JSON.parse(fs.readFileSync(path.join(root, "data", "candidate_conversation_contract_v1.json"), "utf8"));
+assert.deepEqual(Conversation.CONTRACT_MANIFEST, manifest);
+assert.deepEqual(Conversation.ACTIONS, manifest.actions);
+assert.deepEqual(Conversation.OPERATIONS, manifest.canonical_operations);
+assert.equal(Conversation.LIMITS.clarification, manifest.limits.clarification);
 
 const working = Truth.validateCandidateWorkingModel({
   contract_id: "ariadne-candidate-working-model-v1",
@@ -63,6 +68,32 @@ function expect(code, callback) {
   assert.throws(callback, (error) => error instanceof Conversation.CandidateConversationError && error.code === code);
 }
 
+// The browser-facing contract reads the same manifest as the Python adapter.
+// Every action's message semantics are explicit; only ASK permits omission/empty.
+const semanticNoChangeBasis = { target_item_id: "item-edu-001", concept: "institution_name", value: "Royal College of Art RCA" };
+const semanticFixtures = {
+  PATCH_ITEM: { action: "PATCH_ITEM", message: "Updated synthetic title.", patches: [{ target_item_id: "item-edu-001", changes: [{ intent: "SET", concept: "school_name", value: "Royal College of Art" }] }] },
+  PATCH_MULTIPLE_ITEMS: { action: "PATCH_MULTIPLE_ITEMS", message: "Updated synthetic titles.", patches: [
+    { target_item_id: "item-edu-001", changes: [{ intent: "SET", concept: "school_name", value: "Royal College of Art" }] },
+    { target_item_id: "item-edu-002", changes: [{ intent: "SET", concept: "school_name", value: "Service Design Exchange — Royal College of Art" }] },
+  ] },
+  ASK_CLARIFICATION: { action: "ASK_CLARIFICATION", message: "", clarification: "Which synthetic item do you mean?", patches: [] },
+  EXPLAIN: { action: "EXPLAIN", message: "Synthetic explanation.", patches: [] },
+  NO_CHANGE: { action: "NO_CHANGE", message: "Synthetic value already matches.", patches: [], no_change_basis: semanticNoChangeBasis },
+};
+for (const [actionType, fixture] of Object.entries(semanticFixtures)) {
+  assert.equal(Conversation.validateSemanticAction(fixture).action, actionType);
+  const missing = { ...fixture }; delete missing.message;
+  if (actionType === "ASK_CLARIFICATION") assert.equal(Conversation.validateSemanticAction(missing).message, "");
+  else expect("ACTION_MESSAGE_SHAPE_INVALID", () => Conversation.validateSemanticAction(missing));
+  for (const malformed of [null, "", "   ", "x".repeat(manifest.limits.message + 1), 7]) {
+    const candidate = { ...fixture, message: malformed };
+    if (actionType === "ASK_CLARIFICATION" && ["", "   "].includes(malformed)) assert.equal(Conversation.validateSemanticAction(candidate).message, "");
+    else expect("ACTION_MESSAGE_SHAPE_INVALID", () => Conversation.validateSemanticAction(candidate));
+  }
+}
+expect("NO_CHANGE_BASIS_SHAPE_INVALID", () => Conversation.validateSemanticAction({ action: "NO_CHANGE", message: "Synthetic value already matches.", patches: [] }));
+
 Conversation.validateAction(action(candidateObservation, "NO_CHANGE", [], "No change is needed."), { observation: candidateObservation, working_model: working, human_message: "保持不变" });
 Conversation.validateAction(action(candidateObservation, "ASK_CLARIFICATION", [], "", "你指的是哪张卡片？"), { observation: candidateObservation, working_model: working, human_message: "改一下" });
 Conversation.validateAction(action(candidateObservation, "EXPLAIN", [], "Synthetic explanation."), { observation: candidateObservation, working_model: working, human_message: "解释一下" });
@@ -114,7 +145,11 @@ expect("FOCUS_VIOLATION", () => Conversation.validateAction(action(itemObservati
 expect("UNSUPPORTED_ACTION", () => Conversation.validateAction(action(candidateObservation, "MERGE_ITEMS"), { observation: candidateObservation, working_model: working, human_message: "merge" }));
 expect("UNSUPPORTED_OPERATION", () => Conversation.validateAction(action(candidateObservation, "PATCH_ITEM", [patch("item-edu-001", { operation: "REMOVE_ITEM" })]), { observation: candidateObservation, working_model: working, human_message: "remove" }));
 const bypass = action(candidateObservation, "NO_CHANGE", [], "No change is needed."); bypass.bypass = true;
-expect("EXACT_SCHEMA_FAILURE", () => Conversation.validateAction(bypass, { observation: candidateObservation, working_model: working, human_message: "no change" }));
+expect("ACTION_TOP_LEVEL_SHAPE_INVALID", () => Conversation.validateAction(bypass, { observation: candidateObservation, working_model: working, human_message: "no change" }));
+expect("ACTION_CLARIFICATION_SHAPE_INVALID", () => Conversation.validateAction(
+  action(candidateObservation, "ASK_CLARIFICATION", [], "", "x".repeat(manifest.limits.clarification + 1)),
+  { observation: candidateObservation, working_model: working, human_message: "clarify" },
+));
 
 // Stale and cancel are terminal, zero-mutation outcomes.
 let execution = Conversation.createTurnExecution({ execution_id: "turn-001", session, observation: candidateObservation, runtime_snapshot_id: "runtime-snapshot-conversation", generation: "generation-001", created_at: "2026-09-03T07:07:00Z" });
@@ -143,6 +178,6 @@ assert.equal(draftApplication.working_model.working_model_id, working.working_mo
 assert.equal(draftApplication.draft.item.subtitle, null);
 
 const source = fs.readFileSync(path.join(root, "public", "v1-pages.js"), "utf8");
-assert.doesNotMatch(source, /candidate-conversation-turn/); // No Workspace or Detail integration in this slice.
-assert.match(source, /applyCandidateWorkspaceCorrection/); // Existing local flow remains until integration.
+assert.match(source, /fetch\("\/api\/candidate-conversation-turn"/); // Slice A wires only the Workspace list root.
+assert.match(source, /applyCandidateWorkspaceCorrection/); // Frozen Detail behavior remains for Slice B.
 console.log("candidate_conversation_domain=pass");

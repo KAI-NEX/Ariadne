@@ -3,33 +3,40 @@
 (function attachCandidateConversation(root, factory) {
   const truth = root.AriadneTruthPersistence
     || (typeof module === "object" && module.exports ? require("./truth-persistence-domain.js") : null);
-  const api = factory(truth);
+  const manifest = root.AriadneCandidateConversationContractManifest
+    || (typeof module === "object" && module.exports ? require("../data/candidate_conversation_contract_v1.json") : null);
+  const api = factory(truth, manifest);
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.AriadneCandidateConversation = api;
-}(typeof globalThis !== "undefined" ? globalThis : this, function createCandidateConversation(Truth) {
-  if (!Truth) throw new Error("candidate_conversation_truth_dependency_required");
+}(typeof globalThis !== "undefined" ? globalThis : this, function createCandidateConversation(Truth, ContractManifest) {
+  if (!Truth || !ContractManifest) throw new Error("candidate_conversation_contract_dependency_required");
 
   const CONTRACT_ID = "ariadne-candidate-conversation-v1";
-  const ACTION_CONTRACT_ID = "ariadne-candidate-conversation-action-v1";
+  const ACTION_CONTRACT_ID = ContractManifest.canonical_action_version;
   const OPERATION = "CANDIDATE_CONVERSATION_TURN";
   const SUBJECT_TYPE = "CANDIDATE";
-  const ACTIONS = Object.freeze(["NO_CHANGE", "PATCH_ITEM", "PATCH_MULTIPLE_ITEMS", "ASK_CLARIFICATION", "EXPLAIN"]);
-  const UNSUPPORTED_ACTIONS = Object.freeze(["CREATE_ITEM", "REMOVE_ITEM", "MERGE_ITEMS"]);
-  const OPERATIONS = Object.freeze(["SET_ITEM_FIELD", "CLEAR_ITEM_FIELD", "SET_FACT_VALUE", "SET_UNCERTAINTY_STATUS"]);
-  const ITEM_FIELDS = Object.freeze(["title", "subtitle", "time", "summary", "ownership"]);
-  const CLEARABLE_ITEM_FIELDS = Object.freeze(["subtitle", "time", "ownership"]);
-  const UNCERTAINTY_STATUSES = Object.freeze(["OPEN", "RESOLVED", "DISMISSED"]);
+  const ACTIONS = Object.freeze([...ContractManifest.actions]);
+  const UNSUPPORTED_ACTIONS = Object.freeze([...ContractManifest.unsupported_actions]);
+  const OPERATIONS = Object.freeze([...ContractManifest.canonical_operations]);
+  const ITEM_FIELDS = Object.freeze([...ContractManifest.canonical_item_fields]);
+  const CLEARABLE_ITEM_FIELDS = Object.freeze([...ContractManifest.canonical_clearable_item_fields]);
+  const UNCERTAINTY_STATUSES = Object.freeze([...ContractManifest.uncertainty_statuses]);
+  const LIMITS = ContractManifest.limits;
   const STATES = Object.freeze(["CREATED", "SENDING", "RECEIVED", "VALIDATING", "APPLIED", "NO_CHANGE", "NEEDS_CLARIFICATION", "FAILED", "CANCELLED", "STALE"]);
   const TERMINAL_STATES = Object.freeze(["APPLIED", "NO_CHANGE", "NEEDS_CLARIFICATION", "FAILED", "CANCELLED", "STALE"]);
   const FAILURES = Object.freeze([
     "EMPTY_RESPONSE", "MALFORMED_RESPONSE", "TRUNCATED_OUTPUT", "EXACT_SCHEMA_FAILURE",
+    "ACTION_TOP_LEVEL_SHAPE_INVALID", "ACTION_MESSAGE_SHAPE_INVALID", "ACTION_PATCH_SHAPE_INVALID",
+    "ACTION_OPERATION_SHAPE_INVALID", "ACTION_CARDINALITY_INVALID", "ACTION_CLARIFICATION_SHAPE_INVALID",
     "UNSUPPORTED_ACTION", "INVALID_TARGET", "FOCUS_VIOLATION", "IMPLICIT_MULTI_VIOLATION",
     "WRONG_RETURNED_MODEL", "STALE_WORKING_OBSERVATION", "CANCELLED_TURN",
     "UNSUPPORTED_OPERATION", "INVALID_OPERATION_TARGET", "INVALID_EVIDENCE_REF",
+    "UNKNOWN_CONCEPT", "NO_CHANGE_BASIS_SHAPE_INVALID", "NO_CHANGE_STATE_MISMATCH",
   ]);
-  const TOP_LEVEL_KEYS = Object.freeze(["contract_id", "action", "message", "observed_working_model", "patches", "clarification"]);
-  const OBSERVED_KEYS = Object.freeze(["candidate_context_id", "working_model_id", "version", "fingerprint"]);
-  const PATCH_KEYS = Object.freeze(["target_item_id", "operations", "reason", "origin", "evidence_refs"]);
+  const TOP_LEVEL_KEYS = Object.freeze([...ContractManifest.canonical_keys.top_level]);
+  const OBSERVED_KEYS = Object.freeze([...ContractManifest.canonical_keys.observed_working_model]);
+  const PATCH_KEYS = Object.freeze([...ContractManifest.canonical_keys.patch]);
+  const OPERATION_KEYS = ContractManifest.canonical_keys.operations;
   const MULTI_INTENT_PATTERNS = Object.freeze([
     /(?:所有|全部|每一个|每个|统一这些|这些都|两项|这两|多个|跨(?:卡片|项目))/,
     /\b(?:all|every|both|multiple|across\s+(?:items|cards))\b/i,
@@ -59,14 +66,82 @@
     return value;
   }
 
-  function requiredString(value, code = "EXACT_SCHEMA_FAILURE", maximum = 4000) {
+  function requiredString(value, code = "EXACT_SCHEMA_FAILURE", maximum = LIMITS.message) {
     if (typeof value !== "string" || !value.trim() || value.trim().length > maximum) throw new CandidateConversationError(code);
     return value.trim();
   }
 
-  function nullableString(value, code = "EXACT_SCHEMA_FAILURE", maximum = 4000) {
+  function nullableString(value, code = "EXACT_SCHEMA_FAILURE", maximum = LIMITS.clarification) {
     if (value === null) return null;
     return requiredString(value, code, maximum);
+  }
+
+  function semanticObject(value, required, optional, aliases, code = "SEMANTIC_SCHEMA_INVALID") {
+    if (!isPlainObject(value)) throw new CandidateConversationError(code);
+    const normalized = {};
+    Object.entries(value).forEach(([rawKey, rawValue]) => {
+      const key = aliases[rawKey] || rawKey;
+      if (![...required, ...optional].includes(key) || Object.hasOwn(normalized, key)) throw new CandidateConversationError(code);
+      normalized[key] = rawValue;
+    });
+    if (![...required].every((key) => Object.hasOwn(normalized, key))) throw new CandidateConversationError(code);
+    return normalized;
+  }
+
+  function semanticText(value, code, maximum = LIMITS.message) {
+    if (typeof value !== "string" || value.trim().length > maximum) throw new CandidateConversationError(code);
+    return value.trim();
+  }
+
+  function validateSemanticAction(rawAction) {
+    const semantic = ContractManifest.semantic_contract;
+    const top = semanticObject(rawAction, semantic.top_level_required, semantic.top_level_optional, semantic.key_aliases.top_level);
+    const action = top.action;
+    if (UNSUPPORTED_ACTIONS.includes(action) || !ACTIONS.includes(action)) throw new CandidateConversationError("UNSUPPORTED_ACTION");
+    const shape = semantic.action_shapes[action];
+    const message = semanticText(Object.hasOwn(top, "message") ? top.message : "", "ACTION_MESSAGE_SHAPE_INVALID");
+    if (shape.message === "REQUIRED_NONEMPTY_STRING" && !message) throw new CandidateConversationError("ACTION_MESSAGE_SHAPE_INVALID");
+    const clarification = Object.hasOwn(top, "clarification") ? top.clarification : semantic.defaults.clarification;
+    if (clarification !== null && (!semanticText(clarification, "ACTION_CLARIFICATION_SHAPE_INVALID", LIMITS.clarification))) {
+      throw new CandidateConversationError("ACTION_CLARIFICATION_SHAPE_INVALID");
+    }
+    if (action === "ASK_CLARIFICATION" && (clarification === null || !String(clarification).trim())) throw new CandidateConversationError("ACTION_CLARIFICATION_SHAPE_INVALID");
+    if (action !== "ASK_CLARIFICATION" && clarification !== null) throw new CandidateConversationError("ACTION_CLARIFICATION_SHAPE_INVALID");
+    let rawPatches = Object.hasOwn(top, "patches") ? top.patches : semantic.defaults.patches;
+    if (isPlainObject(rawPatches) && semantic.allow_single_patch_object) rawPatches = [rawPatches];
+    if (!Array.isArray(rawPatches) || rawPatches.length > LIMITS.patches) throw new CandidateConversationError("ACTION_PATCH_SHAPE_INVALID");
+    const patches = rawPatches.map((rawPatch) => {
+      const patch = semanticObject(rawPatch, semantic.patch_required, semantic.patch_optional, semantic.key_aliases.patch, "ACTION_PATCH_SHAPE_INVALID");
+      if (Object.hasOwn(patch, "target_item_id")) requiredString(patch.target_item_id, "INVALID_TARGET", LIMITS.identifier);
+      if (!Array.isArray(patch.changes) || !patch.changes.length || patch.changes.length > LIMITS.changes_per_patch) throw new CandidateConversationError("ACTION_PATCH_SHAPE_INVALID");
+      return {
+        ...patch,
+        changes: patch.changes.map((rawChange) => {
+          const change = semanticObject(rawChange, semantic.change_required, semantic.change_optional, semantic.key_aliases.change, "SEMANTIC_SCHEMA_INVALID");
+          if (!semantic.intents.includes(change.intent)) throw new CandidateConversationError("UNSUPPORTED_OPERATION");
+          if (typeof change.concept !== "string" || !change.concept.trim()) throw new CandidateConversationError("SEMANTIC_SCHEMA_INVALID");
+          const concept = semantic.concept_aliases[change.concept.trim()] || change.concept.trim();
+          if (!semantic.concepts.includes(concept)) throw new CandidateConversationError("UNKNOWN_CONCEPT");
+          if (change.intent === "SET" && !semanticText(change.value, "SEMANTIC_SCHEMA_INVALID")) throw new CandidateConversationError("SEMANTIC_SCHEMA_INVALID");
+          if (change.intent === "CLEAR" && (Object.hasOwn(change, "value") || Object.hasOwn(change, "reference_id"))) throw new CandidateConversationError("SEMANTIC_SCHEMA_INVALID");
+          if (change.intent === "SET_STATUS" && (!semanticText(change.value, "SEMANTIC_SCHEMA_INVALID", 64) || !requiredString(change.reference_id, "INVALID_OPERATION_TARGET", LIMITS.identifier))) throw new CandidateConversationError("SEMANTIC_SCHEMA_INVALID");
+          return { ...change, concept };
+        }),
+      };
+    });
+    if (patches.length < shape.patches.minimum || patches.length > shape.patches.maximum) throw new CandidateConversationError("ACTION_CARDINALITY_INVALID");
+    let noChangeBasis = null;
+    if (shape.no_change_basis === "REQUIRED_CURRENT_VALUE_ASSERTION") {
+      const basis = semanticObject(top.no_change_basis, semantic.no_change_basis_required, semantic.no_change_basis_optional, {}, "NO_CHANGE_BASIS_SHAPE_INVALID");
+      const concept = typeof basis.concept === "string" ? (semantic.concept_aliases[basis.concept.trim()] || basis.concept.trim()) : "";
+      if (!concept || !semantic.concepts.includes(concept) || !requiredString(basis.target_item_id, "INVALID_TARGET", LIMITS.identifier) || !requiredString(basis.value, "NO_CHANGE_BASIS_SHAPE_INVALID")) {
+        throw new CandidateConversationError("NO_CHANGE_BASIS_SHAPE_INVALID");
+      }
+      noChangeBasis = { target_item_id: basis.target_item_id.trim(), concept, value: basis.value.trim() };
+    } else if (Object.hasOwn(top, "no_change_basis")) {
+      throw new CandidateConversationError("NO_CHANGE_BASIS_SHAPE_INVALID");
+    }
+    return Object.freeze({ action, message, patches: Object.freeze(patches), clarification: clarification === null ? null : clarification.trim(), no_change_basis: noChangeBasis });
   }
 
   function canonicalJson(value) {
@@ -173,7 +248,7 @@
   }
 
   function hasExplicitMultiIntent(message) {
-    const text = requiredString(message, "HUMAN_MESSAGE_INVALID", 8000);
+    const text = requiredString(message, "HUMAN_MESSAGE_INVALID", LIMITS.human_message);
     return MULTI_INTENT_PATTERNS.some((pattern) => pattern.test(text));
   }
 
@@ -184,36 +259,36 @@
   function validateOperation(operation, item) {
     if (!isPlainObject(operation) || !OPERATIONS.includes(operation.operation)) throw new CandidateConversationError("UNSUPPORTED_OPERATION");
     if (operation.operation === "SET_ITEM_FIELD") {
-      exactKeys(operation, ["operation", "field", "value"]);
+      exactKeys(operation, OPERATION_KEYS.SET_ITEM_FIELD, "ACTION_OPERATION_SHAPE_INVALID");
       if (!ITEM_FIELDS.includes(operation.field)) throw new CandidateConversationError("INVALID_OPERATION_TARGET");
-      requiredString(operation.value, "EXACT_SCHEMA_FAILURE");
+      requiredString(operation.value, "ACTION_OPERATION_SHAPE_INVALID");
     } else if (operation.operation === "CLEAR_ITEM_FIELD") {
-      exactKeys(operation, ["operation", "field"]);
+      exactKeys(operation, OPERATION_KEYS.CLEAR_ITEM_FIELD, "ACTION_OPERATION_SHAPE_INVALID");
       if (!CLEARABLE_ITEM_FIELDS.includes(operation.field)) throw new CandidateConversationError("INVALID_OPERATION_TARGET");
     } else if (operation.operation === "SET_FACT_VALUE") {
-      exactKeys(operation, ["operation", "fact_id", "value"]);
-      requiredString(operation.fact_id, "INVALID_OPERATION_TARGET", 256);
-      requiredString(operation.value, "EXACT_SCHEMA_FAILURE");
+      exactKeys(operation, OPERATION_KEYS.SET_FACT_VALUE, "ACTION_OPERATION_SHAPE_INVALID");
+      requiredString(operation.fact_id, "INVALID_OPERATION_TARGET", LIMITS.identifier);
+      requiredString(operation.value, "ACTION_OPERATION_SHAPE_INVALID");
       if (!(item.facts || []).some((fact) => fact.fact_id === operation.fact_id)) throw new CandidateConversationError("INVALID_OPERATION_TARGET");
     } else {
-      exactKeys(operation, ["operation", "uncertainty_id", "status"]);
-      requiredString(operation.uncertainty_id, "INVALID_OPERATION_TARGET", 256);
-      if (!UNCERTAINTY_STATUSES.includes(operation.status)) throw new CandidateConversationError("EXACT_SCHEMA_FAILURE");
+      exactKeys(operation, OPERATION_KEYS.SET_UNCERTAINTY_STATUS, "ACTION_OPERATION_SHAPE_INVALID");
+      requiredString(operation.uncertainty_id, "INVALID_OPERATION_TARGET", LIMITS.identifier);
+      if (!UNCERTAINTY_STATUSES.includes(operation.status)) throw new CandidateConversationError("ACTION_OPERATION_SHAPE_INVALID");
       if (!(item.uncertainties || []).some((entry) => entry.uncertainty_id === operation.uncertainty_id)) throw new CandidateConversationError("INVALID_OPERATION_TARGET");
     }
     return Object.freeze(clone(operation));
   }
 
   function validatePatch(patch, itemById) {
-    exactKeys(patch, PATCH_KEYS);
-    const targetItemId = requiredString(patch.target_item_id, "INVALID_TARGET", 256);
+    exactKeys(patch, PATCH_KEYS, "ACTION_PATCH_SHAPE_INVALID");
+    const targetItemId = requiredString(patch.target_item_id, "INVALID_TARGET", LIMITS.identifier);
     const item = itemById.get(targetItemId);
     if (!item) throw new CandidateConversationError("INVALID_TARGET");
-    if (!Array.isArray(patch.operations) || !patch.operations.length || patch.operations.length > 32) throw new CandidateConversationError("EXACT_SCHEMA_FAILURE");
-    requiredString(patch.reason, "EXACT_SCHEMA_FAILURE", 2000);
-    if (patch.origin !== "MODEL_PROPOSAL") throw new CandidateConversationError("EXACT_SCHEMA_FAILURE");
+    if (!Array.isArray(patch.operations) || !patch.operations.length || patch.operations.length > LIMITS.changes_per_patch) throw new CandidateConversationError("ACTION_PATCH_SHAPE_INVALID");
+    requiredString(patch.reason, "ACTION_PATCH_SHAPE_INVALID", LIMITS.reason);
+    if (patch.origin !== "MODEL_PROPOSAL") throw new CandidateConversationError("ACTION_PATCH_SHAPE_INVALID");
     if (!Array.isArray(patch.evidence_refs) || patch.evidence_refs.some((ref) => typeof ref !== "string" || !ref.trim())) {
-      throw new CandidateConversationError("EXACT_SCHEMA_FAILURE");
+      throw new CandidateConversationError("ACTION_PATCH_SHAPE_INVALID");
     }
     const knownEvidence = evidenceIdsFor(item);
     if (patch.evidence_refs.some((ref) => !knownEvidence.has(ref))) throw new CandidateConversationError("INVALID_EVIDENCE_REF");
@@ -227,13 +302,13 @@
   }
 
   function validateAction(rawAction, { observation, working_model: workingModel, human_message: humanMessage, draft = null }) {
-    exactKeys(rawAction, TOP_LEVEL_KEYS);
-    if (rawAction.contract_id !== ACTION_CONTRACT_ID) throw new CandidateConversationError("EXACT_SCHEMA_FAILURE");
+    exactKeys(rawAction, TOP_LEVEL_KEYS, "ACTION_TOP_LEVEL_SHAPE_INVALID");
+    if (rawAction.contract_id !== ACTION_CONTRACT_ID) throw new CandidateConversationError("ACTION_TOP_LEVEL_SHAPE_INVALID");
     if (UNSUPPORTED_ACTIONS.includes(rawAction.action) || !ACTIONS.includes(rawAction.action)) throw new CandidateConversationError("UNSUPPORTED_ACTION");
-    if (typeof rawAction.message !== "string") throw new CandidateConversationError("EXACT_SCHEMA_FAILURE");
-    if (!Array.isArray(rawAction.patches)) throw new CandidateConversationError("EXACT_SCHEMA_FAILURE");
-    nullableString(rawAction.clarification, "EXACT_SCHEMA_FAILURE", 4000);
-    exactKeys(rawAction.observed_working_model, OBSERVED_KEYS);
+    if (typeof rawAction.message !== "string" || rawAction.message.trim().length > LIMITS.message) throw new CandidateConversationError("ACTION_MESSAGE_SHAPE_INVALID");
+    if (!Array.isArray(rawAction.patches) || rawAction.patches.length > LIMITS.patches) throw new CandidateConversationError("ACTION_PATCH_SHAPE_INVALID");
+    nullableString(rawAction.clarification, "ACTION_CLARIFICATION_SHAPE_INVALID", LIMITS.clarification);
+    exactKeys(rawAction.observed_working_model, OBSERVED_KEYS, "ACTION_TOP_LEVEL_SHAPE_INVALID");
     if (canonicalJson(rawAction.observed_working_model) !== canonicalJson(observedWorkingModel(observation))) {
       throw new CandidateConversationError("STALE_WORKING_OBSERVATION");
     }
@@ -248,13 +323,13 @@
     const patches = rawAction.patches.map((patch) => validatePatch(patch, itemById));
     const targets = new Set(patches.map((patch) => patch.target_item_id));
     const noPatchAction = ["NO_CHANGE", "ASK_CLARIFICATION", "EXPLAIN"].includes(rawAction.action);
-    if (noPatchAction && patches.length) throw new CandidateConversationError("EXACT_SCHEMA_FAILURE");
-    if (rawAction.action === "PATCH_ITEM" && (targets.size !== 1 || !patches.length)) throw new CandidateConversationError("EXACT_SCHEMA_FAILURE");
-    if (rawAction.action === "PATCH_MULTIPLE_ITEMS" && (targets.size < 2 || patches.length < 2)) throw new CandidateConversationError("EXACT_SCHEMA_FAILURE");
+    if (noPatchAction && patches.length) throw new CandidateConversationError("ACTION_CARDINALITY_INVALID");
+    if (rawAction.action === "PATCH_ITEM" && (targets.size !== 1 || !patches.length)) throw new CandidateConversationError("ACTION_CARDINALITY_INVALID");
+    if (rawAction.action === "PATCH_MULTIPLE_ITEMS" && (targets.size < 2 || patches.length < 2)) throw new CandidateConversationError("ACTION_CARDINALITY_INVALID");
     if (rawAction.action === "PATCH_MULTIPLE_ITEMS" && !hasExplicitMultiIntent(humanMessage)) throw new CandidateConversationError("IMPLICIT_MULTI_VIOLATION");
-    if (rawAction.action === "ASK_CLARIFICATION" && !rawAction.clarification) throw new CandidateConversationError("EXACT_SCHEMA_FAILURE");
-    if (rawAction.action !== "ASK_CLARIFICATION" && rawAction.clarification !== null) throw new CandidateConversationError("EXACT_SCHEMA_FAILURE");
-    if (rawAction.action !== "ASK_CLARIFICATION" && !rawAction.message.trim()) throw new CandidateConversationError("EXACT_SCHEMA_FAILURE");
+    if (rawAction.action === "ASK_CLARIFICATION" && !rawAction.clarification) throw new CandidateConversationError("ACTION_CLARIFICATION_SHAPE_INVALID");
+    if (rawAction.action !== "ASK_CLARIFICATION" && rawAction.clarification !== null) throw new CandidateConversationError("ACTION_CLARIFICATION_SHAPE_INVALID");
+    if (rawAction.action !== "ASK_CLARIFICATION" && !rawAction.message.trim()) throw new CandidateConversationError("ACTION_MESSAGE_SHAPE_INVALID");
 
     const focus = observation.focus;
     if (focus.type === "ITEM_DRAFT" && [...targets].some((target) => target !== focus.item_id)) throw new CandidateConversationError("FOCUS_VIOLATION");
@@ -267,7 +342,7 @@
   }
 
   function provenanceFor(humanMessage, operations) {
-    const text = requiredString(humanMessage, "HUMAN_MESSAGE_INVALID", 8000);
+    const text = requiredString(humanMessage, "HUMAN_MESSAGE_INVALID", LIMITS.human_message);
     const factOnly = operations.every((operation) => ["SET_FACT_VALUE", "SET_UNCERTAINTY_STATUS"].includes(operation.operation));
     if (factOnly && FACT_ASSERTION_PATTERNS.some((pattern) => pattern.test(text))) return "USER_CONFIRMED";
     if (WORDING_DIRECTIVE_PATTERNS.some((pattern) => pattern.test(text))) return "USER_EDITED";
@@ -407,8 +482,9 @@
   return Object.freeze({
     CONTRACT_ID, ACTION_CONTRACT_ID, OPERATION, SUBJECT_TYPE, ACTIONS, UNSUPPORTED_ACTIONS, OPERATIONS,
     ITEM_FIELDS, CLEARABLE_ITEM_FIELDS, UNCERTAINTY_STATUSES, STATES, TERMINAL_STATES, FAILURES,
+    CONTRACT_MANIFEST: ContractManifest, LIMITS,
     CandidateConversationError, conversationIdFor, createSession, validateSession, validateFocus,
-    createObservation, observedWorkingModel, assertCurrentObservation, draftFingerprintFor, hasExplicitMultiIntent,
+    createObservation, observedWorkingModel, assertCurrentObservation, draftFingerprintFor, hasExplicitMultiIntent, validateSemanticAction,
     validateAction, provenanceFor, applyAction, createTurnExecution, transitionExecution,
     cancelExecution, applyExecutionResult,
   });
