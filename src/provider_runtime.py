@@ -89,7 +89,7 @@ def deepseek_model_descriptors(model_ids: list[str]) -> list[ModelDescriptor]:
                     "ai_conversation": "supported",
                     "vision": "unsupported",
                 },
-                "deepseek-candidate-conversation-v3",
+                None,
                 None,
             ))
         elif model_id == "deepseek-v4-flash-vision-exp":
@@ -124,6 +124,21 @@ def is_multimodal(descriptor: ModelDescriptor) -> bool:
 def v1_selector_descriptors(descriptors: list[ModelDescriptor]) -> list[ModelDescriptor]:
     """Expose only model-level multimodal candidates, never provider-wide capability."""
     return [item for item in descriptors if is_multimodal(item) and item.multimodal_readiness in {MULTIMODAL_UNVERIFIED, MULTIMODAL_VERIFIED}]
+
+
+def v1_runtime_selector_descriptors(descriptors: list[ModelDescriptor]) -> list[ModelDescriptor]:
+    """Expose verified product runtimes without assigning a domain adapter."""
+    return [
+        item for item in descriptors
+        if (
+            is_multimodal(item)
+            and item.multimodal_readiness in {MULTIMODAL_UNVERIFIED, MULTIMODAL_VERIFIED}
+        ) or (
+            item.runtime_capability_basis == "adapter_verified"
+            and item.runtime_capabilities is not None
+            and item.runtime_capabilities.get("ai_conversation") == "supported"
+        )
+    ]
 
 
 def descriptor_for(model_id: str, descriptors: list[ModelDescriptor]) -> ModelDescriptor:

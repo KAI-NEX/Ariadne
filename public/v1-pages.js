@@ -15,6 +15,17 @@
   const CandidateConversationPersistence = window.AriadneCandidateConversationPersistence;
   const CandidateWorkspaceConversationRuntime = window.AriadneCandidateWorkspaceConversationRuntime;
   const LocalJobLifecycle = window.AriadneLocalJobLifecycle;
+  const LocalJob = window.AriadneLocalJobExtraction;
+  const JobContext = window.AriadneJobContext;
+  const JobModel = window.AriadneJobModelRuntime;
+  const JobCandidateContext = window.AriadneJobCandidateContext;
+  const SourceRetrieval = window.AriadneSourceRetrieval;
+  const JobConversation = window.AriadneJobConversation;
+  const JobConversationPersistence = window.AriadneJobConversationPersistence;
+  const ConversationUI = window.AriadneConversationUI;
+  const ProductShell = window.AriadneProductShell;
+  const ModelImportLifecycle = window.AriadneModelImportLifecycle;
+  const ModelWorkspaceUI = window.AriadneModelWorkspaceUI;
   const page = document.body.dataset.v1Page;
   const isEmbeddedDetail = new URLSearchParams(window.location.search).get("embed") === "1";
   if (isEmbeddedDetail) document.body.classList.add("v1-embedded-detail");
@@ -25,7 +36,7 @@
   const subtypeLabels = { work_experience: "工作经历", project: "项目经历", education: "教育经历", custom_section: "其他经历", skill_group: "核心能力", award: "获奖经历", language: "语言能力" };
   const materialTypeLabels = { resume: "简历", portfolio: "作品集", project: "项目材料", project_description: "项目说明", other: "其他材料" };
   const factLabels = { rawDate: "日期", date: "时间", time: "时间", achievements: "成果", responsibilities: "职责", summary: "摘要", location: "地点", area: "专业", major: "专业", degree: "专业", score: "成绩", result: "结果", awarder: "颁发方", issuer: "颁发方", keywords: "核心能力", skills: "核心能力", section: "分类", category: "分类", organization: "公司 / 机构", institution: "学校", school: "学校", company: "公司 / 机构", role: "角色", title: "角色", project: "项目", context: "背景", outputs: "产出", outcomes: "结果" };
-  const sourceTypeLabels = { SANITIZED_FIXTURE: "本地测试资料", BROWSER_FILE_METADATA: "浏览器本地文件", PASTED_TEXT_METADATA: "本地粘贴文本" };
+  const sourceTypeLabels = { SANITIZED_FIXTURE: "本地测试资料", BROWSER_FILE_METADATA: "浏览器本地文件", PASTED_TEXT_METADATA: "本地粘贴文本", PDF: "PDF", DOCX: "DOCX", IMAGE: "图片", PASTED_TEXT: "本地粘贴文本", TXT: "文本" };
   let selectedCandidateSources = [];
   let selectedCandidateType = "Resume";
   let selectedJobSource = null;
@@ -58,10 +69,24 @@
   let candidateReviewSourceIds = [];
   let jobProcessingInProgress = false;
   let jobBatchAbortController = null;
-  let jobExecutionState = "READY";
+  let jobExecutionState = "IDLE";
+  let jobImportLifecycle = null;
   let jobSelectionVersion = 0;
+  let jobModelAttemptGeneration = 0;
+  let jobModelConsentSelectionVersion = null;
+  let jobModelConsentRuntimeIdentity = null;
+  let jobModelConsentId = null;
+  let activeJobModelOperation = null;
   let jobReviewSessionTotal = 0;
   let jobReviewSessionResolved = 0;
+  let activeJobRevision = null;
+  let activeJobWorkingProposal = null;
+  let activeJobSourceDocument = null;
+  let activeJobChangeProposal = null;
+  let activeJobConversationSession = null;
+  let jobConversationTurnActive = false;
+  let candidateWorkspaceShell = null;
+  let jobWorkspaceShell = null;
 
   function currentOperationGate(operation) {
     try { return RuntimeGate.operationGate(operation); }
@@ -74,6 +99,42 @@
         authority: Object.freeze({ runtime: Object.freeze({ mode: "invalid", provider: null, model: null }), capabilities: Object.freeze({}) }),
       });
     }
+  }
+
+  function candidateSharedWorkspace() {
+    if (!candidateWorkspaceShell) {
+      candidateWorkspaceShell = ProductShell.bindWorkspaceShell(document, {
+        layer: "candidate-ai-workspace",
+        source: "candidate-working-source",
+        processing: "candidate-workspace-processing",
+        content: "candidate-card-list",
+        save: "candidate-workspace-save",
+        save_status: "candidate-workspace-save-status",
+        progress: "candidate-understanding-events",
+        messages: "candidate-workspace-conversation",
+        form: "candidate-workspace-composer",
+        conversation_status: "candidate-workspace-conversation-status",
+      });
+    }
+    return candidateWorkspaceShell;
+  }
+
+  function jobSharedWorkspace() {
+    if (!jobWorkspaceShell) {
+      jobWorkspaceShell = ProductShell.bindWorkspaceShell(document, {
+        layer: "job-ai-workspace",
+        source: "job-working-source",
+        processing: "job-workspace-processing",
+        content: "job-working-form",
+        save: "job-workspace-save",
+        save_status: "job-workspace-save-status",
+        progress: "job-understanding-events",
+        messages: "job-workspace-conversation",
+        form: "job-workspace-composer",
+        conversation_status: "job-workspace-conversation-status",
+      });
+    }
+    return jobWorkspaceShell;
   }
 
   function runtimeLabel(runtime) {
@@ -147,6 +208,34 @@
     return messages[code] || "操作未完成，请重试。";
   }
 
+  function jobErrorCopy(error) {
+    const code = String(error?.code || error?.message || error || "");
+    const messages = {
+      unsupported_document_type: "暂不支持这种文件格式。",
+      invalid_document_size: "文件大小不符合导入要求。",
+      document_size_limit_exceeded: "当前导入仅支持不超过 8 MB 的文档。",
+      image_size_limit_exceeded: "当前导入仅支持不超过 5 MB 的图片。",
+      job_model_single_source_required: "ARIADNE AI 每次只处理一个职位来源。",
+      job_model_runtime_not_eligible: "当前 ARIADNE AI 职位导入运行契约不可用。",
+      job_model_source_text_required: "当前来源没有可供模型理解的文字内容。",
+      job_model_source_preparation_invalid: "职位来源的只读技术解析未通过完整性校验。",
+      job_model_consent_required: "发送前需要你的明确确认。",
+      job_model_consent_mismatch: "当前来源或运行方式已变化；请重新确认。",
+      job_model_credential_reference_invalid: "模型凭据引用无效；没有发送职位内容。",
+      deepseek_key_not_configured: "尚未配置可用的 DeepSeek 本机凭据。",
+      deepseek_network_error: "连接 DeepSeek 失败。",
+      deepseek_provider_http_error: "DeepSeek 未能完成这次职位理解。",
+      deepseek_response_too_large: "DeepSeek 返回内容超过安全上限。",
+      deepseek_response_malformed: "DeepSeek 返回内容无法解析。",
+      deepseek_returned_model_mismatch: "服务商返回的模型与已验证运行方式不一致。",
+      job_model_proposal_contract_failed: "模型职位提案未通过结构校验。",
+      job_model_grounding_validation_failed: "模型职位提案缺少真实来源依据。",
+      job_model_processing_run_stale: "职位来源已变化；旧模型结果没有写入。",
+      job_model_result_persistence_failed: "模型职位提案未能完整保存。",
+    };
+    return messages[code] || "职位整理未完成，请重试。";
+  }
+
   function unavailableCopy(gate, subject) {
     if (gate.authority.runtime.mode === "model") {
       return `当前所选模型的${subject}能力尚未真实接通；操作已停用，不会生成模型样例，也不会静默改用本地结果。`;
@@ -196,17 +285,59 @@
   }
 
   function refreshJobImportGate() {
-    const gate = currentOperationGate("job_import");
+    let runtime;
+    try { runtime = RuntimeGate.authorityFrom(RuntimeGate.readStoredRuntime()).runtime; }
+    catch (_error) { runtime = { mode: "invalid", provider: null, model: null }; }
+    const modelMode = runtime.mode === "model";
+    const gate = currentOperationGate(modelMode ? "job_model_import" : "job_import");
     const button = byId("start-job-processing");
     if (!button) return gate;
-    button.textContent = gate.authority.runtime.mode !== "local" ? "模型导入尚不可用" : jobExecutionState === "COMPLETE" ? "等待审核完成" : jobProcessingInProgress ? "正在本地整理" : "开始本地演示整理";
-    const local = gate.authority.runtime.mode === "local";
-    button.disabled = jobProcessingInProgress || jobExecutionState === "COMPLETE" || !selectedJobSource || !gate.allowed;
-    byId("job-file-input").disabled = !local || jobProcessingInProgress;
-    byId("job-dropzone").disabled = !local || jobProcessingInProgress;
-    byId("job-dropzone").setAttribute("aria-disabled", String(!local || jobProcessingInProgress));
-    setRuntimeGateMessage("job-page-message", gate.allowed ? "" : unavailableCopy(gate, "职位语义结构化"));
+    document.body.dataset.jobImportRuntime = modelMode ? "model" : "local";
+    document.body.dataset.jobImportLifecycle = jobExecutionState;
+    button.textContent = jobExecutionState === "REVIEWING" ? "请完成下方审核" : jobExecutionState === "WORKING" ? "查看 Working Job" : jobExecutionState === "SAVED" ? "职位已保存" : jobProcessingInProgress
+      ? modelMode ? "ARIADNE AI 正在理解" : "正在本地整理"
+      : modelMode ? "使用 ARIADNE AI 理解" : "开始本地整理";
+    button.disabled = jobProcessingInProgress || ["REVIEWING", "READY_TO_SAVE", "SAVED"].includes(jobExecutionState) || !selectedJobSource || !gate.allowed || (modelMode && selectedJobSources.length > 1);
+    byId("job-file-input").disabled = jobProcessingInProgress || !gate.allowed;
+    byId("job-file-input").multiple = !modelMode;
+    byId("job-dropzone").disabled = jobProcessingInProgress || !gate.allowed;
+    byId("job-dropzone").setAttribute("aria-disabled", String(jobProcessingInProgress || !gate.allowed));
+    byId("job-import-types")?.querySelectorAll("button").forEach((item) => { item.disabled = jobProcessingInProgress; });
+    byId("job-runtime-summary").textContent = modelMode
+      ? "ARIADNE AI 会读取真实来源的有界文本证据；模型结果先成为 NON_AUTHORITATIVE WORKING JOB，只有你在工作区保存后才成为正式职位版本。"
+      : "本地确定规则；不会调用模型服务商。";
+    byId("job-processing-boundary").textContent = modelMode
+      ? "原始来源已持久保留 · 只读技术解析 · Provider 负责语义理解"
+      : "本地读取真实内容 · 原始来源持久保留 · 无模型调用";
+    setRuntimeGateMessage("job-page-message", gate.allowed ? "" : unavailableCopy(gate, modelMode ? "职位语义理解" : "本地职位整理"));
     return gate;
+  }
+
+  function beginJobImportLifecycle(initialState = ModelImportLifecycle.STATES.SOURCE_SELECTED) {
+    jobImportLifecycle = ModelImportLifecycle.createStateMachine(initialState);
+    jobExecutionState = jobImportLifecycle.state;
+    document.body.dataset.jobImportLifecycle = jobExecutionState;
+    return jobImportLifecycle;
+  }
+
+  function transitionJobImportLifecycle(nextState) {
+    if (!jobImportLifecycle) beginJobImportLifecycle();
+    jobExecutionState = jobImportLifecycle.transition(nextState);
+    document.body.dataset.jobImportLifecycle = jobExecutionState;
+    return jobExecutionState;
+  }
+
+  function resolveJobProposalLifecycle(unresolvedCount) {
+    jobExecutionState = jobImportLifecycle.proposalReady(unresolvedCount);
+    document.body.dataset.jobImportLifecycle = jobExecutionState;
+    return jobExecutionState;
+  }
+
+  function updateJobReviewLifecycle(unresolvedCount) {
+    if (!jobImportLifecycle || jobImportLifecycle.state !== ModelImportLifecycle.STATES.REVIEWING) return jobExecutionState;
+    jobExecutionState = jobImportLifecycle.reviewProgress(unresolvedCount);
+    document.body.dataset.jobImportLifecycle = jobExecutionState;
+    return jobExecutionState;
   }
 
   function formatBytes(bytes) {
@@ -391,12 +522,15 @@
 
   function installDetailCardOverlay() {
     if (isEmbeddedDetail || (page !== "personal" && page !== "jd")) return;
+    const importCopy = page === "jd"
+      ? Object.freeze({ title: "添加职位描述", close: "关闭添加职位描述", workspace: "职位描述" })
+      : Object.freeze({ title: "添加个人材料", close: "关闭添加个人材料", workspace: "候选人信息" });
     document.body.insertAdjacentHTML("beforeend", `<div class="v1-detail-overlay hidden" aria-hidden="true">
       <button class="v1-detail-overlay-backdrop v1-sheet-backdrop" type="button" aria-label="关闭详情"></button>
       <section class="v1-detail-overlay-surface" role="dialog" aria-modal="true" aria-label="资料详情" tabindex="-1">
         <div class="v1-detail-overlay-preview" aria-hidden="true"></div>
         <div class="v1-detail-overlay-content">
-          <header><button class="v1-detail-overlay-close" type="button" aria-label="关闭详情"></button><p></p><span class="v1-detail-overlay-header-actions"><button class="v1-detail-overlay-edit" type="button" aria-label="编辑当前内容">编辑</button><button class="v1-detail-overlay-workspace-close hidden" type="button" aria-label="关闭添加个人材料">×</button></span></header>
+          <header><button class="v1-detail-overlay-close" type="button" aria-label="关闭详情"></button><p></p><span class="v1-detail-overlay-header-actions"><button class="v1-detail-overlay-edit" type="button" aria-label="编辑当前内容">编辑</button><button class="v1-detail-overlay-workspace-close hidden" type="button" aria-label="关闭导入">×</button></span></header>
           <iframe title="本地资料详情"></iframe>
         </div>
       </section>
@@ -426,16 +560,19 @@
     function setImportOverlayView(view = "import") {
       const workspace = view === "workspace";
       overlay.classList.toggle("is-import-workspace", workspace);
-      closeButton.setAttribute("aria-label", workspace ? "返回导入" : "关闭添加个人材料");
-      title.textContent = workspace ? "候选人信息" : "添加个人材料";
+      closeButton.setAttribute("aria-label", workspace ? "返回导入" : importCopy.close);
+      workspaceCloseButton.setAttribute("aria-label", importCopy.close);
+      title.textContent = workspace ? importCopy.workspace : importCopy.title;
       workspaceCloseButton.classList.toggle("hidden", !workspace);
     }
 
     function targetRect() {
-      const compact = window.innerWidth < 760;
-      const width = window.innerWidth * (compact ? 0.94 : 0.8);
-      const height = window.innerHeight * (compact ? 0.9 : 0.8);
-      return { left: (window.innerWidth - width) / 2, top: (window.innerHeight - height) / 2, width, height };
+      const viewportWidth = window.visualViewport?.width || window.innerWidth;
+      const viewportHeight = window.visualViewport?.height || window.innerHeight;
+      const compact = viewportWidth < 760;
+      const width = viewportWidth * (compact ? 0.94 : 0.8);
+      const height = viewportHeight * (compact ? 0.9 : 0.8);
+      return { left: (viewportWidth - width) / 2, top: (viewportHeight - height) / 2, width, height };
     }
 
     function rectFrame(rect, radius) {
@@ -464,6 +601,12 @@
       title.textContent = card.querySelector("h3, b")?.textContent || "资料详情";
       overlay.dataset.overlayKind = isImport ? "import" : "detail";
       if (isImport) setImportOverlayView("import");
+      else {
+        overlay.classList.remove("is-import-workspace");
+        closeButton.setAttribute("aria-label", "关闭详情");
+        workspaceCloseButton.setAttribute("aria-label", "关闭导入");
+        workspaceCloseButton.classList.add("hidden");
+      }
       surface.setAttribute("aria-label", isImport ? title.textContent : "资料详情");
       frame.title = isImport ? title.textContent : "资料详情";
       overlay.classList.remove("hidden", "is-content-ready", "is-closing");
@@ -556,13 +699,19 @@
     editButton.addEventListener("click", () => frame.contentWindow?.postMessage({ type: "job-radar-v1-open-detail-edit" }, window.location.origin));
     backdrop.addEventListener("click", closeOverlay);
     document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeOverlay(); });
+    window.addEventListener("resize", () => {
+      if (!sourceCard || closing || surface.classList.contains("floating-window-positioned")) return;
+      Object.assign(surface.style, rectFrame(targetRect(), "28px"));
+    });
     window.addEventListener("message", (event) => {
       if (event.origin !== window.location.origin || event.source !== frame.contentWindow) return;
       if (event.data?.type === "job-radar-v1-import-view-state") {
         if (overlay.dataset.overlayKind === "import") setImportOverlayView(event.data.view);
         return;
       }
-      if (event.data?.type !== "job-radar-v1-import-complete") return;
+      const importComplete = event.data?.type === "job-radar-v1-import-complete";
+      const detailUpdated = event.data?.type === "job-radar-v1-detail-updated";
+      if (!importComplete && !detailUpdated) return;
       const { library, sourceKey } = event.data;
       if ((library === "personal" && page !== "personal") || (library === "jd" && page !== "jd")) return;
       afterClose = async () => {
@@ -570,7 +719,7 @@
         else await renderJobLibrary();
         document.querySelector(`[data-transition-key="${CSS.escape(sourceKey)}"]`)?.focus({ preventScroll: true });
       };
-      closeOverlay();
+      if (importComplete) closeOverlay();
     });
   }
 
@@ -807,7 +956,7 @@
   }
 
   function setCandidateWorkspaceProgress(steps, currentIndex = steps.length - 1) {
-    byId("candidate-understanding-events").innerHTML = steps.map((step, index) => `<li data-entry-type="EXECUTION_EVENT" class="${index < currentIndex ? "is-complete" : index === currentIndex ? "is-current" : "is-upcoming"}"><span aria-hidden="true"></span>${escapeHtml(step)}</li>`).join("");
+    ModelWorkspaceUI.renderProgress(byId("candidate-understanding-events"), steps, currentIndex);
   }
 
   function beginCandidateWorkspaceView() {
@@ -820,28 +969,16 @@
     return candidateWorkspaceViewIntent === "workspace" && generation === candidateWorkspaceViewGeneration;
   }
 
-  function setCandidateWorkspaceShellView(view) {
-    document.body.classList.toggle("v1-workspace-view", view === "workspace");
-    if (isEmbeddedDetail && window.parent !== window) {
-      window.parent.postMessage({ type: "job-radar-v1-import-view-state", view }, window.location.origin);
-    }
-  }
-
   const normalizedDisplayValue = (value) => String(value || "").trim().toLocaleLowerCase().replace(/[\s\p{P}\p{S}]+/gu, "");
 
   function renderCandidateWorkspaceConversation() {
     const target = byId("candidate-workspace-conversation");
     if (!target) return;
-    target.innerHTML = candidateWorkspaceConversation.length
-      ? candidateWorkspaceConversation.map((message) => `<p class="v1-conversation-message ${message.role === "USER" ? "user" : "assistant"}">${escapeHtml(message.text ?? message.content)}</p>`).join("")
-      : '<p class="v1-conversation-empty">你可以告诉 Ariadne 哪些内容需要调整。</p>';
+    ConversationUI.renderMessages(target, candidateWorkspaceConversation, { empty_text: "你可以告诉 Ariadne 哪些内容需要调整。", text_for: (message) => message.text ?? message.content });
   }
 
   function setCandidateConversationExecutionState(copy = "", active = candidateConversationTurnActive) {
-    const status = byId("candidate-workspace-conversation-status");
-    const submit = byId("candidate-workspace-composer")?.querySelector('button[type="submit"]');
-    if (status) status.textContent = copy;
-    if (submit) submit.disabled = active;
+    ConversationUI.setExecutionState({ form: byId("candidate-workspace-composer"), status: byId("candidate-workspace-conversation-status"), active, copy });
   }
 
   async function restoreCandidateWorkspaceConversation(sourceId) {
@@ -860,27 +997,17 @@
   }
 
   function showCandidateWorkspaceLayer(sourceName, processing = false) {
-    const workspace = byId("candidate-ai-workspace");
-    if (!workspace) return;
-    if (workspace.classList.contains("hidden")) candidateWorkspacePreviousFocus = document.activeElement;
-    byId("candidate-working-source").textContent = sourceName || "当前 PDF";
-    byId("candidate-workspace-processing").classList.toggle("hidden", !processing);
-    byId("candidate-card-list").classList.toggle("hidden", processing);
+    const workspace = candidateSharedWorkspace();
     byId("candidate-card-detail").classList.add("hidden");
-    byId("candidate-workspace-save").disabled = true;
-    byId("candidate-workspace-save-status").textContent = "";
-    byId("candidate-ai-workspace").querySelector(".v1-candidate-pane")?.classList.remove("is-detail");
-    workspace.classList.remove("hidden");
-    setCandidateWorkspaceShellView("workspace");
-    document.body.classList.add("v1-workspace-open");
-    window.requestAnimationFrame(() => workspace.focus());
+    const previousFocus = ProductShell.showWorkspace(workspace, { source_name: sourceName || "当前 PDF", processing, model_workspace_ui: ModelWorkspaceUI, embedded: isEmbeddedDetail });
+    if (previousFocus) candidateWorkspacePreviousFocus = previousFocus;
   }
 
   function renderCandidateWorkspaceCardDetail(itemId) {
     const item = activeCandidateWorkingModel?.payload?.items?.find((entry) => entry.item_id === itemId);
     if (!item) return;
     activeCandidateWorkspaceItemId = itemId;
-    byId("candidate-ai-workspace").querySelector(".v1-candidate-pane")?.classList.add("is-detail");
+    byId("candidate-ai-workspace").querySelector(".v1-workspace-content-pane")?.classList.add("is-detail");
     byId("candidate-card-list").classList.add("hidden");
     byId("candidate-card-detail").classList.remove("hidden");
     byId("candidate-card-read").classList.remove("hidden");
@@ -1118,14 +1245,17 @@
     } finally {
       database?.close?.();
       candidateConversationTurnActive = false;
-      if (workspaceViewIsCurrent(viewGeneration)) setCandidateConversationExecutionState(terminalCopy, false);
+      if (workspaceViewIsCurrent(viewGeneration)) {
+        setCandidateConversationExecutionState(terminalCopy, false);
+        ConversationUI.settle({ form: byId("candidate-workspace-composer"), messages: byId("candidate-workspace-conversation") });
+      }
     }
   }
 
   function returnToCandidateCardList() {
     byId("candidate-card-detail").classList.add("hidden");
     byId("candidate-card-list").classList.remove("hidden");
-    byId("candidate-ai-workspace").querySelector(".v1-candidate-pane")?.classList.remove("is-detail");
+    byId("candidate-ai-workspace").querySelector(".v1-workspace-content-pane")?.classList.remove("is-detail");
     activeCandidateWorkspaceItemId = null;
     candidateWorkspaceEditDirty = false;
   }
@@ -1142,16 +1272,13 @@
   function closeCandidateWorkspaceLayer(destination = "import") {
     candidateWorkspaceViewIntent = destination;
     candidateWorkspaceViewGeneration += 1;
-    byId("candidate-ai-workspace").classList.add("hidden");
-    setCandidateWorkspaceShellView("import");
-    document.body.classList.remove("v1-workspace-open");
+    ProductShell.hideWorkspace(candidateSharedWorkspace(), { embedded: isEmbeddedDetail, restore_focus: destination === "profile" ? null : candidateWorkspacePreviousFocus });
     activeCandidateWorkspaceItemId = null;
     candidateWorkspaceEditDirty = false;
     if (destination === "profile") {
       if (!completeEmbeddedImport("personal", "personal-guide")) window.location.assign("/personal-information.html");
       return;
     }
-    candidateWorkspacePreviousFocus?.focus?.();
   }
 
   function requestCandidateWorkspaceExit(destination) {
@@ -1778,6 +1905,8 @@
   }
 
   function initPersonalImport() {
+    ProductShell.bindImportShell(document);
+    candidateSharedWorkspace();
     renderAwaitingCandidateReviews({ sourceIds: [] }).catch(showPersonalError);
     renderSavedCandidatePdfSources().catch(showPersonalError);
     window.addEventListener("message", (event) => {
@@ -2015,44 +2144,6 @@
     byId("personal-processing")?.classList.add("hidden");
   }
 
-  const detailPanelTimers = new WeakMap();
-  function firstVisibleEditableControl(form) {
-    return [...form.querySelectorAll("input, textarea, select, button")].find((control) => {
-      if (control.disabled || control.hidden || control.type === "hidden") return false;
-      const style = window.getComputedStyle(control);
-      return control.offsetParent !== null && style.display !== "none" && style.visibility !== "hidden";
-    });
-  }
-
-  function createDetailPanelController(triggerId, stages) {
-    let current = "closed";
-    const show = (stage, { focusFirst = false } = {}) => {
-      current = stage;
-      Object.entries(stages).forEach(([name, panelId]) => {
-        const panel = byId(panelId);
-        const active = name === stage;
-        window.clearTimeout(detailPanelTimers.get(panel));
-        panel.setAttribute("aria-hidden", String(!active));
-        if (active) {
-          panel.classList.remove("hidden");
-          window.requestAnimationFrame(() => {
-            panel.classList.add("is-active");
-            if (focusFirst) {
-              panel.scrollIntoView({ behavior: "smooth", block: "center" });
-              firstVisibleEditableControl(panel)?.focus({ preventScroll: true });
-            }
-          });
-        } else {
-          panel.classList.remove("is-active");
-          const timer = window.setTimeout(() => panel.classList.add("hidden"), 210);
-          detailPanelTimers.set(panel, timer);
-        }
-      });
-      byId(triggerId).setAttribute("aria-expanded", String(stage !== "closed"));
-    };
-    return Object.freeze({ show, current: () => current });
-  }
-
   function createDeletePopover(popoverId) {
     const popover = byId(popoverId);
     const menu = popover.querySelector(".v1-delete-popover-menu");
@@ -2131,19 +2222,25 @@
     byId("candidate-source").textContent = `${item.source_refs?.[0]?.location || "来源待核对"} · ${item.source_refs?.[0]?.excerpt_or_reference || "来源未记录"}`;
   }
 
-  function setDetailRuntimeMode(record, paneId, editButtonId, runtimeBadgeId) {
-    const gate = currentOperationGate("ai_conversation");
+  function setDetailRuntimeMode(record, paneId, editButtonId, runtimeBadgeId, operation) {
+    const gate = currentOperationGate(operation);
     const runtime = gate.authority.runtime;
     const conversationAllowed = runtime.mode === "model" && gate.allowed;
-    document.body.dataset.detailRuntime = runtime.mode;
-    document.body.dataset.recordRecognition = Demo.isAIRecognizedRecord(record) ? "ai" : "local";
-    document.body.classList.toggle("v1-ai-capable", conversationAllowed);
-    const pane = byId(paneId);
-    pane?.classList.toggle("hidden", !conversationAllowed);
-    pane?.setAttribute("aria-hidden", String(!conversationAllowed));
-    pane?.querySelectorAll("input, textarea, button").forEach((control) => { control.disabled = !conversationAllowed; });
-    byId(editButtonId)?.classList.toggle("hidden", conversationAllowed);
-    if (byId(runtimeBadgeId)) byId(runtimeBadgeId).textContent = runtimeLabel(runtime);
+    const candidate = paneId === "candidate-ai-pane";
+    const shell = ProductShell.bindDetailShell(document, {
+      conversation_pane: paneId,
+      edit: editButtonId,
+      runtime: runtimeBadgeId,
+      messages: candidate ? "candidate-conversation-messages" : "job-conversation-messages",
+      form: candidate ? "candidate-conversation-form" : "job-conversation-form",
+      status: candidate ? "candidate-conversation-status" : "job-conversation-status",
+    });
+    ProductShell.applyDetailRuntime(shell, {
+      mode: runtime.mode,
+      recognition: Demo.isAIRecognizedRecord(record) ? "ai" : "local",
+      conversation_allowed: conversationAllowed,
+      runtime_label: runtimeLabel(runtime),
+    });
     setRuntimeGateMessage(record.item_id ? "candidate-detail-message" : "job-detail-message", runtime.mode === "model" && !conversationAllowed ? unavailableCopy(gate, "对话") : "");
     return conversationAllowed;
   }
@@ -2174,13 +2271,14 @@
       candidate = stored || Demo.clone(fallback);
     }
     renderCandidate(candidate);
-    setDetailRuntimeMode(candidate, "candidate-ai-pane", "open-direct-edit", "candidate-ai-runtime");
+    ConversationUI.renderMessages(byId("candidate-conversation-messages"), [], { empty_text: "" });
+    setDetailRuntimeMode(candidate, "candidate-ai-pane", "open-direct-edit", "candidate-ai-runtime", "candidate_conversation");
     const sourceIdFor = (record, revision) => {
       const allowed = new Set(revision?.provenance?.source_document_ids || []);
       const grounded = (record.source_refs || record.grounding_refs || []).map((ref) => ref.source_document_id).find((sourceId) => sourceId && (!allowed.size || allowed.has(sourceId)));
       return grounded || revision?.provenance?.source_document_ids?.[0] || null;
     };
-    const panels = createDetailPanelController("open-direct-edit", { edit: "candidate-edit-form" });
+    const panels = ProductShell.createDetailPanelController({ trigger: byId("open-direct-edit"), stages: { edit: byId("candidate-edit-form") }, window });
     const deletePopover = createDeletePopover("candidate-delete-popover");
     const setDirectEditOpen = (open, focusTarget = true) => {
       panels.show(open ? "edit" : "closed", { focusFirst: open && focusTarget });
@@ -2283,7 +2381,7 @@
   function jobCardMarkup(job) {
     const canonical = job.data_class === "CANONICAL_CONFIRMED";
     const stateBadge = canonical ? "" : '<span class="v1-review-chip">演示数据</span>';
-    return `<a class="v1-candidate-card job" data-transition-key="job:${escapeHtml(job.job_context_id)}" href="/job-detail.html?job=${encodeURIComponent(job.job_context_id)}"><div class="v1-card-top"><span class="v1-type-chip">职位描述</span>${stateBadge}</div><h3>${escapeHtml(job.title)}</h3><p class="v1-card-subtitle">${escapeHtml(job.company)} · ${escapeHtml(job.location)}</p><p class="v1-card-summary">${escapeHtml(job.summary)}</p><ul>${job.requirements.slice(0, 3).map((item) => `<li>${escapeHtml(item.label)}</li>`).join("")}</ul></a>`;
+    return `<a class="v1-candidate-card job" data-transition-key="job:${escapeHtml(job.job_context_id)}" href="/job-detail.html?job=${encodeURIComponent(job.job_context_id)}"><div class="v1-card-top"><span class="v1-type-chip">职位描述</span>${stateBadge}</div><h3>${escapeHtml(job.title)}</h3><p class="v1-card-subtitle">${escapeHtml(job.company)} · ${escapeHtml(job.location)}</p><p class="v1-card-summary">${escapeHtml(job.summary)}</p><ul>${(job.requirements || []).slice(0, 3).map((item) => `<li>${escapeHtml(item.label)}</li>`).join("")}</ul></a>`;
   }
 
   function jobGuideCardMarkup() {
@@ -2299,12 +2397,125 @@
     }));
   }
 
+  async function canonicalJobRecords(database = null) {
+    if (!Truth || !JobContext) return [];
+    const owned = !database;
+    const db = database || await Truth.openDatabase();
+    try {
+      const revisions = await JobContext.getAll(db, "job_context_revisions");
+      return JobContext.latestRevisions(revisions).map(JobContext.recordForUi);
+    } finally { if (owned) db.close(); }
+  }
+
+  async function canonicalJobRevision(jobContextId, database = null) {
+    if (!Truth || !JobContext) return null;
+    const owned = !database;
+    const db = database || await Truth.openDatabase();
+    try {
+      return JobContext.latestRevision(await JobContext.getAll(db, "job_context_revisions"), jobContextId);
+    } finally { if (owned) db.close(); }
+  }
+
   async function renderJobLibrary() {
+    const canonical = await canonicalJobRecords();
     const records = await localizedJobRecords(await Demo.getAll(Demo.DEMO_STORES.jobs));
-    const jobs = LocalJobLifecycle ? LocalJobLifecycle.libraryJobs(records) : records;
+    const legacy = LocalJobLifecycle ? LocalJobLifecycle.libraryJobs(records) : records;
+    const canonicalIds = new Set(canonical.map((job) => job.job_context_id));
+    const jobs = [...canonical, ...legacy.filter((job) => !canonicalIds.has(job.job_context_id))];
     const grid = byId("job-card-grid");
     grid.innerHTML = jobGuideCardMarkup() + jobs.map(jobCardMarkup).join("");
     window.requestAnimationFrame(playPendingCardReturn);
+  }
+
+  function jobWorkingEdits() {
+    if (!activeJobWorkingProposal || !byId("job-working-form")) return {};
+    const payload = activeJobWorkingProposal.payload;
+    const lines = byId("job-working-requirements").value.split("\n").map((line) => line.trim()).filter(Boolean);
+    return {
+      title: byId("job-working-title-input").value.trim(),
+      company: byId("job-working-company").value.trim(),
+      location: byId("job-working-location").value.trim(),
+      summary: byId("job-working-summary").value.trim(),
+      requirements: lines.map((detail, index) => ({
+        requirement_id: payload.requirements[index]?.requirement_id,
+        label: detail.length > 36 ? `${detail.slice(0, 34)}…` : detail,
+        detail,
+        grounding_refs: payload.requirements[index]?.grounding_refs || [],
+        content_origin: payload.requirements[index]?.content_origin || "HUMAN_EDITED",
+      })),
+    };
+  }
+
+  function currentJobConversationSubject() {
+    if (activeJobWorkingProposal) return JobContext.workingSubjectFor(activeJobWorkingProposal, jobWorkingEdits());
+    return activeJobRevision;
+  }
+
+  function setJobWorkspaceProgress(steps, currentIndex = steps.length - 1) {
+    ModelWorkspaceUI.renderProgress(byId("job-understanding-events"), steps, currentIndex);
+  }
+
+  function showJobModelProcessingWorkspace(sourceName) {
+    activeJobWorkingProposal = null;
+    activeJobConversationSession = null;
+    byId("job-workspace-conversation").innerHTML = '<p class="v1-conversation-empty">职位理解完成后，可以在这里继续对话。</p>';
+    byId("job-workspace-conversation-status").textContent = "";
+    ProductShell.showWorkspace(jobSharedWorkspace(), { source_name: sourceName || "当前职位来源", processing: true, model_workspace_ui: ModelWorkspaceUI, embedded: isEmbeddedDetail });
+    setJobWorkspaceProgress(["正在读取职位材料", "正在理解职位内容", "正在提取职位要求", "正在生成职位信息"], 0);
+  }
+
+  async function showJobWorkingWorkspace(proposal) {
+    const checked = Truth.validateProposal(proposal);
+    if (checked.proposal_type !== "JOB_CONTEXT" || checked.status !== "AWAITING_REVIEW") throw new Error("job_working_proposal_invalid");
+    activeJobWorkingProposal = checked;
+    activeJobRevision = null;
+    activeJobConversationSession = null;
+    const payload = JobContext.validateJobPayload(checked.payload);
+    byId("job-working-title-input").value = payload.title || "";
+    byId("job-working-company").value = payload.company || "";
+    byId("job-working-location").value = payload.location || "";
+    byId("job-working-summary").value = payload.summary || "";
+    byId("job-working-requirements").value = (payload.requirements || []).map((item) => item.detail).join("\n");
+    ProductShell.showWorkspace(jobSharedWorkspace(), { source_name: selectedJobSource?.name || "当前职位来源", processing: false, model_workspace_ui: ModelWorkspaceUI, embedded: isEmbeddedDetail });
+    byId("job-workspace-save").disabled = false;
+    byId("job-workspace-save-status").textContent = "";
+    setJobWorkspaceProgress(["职位材料已准备", "职位内容已读取", "DeepSeek 已完成理解", "Working Job 已生成"]);
+    byId("job-review-surface").classList.add("hidden");
+    const database = await Truth.openDatabase();
+    try {
+      activeJobSourceDocument = (await JobContext.getAll(database, "source_documents")).find((entry) => entry.source_document_id === checked.source_document_ids[0]) || null;
+      const restored = await restoreJobConversation(database, JobContext.contextIdForProposal(checked));
+      renderJobConversationMessages(restored.messages);
+    } finally { database.close(); }
+  }
+
+  async function savedModelJobProposalForSource(sourceId) {
+    const database = await Truth.openDatabase();
+    try {
+      return (await JobContext.getAll(database, "context_proposals"))
+        .filter((proposal) => proposal.proposal_type === "JOB_CONTEXT" && proposal.status === "AWAITING_REVIEW" && proposal.source_document_ids.includes(sourceId)
+          && (proposal.warnings || []).includes("model_generated_non_authoritative"))
+        .sort((left, right) => String(right.created_at).localeCompare(String(left.created_at)))[0] || null;
+    } finally { database.close(); }
+  }
+
+  async function saveJobWorkingWorkspace() {
+    if (!activeJobWorkingProposal) return;
+    const button = byId("job-workspace-save");
+    button.disabled = true;
+    byId("job-workspace-save-status").textContent = "正在保存…";
+    const database = await Truth.openDatabase();
+    try {
+      const outcome = await JobContext.persistReview(database, activeJobWorkingProposal, "CONFIRM", jobWorkingEdits());
+      transitionJobImportLifecycle(ModelImportLifecycle.STATES.SAVED);
+      byId("job-workspace-save-status").textContent = "已保存为不可变职位版本。";
+      const sourceKey = `job:${outcome.revision.context_id}`;
+      if (!completeEmbeddedImport("jd", sourceKey)) window.location.assign(`/job-detail.html?job=${encodeURIComponent(outcome.revision.context_id)}`);
+    } catch (error) {
+      button.disabled = false;
+      byId("job-workspace-save-status").textContent = error?.message === "context_version_conflict" ? "职位版本已经变化，请重新打开后保存。" : "保存失败，请重试。";
+      throw error;
+    } finally { database.close(); }
   }
 
   function showJobSource(source) {
@@ -2313,7 +2524,8 @@
     const selectedNames = selectedJobSources.map((item) => item.name).filter(Boolean);
     byId("job-file-preview").classList.remove("hidden");
     byId("job-file-name").textContent = selectedNames.length > 1 ? selectedNames.join("、") : source.name;
-    byId("job-file-meta").textContent = `${source.type || selectedJobImportType} · ${source.sizeLabel || "本地文本"}${batchSuffix} · 仅本地`;
+    const boundary = refreshJobImportGate().authority.runtime.mode === "model" ? "原始来源保存在本机；确认后发送有界文本证据" : "仅本地";
+    byId("job-file-meta").textContent = `${source.type || selectedJobImportType} · ${source.sizeLabel || "本地文本"}${batchSuffix} · ${boundary}`;
     byId("job-file-icon").textContent = (source.extension || selectedJobImportType).slice(0, 4).toUpperCase();
     refreshJobImportGate();
   }
@@ -2325,7 +2537,8 @@
     byId("job-file-preview").classList.add("hidden");
     byId("job-page-message").textContent = "";
     byId("job-page-message").classList.remove("error");
-    jobExecutionState = "READY";
+    jobExecutionState = "IDLE";
+    jobImportLifecycle = null;
     refreshJobImportGate();
   }
 
@@ -2338,14 +2551,42 @@
     resetJobSource();
   }
 
+  async function jobSourceImportState(sourceId, database, modelMode = false) {
+    const [sources, proposals, revisions, runs] = await Promise.all([
+      JobContext.getAll(database, "source_documents"),
+      JobContext.getAll(database, "context_proposals"),
+      JobContext.getAll(database, "job_context_revisions"),
+      JobContext.getAll(database, "processing_runs"),
+    ]);
+    const modelWorking = proposals.some((proposal) => proposal.proposal_type === "JOB_CONTEXT" && proposal.source_document_ids?.includes(sourceId) && proposal.status === "AWAITING_REVIEW" && proposal.warnings?.includes("model_generated_non_authoritative"));
+    if (modelMode && modelWorking) return "WORKSPACE";
+    const pending = proposals.some((proposal) => proposal.proposal_type === "JOB_CONTEXT" && proposal.source_document_ids?.includes(sourceId) && proposal.status === "AWAITING_REVIEW" && !proposal.warnings?.includes("model_generated_non_authoritative"));
+    if (pending) return "PENDING_REVIEW";
+    if (revisions.some((revision) => revision.context_type === "JOB" && revision.provenance?.source_document_ids?.includes(sourceId))) return "ACTIVE";
+    if (!sources.some((source) => source.source_document_id === sourceId)) return "NEW";
+    const latest = runs.filter((run) => run.source_document_id === sourceId).sort((a, b) => String(b.finished_at || b.started_at || "").localeCompare(String(a.finished_at || a.started_at || "")))[0];
+    return ["FAILED", "CANCELLED"].includes(latest?.status) ? "RETRY" : "RETRY";
+  }
+
   async function acceptJobFiles(files) {
+    const selectionVersion = ++jobSelectionVersion;
+    const selectedFiles = Array.from(files || []);
+    const modelMode = refreshJobImportGate().authority.runtime.mode === "model";
+    if (modelMode && selectedFiles.length !== 1) throw new Error("job_model_single_source_required");
     const batchKey = `job-batch-${crypto.randomUUID()}`;
     const sourceUrl = byId("job-link-input")?.value.trim() || null;
-    const settled = await Promise.allSettled(Array.from(files || []).map((file) => LocalContextLifecycle.prepareFileSource(file, { batchId: batchKey, namespace: "job", allowedExtensions: ["pdf", "png", "jpg", "jpeg", "docx"] })));
-    const prepared = settled.filter((result) => result.status === "fulfilled").map((result) => ({ ...result.value, sizeLabel: formatBytes(result.value.size), import_type: "Document", source_url: sourceUrl }));
-    const jobs = await Demo.getAll(Demo.DEMO_STORES.jobs);
-    selectedJobSources = LocalContextLifecycle.uniqueSources(prepared).map((source) => ({ ...source, import_state: LocalJobLifecycle.sourceImportState(source.source_document_id, jobs) }));
-    jobExecutionState = selectedJobSources.some((source) => ["NEW", "RETRY"].includes(source.import_state)) ? "READY" : "COMPLETE";
+    const settled = await Promise.allSettled(selectedFiles.map((file) => LocalJob.prepareSource(file, batchKey, { source_url: sourceUrl })));
+    const prepared = settled.filter((result) => result.status === "fulfilled").map((result) => ({ ...result.value, sizeLabel: formatBytes(result.value.size), import_type: "Document" }));
+    if (selectionVersion !== jobSelectionVersion) return;
+    const database = await Truth.openDatabase();
+    try {
+      selectedJobSources = [];
+      for (const source of LocalContextLifecycle.uniqueSources(prepared)) selectedJobSources.push({ ...source, import_state: await jobSourceImportState(source.source_document_id, database, modelMode) });
+    } finally { database.close(); }
+    if (selectedJobSources.some((source) => ["NEW", "RETRY"].includes(source.import_state))) beginJobImportLifecycle();
+    else if (modelMode && selectedJobSources.some((source) => source.import_state === "WORKSPACE")) beginJobImportLifecycle(ModelImportLifecycle.STATES.WORKING);
+    else if (selectedJobSources.some((source) => source.import_state === "PENDING_REVIEW")) beginJobImportLifecycle(ModelImportLifecycle.STATES.REVIEWING);
+    else beginJobImportLifecycle(ModelImportLifecycle.STATES.SAVED);
     if (selectedJobSources[0]) showJobSource(selectedJobSources[0]);
     else resetJobSource();
     const duplicateCount = prepared.length - selectedJobSources.length;
@@ -2364,44 +2605,266 @@
     refreshJobImportGate();
   }
 
-  async function processJobSource(source, batchAuthority, signal) {
-    if (batchAuthority.runtime.mode !== "local") throw new Error("model_job_import_not_connected");
-    for (const [state, label] of Demo.JOB_PROCESSING_STATES) {
-      if (signal.aborted) return { cancelled: true };
-      byId("job-processing").dataset.state = state;
-      byId("job-processing-state").textContent = label;
-      await delay(260);
-    }
+  async function extractJobSource(source, snapshot, signal) {
+    const documentDataUrl = await LocalJob.readAsDataURL(source.file, source.mime_type);
+    const image = source.source_type === "IMAGE";
+    const response = await fetch(image ? "/api/local-job-image-ocr" : "/api/local-job-extract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal,
+      body: JSON.stringify({
+        filename: source.file.name,
+        media_type: source.mime_type,
+        source_document_id: source.source_document_id,
+        runtime_snapshot: snapshot,
+        ...(image ? { image_data_url: documentDataUrl } : { document_data_url: documentDataUrl }),
+      }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "job_local_extraction_failed");
+    if (result.model_call_made !== false || result.runtime_snapshot_id !== snapshot.snapshot_id || result.content_hash !== source.content_hash) throw new Error("job_local_extraction_contract_failed");
+    return result;
+  }
+
+  async function processJobSource(source, snapshot, database, signal) {
+    if (snapshot.mode !== "local" || snapshot.capabilities.deterministic_structuring !== "supported") throw new Error("job_local_runtime_required");
+    byId("job-processing").dataset.state = "PREPARING";
+    byId("job-processing-state").textContent = "正在读取职位材料";
+    const sourceDocument = LocalJob.sourceDocumentFor(source);
+    const durable = await LocalJob.persistCanonicalSource(database, sourceDocument, source.file);
     if (signal.aborted) return { cancelled: true };
-    const incoming = Demo.createLocalJobFixture(source);
-    return LocalJobLifecycle.persistPendingImport(Demo, incoming, source);
+
+    let extractionRun = LocalJob.processingRunFor(source, snapshot.snapshot_id, "PENDING");
+    await Truth.persistRecord(database, "processing_runs", extractionRun);
+    extractionRun = LocalJob.processingRunFor(source, snapshot.snapshot_id, "RUNNING", { run_id: extractionRun.run_id });
+    await Truth.persistRecord(database, "processing_runs", extractionRun);
+    byId("job-processing").dataset.state = "UNDERSTANDING";
+    byId("job-processing-state").textContent = "正在理解职位要求";
+    let result;
+    try {
+      result = await extractJobSource({ ...source, file: durable.file }, snapshot, signal);
+    } catch (error) {
+      const failed = LocalJob.processingRunFor(source, snapshot.snapshot_id, "FAILED", { run_id: extractionRun.run_id, started_at: extractionRun.started_at, error_code: String(error?.message || "JOB_LOCAL_EXTRACTION_FAILED").slice(0, 180) });
+      await Truth.persistRecord(database, "processing_runs", failed);
+      throw error;
+    }
+    const artifact = LocalJob.artifactFor(source, extractionRun, result);
+    extractionRun = LocalJob.processingRunFor(source, snapshot.snapshot_id, "SUCCEEDED", { run_id: extractionRun.run_id, started_at: extractionRun.started_at, output_artifact_ids: [artifact.artifact_id] });
+    await Truth.persistRecord(database, "extraction_artifacts", artifact);
+    await Truth.persistRecord(database, "processing_runs", extractionRun);
+    if (signal.aborted) return { cancelled: true };
+
+    byId("job-processing").dataset.state = "BUILDING_CARDS";
+    byId("job-processing-state").textContent = "正在生成结构化职位草稿";
+    let structuringRun = JobContext.structuringRunFor(source, snapshot.snapshot_id, "RUNNING");
+    await Truth.persistRecord(database, "processing_runs", structuringRun);
+    let proposal;
+    try {
+      proposal = JobContext.proposalFor({ source: sourceDocument, artifact, structuring_run: structuringRun, source_url: source.source_url });
+    } catch (error) {
+      structuringRun = JobContext.structuringRunFor(source, snapshot.snapshot_id, "FAILED", { run_id: structuringRun.run_id, started_at: structuringRun.started_at, error_code: String(error?.message || "JOB_LOCAL_STRUCTURING_FAILED").slice(0, 180) });
+      await Truth.persistRecord(database, "processing_runs", structuringRun);
+      throw error;
+    }
+    await Truth.persistRecord(database, "context_proposals", proposal);
+    structuringRun = JobContext.structuringRunFor(source, snapshot.snapshot_id, "SUCCEEDED", { run_id: structuringRun.run_id, started_at: structuringRun.started_at, proposal_ids: [proposal.proposal_id] });
+    await Truth.persistRecord(database, "processing_runs", structuringRun);
+    byId("job-processing").dataset.state = "READY_FOR_REVIEW";
+    byId("job-processing-state").textContent = "已生成真实内容的待审核职位草稿";
+    return { proposal, artifact, source_document: sourceDocument, provider_calls: 0 };
+  }
+
+  async function readJobSourceForModel(database, source, sourceDocument, runtimeSnapshot, signal) {
+    const resolved = await LocalJob.resolveRawSource(database, sourceDocument);
+    const dataUrl = await LocalJob.readAsDataURL(resolved.file || resolved.blob, sourceDocument.mime_type);
+    const image = ["image/png", "image/jpeg"].includes(sourceDocument.mime_type);
+    const response = await fetch("/api/local-source-read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal,
+      body: JSON.stringify({
+        filename: sourceDocument.filename,
+        media_type: sourceDocument.mime_type,
+        material_type: "JOB",
+        source_document_id: sourceDocument.source_document_id,
+        expected_content_hash: sourceDocument.content_hash,
+        runtime_snapshot: runtimeSnapshot,
+        ...(image ? { image_data_url: dataUrl } : { document_data_url: dataUrl }),
+      }),
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || result?.read_only !== true || result?.writeback !== false || result?.model_call_made !== false || result?.network_call_made !== false) {
+      throw new Error(result?.error || "job_model_source_preparation_invalid");
+    }
+    return JobModel.sourcePreparationFor(sourceDocument, result);
+  }
+
+  async function callJobModelRuntime(request, signal) {
+    const signatureResponse = await fetch("/api/job-model-import-runtime-signature", { cache: "no-store", signal });
+    const signaturePayload = await signatureResponse.json().catch(() => null);
+    if (!signatureResponse.ok || !JobModel.runtimeSignaturesMatch(JobModel.runtimeSignature(), signaturePayload?.runtime_signature)) {
+      const error = new Error("RUNTIME_CONTRACT_VERSION_MISMATCH");
+      error.code = "RUNTIME_CONTRACT_VERSION_MISMATCH";
+      error.network_call_made = false;
+      throw error;
+    }
+    const response = await fetch("/api/job-model-structure", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal,
+      body: JSON.stringify(request),
+    });
+    const result = await response.json().catch(() => ({ error: "deepseek_response_malformed", network_call_made: true }));
+    if (!response.ok) {
+      const error = new Error(result.error || "deepseek_provider_http_error");
+      error.code = result.error || "deepseek_provider_http_error";
+      error.failure_layer = result.failure_layer || "provider";
+      error.network_call_made = result.network_call_made === true;
+      throw error;
+    }
+    return result;
+  }
+
+  async function openJobModelConsent() {
+    if (!JobModel || !selectedJobSource || selectedJobSources.length > 1) throw new Error("job_model_single_source_required");
+    const gate = JobModel.assertEligibleGate(refreshJobImportGate());
+    const selectionVersion = jobSelectionVersion;
+    const source = selectedJobSource;
+    const database = await Truth.openDatabase();
+    try {
+      const existing = await RawSource.readRecord(database, source.source_document_id);
+      if (existing) await RawSource.resolveRawSource(database, source.source_document_id);
+      else await LocalJob.persistCanonicalSource(database, LocalJob.sourceDocumentFor(source), source.file);
+    } finally { database.close(); }
+    const currentGate = refreshJobImportGate();
+    if (selectionVersion !== jobSelectionVersion || currentGate.authority.runtime.mode !== "model") throw new Error("job_model_consent_mismatch");
+    JobModel.assertEligibleGate(gate);
+    if (jobImportLifecycle?.state === ModelImportLifecycle.STATES.SOURCE_SELECTED) transitionJobImportLifecycle(ModelImportLifecycle.STATES.SOURCE_STORED);
+    jobModelConsentSelectionVersion = selectionVersion;
+    jobModelConsentRuntimeIdentity = runtimeIdentity(currentGate.authority.runtime);
+    jobModelConsentId = `consent-job-model-import-${crypto.randomUUID()}`;
+    const dialog = byId("job-model-consent-dialog");
+    if (!dialog.open) dialog.showModal();
+  }
+
+  function runJobModelProcessing(gate, confirmedAt, consentId) {
+    if (activeJobModelOperation?.consentId === consentId) return activeJobModelOperation.promise;
+    const promise = executeJobModelProcessing(gate, confirmedAt, consentId);
+    activeJobModelOperation = { consentId, promise };
+    promise.then(
+      () => { if (activeJobModelOperation?.promise === promise) activeJobModelOperation = null; },
+      () => { if (activeJobModelOperation?.promise === promise) activeJobModelOperation = null; },
+    );
+    return promise;
+  }
+
+  async function executeJobModelProcessing(gate, confirmedAt, consentId) {
+    JobModel.assertEligibleGate(gate);
+    const source = selectedJobSource;
+    if (!source || selectedJobSources.length > 1) throw new Error("job_model_single_source_required");
+    const runtimeSnapshot = JobModel.createRuntimeSnapshot();
+    const consent = JobModel.consentFor(source, runtimeSnapshot, confirmedAt, consentId);
+    const operationIdentity = await JobModel.operationIdentityFor(source, runtimeSnapshot, consent);
+    const attemptGeneration = ++jobModelAttemptGeneration;
+    const selectionVersion = jobSelectionVersion;
+    const abortController = new AbortController();
+    jobProcessingInProgress = true;
+    if (jobImportLifecycle?.state !== ModelImportLifecycle.STATES.SOURCE_STORED) throw new Error("job_import_source_not_stored");
+    transitionJobImportLifecycle(ModelImportLifecycle.STATES.MODEL_PROCESSING);
+    jobBatchAbortController = abortController;
+    byId("replace-job-file").textContent = "取消本次理解";
+    showJobModelProcessingWorkspace(source.name);
+    refreshJobImportGate();
+    let database = null;
+    let run = null;
+    try {
+      database = await Truth.openDatabase();
+      await Truth.persistRecord(database, "runtime_snapshots", runtimeSnapshot);
+      run = JobModel.processingRunFor(source, runtimeSnapshot.snapshot_id, "PENDING", { run_id: `run-${operationIdentity.operation_id}` });
+      if (!await JobModel.claimProcessingRun(database, run)) return;
+      const sourceDocument = await RawSource.sourceDocumentForId(database, source.source_document_id);
+      await RawSource.resolveRawSource(database, sourceDocument);
+      const startedAt = new Date().toISOString();
+      run = JobModel.processingRunFor(source, runtimeSnapshot.snapshot_id, "RUNNING", { run_id: run.run_id, started_at: startedAt });
+      await Truth.persistRecord(database, "processing_runs", run);
+      setJobWorkspaceProgress(["职位材料已准备", "正在理解职位内容", "正在提取职位要求", "正在生成职位信息"], 1);
+      const preparation = await readJobSourceForModel(database, source, sourceDocument, runtimeSnapshot, abortController.signal);
+      if (abortController.signal.aborted) throw Object.assign(new Error("job_model_import_cancelled"), { name: "AbortError" });
+      setJobWorkspaceProgress(["职位材料已准备", "职位内容已读取", "正在提取职位要求", "正在生成职位信息"], 2);
+      const request = JobModel.requestFor({ source_document: sourceDocument, source_preparation: preparation, snapshot: runtimeSnapshot, run, consent, operation_identity: operationIdentity });
+      const result = await callJobModelRuntime(request, abortController.signal);
+      setJobWorkspaceProgress(["职位材料已准备", "职位内容已读取", "职位要求已提取", "正在生成职位信息"], 3);
+      const proposal = JobModel.proposalFor({ source, source_document: sourceDocument, source_preparation: preparation, run, result });
+      const isCurrent = () => attemptGeneration === jobModelAttemptGeneration && selectionVersion === jobSelectionVersion && refreshJobImportGate().authority.runtime.mode === "model" && selectedJobSource?.source_document_id === source.source_document_id;
+      await JobModel.persistSuccessfulResult(database, run, proposal, abortController.signal, isCurrent);
+      if (!isCurrent()) throw new Error("job_model_processing_run_stale");
+      transitionJobImportLifecycle(ModelImportLifecycle.STATES.WORKING);
+      byId("job-processing").dataset.state = "WORKING_READY";
+      byId("job-processing-state").textContent = "Working Job 已生成";
+      await showJobWorkingWorkspace(proposal);
+      byId("job-page-message").textContent = "已从真实来源生成非权威 Working Job；编辑或继续对话后，由你保存为正式职位。";
+      byId("job-page-message").classList.remove("error");
+    } catch (error) {
+      if (database && run && ["PENDING", "RUNNING"].includes(run.status)) {
+        const terminal = error?.name === "AbortError"
+          ? Truth.cancelProcessingRun(run, new Date().toISOString())
+          : JobModel.processingRunFor(source, runtimeSnapshot.snapshot_id, "FAILED", { run_id: run.run_id, started_at: run.started_at || new Date().toISOString(), error_code: String(error?.code || error?.message || "job_model_execution_failed").slice(0, 180) });
+        await Truth.persistRecord(database, "processing_runs", terminal);
+      }
+      if (jobImportLifecycle?.state === ModelImportLifecycle.STATES.MODEL_PROCESSING) transitionJobImportLifecycle(ModelImportLifecycle.STATES.MODEL_FAILED);
+      if (error?.name === "AbortError") {
+        byId("job-ai-workspace").classList.add("hidden");
+        document.body.classList.remove("v1-workspace-open", "v1-workspace-view");
+        byId("job-page-message").textContent = "本次 ARIADNE AI 职位理解已取消；没有保存模型职位提案，也没有执行本地整理。";
+        byId("job-page-message").classList.remove("error");
+        return;
+      }
+      error.jobModelExecution = true;
+      throw error;
+    } finally {
+      database?.close?.();
+      if (attemptGeneration === jobModelAttemptGeneration) {
+        jobBatchAbortController = null;
+        jobProcessingInProgress = false;
+        byId("replace-job-file").textContent = "替换";
+        byId("job-processing").classList.add("hidden");
+        refreshJobImportGate();
+      }
+    }
   }
 
   async function runJobProcessing() {
     const button = byId("start-job-processing");
     const gate = refreshJobImportGate();
-    if (!gate.allowed) throw new Error(`runtime_capability_${gate.state}`);
+    if (!gate.allowed || gate.authority.runtime.mode !== "local") throw new Error(`runtime_capability_${gate.state}`);
     const batchAuthority = gate.authority;
     jobProcessingInProgress = true;
     jobBatchAbortController = new AbortController();
     button.disabled = true;
     byId("replace-job-file").textContent = "取消本次整理";
     byId("job-processing").classList.remove("hidden");
-    const sources = (selectedJobImportType === "Paste" ? [selectedJobSource] : selectedJobSources).filter((source) => ["NEW", "RETRY"].includes(source.import_state || "NEW"));
+    const currentSourceUrl = byId("job-link-input")?.value.trim() || null;
+    const sources = (selectedJobImportType === "Paste" ? [selectedJobSource] : selectedJobSources).filter((source) => ["NEW", "RETRY"].includes(source.import_state || "NEW")).map((source) => ({ ...source, source_url: currentSourceUrl || source.source_url }));
     let lastError = null;
+    const database = await Truth.openDatabase();
     try {
+      const localOcr = sources.some((source) => source.source_type === "IMAGE") ? await localOcrEnvironmentCapability() : "unverified";
+      const snapshot = RuntimeExecution.createRuntimeSnapshot(batchAuthority.runtime, { environmentCapabilities: { local_ocr: localOcr }, operation: "JOB_LOCAL_IMPORT", schemaVersion: JobContext.PAYLOAD_CONTRACT });
+      await Truth.persistRecord(database, "runtime_snapshots", snapshot);
+      if (jobImportLifecycle?.state === ModelImportLifecycle.STATES.SOURCE_SELECTED) transitionJobImportLifecycle(ModelImportLifecycle.STATES.SOURCE_STORED);
+      if (jobImportLifecycle?.state === ModelImportLifecycle.STATES.SOURCE_STORED) transitionJobImportLifecycle(ModelImportLifecycle.STATES.MODEL_PROCESSING);
       for (const source of sources) {
         if (jobBatchAbortController.signal.aborted) {
-          jobExecutionState = "COMPLETE";
+          transitionJobImportLifecycle(ModelImportLifecycle.STATES.MODEL_FAILED);
           byId("job-page-message").textContent = "本次职位整理已取消；此前已保存的草稿保留，剩余文件没有处理。";
           byId("job-page-message").classList.remove("error");
           return;
         }
         showJobSource(source);
         try {
-          const result = await processJobSource(source, batchAuthority, jobBatchAbortController.signal);
+          const result = await processJobSource(source, snapshot, database, jobBatchAbortController.signal);
           if (result.cancelled) {
-            jobExecutionState = "COMPLETE";
+            transitionJobImportLifecycle(ModelImportLifecycle.STATES.MODEL_FAILED);
             byId("job-page-message").textContent = "本次职位整理已取消；当前来源未形成成功结果，剩余文件没有处理，此前已保存的草稿保留。";
             byId("job-page-message").classList.remove("error");
             return;
@@ -2414,13 +2877,15 @@
         }
       }
       const pending = await renderAwaitingJobReviews({ reset: true });
-      jobExecutionState = pending.length ? "COMPLETE" : "READY";
+      transitionJobImportLifecycle(ModelImportLifecycle.STATES.PROPOSAL_READY);
+      resolveJobProposalLifecycle(pending.length);
       if (pending.length) {
-        byId("job-page-message").textContent = `已建立 ${pending.length} 条待审核职位演示草稿，请逐条确认或拒绝。`;
+        byId("job-page-message").textContent = `已从真实内容建立 ${pending.length} 条待审核职位草稿，请逐条确认或拒绝。`;
         byId("job-page-message").classList.remove("error");
       }
       if (lastError && !pending.length) throw lastError;
     } finally {
+      database.close();
       jobBatchAbortController = null;
       jobProcessingInProgress = false;
       byId("replace-job-file").textContent = "替换";
@@ -2429,41 +2894,75 @@
     }
   }
 
-  function jobReviewMarkup(job, position, total) {
-    const source = job.imported_from || {};
-    return `<article class="v1-review-card" data-job-id="${escapeHtml(job.job_context_id)}"><p class="v1-review-progress">第 ${position} / ${total} 条</p><h3>职位描述 · 演示草稿</h3><p class="v1-review-note">来源：${escapeHtml(source.name || "本地来源")} · 仅用于验证生命周期，不代表真实 JD 语义理解</p><section class="v1-review-item"><div class="v1-review-source"><p class="v1-section-label">来源</p><p class="v1-review-evidence">${escapeHtml(source.name || "本地粘贴文本")}</p><small>${escapeHtml(source.content_hash || source.source_document_id || "来源身份待核对")}</small></div><div class="v1-review-result"><p class="v1-section-label">演示整理结果</p><label>职位名称<input data-job-field="title" value="${escapeHtml(job.title || "")}"></label><label>公司<input data-job-field="company" value="${escapeHtml(job.company || "")}"></label><label>地点<input data-job-field="location" value="${escapeHtml(job.location || "")}"></label><label>摘要<textarea data-job-field="summary">${escapeHtml(job.summary || "")}</textarea></label></div></section><div class="v1-button-row"><button type="button" class="v1-primary-button" data-job-review-action="confirm">确认</button><button type="button" class="v1-tertiary-button" data-job-review-action="reject">拒绝</button></div></article>`;
+  function jobReviewMarkup(proposal, position, total) {
+    const job = proposal.payload;
+    const requirements = (job.requirements || []).map((item) => item.detail).join("\n");
+    const unresolved = (job.uncertainties || []).length ? ` · ${job.uncertainties.length} 个字段需要确认` : "";
+    const modelProposal = proposal.warnings?.includes("model_generated_non_authoritative") || Object.values(job.field_provenance || {}).some((origin) => origin === "MODEL_PROPOSED");
+    const title = modelProposal ? "职位描述 · ARIADNE AI 提案" : "职位描述 · 本地结构化草稿";
+    const note = modelProposal ? `真实来源已保存在本地${unresolved}；模型理解尚未成为正式职位。` : `真实来源已保存在本地${unresolved}；确定性抽取不代表语义保证。`;
+    const resultLabel = modelProposal ? "模型理解结果" : "本地整理结果";
+    return `<article class="v1-review-card" data-job-proposal-id="${escapeHtml(proposal.proposal_id)}"><p class="v1-review-progress">第 ${position} / ${total} 条</p><h3>${escapeHtml(title)}</h3><p class="v1-review-note">${escapeHtml(note)}</p><section class="v1-review-item"><div class="v1-review-source"><p class="v1-section-label">来源证据</p><p class="v1-review-evidence">${escapeHtml(proposal.grounding_refs?.[0]?.excerpt_or_reference || "原始来源已保留")}</p><small>${escapeHtml(proposal.grounding_refs?.[0]?.location || "document")}</small></div><div class="v1-review-result"><p class="v1-section-label">${escapeHtml(resultLabel)}</p><label>职位名称<input data-job-field="title" value="${escapeHtml(job.title || "")}"></label><label>公司<input data-job-field="company" value="${escapeHtml(job.company || "")}"></label><label>地点<input data-job-field="location" value="${escapeHtml(job.location || "")}"></label><label>摘要<textarea data-job-field="summary">${escapeHtml(job.summary || "")}</textarea></label><label>任职要求（每行一条）<textarea data-job-field="requirements">${escapeHtml(requirements)}</textarea></label></div></section><div class="v1-button-row"><button type="button" class="v1-primary-button" data-job-review-action="confirm">确认并创建职位版本</button><button type="button" class="v1-tertiary-button" data-job-review-action="reject">拒绝</button></div></article>`;
   }
 
   async function renderAwaitingJobReviews({ advance = false, reset = false } = {}) {
-    if (!LocalJobLifecycle || !byId("job-review-surface")) return [];
-    const pending = LocalJobLifecycle.pendingJobs(await Demo.getAll(Demo.DEMO_STORES.jobs)).sort((a, b) => String(a.updated_at || "").localeCompare(String(b.updated_at || "")) || a.job_context_id.localeCompare(b.job_context_id));
+    if (!JobContext || !byId("job-review-surface")) return [];
+    const database = await Truth.openDatabase();
+    let pending;
+    try {
+      const selectedSourceIds = new Set((selectedJobSources.length ? selectedJobSources : [selectedJobSource]).filter(Boolean).map((source) => source.source_document_id));
+      pending = (await JobContext.getAll(database, "context_proposals"))
+        .filter((proposal) => proposal.proposal_type === "JOB_CONTEXT" && proposal.status === "AWAITING_REVIEW")
+        .filter((proposal) => !proposal.warnings?.includes("model_generated_non_authoritative"))
+        .filter((proposal) => selectedSourceIds.size > 0 && proposal.source_document_ids.some((sourceId) => selectedSourceIds.has(sourceId)))
+        .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.proposal_id.localeCompare(b.proposal_id));
+    } finally { database.close(); }
     if (reset || !jobReviewSessionTotal) { jobReviewSessionTotal = pending.length; jobReviewSessionResolved = 0; }
     else if (advance) jobReviewSessionResolved += 1;
     if (pending.length > jobReviewSessionTotal - jobReviewSessionResolved) jobReviewSessionTotal = jobReviewSessionResolved + pending.length;
     byId("job-review-surface").classList.toggle("hidden", !pending.length);
+    const modelReview = pending[0] && (pending[0].warnings?.includes("model_generated_non_authoritative") || Object.values(pending[0].payload?.field_provenance || {}).some((origin) => origin === "MODEL_PROPOSED"));
+    byId("job-review-heading").textContent = modelReview ? "ARIADNE AI 职位提案" : "职位结构化草稿";
+    byId("job-review-heading").nextElementSibling.textContent = modelReview ? "模型结果来自真实职位来源，尚未成为正式职位；请逐字段审核。" : "结果来自本地确定性抽取，可能保留未知字段；请以原始职位材料为准逐条审核。";
     byId("job-review-list").innerHTML = pending.length ? jobReviewMarkup(pending[0], Math.min(jobReviewSessionResolved + 1, jobReviewSessionTotal), jobReviewSessionTotal) : "";
     if (!pending.length) { jobReviewSessionTotal = 0; jobReviewSessionResolved = 0; }
     return pending;
   }
 
-  async function reviewJobDraft(jobId, action, card) {
+  async function reviewJobDraft(proposalId, action, card) {
     const buttons = [...card.querySelectorAll("[data-job-review-action]")];
     buttons.forEach((button) => { button.disabled = true; });
     try {
-      const job = await Demo.get(Demo.DEMO_STORES.jobs, jobId);
-      if (!job || job.review_status !== "NEEDS_REVIEW") throw new Error("job_review_draft_not_found");
+      const database = await Truth.openDatabase();
+      const proposal = (await JobContext.getAll(database, "context_proposals")).find((entry) => entry.proposal_id === proposalId);
+      if (!proposal || proposal.status !== "AWAITING_REVIEW") { database.close(); throw new Error("job_review_draft_not_found"); }
       let confirmed = null;
-      if (action === "reject") await LocalJobLifecycle.reject(Demo, Demo.DEMO_STORES.jobs, jobId);
-      else {
-        const value = (field) => card.querySelector(`[data-job-field="${field}"]`).value.trim();
-        if (!value("title")) throw new Error("job_title_required");
-        confirmed = await LocalJobLifecycle.confirm(Demo, Demo.DEMO_STORES.jobs, job, { ...job, title: value("title"), company: value("company"), location: value("location"), summary: value("summary") });
-      }
+      try {
+        if (action === "reject") await JobContext.persistReview(database, proposal, "REJECT");
+        else {
+          const value = (field) => card.querySelector(`[data-job-field="${field}"]`).value.trim();
+          if (!value("title")) throw new Error("job_title_required");
+          const requirementLines = value("requirements").split("\n").map((line) => line.trim()).filter(Boolean);
+          const requirements = requirementLines.map((detail, index) => {
+            const existing = proposal.payload.requirements[index];
+            return {
+              requirement_id: existing?.requirement_id,
+              label: detail.length > 36 ? `${detail.slice(0, 34)}…` : detail,
+              detail,
+              grounding_refs: existing?.grounding_refs || [],
+              content_origin: existing?.detail === detail ? existing.content_origin : "HUMAN_EDITED",
+            };
+          });
+          confirmed = await JobContext.persistReview(database, proposal, "CONFIRM", { title: value("title"), company: value("company"), location: value("location"), summary: value("summary"), requirements });
+        }
+      } finally { database.close(); }
       const remaining = await renderAwaitingJobReviews({ advance: true });
-      byId("job-page-message").textContent = remaining.length ? "当前草稿已处理，继续审核下一条。" : "全部职位草稿已审核；演示数据已按你的选择更新。";
+      updateJobReviewLifecycle(remaining.length);
+      if (!remaining.length && jobImportLifecycle?.state === ModelImportLifecycle.STATES.READY_TO_SAVE) transitionJobImportLifecycle(ModelImportLifecycle.STATES.SAVED);
+      byId("job-page-message").textContent = remaining.length ? "当前草稿已处理，继续审核下一条。" : "全部职位草稿已审核；确认内容已保存为不可变职位版本。";
       byId("job-page-message").classList.remove("error");
       if (!remaining.length) {
-        const sourceKey = confirmed ? `job:${confirmed.job_context_id}` : "job-guide";
+        const sourceKey = confirmed ? `job:${confirmed.revision.context_id}` : "job-guide";
         if (!completeEmbeddedImport("jd", sourceKey)) returnToCardLibrary("/jd.html", sourceKey);
       }
     } catch (error) {
@@ -2477,6 +2976,8 @@
   }
 
   function initJobImport() {
+    ProductShell.bindImportShell(document);
+    jobSharedWorkspace();
     byId("job-import-types").addEventListener("click", (event) => {
       const button = event.target.closest("[data-job-import-type]");
       if (!button) return;
@@ -2486,12 +2987,18 @@
       const text = event.target.value.trim();
       if (!text) { resetJobSource(); return; }
       const selectionVersion = ++jobSelectionVersion;
-      const source = await LocalContextLifecycle.prepareTextSource(text, { batchId: `job-batch-${crypto.randomUUID()}`, namespace: "job" });
-      const jobs = await Demo.getAll(Demo.DEMO_STORES.jobs);
+      const source = await LocalJob.preparePastedText(text, `job-batch-${crypto.randomUUID()}`, byId("job-link-input")?.value.trim() || null);
+      const database = await Truth.openDatabase();
+      const modelMode = refreshJobImportGate().authority.runtime.mode === "model";
+      const importState = await jobSourceImportState(source.source_document_id, database, modelMode);
+      database.close();
       if (selectionVersion !== jobSelectionVersion || event.target.value.trim() !== text) return;
       selectedJobSources = [];
-      selectedJobSource = { ...source, sizeLabel: `${text.length} 字符`, import_type: "Paste", source_url: byId("job-link-input")?.value.trim() || null, import_state: LocalJobLifecycle.sourceImportState(source.source_document_id, jobs) };
-      jobExecutionState = ["NEW", "RETRY"].includes(selectedJobSource.import_state) ? "READY" : "COMPLETE";
+      selectedJobSource = { ...source, sizeLabel: `${text.length} 字符`, import_type: "Paste", import_state: importState };
+      if (["NEW", "RETRY"].includes(selectedJobSource.import_state)) beginJobImportLifecycle();
+      else if (modelMode && selectedJobSource.import_state === "WORKSPACE") beginJobImportLifecycle(ModelImportLifecycle.STATES.WORKING);
+      else if (selectedJobSource.import_state === "PENDING_REVIEW") beginJobImportLifecycle(ModelImportLifecycle.STATES.REVIEWING);
+      else beginJobImportLifecycle(ModelImportLifecycle.STATES.SAVED);
       showJobSource(selectedJobSource);
       await renderAwaitingJobReviews({ reset: true });
     });
@@ -2499,35 +3006,282 @@
     byId("replace-job-file").addEventListener("click", () => {
       if (jobProcessingInProgress) {
         jobBatchAbortController?.abort();
-        byId("job-processing-state").textContent = "正在取消本次职位整理";
+        byId("job-processing-state").textContent = refreshJobImportGate().authority.runtime.mode === "model" ? "正在取消本次 ARIADNE AI 理解" : "正在取消本次职位整理";
         return;
       }
       if (selectedJobImportType === "Paste") byId("job-paste-input").focus();
       else byId("job-file-input").click();
     });
-    byId("start-job-processing").addEventListener("click", () => runJobProcessing().catch(showJobError));
+    byId("start-job-processing").addEventListener("click", () => {
+      const modelMode = refreshJobImportGate().authority.runtime.mode === "model";
+      const operation = modelMode
+        ? selectedJobSource?.import_state === "WORKSPACE"
+          ? savedModelJobProposalForSource(selectedJobSource.source_document_id).then((proposal) => proposal ? showJobWorkingWorkspace(proposal) : Promise.reject(new Error("job_working_proposal_missing")))
+          : openJobModelConsent()
+        : runJobProcessing();
+      Promise.resolve(operation).catch(showJobError);
+    });
+    byId("job-workspace-save").addEventListener("click", () => saveJobWorkingWorkspace().catch(showJobError));
+    byId("job-workspace-composer").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const input = byId("job-workspace-message");
+      const content = input.value.trim();
+      if (!content) return;
+      input.value = "";
+      submitJobConversation(content).catch(showJobError);
+    });
     byId("job-review-list").addEventListener("click", (event) => {
       const button = event.target.closest("[data-job-review-action]");
-      const card = event.target.closest("[data-job-id]");
+      const card = event.target.closest("[data-job-proposal-id]");
       if (!button || !card) return;
-      reviewJobDraft(card.dataset.jobId, button.dataset.jobReviewAction, card).catch(showJobError);
+      reviewJobDraft(card.dataset.jobProposalId, button.dataset.jobReviewAction, card).catch(showJobError);
     });
+    byId("job-model-consent-dialog").addEventListener("cancel", (event) => event.preventDefault());
+    byId("cancel-job-model-consent").addEventListener("click", () => byId("job-model-consent-dialog").close());
+    byId("confirm-job-model-consent").addEventListener("click", () => {
+      try {
+        const gate = JobModel.assertEligibleGate(refreshJobImportGate());
+        if (jobModelConsentSelectionVersion !== jobSelectionVersion || gate.authority.runtime.mode !== "model" || jobModelConsentRuntimeIdentity !== runtimeIdentity(gate.authority.runtime)) throw new Error("job_model_consent_mismatch");
+        byId("job-model-consent-dialog").close();
+        runJobModelProcessing(gate, new Date().toISOString(), jobModelConsentId).catch(showJobError);
+      } catch (error) {
+        byId("job-model-consent-dialog").close();
+        showJobError(error);
+      }
+    });
+    byId("job-model-failure-dialog").addEventListener("cancel", (event) => event.preventDefault());
+    byId("dismiss-job-model-failure").addEventListener("click", () => byId("job-model-failure-dialog").close());
+    refreshJobImportGate();
     configureJobImportType("Document");
     renderAwaitingJobReviews({ reset: true }).catch(showJobError);
   }
 
   function showJobError(error) {
     jobProcessingInProgress = false;
-    byId("job-page-message").textContent = `无法整理职位：${error.message}`;
+    const modelFailure = error?.jobModelExecution === true;
+    if (jobImportLifecycle?.state === ModelImportLifecycle?.STATES.MODEL_PROCESSING) transitionJobImportLifecycle(ModelImportLifecycle.STATES.MODEL_FAILED);
+    byId("job-page-message").textContent = modelFailure ? `MODEL_FAILED：${jobErrorCopy(error)} 没有自动执行本地整理。` : `无法整理职位：${jobErrorCopy(error)}`;
     byId("job-page-message").classList.add("error");
     refreshJobImportGate();
     byId("job-processing")?.classList.add("hidden");
+    if (modelFailure) {
+      byId("job-ai-workspace")?.classList.add("hidden");
+      document.body.classList.remove("v1-workspace-open", "v1-workspace-view");
+      const dialog = byId("job-model-failure-dialog");
+      if (!dialog.open) dialog.showModal();
+    }
+  }
+
+  function renderJobConversationMessages(messages, { include_pending_user: includePendingUser = false } = {}) {
+    const target = byId("job-workspace-conversation") || byId("job-conversation-messages");
+    if (!target) return;
+    const visible = JobConversation.connectedHistory(messages);
+    if (includePendingUser) {
+      const latest = [...messages].sort((left, right) => String(left.created_at).localeCompare(String(right.created_at))).at(-1);
+      if (latest?.role === "USER" && !visible.some((entry) => entry.message_id === latest.message_id)) visible.push(latest);
+    }
+    ConversationUI.renderMessages(target, visible, { empty_text: "可以询问岗位要求、证据差距、项目或简历表达；结论不会自动改写职位或个人资料。" });
+  }
+
+  function showJobChangeProposal(proposal) {
+    activeJobChangeProposal = proposal || null;
+    const panel = byId("job-patch-proposal");
+    if (!panel) return;
+    panel.classList.toggle("hidden", !proposal);
+    if (!proposal) return;
+    const fieldLabels = { title: "职位名称", company: "公司", location: "地点", summary: "摘要" };
+    byId("job-patch-before").textContent = `${fieldLabels[proposal.field] || proposal.field}：${proposal.before_value || "（空）"}`;
+    byId("job-patch-after").textContent = `${fieldLabels[proposal.field] || proposal.field}：${proposal.desired_value}`;
+    byId("job-patch-reason").textContent = proposal.reason;
+  }
+
+  async function restoreJobConversation(database, jobContextId) {
+    const session = JobConversation.createSession(jobContextId);
+    activeJobConversationSession = await JobConversationPersistence.ensureSession(database, session);
+    const [messages, proposals, decisions] = await Promise.all([
+      JobConversationPersistence.messages(database, session.conversation_id),
+      JobConversationPersistence.getAll(database, "job_change_proposals"),
+      JobConversationPersistence.getAll(database, "job_change_decisions"),
+    ]);
+    const decided = new Set(decisions.map((entry) => entry.job_change_proposal_id));
+    const pending = proposals.filter((entry) => entry.job_context_id === jobContextId && !decided.has(entry.job_change_proposal_id))
+      .sort((left, right) => String(right.created_at).localeCompare(String(left.created_at)))[0] || null;
+    renderJobConversationMessages(messages);
+    showJobChangeProposal(pending);
+    return { session: activeJobConversationSession, messages };
+  }
+
+  async function callJobConversationRuntime(request) {
+    const signatureResponse = await fetch("/api/job-conversation-runtime-signature", { cache: "no-store" });
+    const signaturePayload = await signatureResponse.json().catch(() => null);
+    if (!signatureResponse.ok || !JobConversation.runtimeSignaturesMatch(JobConversation.runtimeSignature(), signaturePayload?.runtime_signature)) {
+      const error = new Error("RUNTIME_CONTRACT_VERSION_MISMATCH");
+      error.code = "RUNTIME_CONTRACT_VERSION_MISMATCH";
+      error.network_call_made = false;
+      throw error;
+    }
+    const response = await fetch("/api/job-conversation-turn", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+    const result = await response.json().catch(() => ({ error: "MALFORMED_RESPONSE" }));
+    if (!response.ok) {
+      const error = new Error(result.error || "JOB_CONVERSATION_FAILED");
+      error.code = result.error || "JOB_CONVERSATION_FAILED";
+      error.network_call_made = result.network_call_made === true;
+      throw error;
+    }
+    return result;
+  }
+
+  function previousCandidateSnapshot(analysis) {
+    if (!analysis?.candidate_observation) return null;
+    return {
+      contract_id: JobCandidateContext.SNAPSHOT_CONTRACT,
+      confirmed_manifest: analysis.candidate_observation.confirmed_manifest,
+      working_manifest: analysis.candidate_observation.working_manifest,
+      provider_view: analysis.candidate_observation.provider_view || null,
+      confirmed_fingerprint: analysis.candidate_observation.confirmed_fingerprint,
+      working_fingerprint: analysis.candidate_observation.working_fingerprint,
+      aggregate_fingerprint: analysis.candidate_observation.aggregate_fingerprint,
+    };
+  }
+
+  async function retrieveJobTurnSources(database, humanMessage, runtimeSnapshot, candidateSnapshot, previousAnalysis, jobSubject) {
+    const previousNeed = previousAnalysis?.output?.source_need || null;
+    const explicitCue = /(?:原文|来源|证据原句|具体措辞|source|evidence|quote)/iu.test(humanMessage);
+    const structuredSufficient = !previousNeed && !explicitCue;
+    const purpose = previousNeed?.purpose || (/(?:候选|简历|经历|candidate|resume)/iu.test(humanMessage) ? "CANDIDATE_EVIDENCE_DETAIL" : "JOB_REQUIREMENT_DETAIL");
+    const candidateTerms = SourceRetrieval.normalizeTerms([humanMessage, previousNeed?.reason || ""]);
+    const candidateEntries = [
+      ...candidateSnapshot.confirmed_manifest.map((manifest, index) => ({ manifest, semantic: candidateSnapshot.provider_view.confirmed[index] })),
+      ...candidateSnapshot.working_manifest.map((manifest, index) => ({ manifest, semantic: candidateSnapshot.provider_view.working[index] })),
+    ];
+    const candidateSourceIds = candidateEntries.filter((entry) => SourceRetrieval.scoreText(JSON.stringify(entry.semantic), candidateTerms) > 0).flatMap((entry) => entry.manifest.source_ids || []);
+    const requested = purpose === "CANDIDATE_EVIDENCE_DETAIL"
+      ? candidateSourceIds
+      : jobSubject.provenance.source_document_ids;
+    const [sourceDocuments, extractionArtifacts] = await Promise.all([
+      JobContext.getAll(database, "source_documents"),
+      JobContext.getAll(database, "extraction_artifacts"),
+    ]);
+    return SourceRetrieval.retrieve({
+      mode: "model",
+      purpose,
+      structured_sufficient: structuredSufficient,
+      requested_source_document_ids: [...new Set(requested)],
+      source_documents: sourceDocuments,
+      extraction_artifacts: extractionArtifacts,
+      query_terms: [humanMessage, previousNeed?.reason || ""],
+      raw_text_reader: async (source) => {
+        const resolved = await LocalJob.resolveRawSource(database, source);
+        const dataUrl = await LocalJob.readAsDataURL(resolved.file || resolved.blob, source.mime_type);
+        const payload = {
+          filename: source.filename,
+          media_type: source.mime_type,
+          material_type: source.material_type,
+          source_document_id: source.source_document_id,
+          expected_content_hash: source.content_hash,
+          runtime_snapshot: runtimeSnapshot,
+          ...(source.mime_type === "image/png" || source.mime_type === "image/jpeg" ? { image_data_url: dataUrl } : { document_data_url: dataUrl }),
+        };
+        const response = await fetch("/api/local-source-read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        const result = await response.json().catch(() => null);
+        if (!response.ok || !result?.read_only || result.writeback !== false || result.model_call_made !== false) throw new Error(result?.error || "SOURCE_UNAVAILABLE");
+        return result;
+      },
+    });
+  }
+
+  async function submitJobConversation(humanMessage) {
+    const content = String(humanMessage || "").trim();
+    const jobSubject = currentJobConversationSubject();
+    if (!content || !jobSubject || jobConversationTurnActive) return;
+    jobConversationTurnActive = true;
+    const form = byId("job-workspace-composer") || byId("job-conversation-form");
+    const status = byId("job-workspace-conversation-status") || byId("job-conversation-status");
+    const pageMessage = byId("job-detail-message");
+    ConversationUI.setExecutionState({ form, status, active: true, copy: "正在理解…" });
+    if (pageMessage) {
+      pageMessage.textContent = "正在基于当前职位与当前个人资料分析…";
+      pageMessage.classList.remove("error");
+    }
+    const database = await Truth.openDatabase();
+    let execution = null;
+    try {
+      const restored = activeJobConversationSession ? { session: activeJobConversationSession, messages: await JobConversationPersistence.messages(database, activeJobConversationSession.conversation_id) } : await restoreJobConversation(database, jobSubject.context_id);
+      const session = restored.session;
+      const [candidateSnapshot, previousAnalysis] = await Promise.all([
+        JobCandidateContext.buildSnapshotFromDatabase(database),
+        JobConversationPersistence.latestAnalysis(database, jobSubject.context_id),
+      ]);
+      const candidateDelta = JobCandidateContext.candidateDelta(previousCandidateSnapshot(previousAnalysis), candidateSnapshot);
+      const runtimeSnapshot = JobConversation.createRuntimeSnapshot();
+      await Truth.persistRecord(database, "runtime_snapshots", runtimeSnapshot);
+      const sourceManifest = await retrieveJobTurnSources(database, content, runtimeSnapshot, candidateSnapshot, previousAnalysis, jobSubject);
+      const compiledContext = JobConversation.compileContext({ job_subject: jobSubject, candidate_snapshot: candidateSnapshot, candidate_delta: candidateDelta, source_excerpt_manifest: sourceManifest, human_message: content, messages: restored.messages });
+      const observation = JobConversation.observationFor(jobSubject, candidateSnapshot);
+      execution = JobConversation.createTurnExecution(session, observation, runtimeSnapshot, { candidate_snapshot: candidateSnapshot, candidate_delta: candidateDelta, source_excerpt_manifest: sourceManifest });
+      const userMessage = JobConversation.createMessage(session, "USER", content);
+      await JobConversationPersistence.persistMessage(database, userMessage);
+      await JobConversationPersistence.persistExecution(database, execution);
+      renderJobConversationMessages([...restored.messages, userMessage], { include_pending_user: true });
+      const request = JobConversation.createRuntimeRequest({ session, human_message: content, observation, compiled_context: compiledContext, candidate_snapshot: candidateSnapshot, candidate_delta: candidateDelta, source_excerpt_manifest: sourceManifest, runtime_snapshot: runtimeSnapshot, execution });
+      const rawResult = await callJobConversationRuntime(request);
+      const result = JobConversation.validateRuntimeResult(rawResult, execution, session, runtimeSnapshot, compiledContext);
+      const [currentSubject, currentCandidate] = await Promise.all([
+        activeJobWorkingProposal ? Promise.resolve(currentJobConversationSubject()) : canonicalJobRevision(jobSubject.context_id, database),
+        JobCandidateContext.buildSnapshotFromDatabase(database),
+      ]);
+      if (!JobConversation.observationMatches(observation, currentSubject, currentCandidate)) {
+        await JobConversationPersistence.persistExecution(database, JobConversationPersistence.transitionExecution(execution, "ANALYSIS_STALE", "OBSERVATION_CHANGED"));
+        if (pageMessage) pageMessage.textContent = "职位或个人资料已变化，这次结果未保存；请基于最新内容重试。";
+        else status.textContent = "职位或个人资料已变化，请重试。";
+        return;
+      }
+      const analysis = JobConversationPersistence.createAnalysis({ session, execution, job_subject: jobSubject, candidate_snapshot: candidateSnapshot, candidate_delta: candidateDelta, source_excerpt_manifest: sourceManifest, runtime_snapshot: runtimeSnapshot, output: result.output, previous_analysis_id: previousAnalysis?.analysis_id || null });
+      const assistantMessage = JobConversation.createMessage(session, "ASSISTANT", result.output.message);
+      await JobConversationPersistence.persistSuccessfulTurn(database, { execution, analysis, assistant_message: assistantMessage });
+      if (result.output.job_edit && activeJobRevision) {
+        const proposal = JobContext.createChangeProposal({ current_revision: activeJobRevision, field: result.output.job_edit.field, desired_value: result.output.job_edit.desired_value, reason: result.output.job_edit.reason, source_analysis_id: analysis.analysis_id });
+        await JobContext.persistChangeProposal(database, proposal);
+        showJobChangeProposal(proposal);
+      }
+      renderJobConversationMessages(await JobConversationPersistence.messages(database, session.conversation_id));
+      if (pageMessage) pageMessage.textContent = sourceManifest.status === "SOURCE_UNAVAILABLE" ? "分析已保存；所请求的原始来源不可用，结论已按缺失来源处理。" : "分析已保存；任何职位修改仍需你确认。";
+    } catch (error) {
+      if (execution) {
+        try { await JobConversationPersistence.persistExecution(database, JobConversationPersistence.transitionExecution(execution, "HARD_FAILED", String(error?.code || error?.message).slice(0, 160))); }
+        catch (_persistenceError) { /* Preserve the original failure. */ }
+      }
+      const copy = error?.code === "RUNTIME_CONTRACT_VERSION_MISMATCH" ? "服务版本已更新，请刷新页面后重试。" : "这次模型分析失败；没有使用本地替代结果，也没有修改职位或个人资料。";
+      if (pageMessage) { pageMessage.textContent = copy; pageMessage.classList.add("error"); }
+      else status.textContent = copy;
+      if (activeJobConversationSession) {
+        try { renderJobConversationMessages(await JobConversationPersistence.messages(database, activeJobConversationSession.conversation_id)); }
+        catch (_historyError) { /* Preserve the original failure. */ }
+      }
+    } finally {
+      database.close();
+      jobConversationTurnActive = false;
+      ConversationUI.setExecutionState({ form, status, active: false, copy: "" });
+      ConversationUI.settle({ form, messages: byId("job-workspace-conversation") || byId("job-conversation-messages") });
+    }
   }
 
   async function initJobDetail() {
     const jobId = new URLSearchParams(window.location.search).get("job") || Demo.JOB_FIXTURE.job_context_id;
-    const storedJob = await Demo.get(Demo.DEMO_STORES.jobs, jobId);
-    const job = (await localizedJobRecords(storedJob ? [storedJob] : []))[0] || (jobId === Demo.JOB_FIXTURE.job_context_id ? Demo.clone(Demo.JOB_FIXTURE) : null);
+    activeJobRevision = await canonicalJobRevision(jobId);
+    if (activeJobRevision) {
+      const database = await Truth.openDatabase();
+      try {
+        const sourceId = activeJobRevision.provenance.source_document_ids[0];
+        activeJobSourceDocument = (await JobContext.getAll(database, "source_documents")).find((entry) => entry.source_document_id === sourceId) || null;
+      } finally { database.close(); }
+    }
+    const storedJob = activeJobRevision ? null : await Demo.get(Demo.DEMO_STORES.jobs, jobId);
+    const job = activeJobRevision ? JobContext.recordForUi(activeJobRevision) : (await localizedJobRecords(storedJob ? [storedJob] : []))[0] || (jobId === Demo.JOB_FIXTURE.job_context_id ? Demo.clone(Demo.JOB_FIXTURE) : null);
     if (!job) throw new Error("job_context_not_found");
     const renderJob = (record) => {
       activeJob = record;
@@ -2539,12 +3293,19 @@
       byId("job-location").textContent = record.location;
       byId("job-summary").textContent = record.summary;
       const imported = record.imported_from || {};
-      byId("job-source").textContent = imported.name ? `${sourceTypeLabels[imported.source_type] || "本地来源"} · ${imported.name}` : `${sourceTypeLabels[record.source?.source_type] || record.source?.source_type || "演示来源"} · ${record.source?.display_name || "来源未记录"}`;
+      byId("job-source").textContent = activeJobSourceDocument
+        ? `${sourceTypeLabels[activeJobSourceDocument.source_type] || activeJobSourceDocument.source_type} · ${activeJobSourceDocument.filename || activeJobSourceDocument.label || "本地来源"} · 原始来源可恢复`
+        : imported.name ? `${sourceTypeLabels[imported.source_type] || "本地来源"} · ${imported.name}` : `${sourceTypeLabels[record.source?.source_type] || record.source?.source_type || "演示来源"} · ${record.source?.display_name || "来源未记录"}`;
       byId("job-requirements").innerHTML = (record.requirements || []).map((requirement, index) => `<div><span>${String(index + 1).padStart(2, "0")}</span><p><b>${escapeHtml(requirement.label)}</b>${escapeHtml(requirement.detail)}</p></div>`).join("");
     };
     renderJob(job);
-    setDetailRuntimeMode(job, "job-ai-pane", "open-job-edit", "job-ai-runtime");
-    const panels = createDetailPanelController("open-job-edit", { edit: "job-edit-form" });
+    const conversationAllowed = setDetailRuntimeMode(job, "job-ai-pane", "open-job-edit", "job-ai-runtime", "job_conversation") && Boolean(activeJobRevision);
+    if (!activeJobRevision) {
+      byId("job-ai-pane").classList.add("hidden");
+      byId("job-ai-pane").setAttribute("aria-hidden", "true");
+    }
+    if (activeJobRevision) byId("open-job-delete").classList.add("hidden");
+    const panels = ProductShell.createDetailPanelController({ trigger: byId("open-job-edit"), stages: { edit: byId("job-edit-form") }, window });
     const deletePopover = createDeletePopover("job-delete-popover");
     let pendingJobEdit = null;
     const openEdit = (focusFirst = true) => {
@@ -2552,7 +3313,7 @@
       byId("job-edit-company").value = activeJob.company || "";
       byId("job-edit-location").value = activeJob.location || "";
       byId("job-edit-summary").value = activeJob.summary || "";
-      byId("job-edit-requirements").value = (activeJob.requirements || []).map((item) => `${item.label}：${item.detail}`).join("\n");
+      byId("job-edit-requirements").value = (activeJob.requirements || []).map((item) => item.detail).join("\n");
       panels.show("edit", { focusFirst });
     };
     byId("open-job-edit").addEventListener("click", () => panels.current() === "closed" ? openEdit() : panels.show("closed"));
@@ -2564,9 +3325,15 @@
     byId("preview-job-edit").addEventListener("click", () => {
       const title = byId("job-edit-title").value.trim();
       if (!title) return;
-      const requirements = byId("job-edit-requirements").value.split("\n").map((line) => line.trim()).filter(Boolean).map((line, index) => {
-        const [label, ...detail] = line.split(/[：:]/);
-        return { requirement_id: activeJob.requirements?.[index]?.requirement_id || `job-user-requirement-${index + 1}`, label: label.trim() || "要求", detail: detail.join("：").trim() || label.trim() };
+      const requirements = byId("job-edit-requirements").value.split("\n").map((line) => line.trim()).filter(Boolean).map((detail, index) => {
+        const previous = activeJob.requirements?.[index];
+        return {
+          requirement_id: previous?.requirement_id || `job-user-requirement-${index + 1}`,
+          label: previous?.detail === detail ? previous.label : (detail.length > 36 ? `${detail.slice(0, 34)}…` : detail),
+          detail,
+          grounding_refs: previous?.grounding_refs || [],
+          content_origin: previous?.detail === detail ? previous.content_origin : "HUMAN_EDITED",
+        };
       });
       pendingJobEdit = { title, company: byId("job-edit-company").value.trim(), location: byId("job-edit-location").value.trim(), summary: byId("job-edit-summary").value.trim(), requirements };
       byId("job-edit-before").textContent = `${activeJob.title} · ${activeJob.requirements?.length || 0} 条要求`;
@@ -2581,14 +3348,67 @@
       const button = byId("confirm-job-edit");
       button.disabled = true;
       try {
-        activeJob = { ...activeJob, ...pendingJobEdit, item_version: (Number(activeJob.item_version) || 1) + 1, updated_at: new Date().toISOString() };
-        await Demo.put(Demo.DEMO_STORES.jobs, activeJob);
+        if (activeJobRevision) {
+          const database = await Truth.openDatabase();
+          try {
+            const outcome = await JobContext.persistDirectEdit(database, activeJobRevision, pendingJobEdit);
+            activeJobRevision = outcome.revision;
+            activeJob = JobContext.recordForUi(activeJobRevision);
+            byId("job-detail-message").textContent = `修改已保存为职位第 ${activeJobRevision.version} 版；上一版本仍保留。`;
+          } finally { database.close(); }
+        } else {
+          activeJob = { ...activeJob, ...pendingJobEdit, item_version: (Number(activeJob.item_version) || 1) + 1, updated_at: new Date().toISOString() };
+          await Demo.put(Demo.DEMO_STORES.jobs, activeJob);
+          byId("job-detail-message").textContent = "修改已保存到当前本地演示记录。";
+        }
         renderJob(activeJob);
+        if (isEmbeddedDetail && window.parent !== window) {
+          window.parent.postMessage({ type: "job-radar-v1-detail-updated", library: "jd", sourceKey: `job:${activeJob.job_context_id}` }, window.location.origin);
+        }
         byId("job-edit-preview").classList.add("hidden");
-        byId("job-detail-message").textContent = "修改已保存到当前本地职位记录。";
         pendingJobEdit = null;
       } finally { button.disabled = false; }
     });
+    if (conversationAllowed) {
+      const database = await Truth.openDatabase();
+      try { await restoreJobConversation(database, activeJobRevision.context_id); }
+      finally { database.close(); }
+      byId("job-conversation-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const input = byId("job-conversation-input");
+        const content = input.value.trim();
+        if (!content) return;
+        input.value = "";
+        await submitJobConversation(content);
+      });
+      byId("accept-job-patch").addEventListener("click", async () => {
+        if (!activeJobChangeProposal) return;
+        const database = await Truth.openDatabase();
+        try {
+          const head = await canonicalJobRevision(activeJobRevision.context_id, database);
+          const outcome = await JobContext.persistAcceptedChange(database, head, activeJobChangeProposal);
+          activeJobRevision = outcome.revision;
+          renderJob(JobContext.recordForUi(activeJobRevision));
+          if (isEmbeddedDetail && window.parent !== window) {
+            window.parent.postMessage({ type: "job-radar-v1-detail-updated", library: "jd", sourceKey: `job:${activeJobRevision.context_id}` }, window.location.origin);
+          }
+          showJobChangeProposal(null);
+          byId("job-detail-message").textContent = `建议已由你确认并保存为职位第 ${activeJobRevision.version} 版；旧版本与分析来源仍保留。`;
+        } catch (error) {
+          byId("job-detail-message").textContent = error.message === "ANALYSIS_STALE" ? "职位已经变化，这条建议已过期，未保存。" : `无法保存建议：${error.message}`;
+          byId("job-detail-message").classList.add("error");
+        } finally { database.close(); }
+      });
+      byId("reject-job-patch").addEventListener("click", async () => {
+        if (!activeJobChangeProposal) return;
+        const database = await Truth.openDatabase();
+        try {
+          await JobContext.persistRejectedChange(database, activeJobChangeProposal);
+          showJobChangeProposal(null);
+          byId("job-detail-message").textContent = "建议已拒绝；职位版本没有变化。";
+        } finally { database.close(); }
+      });
+    }
     document.querySelectorAll("[data-job-delete-scope]").forEach((button) => button.addEventListener("click", async () => {
       const controls = [...document.querySelectorAll("[data-job-delete-scope]")];
       controls.forEach((control) => { control.disabled = true; });
@@ -2622,8 +3442,8 @@
       renderSavedCandidatePdfSources().catch(showPersonalError);
     }
     if (page === "job-import") refreshJobImportGate();
-    if (page === "candidate-detail" && activeCandidate) setDetailRuntimeMode(activeCandidate, "candidate-ai-pane", "open-direct-edit", "candidate-ai-runtime");
-    if (page === "job-detail" && activeJob) setDetailRuntimeMode(activeJob, "job-ai-pane", "open-job-edit", "job-ai-runtime");
+    if (page === "candidate-detail" && activeCandidate) setDetailRuntimeMode(activeCandidate, "candidate-ai-pane", "open-direct-edit", "candidate-ai-runtime", "candidate_conversation");
+    if (page === "job-detail" && activeJob) setDetailRuntimeMode(activeJob, "job-ai-pane", "open-job-edit", "job-ai-runtime", "job_conversation");
   });
   const initializers = { workspace: initWorkspace, personal: initPersonal, "personal-import": initPersonalImport, "candidate-detail": initCandidateDetail, jd: initJobLibrary, "job-import": initJobImport, "job-detail": initJobDetail };
   async function initializePage() {

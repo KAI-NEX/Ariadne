@@ -157,12 +157,13 @@ assert.equal(Review.sourceImportState(sourceA, { source_documents: [{ source_doc
 assert.equal(Review.sourceImportState(sourceA, { source_documents: [{ source_document_id: sourceA }], context_proposals: [], processing_runs: [{ source_document_id: sourceA, status: "CANCELLED", finished_at: "2026-09-02T15:00:00Z" }], candidate_context_revisions: [], candidate_context_lifecycle: [] }), "RETRY");
 
 const pages = fs.readFileSync(path.join(root, "public", "v1-pages.js"), "utf8");
+const productShell = fs.readFileSync(path.join(root, "public", "product-shell-domain.js"), "utf8");
 const detailHtml = fs.readFileSync(path.join(root, "public", "candidate-detail.html"), "utf8");
 assert.match(detailHtml, /id="open-candidate-delete"[\s\S]*>删除</);
 assert.match(detailHtml, /id="candidate-delete-popover"[\s\S]*仅删除这张卡片[\s\S]*移除此文件导入的所有内容[\s\S]*取消/);
 assert.doesNotMatch(detailHtml, /id="candidate-delete-first"|id="candidate-delete-scope"|要从个人资料中移除内容吗？/);
 assert.doesNotMatch(detailHtml.slice(0, detailHtml.indexOf("candidate-edit-form")), /删除|移除/);
-assert.match(pages, /firstVisibleEditableControl\(panel\)\?\.focus/);
+assert.match(productShell, /firstVisibleEditableControl\(panel, windowObject\)\?\.focus/);
 assert.doesNotMatch(pages, /candidate-edit-summary"\)\.focus/);
 assert.match(pages, /persistRemoval\(database, canonicalRevision, itemId\)/);
 assert.match(pages, /persistSourceHardDelete\(database, sourceId\)/);

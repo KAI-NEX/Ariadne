@@ -12,6 +12,7 @@ const jobDetail = read("job-detail.html");
 const jobImport = read("jd-import.html");
 const lifecycle = read("local-context-lifecycle-domain.js");
 const jobLifecycle = read("local-job-lifecycle-domain.js");
+const productShell = read("product-shell-domain.js");
 
 assert.match(styles, /:where\(\.v1-body\) button, :where\(\.v1-body\) input, :where\(\.v1-body\) textarea \{ font: inherit; \}/);
 for (const detail of [candidateDetail, jobDetail]) {
@@ -60,10 +61,11 @@ assert.match(jobDetail, /local-context-lifecycle-domain\.js/);
 assert.match(jobDetail, /local-job-lifecycle-domain\.js/);
 assert.match(jobImport, /\bmultiple\b/);
 assert.match(jobImport, /job-review-surface/);
-assert.match(pages, /LocalContextLifecycle\.prepareFileSource/);
 assert.match(pages, /LocalContextLifecycle\.uniqueSources/);
-assert.match(pages, /LocalJobLifecycle\.sourceImportState/);
-assert.match(pages, /LocalJobLifecycle\.persistPendingImport/);
+assert.match(pages, /LocalJob\.prepareSource/);
+assert.match(pages, /LocalJob\.preparePastedText/);
+assert.match(pages, /LocalJob\.persistCanonicalSource/);
+assert.match(pages, /JobContext\.persistReview/);
 assert.match(pages, /LocalJobLifecycle\.hardDeleteSource/);
 assert.match(pages, /renderAwaitingJobReviews/);
 assert.match(pages, /if \(!remaining\.length\)/);
@@ -76,6 +78,8 @@ assert.match(jobLifecycle, /content_read_for_identity_only: true/);
 assert.match(jobLifecycle, /database\.transaction\(\[storeName, sourceStoreName\], "readwrite"\)/);
 
 assert.match(pages, /function createDeletePopover\(popoverId\)/);
+assert.match(pages, /ProductShell\.createDetailPanelController/);
+assert.match(productShell, /function createDetailPanelController/);
 assert.match(pages, /rect\.right - width/);
 assert.match(pages, /createDeletePopover\("candidate-delete-popover"\)/);
 assert.match(pages, /createDeletePopover\("job-delete-popover"\)/);

@@ -40,7 +40,7 @@ assert.match(script, /restoreGeminiReadyState/);
 assert.match(script, /sessionStorage\.setItem\("job-radar-runtime-check"/);
 assert.match(script, /career_data_sent: false/);
 assert.match(script, /multimodal_connection_ready/);
-assert.match(script, /selectOfficialMultimodalModel/);
+assert.match(script, /selectVerifiedRuntimeModel/);
 assert.match(script, /"OFFICIAL_READY"/);
 assert.match(script, /"OFFICIAL_MODEL_CAPABILITY"/);
 assert.match(script, /JobRadarAddModelSheet\.mount/);
@@ -56,7 +56,8 @@ const loadModelsSource = script.slice(script.indexOf("async function loadModels"
 assert.match(loadModelsSource, /const restoredModel = selectableModels\(\)\.find\(\(model\) => model\.provider_id === state\.provider && model\.model_id === state\.model\);[\s\S]*applyReadyModel\(restoredModel, false\)/);
 assert.doesNotMatch(loadModelsSource, /defaultModel|runtime_default|persistSelectedRuntime/);
 assert.match(script, /const ready = state\.phase === "READY" \|\| state\.phase === "OFFICIAL_READY" \|\| state\.phase === "LOCAL_READY"/);
-assert.match(script, /if \(model\?\.provider_id === "deepseek" && model\.multimodal_readiness === "VERIFIED"\) selectOfficialMultimodalModel/);
+assert.match(script, /if \(isVerifiedRuntimeModel\(model\)\) selectVerifiedRuntimeModel/);
+assert.match(script, /职位 \/ 候选人对话/);
 assert.match(script, /menu\.classList\.add\("is-open"\)/);
 assert.match(script, /selectAddedMultimodalModel/);
 assert.match(script, /button\.dataset\.provider/);

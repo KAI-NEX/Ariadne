@@ -4,10 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ariadne · 个人材料详情</title>
-    <link rel="stylesheet" href="/styles.css?v=personal-lifecycle-v1">
+    <link rel="stylesheet" href="/styles.css?v=shared-product-shell-v1">
   </head>
   <body class="v1-body" data-v1-page="candidate-detail">
-    <main class="v1-page-shell v1-detail-shell">
+    <main class="v1-page-shell v1-detail-shell" data-ariadne-shell="detail">
       <header class="v1-topbar">
         <a class="v1-back" href="/personal-information.html" aria-label="返回个人资料"></a>
         <p class="v1-detail-breadcrumb">个人资料 / 材料对象</p>
@@ -56,7 +56,8 @@
           <div class="v1-conversation-heading"><p class="v1-section-label">AI 对话</p><span id="candidate-ai-runtime">仅限当前材料</span></div>
           <h2 id="candidate-ai-heading">只讨论当前材料</h2>
           <p class="v1-conversation-copy">使用当前选择的模型讨论这张卡片。对话不会静默修改已确认信息；需要修改时会生成单独的待审核建议。</p>
-          <div id="candidate-conversation-messages" class="v1-conversation-messages" aria-live="polite"></div>
+          <div id="candidate-conversation-messages" class="v1-conversation-messages v1-conversation-thread" aria-live="polite"></div>
+          <p id="candidate-conversation-status" class="v1-conversation-empty" aria-live="polite"></p>
           <section id="candidate-patch-proposal" class="v1-patch-card hidden">
             <p class="v1-section-label">待审核修改建议</p>
             <div class="v1-diff-grid"><div><small>修改前</small><p id="candidate-patch-before"></p></div><div><small>修改后</small><p id="candidate-patch-after"></p></div></div>
@@ -85,7 +86,9 @@
     <script src="/local-candidate-review-domain.js?v=source-storage-v1"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
     <script src="/scoped-conversation-domain.js"></script>
+    <script src="/conversation-ui-domain.js?v=shared-conversation-ui-v1"></script>
+    <script src="/product-shell-domain.js?v=shared-product-shell-v1"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
-    <script src="/v1-pages.js?v=source-storage-v1"></script>
+    <script src="/v1-pages.js?v=shared-product-shell-v1"></script>
   </body>
 </html>

@@ -1,0 +1,75 @@
+{
+  "manifest_version": "ariadne-job-intelligence-manifest-v1",
+  "job_context_payload_version": "ariadne-job-context-payload-v1",
+  "candidate_snapshot_version": "ariadne-candidate-context-snapshot-v1",
+  "candidate_delta_version": "ariadne-candidate-delta-v1",
+  "source_excerpt_manifest_version": "ariadne-source-excerpt-manifest-v1",
+  "job_change_proposal_version": "ariadne-job-change-proposal-v1",
+  "job_change_decision_version": "ariadne-job-change-decision-v1",
+  "job_analysis_version": "ariadne-job-analysis-v1",
+  "conversation_session_version": "ariadne-job-conversation-session-v1",
+  "conversation_message_version": "ariadne-job-conversation-message-v1",
+  "turn_execution_version": "ariadne-job-turn-execution-v1",
+  "semantic_output_version": "ariadne-job-semantic-output-v1",
+  "job_model_import_source_preparation_version": "ariadne-job-model-source-preparation-v1",
+  "job_model_import_proposal_version": "ariadne-job-model-proposal-v1",
+  "job_model_import_runtime_contracts": {
+    "request_contract_version": "ariadne-job-model-import-runtime-request-v1",
+    "result_contract_version": "ariadne-job-model-import-runtime-result-v1",
+    "adapter_version": "deepseek-job-import-v1",
+    "prompt_version": "ariadne-job-model-import-prompt-v1",
+    "request_config_version": "deepseek-job-model-import-request-v1",
+    "delivery_method": "prepared_text_blocks"
+  },
+  "runtime_contracts": {
+    "request_contract_version": "ariadne-job-conversation-runtime-request-v3",
+    "result_contract_version": "ariadne-job-conversation-runtime-result-v2",
+    "adapter_version": "deepseek-job-conversation-v8",
+    "prompt_version": "ariadne-job-intelligence-prompt-v7",
+    "request_config_version": "deepseek-job-conversation-request-v8"
+  },
+  "gap_types": [
+    "CAPABILITY_GAP",
+    "EVIDENCE_GAP",
+    "PRESENTATION_GAP",
+    "RELEVANCE_GAP",
+    "UNKNOWN",
+    "NEEDS_CLARIFICATION"
+  ],
+  "fit_assessments": ["SUPPORTED", "PARTIALLY_SUPPORTED", "UNSUPPORTED", "UNKNOWN"],
+  "recommendation_kinds": [
+    "RESUME_POSITIONING",
+    "PROJECT_POSITIONING",
+    "PROJECT_IMPROVEMENT",
+    "LEARNING",
+    "EVIDENCE_COLLECTION"
+  ],
+  "semantic_actions": ["EXPLAIN", "PROPOSE_JOB_EDIT", "ASK_CLARIFICATION"],
+  "editable_job_fields": ["title", "company", "location", "summary"],
+  "candidate_delta_changes": ["BASELINE", "ADDED", "UPDATED", "REMOVED", "NEEDS_REVIEW"],
+  "source_availability": [
+    "SOURCE_GROUNDED",
+    "ORIGINAL_AVAILABLE",
+    "RAW_TEXT_AVAILABLE",
+    "STRUCTURED_ONLY",
+    "SOURCE_REFERENCE_ONLY",
+    "SOURCE_UNAVAILABLE",
+    "LEGACY_PROVENANCE_UNKNOWN"
+  ],
+  "source_retrieval": {
+    "policy_version": "ariadne-bounded-source-retrieval-v1",
+    "allowed_purposes": ["JOB_REQUIREMENT_DETAIL", "CANDIDATE_EVIDENCE_DETAIL", "GROUNDING_VERIFICATION"],
+    "max_excerpts": 12,
+    "max_excerpt_characters": 1200,
+    "max_total_characters": 6000
+  },
+  "limits": {
+    "human_message": 8000,
+    "history_turns": 8,
+    "analysis_message": 12000,
+    "findings": 48,
+    "recommendations": 24,
+    "clarification": 4000,
+    "job_field_value": 8000
+  }
+}

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ariadne · 添加个人材料</title>
-    <link rel="stylesheet" href="/styles.css?v=candidate-workspace-shell-v1">
+    <link rel="stylesheet" href="/styles.css?v=shared-product-shell-v1">
   </head>
   <body class="v1-body" data-v1-page="personal-import">
     <main class="v1-page-shell v1-import-shell">
@@ -53,11 +53,11 @@
           <button id="start-personal-processing" class="v1-primary-button v1-sheet-primary" type="button" disabled>开始本地提取</button>
         </div>
       </section>
-      <section id="candidate-ai-workspace" class="v1-candidate-workspace-layer hidden" aria-label="候选人信息工作区" tabindex="-1">
-        <div class="v1-candidate-workspace-backdrop" aria-hidden="true"></div>
-        <div class="v1-candidate-workspace-shell">
-          <div class="v1-candidate-workspace-panels">
-            <section class="v1-candidate-pane" aria-labelledby="candidate-pane-title">
+      <section id="candidate-ai-workspace" class="v1-workspace-layer hidden" aria-label="候选人信息工作区" tabindex="-1" data-ariadne-shell="workspace">
+        <div class="v1-workspace-backdrop" aria-hidden="true"></div>
+        <div class="v1-workspace-shell">
+          <div class="v1-workspace-panels">
+            <section class="v1-workspace-content-pane" aria-labelledby="candidate-pane-title">
               <header class="v1-workspace-pane-header"><div><h2 id="candidate-pane-title">Candidate</h2><p id="candidate-working-source"></p></div></header>
               <div id="candidate-workspace-left-scroll" class="v1-workspace-scroll-region" tabindex="0">
                 <div id="candidate-workspace-processing" class="v1-workspace-processing"><span class="v1-workspace-processing-dot" aria-hidden="true"></span><p>正在整理候选人信息…</p></div>
@@ -80,14 +80,14 @@
                   </form>
                 </section>
               </div>
-              <footer class="v1-candidate-pane-footer"><p id="candidate-workspace-save-status" aria-live="polite"></p><button id="candidate-workspace-save" class="v1-primary-button" type="button" disabled>保存到个人资料</button></footer>
+              <footer class="v1-workspace-content-footer"><p id="candidate-workspace-save-status" aria-live="polite"></p><button id="candidate-workspace-save" class="v1-primary-button" type="button" disabled>保存到个人资料</button></footer>
             </section>
             <aside class="v1-ariadne-pane" aria-labelledby="candidate-understanding-title">
               <header class="v1-workspace-pane-header"><div><h2 id="candidate-understanding-title">Ariadne AI</h2><p>DeepSeek</p></div></header>
               <div id="candidate-workspace-history" class="v1-workspace-history" tabindex="0" aria-live="polite">
                 <ol id="candidate-understanding-events" class="v1-understanding-events"></ol>
                 <div id="candidate-clarification-list" class="v1-clarification-list"></div>
-                <div id="candidate-workspace-conversation" class="v1-workspace-conversation" aria-live="polite"></div>
+                <div id="candidate-workspace-conversation" class="v1-workspace-conversation v1-conversation-messages v1-conversation-thread" aria-live="polite"></div>
                 <p id="candidate-workspace-conversation-status" class="v1-conversation-empty" aria-live="polite"></p>
               </div>
               <form id="candidate-workspace-composer" class="v1-conversation-form v1-workspace-composer">
@@ -152,6 +152,9 @@
     <script src="/runtime-capability-gate.js?v=candidate-model-runtime-v1"></script>
     <script src="/truth-persistence-domain.js?v=candidate-workspace-authority-v1"></script>
     <script src="/raw-source-storage-domain.js?v=source-storage-v1"></script>
+    <script src="/model-import-lifecycle-domain.js?v=job-model-import-v1"></script>
+    <script src="/product-shell-domain.js?v=shared-product-shell-v1"></script>
+    <script src="/model-workspace-ui-domain.js?v=product-convergence-v1"></script>
     <script src="/candidate-context-domain.js?v=model-e2e-stabilization-v1"></script>
     <script src="/candidate-model-runtime-domain.js?v=candidate-workspace-authority-v1"></script>
     <script src="/local-context-lifecycle-domain.js?v=lifecycle-final-v1"></script>
@@ -163,8 +166,9 @@
     <script src="/candidate-conversation-persistence-domain.js?v=candidate-conversation-slice-a-v1"></script>
     <script src="/candidate-conversation-context-compiler.js?v=candidate-conversation-slice-a-v1"></script>
     <script src="/candidate-workspace-conversation-runtime.js?v=candidate-conversation-route-contract-v2"></script>
+    <script src="/conversation-ui-domain.js?v=shared-conversation-ui-v1"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
-    <script src="/v1-pages.js?v=candidate-conversation-slice-a-v1"></script>
+    <script src="/v1-pages.js?v=shared-product-shell-v1"></script>
   </body>
 </html>

@@ -1,7 +1,7 @@
 "use strict";
 
 const DB_NAME = "job-radar-local-first-v1";
-const DB_VERSION = 14;
+const DB_VERSION = 15;
 const SOURCE_DOCUMENTS = "source_documents";
 const EXTRACTION_RUNS = "extraction_runs";
 const CAREER_ENTITIES = "career_entities";
@@ -127,6 +127,12 @@ function openDatabase() {
       if (!db.objectStoreNames.contains(CONVERSATION_MESSAGES)) db.createObjectStore(CONVERSATION_MESSAGES, { keyPath: "message_id" });
       if (!db.objectStoreNames.contains(CONVERSATION_TURN_EXECUTIONS)) db.createObjectStore(CONVERSATION_TURN_EXECUTIONS, { keyPath: "execution_id" });
       if (!db.objectStoreNames.contains(CANDIDATE_ACTIONS)) db.createObjectStore(CANDIDATE_ACTIONS, { keyPath: "action_id" });
+      if (!db.objectStoreNames.contains("job_analyses")) db.createObjectStore("job_analyses", { keyPath: "analysis_id" });
+      if (!db.objectStoreNames.contains("job_conversation_sessions")) db.createObjectStore("job_conversation_sessions", { keyPath: "conversation_id" });
+      if (!db.objectStoreNames.contains("job_conversation_messages")) db.createObjectStore("job_conversation_messages", { keyPath: "message_id" });
+      if (!db.objectStoreNames.contains("job_turn_executions")) db.createObjectStore("job_turn_executions", { keyPath: "execution_id" });
+      if (!db.objectStoreNames.contains("job_change_proposals")) db.createObjectStore("job_change_proposals", { keyPath: "job_change_proposal_id" });
+      if (!db.objectStoreNames.contains("job_change_decisions")) db.createObjectStore("job_change_decisions", { keyPath: "job_change_decision_id" });
       if (!db.objectStoreNames.contains(DEMO_CANDIDATE_ITEMS)) db.createObjectStore(DEMO_CANDIDATE_ITEMS, { keyPath: "item_id" });
       if (!db.objectStoreNames.contains(DEMO_JOB_CONTEXTS)) db.createObjectStore(DEMO_JOB_CONTEXTS, { keyPath: "job_context_id" });
       if (!db.objectStoreNames.contains(DEMO_CONVERSATIONS)) db.createObjectStore(DEMO_CONVERSATIONS, { keyPath: "conversation_id" });

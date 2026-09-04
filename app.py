@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
-from src.career_evidence import CareerDocumentError, _document_blocks, extract_career_document, extract_career_document_only, propose_entities
+from src.career_evidence import CareerDocumentError, _document_blocks, extract_career_document, extract_career_document_only, extract_job_document_only, propose_entities
 from src.execution_contract import ExecutionContractError, validate_runtime_snapshot
 from src.ai_career_ingestion import (
     AICareerIngestionError,
@@ -40,7 +40,8 @@ from src.ai_provider_capabilities import (
 )
 from src.provider_runtime import (
     ProviderRuntimeError, connection_request, deepseek_model_descriptors, descriptor_for,
-    is_multimodal, multimodal_connection_request, multimodal_smoke_passed, normalize_response, v1_selector_descriptors,
+    is_multimodal, multimodal_connection_request, multimodal_smoke_passed, normalize_response,
+    v1_runtime_selector_descriptors,
 )
 from src.candidate_model_runtime import (
     CandidateModelExecutionRegistry,
@@ -55,6 +56,18 @@ from src.candidate_conversation_runtime import (
     validate_candidate_conversation_request,
     candidate_conversation_runtime_signature,
 )
+from src.job_conversation_runtime import (
+    JobConversationRuntimeError,
+    execute_job_conversation_request,
+    job_conversation_runtime_signature,
+    validate_job_conversation_request,
+)
+from src.job_model_runtime import (
+    JobModelRuntimeError,
+    execute_job_model_request,
+    job_model_import_runtime_signature,
+    validate_job_model_request,
+)
 
 
 PROJECT_ROOT = Path(__file__).parent
@@ -62,6 +75,7 @@ DATA_PATH = PROJECT_ROOT / "data" / "jd-001.json"
 DATABASE_PATH = PROJECT_ROOT / "data" / "job_radar.db"
 SCHEMA_PATH = PROJECT_ROOT / "data" / "schema.sql"
 CONVERSATION_CONTRACT_MANIFEST_PATH = PROJECT_ROOT / "data" / "candidate_conversation_contract_v1.json"
+JOB_INTELLIGENCE_CONTRACT_MANIFEST_PATH = PROJECT_ROOT / "data" / "job_intelligence_contract_v1.json"
 PUBLIC_PATH = PROJECT_ROOT / "public"
 OCR_SCRIPT_PATH = PROJECT_ROOT / "src" / "extraction" / "ocr_with_vision.swift"
 PDF_TEXT_SCRIPT_PATH = PROJECT_ROOT / "src" / "extraction" / "extract_pdf_text.swift"
@@ -70,6 +84,7 @@ OCR_UPLOAD_PATH = PROJECT_ROOT / "data" / "local_ocr_uploads"
 RAW_CAPTURE_PATH = PROJECT_ROOT / "data" / "raw"
 DEEPSEEK_ENDPOINT = "https://api.deepseek.com/chat/completions"
 DEEPSEEK_VISION_MODEL = "deepseek-v4-flash-vision-exp"
+DEEPSEEK_CONVERSATION_MODEL = "deepseek-v4-pro"
 QWEN_CHAT_COMPLETIONS_ENDPOINT = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
 QWEN_V1_MULTIMODAL_MODEL = "qwen3.8-max"
 MULTIMODAL_SMOKE_IMAGE_PATH = PUBLIC_PATH / "job-radar-multimodal-smoke.jpg"
@@ -91,6 +106,8 @@ LEGACY_PROVIDER_ACTION_PATHS = frozenset({
 })
 CANDIDATE_MODEL_EXECUTIONS = CandidateModelExecutionRegistry()
 CANDIDATE_CONVERSATION_EXECUTIONS = CandidateConversationExecutionRegistry()
+JOB_CONVERSATION_EXECUTIONS = CandidateConversationExecutionRegistry()
+JOB_MODEL_IMPORT_EXECUTIONS = CandidateModelExecutionRegistry()
 
 
 # These patterns deliberately produce review candidates, never authoritative Job fields.
@@ -843,11 +860,20 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/candidate-conversation-contract-manifest.js":
             self.candidate_conversation_contract_manifest()
             return
+        if parsed.path == "/job-intelligence-contract-manifest.js":
+            self.job_intelligence_contract_manifest()
+            return
         if parsed.path == "/api/runtime-options":
             self.runtime_options()
             return
         if parsed.path == "/api/candidate-conversation-runtime-signature":
             self.send_json(HTTPStatus.OK, {"runtime_signature": candidate_conversation_runtime_signature(), "network_call_made": False})
+            return
+        if parsed.path == "/api/job-conversation-runtime-signature":
+            self.send_json(HTTPStatus.OK, {"runtime_signature": job_conversation_runtime_signature(), "network_call_made": False})
+            return
+        if parsed.path == "/api/job-model-import-runtime-signature":
+            self.send_json(HTTPStatus.OK, {"runtime_signature": job_model_import_runtime_signature(), "network_call_made": False})
             return
         if parsed.path == "/api/ai-career-ingestion-config":
             self.send_json(HTTPStatus.OK, {
@@ -888,6 +914,22 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             '"use strict";(function(root){function freeze(value){if(value&&typeof value==="object")'
             '{Object.values(value).forEach(freeze);Object.freeze(value);}return value;}'
             f'root.AriadneCandidateConversationContractManifest=freeze({encoded});'
+            '}(typeof globalThis!=="undefined"?globalThis:this));'
+        ).encode("utf-8")
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "application/javascript; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def job_intelligence_contract_manifest(self) -> None:
+        """Expose the Job Intelligence manifest without embedding it in app code."""
+        manifest = json.loads(JOB_INTELLIGENCE_CONTRACT_MANIFEST_PATH.read_text(encoding="utf-8"))
+        encoded = json.dumps(manifest, ensure_ascii=False, separators=(",", ":"))
+        body = (
+            '"use strict";(function(root){function freeze(value){if(value&&typeof value==="object")'
+            '{Object.values(value).forEach(freeze);Object.freeze(value);}return value;}'
+            f'root.AriadneJobIntelligenceContract=freeze({encoded});'
             '}(typeof globalThis!=="undefined"?globalThis:this));'
         ).encode("utf-8")
         self.send_response(HTTPStatus.OK)
@@ -950,6 +992,15 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/local-candidate-structure":
             self.structure_local_candidate_proposal()
             return
+        if parsed.path == "/api/local-job-extract":
+            self.extract_local_job_source()
+            return
+        if parsed.path == "/api/local-job-image-ocr":
+            self.extract_local_job_image()
+            return
+        if parsed.path == "/api/local-source-read":
+            self.read_local_source_for_model()
+            return
         if parsed.path == "/api/candidate-model-structure":
             self.structure_model_candidate_proposal()
             return
@@ -961,6 +1012,12 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/candidate-conversation-turn/cancel":
             self.cancel_candidate_conversation_turn()
+            return
+        if parsed.path == "/api/job-conversation-turn":
+            self.run_job_conversation_turn()
+            return
+        if parsed.path == "/api/job-model-structure":
+            self.structure_model_job_proposal()
             return
         if parsed.path == "/api/career-document-extract":
             self.extract_career_document_candidate()
@@ -975,9 +1032,9 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
 
     def runtime_options(self) -> None:
         """List current runtime choices without sending career material or an inference."""
-        descriptors = deepseek_model_descriptors([DEEPSEEK_VISION_MODEL])
+        descriptors = deepseek_model_descriptors([DEEPSEEK_VISION_MODEL, DEEPSEEK_CONVERSATION_MODEL])
         self.send_json(HTTPStatus.OK, {
-            "provider": "deepseek", "models": [item.to_public_dict() for item in v1_selector_descriptors(descriptors)], "network_call_made": False,
+            "provider": "deepseek", "models": [item.to_public_dict() for item in v1_runtime_selector_descriptors(descriptors)], "network_call_made": False,
             "career_data_sent": False,
         })
 
@@ -1175,6 +1232,149 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             self.send_json(HTTPStatus.BAD_REQUEST, {
                 "error": "REQUEST_INVALID", "failure_layer": "request",
                 "network_call_made": False, "persistence": "not_written",
+            })
+            return
+        self.send_json(HTTPStatus.OK, result)
+
+    def run_job_conversation_turn(self) -> None:
+        """Run one Job Intelligence turn; browser persistence remains authoritative."""
+        execution_id = None
+        generation = None
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+            if content_length <= 0 or content_length > 2_000_000:
+                raise JobConversationRuntimeError("REQUEST_SIZE_INVALID", "request")
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            validated = validate_job_conversation_request(payload)
+            execution_id, generation = validated.execution_id, validated.generation
+            if not JOB_CONVERSATION_EXECUTIONS.begin(execution_id, generation):
+                self.send_json(HTTPStatus.CONFLICT, {
+                    "error": "TURN_ALREADY_ACTIVE", "failure_layer": "generation",
+                    "network_call_made": False, "persistence": "not_written",
+                })
+                return
+
+            def provider_call(api_key: str, provider_payload: dict) -> tuple[int, dict]:
+                try:
+                    return call_deepseek_chat_completions(api_key, provider_payload, response_limit=2_000_000)
+                except ValueError as error:
+                    raise JobConversationRuntimeError("MALFORMED_RESPONSE", "parsing", True) from error
+
+            result = execute_job_conversation_request(payload, read_deepseek_key, provider_call)
+            if not JOB_CONVERSATION_EXECUTIONS.accept(execution_id, generation):
+                self.send_json(HTTPStatus.CONFLICT, {
+                    "error": "CANCELLED_TURN", "failure_layer": "generation",
+                    "network_call_made": True, "persistence": "not_written",
+                })
+                return
+        except JobConversationRuntimeError as error:
+            if execution_id and generation:
+                JOB_CONVERSATION_EXECUTIONS.fail(execution_id, generation)
+            print(
+                "job_conversation_failure "
+                f"provider_called={str(error.network_call_made).lower()} provider=deepseek "
+                f"model=deepseek-v4-pro stage={error.failure_layer} "
+                f"error_code={error.code} assistant_copy_source=NONE",
+                flush=True,
+            )
+            status = HTTPStatus.PRECONDITION_REQUIRED if error.failure_layer == "credential" else HTTPStatus.BAD_GATEWAY if error.failure_layer in {"provider", "transport", "model"} else HTTPStatus.UNPROCESSABLE_ENTITY
+            self.send_json(status, {
+                "error": error.code,
+                "failure_layer": error.failure_layer,
+                "network_call_made": error.network_call_made,
+                "persistence": "not_written",
+            })
+            return
+        except HTTPError as error:
+            if execution_id and generation:
+                JOB_CONVERSATION_EXECUTIONS.fail(execution_id, generation)
+            self.send_json(HTTPStatus.BAD_GATEWAY, {
+                "error": "PROVIDER_HTTP_ERROR",
+                "failure_layer": "credential" if error.code in {401, 403} else "provider",
+                "provider_http_status": error.code,
+                "network_call_made": True,
+                "persistence": "not_written",
+            })
+            return
+        except (URLError, TimeoutError, OSError):
+            if execution_id and generation:
+                JOB_CONVERSATION_EXECUTIONS.fail(execution_id, generation)
+            self.send_json(HTTPStatus.BAD_GATEWAY, {"error": "PROVIDER_TRANSPORT_ERROR", "failure_layer": "transport", "network_call_made": True, "persistence": "not_written"})
+            return
+        except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
+            if execution_id and generation:
+                JOB_CONVERSATION_EXECUTIONS.fail(execution_id, generation)
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": "REQUEST_INVALID", "failure_layer": "request", "network_call_made": False, "persistence": "not_written"})
+            return
+        self.send_json(HTTPStatus.OK, result)
+
+    def structure_model_job_proposal(self) -> None:
+        """Run one qualified Job Model Import over mechanically prepared source text."""
+        claimed_operation_id = None
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+            if content_length <= 0 or content_length > 2_000_000:
+                raise JobModelRuntimeError("job_model_request_size_invalid", "request")
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            validated = validate_job_model_request(payload)
+            claim_state, cached_result = JOB_MODEL_IMPORT_EXECUTIONS.begin(validated.operation_id, validated.source_document["source_document_id"])
+            if claim_state == "COMPLETED":
+                self.send_json(HTTPStatus.OK, cached_result)
+                return
+            if claim_state == "ACTIVE":
+                self.send_json(HTTPStatus.CONFLICT, {
+                    "error": "job_model_execution_in_progress", "failure_layer": "idempotency",
+                    "network_call_made": False, "persistence": "not_written",
+                })
+                return
+            claimed_operation_id = validated.operation_id
+
+            def provider_call(api_key: str, provider_payload: dict) -> tuple[int, dict]:
+                print("job_model_import_provider_call provider=deepseek model=deepseek-v4-pro", flush=True)
+                try:
+                    return call_deepseek_chat_completions(api_key, provider_payload, response_limit=2_000_000)
+                except ValueError as error:
+                    code = "deepseek_response_too_large" if str(error) == "provider_response_too_large" else "deepseek_response_malformed"
+                    raise JobModelRuntimeError(code, "parsing", True) from error
+
+            result = execute_job_model_request(payload, read_deepseek_key, provider_call)
+        except JobModelRuntimeError as error:
+            if claimed_operation_id:
+                JOB_MODEL_IMPORT_EXECUTIONS.fail(claimed_operation_id)
+            status = HTTPStatus.PRECONDITION_REQUIRED if error.failure_layer == "credential" else HTTPStatus.BAD_GATEWAY if error.failure_layer in {"provider", "transport", "model"} else HTTPStatus.UNPROCESSABLE_ENTITY
+            self.send_json(status, {
+                "error": error.code, "failure_layer": error.failure_layer,
+                "network_call_made": error.network_call_made, "persistence": "not_written",
+            })
+            return
+        except HTTPError as error:
+            if claimed_operation_id:
+                JOB_MODEL_IMPORT_EXECUTIONS.fail(claimed_operation_id)
+            self.send_json(HTTPStatus.BAD_GATEWAY, {
+                "error": "deepseek_provider_http_error", "failure_layer": "credential" if error.code in {401, 403} else "provider",
+                "provider_http_status": error.code, "network_call_made": True, "persistence": "not_written",
+            })
+            return
+        except (URLError, TimeoutError, OSError):
+            if claimed_operation_id:
+                JOB_MODEL_IMPORT_EXECUTIONS.fail(claimed_operation_id)
+            self.send_json(HTTPStatus.BAD_GATEWAY, {
+                "error": "deepseek_network_error", "failure_layer": "transport",
+                "network_call_made": True, "persistence": "not_written",
+            })
+            return
+        except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
+            if claimed_operation_id:
+                JOB_MODEL_IMPORT_EXECUTIONS.fail(claimed_operation_id)
+            self.send_json(HTTPStatus.BAD_REQUEST, {
+                "error": "job_model_request_invalid", "failure_layer": "request",
+                "network_call_made": False, "persistence": "not_written",
+            })
+            return
+        if not JOB_MODEL_IMPORT_EXECUTIONS.succeed(claimed_operation_id, result):
+            self.send_json(HTTPStatus.CONFLICT, {
+                "error": "job_model_processing_run_stale", "failure_layer": "idempotency",
+                "network_call_made": True, "persistence": "not_written",
             })
             return
         self.send_json(HTTPStatus.OK, result)
@@ -1554,6 +1754,149 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             })
             return
         self.send_json(HTTPStatus.OK, result)
+
+    def extract_local_job_source(self) -> None:
+        """Mechanical Job extraction only; never calls a Provider or creates a Proposal."""
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+            if content_length <= 0 or content_length > 12_000_000:
+                raise CareerDocumentError("invalid_document_request_size")
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            if not isinstance(payload, dict):
+                raise CareerDocumentError("invalid_document_request")
+            snapshot = local_snapshot_from_payload(payload)
+            visual_ocr_script_path = PDF_VISUAL_OCR_SCRIPT_PATH if snapshot["capabilities"]["local_ocr"] == "supported" else None
+            result = extract_job_document_only(payload, PDF_TEXT_SCRIPT_PATH, visual_ocr_script_path)
+            result["runtime_snapshot_id"] = snapshot["snapshot_id"]
+        except (CareerDocumentError, KeyError) as error:
+            self.send_json(HTTPStatus.BAD_REQUEST, {
+                "error": str(error) or "job_local_extraction_failed",
+                "persistence": "not_written",
+                "model_call_made": False,
+            })
+            return
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            self.send_json(HTTPStatus.BAD_REQUEST, {
+                "error": "invalid_document_request",
+                "persistence": "not_written",
+                "model_call_made": False,
+            })
+            return
+        self.send_json(HTTPStatus.OK, result)
+
+    def extract_local_job_image(self) -> None:
+        """Run pure local Apple Vision OCR for one canonical Job image."""
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+            if content_length <= 0 or content_length > 12_000_000:
+                raise CareerDocumentError("invalid_document_request_size")
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            if not isinstance(payload, dict):
+                raise CareerDocumentError("invalid_document_request")
+            snapshot = local_snapshot_from_payload(payload)
+            if snapshot["capabilities"]["local_ocr"] != "supported":
+                raise CareerDocumentError("local_ocr_unavailable")
+            filename = payload.get("filename")
+            source_id = payload.get("source_document_id")
+            if not isinstance(filename, str) or not filename.strip() or Path(filename).name != filename:
+                raise CareerDocumentError("invalid_document_filename")
+            if not isinstance(source_id, str) or not source_id.startswith("source-job-") or len(source_id) > 160:
+                raise CareerDocumentError("invalid_job_source_document_id")
+            decoded = decode_image_data_urls(payload)
+            if len(decoded) != 1:
+                raise CareerDocumentError("job_image_count_invalid")
+            mime_type, image_bytes = decoded[0]
+            extension = Path(filename).suffix.lower()
+            if (mime_type == "image/png" and extension != ".png") or (mime_type == "image/jpeg" and extension not in {".jpg", ".jpeg"}):
+                raise CareerDocumentError("document_extension_mismatch")
+            with tempfile.TemporaryDirectory(prefix="ariadne-job-ocr-") as directory:
+                image_path = Path(directory) / ("source.png" if mime_type == "image/png" else "source.jpg")
+                image_path.write_bytes(image_bytes)
+                ocr = run_apple_vision_ocr(image_path)
+            lines = [line.strip() for line in ocr["text"].splitlines() if line.strip()]
+            content_hash = hashlib.sha256(image_bytes).hexdigest()
+            pages = [{"page": 1, "lines": lines, "source_method": "apple_vision"}]
+            result = {
+                "filename": filename.strip(),
+                "media_type": mime_type,
+                "content_hash": "sha256:" + content_hash,
+                "byte_size": len(image_bytes),
+                "pages": pages,
+                "document_blocks": _document_blocks(pages, source_id, content_hash),
+                "extracted_text": "\n".join(lines),
+                "extraction_method": "apple_vision_job_image_v1",
+                "warnings": [],
+                "model_call_made": False,
+                "processing_boundary": "localhost_transient_job_image_ocr",
+                "runtime_snapshot_id": snapshot["snapshot_id"],
+            }
+        except (CareerDocumentError, KeyError, ValueError) as error:
+            self.send_json(HTTPStatus.BAD_REQUEST, {
+                "error": str(error) or "job_local_image_ocr_failed",
+                "persistence": "not_written",
+                "model_call_made": False,
+            })
+            return
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": "invalid_document_request", "persistence": "not_written", "model_call_made": False})
+            return
+        self.send_json(HTTPStatus.OK, result)
+
+    def read_local_source_for_model(self) -> None:
+        """Read original source ephemerally for Model-mode retrieval; never write back."""
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+            if content_length <= 0 or content_length > 12_000_000:
+                raise CareerDocumentError("invalid_source_read_request_size")
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            snapshot = validate_runtime_snapshot(payload.get("runtime_snapshot"))
+            if snapshot.mode != "model" or snapshot.capabilities.ai_conversation != "supported":
+                raise CareerDocumentError("source_read_model_mode_required")
+            material_type = payload.get("material_type")
+            source_id = payload.get("source_document_id")
+            expected_prefix = "source-job-" if material_type == "JOB" else "source-candidate-" if material_type == "CANDIDATE" else None
+            if not expected_prefix or not isinstance(source_id, str) or not source_id.startswith(expected_prefix):
+                raise CareerDocumentError("invalid_source_read_identity")
+            media_type = payload.get("media_type")
+            if media_type in {"image/png", "image/jpeg"}:
+                decoded = decode_image_data_urls(payload)
+                if len(decoded) != 1:
+                    raise CareerDocumentError("source_read_image_count_invalid")
+                _, image_bytes = decoded[0]
+                with tempfile.TemporaryDirectory(prefix="ariadne-source-read-") as directory:
+                    image_path = Path(directory) / ("source.png" if media_type == "image/png" else "source.jpg")
+                    image_path.write_bytes(image_bytes)
+                    ocr = run_apple_vision_ocr(image_path)
+                lines = [line.strip() for line in ocr["text"].splitlines() if line.strip()]
+                result = {"extracted_text": "\n".join(lines), "content_hash": "sha256:" + hashlib.sha256(image_bytes).hexdigest(), "extraction_method": "ephemeral_apple_vision_source_read_v1"}
+            elif material_type == "JOB":
+                result = extract_job_document_only(payload, PDF_TEXT_SCRIPT_PATH, PDF_VISUAL_OCR_SCRIPT_PATH)
+            else:
+                result = extract_career_document_only(payload, PDF_TEXT_SCRIPT_PATH, PDF_VISUAL_OCR_SCRIPT_PATH)
+            if result["content_hash"] != payload.get("expected_content_hash"):
+                raise CareerDocumentError("source_read_integrity_mismatch")
+            self.send_json(HTTPStatus.OK, {
+                "source_document_id": source_id,
+                "content_hash": result["content_hash"],
+                "extracted_text": result["extracted_text"],
+                "extraction_method": result["extraction_method"],
+                "read_only": True,
+                "writeback": False,
+                "model_call_made": False,
+                "network_call_made": False,
+                "runtime_snapshot_id": snapshot.snapshot_id,
+            })
+        except (CareerDocumentError, ExecutionContractError, KeyError, ValueError) as error:
+            self.send_json(HTTPStatus.UNPROCESSABLE_ENTITY, {
+                "error": str(error) or "SOURCE_UNAVAILABLE",
+                "read_only": True,
+                "writeback": False,
+                "model_call_made": False,
+                "network_call_made": False,
+                "persistence": "not_written",
+            })
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": "invalid_source_read_request", "network_call_made": False, "persistence": "not_written"})
 
     def structure_local_candidate_proposal(self) -> None:
         """Run existing deterministic CareerEntity rules over an ExtractionArtifact payload only."""

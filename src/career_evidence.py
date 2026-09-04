@@ -1538,23 +1538,20 @@ def extract_career_document(payload: dict, pdf_script_path: Path, visual_ocr_scr
     }
 
 
-def extract_career_document_only(
+def _extract_document_only(
     payload: dict,
     pdf_script_path: Path,
     visual_ocr_script_path: Path | None = None,
+    *,
+    source_prefix: str,
+    invalid_source_code: str,
+    processing_boundary: str,
 ) -> dict:
-    """Extract a bounded local Candidate source without proposing CareerEntities.
-
-    Slice 4A deliberately shares the mature mechanical extraction primitives
-    above while stopping before ``propose_entities``.  The caller supplies the
-    already-chosen canonical SourceDocument ID so DocumentBlock provenance is
-    linked to the same non-authoritative source record that the browser will
-    persist.
-    """
+    """Extract one bounded local source without semantic structuring."""
     filename, media_type = _validate_identity(payload.get("filename"), payload.get("media_type"))
     source_id = payload.get("source_document_id")
-    if not isinstance(source_id, str) or not source_id.startswith("source-candidate-") or len(source_id) > 160:
-        raise CareerDocumentError("invalid_candidate_source_document_id")
+    if not isinstance(source_id, str) or not source_id.startswith(source_prefix) or len(source_id) > 160:
+        raise CareerDocumentError(invalid_source_code)
     content = _decode_data_url(payload.get("document_data_url"), media_type)
     extraction_warnings: list[str] = []
     if media_type == "application/pdf":
@@ -1586,5 +1583,37 @@ def extract_career_document_only(
         "extraction_method": extraction_method,
         "warnings": extraction_warnings,
         "model_call_made": False,
-        "processing_boundary": "localhost_transient_candidate_extraction",
+        "processing_boundary": processing_boundary,
     }
+
+
+def extract_career_document_only(
+    payload: dict,
+    pdf_script_path: Path,
+    visual_ocr_script_path: Path | None = None,
+) -> dict:
+    """Extract a bounded local Candidate source without proposing CareerEntities."""
+    return _extract_document_only(
+        payload,
+        pdf_script_path,
+        visual_ocr_script_path,
+        source_prefix="source-candidate-",
+        invalid_source_code="invalid_candidate_source_document_id",
+        processing_boundary="localhost_transient_candidate_extraction",
+    )
+
+
+def extract_job_document_only(
+    payload: dict,
+    pdf_script_path: Path,
+    visual_ocr_script_path: Path | None = None,
+) -> dict:
+    """Extract a bounded local Job source without proposing Job semantics."""
+    return _extract_document_only(
+        payload,
+        pdf_script_path,
+        visual_ocr_script_path,
+        source_prefix="source-job-",
+        invalid_source_code="invalid_job_source_document_id",
+        processing_boundary="localhost_transient_job_extraction",
+    )

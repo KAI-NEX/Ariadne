@@ -57,6 +57,13 @@ assert len(calls) == 1 and calls[0][0] == HTTPStatus.OK
 runtime_payload = calls[0][1]
 assert runtime_payload["provider"] == "deepseek"
 assert runtime_payload["models"]
+assert [model["model_id"] for model in runtime_payload["models"]] == [
+    "deepseek-v4-flash-vision-exp",
+    "deepseek-v4-pro",
+]
+job_conversation_option = runtime_payload["models"][1]
+assert job_conversation_option["runtime_capabilities"]["ai_conversation"] == "supported"
+assert job_conversation_option["adapter_version"] is None
 assert runtime_payload["network_call_made"] is False
 assert runtime_payload["career_data_sent"] is False
 

@@ -35,6 +35,16 @@ assert.equal(Gate.operationGate("ai_conversation", conversationAuthority).allowe
 assert.equal(Gate.operationGate("candidate_import", conversationAuthority).allowed, false);
 assert.equal(conversationAuthority.capabilities.vision, "unsupported");
 assert.equal(Gate.modelDescriptorForRuntime(conversationAuthority.runtime), Gate.CANDIDATE_CONVERSATION_MODEL_ADAPTER);
+assert.equal(Gate.modelDescriptorForRuntime(conversationAuthority.runtime, "candidate_conversation"), Gate.CANDIDATE_CONVERSATION_MODEL_ADAPTER);
+assert.equal(Gate.modelDescriptorForRuntime(conversationAuthority.runtime, "job_conversation"), Gate.JOB_CONVERSATION_MODEL_ADAPTER);
+assert.equal(Gate.modelDescriptorForRuntime(conversationAuthority.runtime, "job_model_import"), Gate.JOB_MODEL_IMPORT_ADAPTER);
+const jobModelImportAuthority = Gate.authorityFrom(conversationAuthority.runtime, "job_model_import");
+assert.equal(Gate.operationGate("job_model_import", jobModelImportAuthority).allowed, true);
+assert.equal(jobModelImportAuthority.capabilities.job_model_structuring, "supported");
+assert.equal(conversationAuthority.capabilities.job_model_structuring, "unsupported");
+assert.equal(Gate.authorityFrom(conversationAuthority.runtime, "candidate_conversation").capabilities.ai_conversation, "supported");
+assert.equal(Gate.authorityFrom(conversationAuthority.runtime, "job_conversation").capabilities.ai_conversation, "supported");
+assert.equal(Gate.operationGate("candidate_conversation").operation, "candidate_conversation");
 
 assert.equal(Gate.currentAuthority(storageWith(null)).runtime.mode, "local");
 assert.throws(() => Gate.currentAuthority(storageWith("{not-json")), (error) => error.code === "current_runtime_storage_malformed");
@@ -72,6 +82,7 @@ const careerHtml = read("public/career-evidence.html");
 const careerJs = read("public/career-evidence.js");
 const localHtml = read("public/local-first.html");
 const localJs = read("public/local-first.js");
+const productShell = read("public/product-shell-domain.js");
 
 for (const html of [candidateDetail, jobDetail, personalImport, jobImport]) {
   assert.ok(html.indexOf("runtime-capabilities.js") < html.indexOf("runtime-capability-gate.js"));
@@ -80,18 +91,24 @@ for (const html of [candidateDetail, jobDetail, personalImport, jobImport]) {
 assert.match(candidateDetail, /id="candidate-ai-pane" class="v1-conversation-pane hidden"/);
 assert.match(jobDetail, /id="job-ai-pane" class="v1-conversation-pane hidden"/);
 assert.match(personalImport, /仅本地读取、提取与确定规则；不调用模型服务商/);
-assert.match(jobImport, /本地演示样例 · 不读取文件内容 · 无模型调用/);
+assert.match(jobImport, /本地读取真实内容 · 原始来源持久保留 · 无模型调用/);
 assert.match(personalImport, /开始本地提取/);
-assert.match(jobImport, /开始本地演示整理/);
+assert.match(jobImport, /开始本地整理/);
+assert.doesNotMatch(jobImport, /data-job-processing-mode|id="job-processing-modes"/);
 assert.match(personalImport, /local-candidate-extraction-domain\.js/);
 assert.match(personalImport, /candidate-model-runtime-domain\.js/);
+assert.match(jobImport, /local-job-extraction-domain\.js/);
+assert.match(jobImport, /job-context-domain\.js/);
 
 assert.doesNotMatch(pages, /localStorage|preview-source|appendDemoMessage|createConversation|candidatePatchFor|jobPatchFor/);
 assert.match(pages, /currentOperationGate\("candidate_import"\)/);
-assert.match(pages, /currentOperationGate\("job_import"\)/);
-assert.match(pages, /currentOperationGate\("ai_conversation"\)/);
+assert.match(pages, /currentOperationGate\(modelMode \? "job_model_import" : "job_import"\)/);
+assert.match(pages, /currentOperationGate\(operation\)/);
+assert.match(pages, /"candidate_conversation"/);
+assert.match(pages, /"job_conversation"/);
 assert.match(pages, /runtime\.mode === "model" && gate\.allowed/);
-assert.match(pages, /pane\?\.querySelectorAll\("input, textarea, button"\)[\s\S]*control\.disabled = !conversationAllowed/);
+assert.match(pages, /ProductShell\.applyDetailRuntime\(shell,/);
+assert.match(productShell, /shell\.conversationPane\.querySelectorAll\("input, textarea, button"\)[\s\S]*control\.disabled = !conversationAllowed/);
 assert.match(pages, /fetch\("\/api\/local-ocr-capability"/);
 assert.match(pages, /fetch\(image \? "\/api\/local-candidate-image-ocr" : "\/api\/local-candidate-extract"/);
 assert.match(pages, /fetch\("\/api\/candidate-model-structure"/);
@@ -109,14 +126,25 @@ assert.match(candidateRun, /createRuntimeSnapshot/);
 assert.match(candidateProcess, /snapshot\.snapshot_id/);
 
 const jobProcess = pages.slice(pages.indexOf("async function processJobSource"), pages.indexOf("async function runJobProcessing"));
-assert.ok(jobProcess.indexOf('batchAuthority.runtime.mode !== "local"') < jobProcess.indexOf("Demo.createLocalJobFixture"));
-assert.ok(jobProcess.indexOf("signal.aborted") < jobProcess.indexOf("LocalJobLifecycle.persistPendingImport"));
-const jobRun = pages.slice(pages.indexOf("async function runJobProcessing"), pages.indexOf("function initJobLibrary"));
+assert.ok(jobProcess.indexOf('snapshot.mode !== "local"') < jobProcess.indexOf("LocalJob.persistCanonicalSource"));
+assert.ok(jobProcess.indexOf("LocalJob.persistCanonicalSource") < jobProcess.indexOf("signal.aborted"));
+assert.match(jobProcess, /extraction_artifacts/);
+assert.match(jobProcess, /JobContext\.proposalFor/);
+assert.doesNotMatch(jobProcess, /Demo\.createLocalJobFixture|LocalJobLifecycle\.persistPendingImport/);
+const jobRun = pages.slice(pages.indexOf("async function runJobProcessing"), pages.indexOf("function jobReviewMarkup"));
+assert.match(jobRun, /const gate = refreshJobImportGate\(\)/);
+assert.doesNotMatch(jobRun, /currentOperationGate|modelDescriptorForRuntime|job_model_structuring/);
 const jobCancel = jobRun.match(/if \(result\.cancelled\) \{([\s\S]*?)\n          \}/)?.[1] || "";
 assert.match(jobCancel, /return;/);
 assert.doesNotMatch(jobCancel, /continue|completeEmbeddedImport|returnToCardLibrary/);
 assert.match(jobCancel, /当前来源未形成成功结果/);
 assert.match(jobRun, /剩余文件没有处理/);
+const jobGate = pages.slice(pages.indexOf("function refreshJobImportGate"), pages.indexOf("function formatBytes"));
+assert.match(jobGate, /RuntimeGate\.readStoredRuntime\(\)/);
+assert.match(jobGate, /currentOperationGate\(modelMode \? "job_model_import" : "job_import"\)/);
+assert.match(jobGate, /byId\("job-file-input"\)\.disabled = jobProcessingInProgress \|\| !gate\.allowed/);
+assert.match(jobGate, /byId\("job-dropzone"\)\.disabled = jobProcessingInProgress \|\| !gate\.allowed/);
+assert.doesNotMatch(jobGate, /authorityFrom\(\{ mode: "(?:local|model)"/);
 
 for (const labels of [Demo.CANDIDATE_PROCESSING_STATES, Demo.JOB_PROCESSING_STATES]) {
   for (const [, label] of labels) assert.doesNotMatch(label, /AI|模型|理解|识别/);

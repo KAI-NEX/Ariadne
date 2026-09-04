@@ -3,11 +3,12 @@
 (function attachCandidateModelRuntime(root, factory) {
   const truth = root.AriadneTruthPersistence || (typeof module === "object" && module.exports ? require("./truth-persistence-domain.js") : null);
   const candidate = root.CandidateContextDomain || (typeof module === "object" && module.exports ? require("./candidate-context-domain.js") : null);
-  const api = factory(truth, candidate);
+  const lifecycle = root.AriadneModelImportLifecycle || (typeof module === "object" && module.exports ? require("./model-import-lifecycle-domain.js") : null);
+  const api = factory(truth, candidate, lifecycle);
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.AriadneCandidateModelRuntime = api;
-}(typeof globalThis !== "undefined" ? globalThis : this, function createCandidateModelRuntime(Truth, Candidate) {
-  if (!Truth || !Candidate) throw new Error("candidate_model_runtime_dependencies_required");
+}(typeof globalThis !== "undefined" ? globalThis : this, function createCandidateModelRuntime(Truth, Candidate, ModelImportLifecycle) {
+  if (!Truth || !Candidate || !ModelImportLifecycle) throw new Error("candidate_model_runtime_dependencies_required");
 
   const PROVIDER_ID = "deepseek";
   const MODEL_ID = "deepseek-v4-flash-vision-exp";
@@ -33,15 +34,17 @@
   }
 
   async function runtimeFingerprint(snapshot) {
-    const fields = Object.fromEntries(["mode", "provider", "model", "protocol", "adapter_version", "prompt_version", "schema_version", "delivery_method"].map((key) => [key, snapshot[key]]));
-    return `sha256:${await sha256(canonicalJson(fields))}`;
+    return ModelImportLifecycle.runtimeFingerprint(snapshot);
   }
 
   async function operationIdentityFor(source, snapshot, consent) {
-    const fingerprint = await runtimeFingerprint(snapshot);
-    const operationType = "CANDIDATE_MODEL_STRUCTURING";
-    const operationId = `candidate-model-op-${await sha256(`${source.source_document_id}|${operationType}|${fingerprint}|${consent.consent_id}`)}`;
-    return Object.freeze({ operation_id: operationId, operation_type: operationType, source_document_id: source.source_document_id, runtime_fingerprint: fingerprint, consent_id: consent.consent_id });
+    return ModelImportLifecycle.operationIdentityFor({
+      source_document_id: source.source_document_id,
+      operation_type: "CANDIDATE_MODEL_STRUCTURING",
+      operation_prefix: "candidate-model-op",
+      snapshot,
+      consent_id: consent.consent_id,
+    });
   }
 
   function abortError() {
@@ -89,24 +92,7 @@
   }
 
   function claimProcessingRun(database, pendingRun) {
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction(["processing_runs"], "readwrite");
-      let claimed = true;
-      let failure = null;
-      const request = transaction.objectStore("processing_runs").add(structuredClone(pendingRun));
-      request.onerror = (event) => {
-        if (request.error?.name === "ConstraintError") {
-          event?.preventDefault?.();
-          event?.stopPropagation?.();
-          claimed = false;
-          return;
-        }
-        failure = request.error || new Error("candidate_model_processing_run_claim_failed");
-      };
-      transaction.oncomplete = () => resolve(claimed);
-      transaction.onerror = () => reject(failure || transaction.error || new Error("candidate_model_processing_run_claim_failed"));
-      transaction.onabort = () => reject(failure || transaction.error || new Error("candidate_model_processing_run_claim_aborted"));
-    });
+    return ModelImportLifecycle.claimProcessingRun(database, pendingRun, "candidate_model_processing_run_claim_failed");
   }
 
   function truthRef(ref) {
@@ -345,15 +331,7 @@
 
   function consentFor(source, snapshot, confirmedAt = now(), consentId = id("consent-candidate-model")) {
     assertPdfSource(source);
-    return Object.freeze({
-      explicitly_confirmed: true,
-      consent_id: consentId,
-      source_document_id: source.source_document_id,
-      provider: snapshot.provider,
-      model: snapshot.model,
-      delivery_method: snapshot.delivery_method,
-      confirmed_at: confirmedAt,
-    });
+    return ModelImportLifecycle.consentFor({ source_document_id: source.source_document_id, snapshot, confirmed_at: confirmedAt, consent_id: consentId });
   }
 
   function requestFor({ source, sourceDocument, documentDataUrl, snapshot, run, consent, operationIdentity }) {
@@ -370,35 +348,23 @@
   }
 
   function persistSuccessfulResult(database, runningRun, proposals, signal, isActive = () => true) {
-    if (signal?.aborted) return Promise.reject(abortError());
     const succeeded = processingRunFor({ source_document_id: runningRun.source_document_id, batch_id: runningRun.batch_id }, runningRun.runtime_snapshot_id, "SUCCEEDED", runningRun.started_at, {
       run_id: runningRun.run_id,
       started_at: runningRun.started_at,
       finished_at: now(),
       proposal_ids: proposals.map((proposal) => proposal.proposal_id),
     });
-    return new Promise((resolve, reject) => {
-      const transaction = database.transaction(["processing_runs", "context_proposals"], "readwrite");
-      let contractError = null;
-      const onAbort = () => transaction.abort();
-      signal?.addEventListener?.("abort", onAbort, { once: true });
-      const request = transaction.objectStore("processing_runs").get(runningRun.run_id);
-      request.onsuccess = () => {
-        try {
-          const current = Truth.validateProcessingRun(request.result);
-          if (current.status !== "RUNNING" || current.runtime_snapshot_id !== runningRun.runtime_snapshot_id || current.source_document_id !== runningRun.source_document_id) {
-            throw new Error("candidate_model_processing_run_stale");
-          }
-          if (signal?.aborted) throw abortError();
-          if (!isActive()) throw new Error("candidate_model_processing_run_stale");
-          proposals.forEach((proposal) => transaction.objectStore("context_proposals").add(structuredClone(proposal)));
-          transaction.objectStore("processing_runs").put(structuredClone(succeeded));
-        } catch (error) { contractError = error; transaction.abort(); }
-      };
-      request.onerror = () => { contractError = request.error || new Error("candidate_model_processing_run_read_failed"); transaction.abort(); };
-      transaction.oncomplete = () => { signal?.removeEventListener?.("abort", onAbort); resolve(succeeded); };
-      transaction.onerror = () => { signal?.removeEventListener?.("abort", onAbort); reject(contractError || transaction.error || new Error("candidate_model_result_persistence_failed")); };
-      transaction.onabort = () => { signal?.removeEventListener?.("abort", onAbort); reject(contractError || (signal?.aborted ? abortError() : transaction.error || new Error("candidate_model_result_persistence_aborted"))); };
+    return ModelImportLifecycle.persistClaimedProposals(database, {
+      running_run: runningRun,
+      succeeded_run: succeeded,
+      proposals,
+      signal,
+      is_active: isActive,
+      validate_run: Truth.validateProcessingRun,
+      stale_code: "candidate_model_processing_run_stale",
+      read_code: "candidate_model_processing_run_read_failed",
+      persistence_code: "candidate_model_result_persistence_failed",
+      abort_error: abortError,
     });
   }
 

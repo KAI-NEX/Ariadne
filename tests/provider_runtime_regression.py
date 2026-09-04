@@ -6,7 +6,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.provider_runtime import (
     MULTIMODAL_VERIFIED, OPENAI_CHAT_COMPLETIONS, OPENAI_RESPONSES, ProviderRuntimeError,
     ModelDescriptor, TEXT, VISION, connection_request, deepseek_model_descriptors, descriptor_for, is_multimodal,
-    multimodal_connection_request, multimodal_smoke_passed, normalize_response, v1_selector_descriptors,
+    multimodal_connection_request, multimodal_smoke_passed, normalize_response, v1_runtime_selector_descriptors,
+    v1_selector_descriptors,
     resolve_credential_reference,
 )
 
@@ -19,7 +20,7 @@ assert pro.protocol == OPENAI_CHAT_COMPLETIONS
 assert pro.runtime_capability_basis == "adapter_verified"
 assert pro.runtime_capabilities["ai_conversation"] == "supported"
 assert pro.runtime_capabilities["candidate_model_structuring"] == "unsupported"
-assert pro.adapter_version == "deepseek-candidate-conversation-v3" and pro.delivery_method is None
+assert pro.adapter_version is None and pro.delivery_method is None  # adapter identity is resolved by product operation
 assert vision.protocol == OPENAI_CHAT_COMPLETIONS and vision.capabilities == (TEXT, VISION)
 assert vision.multimodal_readiness == MULTIMODAL_VERIFIED and vision.discovery_source == "qualification_2026-09-03" and is_multimodal(vision)
 assert vision.runtime_capability_basis == "adapter_verified"
@@ -33,6 +34,7 @@ assert not is_multimodal(unknown)
 assert descriptor_for("deepseek-v4-pro", descriptors) == pro
 assert resolve_credential_reference("keychain://synthetic", "keychain://synthetic", lambda: "synthetic-secret") == "synthetic-secret"
 assert v1_selector_descriptors(descriptors) == [vision]  # only the model-level official vision model is visible
+assert v1_runtime_selector_descriptors(descriptors) == [pro, vision]
 verified = ModelDescriptor("fixture", "verified-vision", "Fixture vision", OPENAI_CHAT_COMPLETIONS, (TEXT, VISION), "fixture", False, MULTIMODAL_VERIFIED)
 assert v1_selector_descriptors([flash, verified]) == [verified]
 

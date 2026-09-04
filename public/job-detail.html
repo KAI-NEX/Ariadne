@@ -4,10 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ariadne · 职位详情</title>
-    <link rel="stylesheet" href="/styles.css?v=lifecycle-final-v1">
+    <link rel="stylesheet" href="/styles.css?v=shared-product-shell-v1">
   </head>
   <body class="v1-body" data-v1-page="job-detail">
-    <main class="v1-page-shell v1-detail-shell">
+    <main class="v1-page-shell v1-detail-shell" data-ariadne-shell="detail">
       <header class="v1-topbar">
         <a class="v1-back" href="/jd.html" aria-label="返回职位描述"></a>
         <p class="v1-detail-breadcrumb">职位描述 / 职位上下文</p>
@@ -44,9 +44,10 @@
 
         <aside id="job-ai-pane" class="v1-conversation-pane hidden" aria-labelledby="job-ai-heading">
           <div class="v1-conversation-heading"><p class="v1-section-label">AI 对话</p><span id="job-ai-runtime">仅限当前职位</span></div>
-          <h2 id="job-ai-heading">只讨论当前职位</h2>
-          <p class="v1-conversation-copy">使用当前选择的模型讨论这张职位卡片。回答仅解释当前职位内容，不评估候选人与职位的匹配程度。</p>
-          <div id="job-conversation-messages" class="v1-conversation-messages" aria-live="polite"></div>
+          <h2 id="job-ai-heading">职位智能分析</h2>
+          <p class="v1-conversation-copy">每次对话都会读取当前职位版本与当前个人资料；未确认的 Working 信息会明确标注，不会写入正式个人资料。</p>
+          <div id="job-conversation-messages" class="v1-conversation-messages v1-conversation-thread" aria-live="polite"></div>
+          <p id="job-conversation-status" class="v1-conversation-empty" aria-live="polite"></p>
           <section id="job-patch-proposal" class="v1-patch-card hidden">
             <p class="v1-section-label">待审核修改建议</p>
             <div class="v1-diff-grid"><div><small>修改前</small><p id="job-patch-before"></p></div><div><small>修改后</small><p id="job-patch-after"></p></div></div>
@@ -69,11 +70,21 @@
     </div>
     <script src="/runtime-capabilities.js?v=runtime-gate-v1"></script>
     <script src="/runtime-capability-gate.js?v=runtime-gate-v1"></script>
+    <script src="/truth-persistence-domain.js?v=job-intelligence-v1"></script>
+    <script src="/raw-source-storage-domain.js?v=job-intelligence-v1"></script>
+    <script src="/job-intelligence-contract-manifest.js?v=job-intelligence-v1"></script>
+    <script src="/job-context-domain.js?v=job-intelligence-v1"></script>
+    <script src="/job-candidate-context-domain.js?v=job-intelligence-v1"></script>
+    <script src="/source-retrieval-domain.js?v=job-intelligence-v1"></script>
+    <script src="/job-conversation-domain.js?v=product-convergence-v2"></script>
+    <script src="/job-conversation-persistence-domain.js?v=product-convergence-v1"></script>
+    <script src="/conversation-ui-domain.js?v=shared-conversation-ui-v1"></script>
+    <script src="/product-shell-domain.js?v=shared-product-shell-v1"></script>
     <script src="/local-context-lifecycle-domain.js?v=lifecycle-final-v1"></script>
     <script src="/local-job-lifecycle-domain.js?v=lifecycle-final-v1"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
     <script src="/scoped-conversation-domain.js"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
-    <script src="/v1-pages.js?v=lifecycle-final-v1"></script>
+    <script src="/v1-pages.js?v=shared-product-shell-v1"></script>
   </body>
 </html>

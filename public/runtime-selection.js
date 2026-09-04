@@ -89,9 +89,14 @@ function failureCopy(layer) {
   return { AUTH: "连接失败：请检查 Gemini API Key。", CORS: "连接失败：浏览器无法直接访问 Gemini。", PROVIDER: "连接失败：Gemini 暂时不可用。", MODEL: "连接失败：当前账号没有可用的图文模型。", REQUEST: "连接失败：Gemini 未接受图文验证请求。", RESPONSE_EXTRACTION: "连接失败：无法读取 Gemini 返回内容。", EMPTY_RESPONSE: "连接失败：Gemini 返回了空内容。", SMOKE_MISMATCH: "连接失败：模型未正确读取测试图片。", credential: "连接失败：请检查 DeepSeek 凭据。", transport: "连接失败：无法访问 DeepSeek。", provider: "连接失败：DeepSeek 暂时不可用。", model: "连接失败：该模型当前不可用。", capability: "该模型尚未完成图文验证。", protocol: "该模型的连接协议尚未确认。", unexpected_response: "连接失败：服务返回异常。" }[layer] || "连接失败：请重试。";
 }
 
-function selectOfficialMultimodalModel(model) {
+function isVerifiedRuntimeModel(model) {
+  return model?.provider_id === "deepseek" && model.runtime_capability_basis === "adapter_verified"
+    && (model.multimodal_readiness === "VERIFIED" || model.runtime_capabilities?.ai_conversation === "supported");
+}
+
+function selectVerifiedRuntimeModel(model) {
   const descriptor = selectableModels().find((item) => item.provider_id === "deepseek" && item.model_id === model);
-  applyReadyModel(descriptor || { provider_id: "deepseek", model_id: model, multimodal_readiness: "VERIFIED" });
+  applyReadyModel(descriptor);
   closeMenu(); render();
 }
 
@@ -103,7 +108,7 @@ function applyReadyModel(model, shouldPersist = true) {
   if (model.connection_verified) {
     state.phase = "READY";
     state.diagnostics = { purpose: "MULTIMODAL_CONNECTION_TEST", provider: model.provider_id, model: model.model_id, provider_name: model.provider_name, multimodal_connection_ready: true, structured_output_verified: false, career_data_sent: false };
-  } else if (model.provider_id === "deepseek" && model.multimodal_readiness === "VERIFIED") {
+  } else if (isVerifiedRuntimeModel(model)) {
     state.phase = "OFFICIAL_READY";
     state.diagnostics = { purpose: "OFFICIAL_MODEL_CAPABILITY", capability_basis: "official_contract", multimodal_connection_ready: false, structured_output_verified: false, career_data_sent: false, network_call_made: false };
   } else {
@@ -144,12 +149,12 @@ function renderModels() {
     button.className = "runtime-menu-item runtime-existing-model";
     button.type = "button"; button.setAttribute("role", "option"); button.setAttribute("aria-selected", "false"); button.dataset.model = model.model_id; button.dataset.provider = model.provider_id; button.style.setProperty("--runtime-menu-index", String(index));
     title.textContent = labelFor(model);
-    detail.textContent = model.multimodal_readiness === "VERIFIED" ? "图文模型" : "实验图文模型";
+    detail.textContent = model.runtime_capabilities?.ai_conversation === "supported" ? "职位 / 候选人对话" : model.multimodal_readiness === "VERIFIED" ? "图文模型" : "实验图文模型";
     button.append(title, detail); container.append(button);
   });
   document.querySelectorAll(".runtime-existing-model").forEach((button) => button.addEventListener("click", () => {
     const model = selectableModels().find((item) => item.model_id === button.dataset.model && item.provider_id === button.dataset.provider);
-    if (model?.provider_id === "deepseek" && model.multimodal_readiness === "VERIFIED") selectOfficialMultimodalModel(button.dataset.model);
+    if (isVerifiedRuntimeModel(model)) selectVerifiedRuntimeModel(button.dataset.model);
     else if (model?.connection_verified) selectAddedMultimodalModel(model);
     else checkModel(button.dataset.model);
   }));
