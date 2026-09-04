@@ -271,7 +271,7 @@
   const INTERNAL_IDENTITY_KEYS = Object.freeze([
     "item_id", "fact_id", "uncertainty_id", "working_model_id", "source_document_id", "session_id",
     "conversation_id", "turn_id", "execution_id", "generation", "action_id", "candidate_action_id",
-    "runtime_snapshot_id", "candidate_context_id", "fingerprint",
+    "runtime_snapshot_id", "candidate_context_id", "fingerprint", "card_ref", "active_card_ref",
   ]);
 
   function collectInternalIdentities(value, result = new Set()) {

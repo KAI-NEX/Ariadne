@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ariadne · 职位详情</title>
-    <link rel="stylesheet" href="/styles.css?v=shared-product-shell-v1">
+    <link rel="stylesheet" href="/styles.css?v=candidate-job-parity-v1">
   </head>
   <body class="v1-body" data-v1-page="job-detail">
     <main class="v1-page-shell v1-detail-shell" data-ariadne-shell="detail">
@@ -27,18 +27,18 @@
           <section class="v1-detail-block"><p class="v1-section-label">摘要</p><p id="job-summary" class="v1-detail-summary"></p></section>
           <section class="v1-detail-block"><p class="v1-section-label">任职要求</p><div id="job-requirements" class="v1-requirement-list"></div></section>
           <section class="v1-detail-block"><p class="v1-section-label">来源</p><p id="job-source" class="v1-source-note"></p></section>
-          <form id="job-edit-form" class="v1-edit-form v1-detail-state-panel hidden" aria-hidden="true">
-            <label>职位名称<input id="job-edit-title"></label>
-            <label>公司<input id="job-edit-company"></label>
-            <label>地点<input id="job-edit-location"></label>
-            <label>摘要<textarea id="job-edit-summary"></textarea></label>
-            <label>任职要求（每行一条）<textarea id="job-edit-requirements"></textarea></label>
-            <div class="v1-button-row v1-edit-actions"><button id="cancel-job-edit" class="v1-tertiary-button" type="button">取消</button><span class="v1-edit-primary-actions"><button id="preview-job-edit" class="v1-primary-button" type="button">预览修改</button><button id="open-job-delete" class="v1-primary-button v1-detail-remove-button" type="button">删除</button></span></div>
+          <form id="job-edit-form" class="v1-edit-form v1-detail-state-panel hidden" data-ariadne-edit-shell="detail" aria-hidden="true">
+            <label class="v1-edit-field" data-ariadne-edit-field>职位名称<input id="job-edit-title"></label>
+            <label class="v1-edit-field" data-ariadne-edit-field>公司<input id="job-edit-company"></label>
+            <label class="v1-edit-field" data-ariadne-edit-field>地点<input id="job-edit-location"></label>
+            <label class="v1-edit-field" data-ariadne-edit-field>摘要<textarea id="job-edit-summary"></textarea></label>
+            <label class="v1-edit-field" data-ariadne-edit-field>任职要求（每行一条）<textarea id="job-edit-requirements"></textarea></label>
+            <div class="v1-button-row v1-edit-actions" data-ariadne-edit-actions><button id="cancel-job-edit" class="v1-tertiary-button" data-edit-cancel type="button">取消</button><span class="v1-edit-primary-actions"><button id="preview-job-edit" class="v1-primary-button" data-edit-preview type="button">预览修改</button><button id="open-job-delete" class="v1-primary-button v1-detail-remove-button" data-edit-destructive type="button">删除</button></span></div>
           </form>
           <section id="job-edit-preview" class="v1-patch-card hidden">
             <p class="v1-section-label">直接编辑预览</p>
             <div class="v1-diff-grid"><div><small>修改前</small><p id="job-edit-before"></p></div><div><small>修改后</small><p id="job-edit-after"></p></div></div>
-            <div class="v1-button-row v1-detail-action-row"><button id="confirm-job-edit" class="v1-primary-button" type="button">确认保存</button><button id="back-to-job-edit" class="v1-tertiary-button" type="button">返回编辑</button></div>
+            <div class="v1-button-row" data-edit-preview-actions><button id="confirm-job-edit" class="v1-primary-button" data-edit-apply type="button">确认保存</button><button id="back-to-job-edit" class="v1-tertiary-button" data-edit-back type="button">返回编辑</button></div>
           </section>
         </article>
 
@@ -47,7 +47,7 @@
           <h2 id="job-ai-heading">职位智能分析</h2>
           <p class="v1-conversation-copy">每次对话都会读取当前职位版本与当前个人资料；未确认的 Working 信息会明确标注，不会写入正式个人资料。</p>
           <div id="job-conversation-messages" class="v1-conversation-messages v1-conversation-thread" aria-live="polite"></div>
-          <p id="job-conversation-status" class="v1-conversation-empty" aria-live="polite"></p>
+          <div id="job-conversation-status" class="v1-conversation-status hidden" aria-live="polite"></div>
           <section id="job-patch-proposal" class="v1-patch-card hidden">
             <p class="v1-section-label">待审核修改建议</p>
             <div class="v1-diff-grid"><div><small>修改前</small><p id="job-patch-before"></p></div><div><small>修改后</small><p id="job-patch-after"></p></div></div>
@@ -56,7 +56,7 @@
           </section>
           <form id="job-conversation-form" class="v1-conversation-form">
             <label class="sr-only" for="job-conversation-input">询问当前职位</label>
-            <textarea id="job-conversation-input" placeholder="例如：这份职位最核心的三个要求是什么？"></textarea>
+            <div class="v1-composer-field"><textarea id="job-conversation-input" placeholder="例如：这份职位最核心的三个要求是什么？"></textarea></div>
             <button type="submit" aria-label="发送"></button>
           </form>
         </aside>
@@ -78,13 +78,14 @@
     <script src="/source-retrieval-domain.js?v=job-intelligence-v1"></script>
     <script src="/job-conversation-domain.js?v=product-convergence-v2"></script>
     <script src="/job-conversation-persistence-domain.js?v=product-convergence-v1"></script>
-    <script src="/conversation-ui-domain.js?v=shared-conversation-ui-v1"></script>
-    <script src="/product-shell-domain.js?v=shared-product-shell-v1"></script>
+    <script src="/processing-indicator-domain.js?v=ui-contract-addendum-v5"></script>
+    <script src="/conversation-ui-domain.js?v=shared-conversation-ui-v5"></script>
+    <script src="/product-shell-domain.js?v=detail-behavior-v1"></script>
     <script src="/local-context-lifecycle-domain.js?v=lifecycle-final-v1"></script>
     <script src="/local-job-lifecycle-domain.js?v=lifecycle-final-v1"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
     <script src="/scoped-conversation-domain.js"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
-    <script src="/v1-pages.js?v=shared-product-shell-v1"></script>
+    <script src="/v1-pages.js?v=computer-use-e2e-v3"></script>
   </body>
 </html>

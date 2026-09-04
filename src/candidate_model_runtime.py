@@ -1,4 +1,4 @@
-"""One verified Candidate-PDF Model Runtime adapter.
+"""One verified Candidate multimodal Model Runtime adapter.
 
 This module owns only the qualified DeepSeek rendered-page execution boundary.
 It performs no persistence and never invokes local semantic extraction.
@@ -28,10 +28,10 @@ from src.provider_runtime import OPENAI_CHAT_COMPLETIONS, ProviderRuntimeError, 
 
 PROVIDER_ID = "deepseek"
 MODEL_ID = "deepseek-v4-flash-vision-exp"
-ADAPTER_VERSION = "deepseek-candidate-pdf-v1"
-DELIVERY_METHOD = "rendered_pdf_pages"
+ADAPTER_VERSION = "deepseek-candidate-multimodal-v2"
+DELIVERY_METHOD = "source_or_rendered_images"
 CREDENTIAL_REF = "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision"
-MAX_PDF_BYTES = 8_000_000
+MAX_SOURCE_BYTES = 8_000_000
 
 
 class CandidateModelRuntimeError(ValueError):
@@ -48,7 +48,7 @@ class CandidateModelRuntimeError(ValueError):
 @dataclass(frozen=True)
 class CandidateModelRequest:
     source_document: dict[str, Any]
-    pdf_bytes: bytes
+    source_bytes: bytes
     processing_run_id: str
     operation_id: str
     runtime_snapshot: dict[str, Any]
@@ -131,6 +131,7 @@ def _validate_snapshot(value: Any) -> dict[str, Any]:
         or snapshot.adapter_version != ADAPTER_VERSION
         or snapshot.prompt_version != PROMPT_VERSION
         or snapshot.schema_version != CANDIDATE_SCHEMA_VERSION
+        or snapshot.operation != "CANDIDATE_IMAGE_IMPORT"
         or snapshot.delivery_method != DELIVERY_METHOD
         or snapshot.credential_ref != CREDENTIAL_REF
         or any(capabilities.get(name) != state for name, state in expected_capabilities.items())
@@ -146,16 +147,18 @@ def _validate_source(value: Any) -> dict[str, Any]:
     filename = _required_string(value.get("filename"), "candidate_model_source_invalid", 240)
     if Path(filename).name != filename:
         raise CandidateModelRuntimeError("candidate_model_source_invalid", "source")
+    source_type = value.get("source_type")
+    mime_type = value.get("mime_type")
+    valid_pdf = source_type == "PDF" and mime_type == "application/pdf" and filename.lower().endswith(".pdf")
+    valid_image = source_type == "IMAGE" and mime_type in {"image/png", "image/jpeg"} and filename.lower().endswith((".png", ".jpg", ".jpeg"))
     if (
         value.get("contract_id") != "ariadne-source-document-v1"
-        or value.get("source_type") != "PDF"
-        or value.get("mime_type") != "application/pdf"
         or value.get("material_type") != "CANDIDATE"
         or value.get("authority") != "SOURCE_INPUT_ONLY"
-        or not filename.lower().endswith(".pdf")
+        or not (valid_pdf or valid_image)
         or not source_id.startswith("source-candidate-")
     ):
-        raise CandidateModelRuntimeError("candidate_model_pdf_required", "source")
+        raise CandidateModelRuntimeError("candidate_model_multimodal_source_required", "source")
     _required_string(value.get("local_reference"), "candidate_model_source_reference_required", 512)
     content_hash = _required_string(value.get("content_hash"), "candidate_model_source_hash_invalid", 96)
     if not content_hash.startswith("sha256:") or len(content_hash) != 71:
@@ -163,22 +166,26 @@ def _validate_source(value: Any) -> dict[str, Any]:
     return value
 
 
-def _decode_pdf(data_url: Any, source: dict[str, Any]) -> bytes:
-    if not isinstance(data_url, str) or not data_url.startswith("data:application/pdf;base64,"):
-        raise CandidateModelRuntimeError("candidate_model_pdf_payload_invalid", "source")
+def _decode_source(data_url: Any, source: dict[str, Any]) -> bytes:
+    expected_prefix = f"data:{source['mime_type']};base64,"
+    if not isinstance(data_url, str) or not data_url.startswith(expected_prefix):
+        raise CandidateModelRuntimeError("candidate_model_source_payload_invalid", "source")
     try:
-        pdf_bytes = base64.b64decode(data_url.split(",", 1)[1], validate=True)
+        source_bytes = base64.b64decode(data_url.split(",", 1)[1], validate=True)
     except (binascii.Error, ValueError) as error:
-        raise CandidateModelRuntimeError("candidate_model_pdf_payload_invalid", "source") from error
-    if not pdf_bytes or len(pdf_bytes) > MAX_PDF_BYTES or not pdf_bytes.startswith(b"%PDF-"):
-        raise CandidateModelRuntimeError("candidate_model_pdf_payload_invalid", "source")
-    resolved_hash = "sha256:" + hashlib.sha256(pdf_bytes).hexdigest()
+        raise CandidateModelRuntimeError("candidate_model_source_payload_invalid", "source") from error
+    valid_signature = source["source_type"] == "PDF" and source_bytes.startswith(b"%PDF-")
+    valid_signature = valid_signature or source["mime_type"] == "image/png" and source_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+    valid_signature = valid_signature or source["mime_type"] == "image/jpeg" and source_bytes.startswith(b"\xff\xd8\xff")
+    if not source_bytes or len(source_bytes) > MAX_SOURCE_BYTES or not valid_signature:
+        raise CandidateModelRuntimeError("candidate_model_source_payload_invalid", "source")
+    resolved_hash = "sha256:" + hashlib.sha256(source_bytes).hexdigest()
     if resolved_hash != source["content_hash"]:
         raise CandidateModelRuntimeError("raw_source_integrity_mismatch", "source")
     expected_source_id = f"source-candidate-{resolved_hash.removeprefix('sha256:')}"
     if source["source_document_id"] != expected_source_id:
         raise CandidateModelRuntimeError("candidate_model_source_identity_mismatch", "source")
-    return pdf_bytes
+    return source_bytes
 
 
 def _validate_consent(value: Any, source: dict[str, Any], snapshot: dict[str, Any]) -> tuple[str, str]:
@@ -237,8 +244,8 @@ def validate_candidate_model_request(payload: Any) -> CandidateModelRequest:
     operation_id = _validate_operation(payload.get("operation_identity"), source, snapshot, consent_id)
     if run_id != f"run-{operation_id}":
         raise CandidateModelRuntimeError("candidate_model_operation_identity_invalid", "request")
-    pdf_bytes = _decode_pdf(payload.get("document_data_url"), source)
-    return CandidateModelRequest(source, pdf_bytes, run_id, operation_id, snapshot, consent_at)
+    source_bytes = _decode_source(payload.get("document_data_url"), source)
+    return CandidateModelRequest(source, source_bytes, run_id, operation_id, snapshot, consent_at)
 
 
 def resolve_credential(credential_ref: str, reader: Callable[[], str | None]) -> str:
@@ -298,14 +305,19 @@ def execute_candidate_model_request(
 ) -> dict[str, Any]:
     request = validate_candidate_model_request(payload)
     credential = resolve_credential(request.runtime_snapshot["credential_ref"], credential_reader)
-    try:
-        rendered_pages = render_pages(request.pdf_bytes)
-    except Exception as error:
-        raise CandidateModelRuntimeError("candidate_model_pdf_render_failed", "delivery") from error
+    if request.source_document["source_type"] == "PDF":
+        try:
+            rendered_pages = render_pages(request.source_bytes)
+        except Exception as error:
+            raise CandidateModelRuntimeError("candidate_model_pdf_render_failed", "delivery") from error
+        media_type = "image/jpeg"
+    else:
+        rendered_pages = [("1", request.source_bytes)]
+        media_type = request.source_document["mime_type"]
     if not rendered_pages or any(not page_number or not image for page_number, image in rendered_pages):
-        raise CandidateModelRuntimeError("candidate_model_pdf_render_failed", "delivery")
+        raise CandidateModelRuntimeError("candidate_model_source_delivery_failed", "delivery")
     provider_payload = build_deepseek_candidate_proposal_payload(
-        request.source_document["source_document_id"], MODEL_ID, rendered_pages,
+        request.source_document["source_document_id"], MODEL_ID, rendered_pages, media_type,
     )
     http_status, provider_response = provider_call(credential, provider_payload)
     diagnostics = response_diagnostics(provider_response, http_status)

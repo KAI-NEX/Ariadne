@@ -249,6 +249,23 @@ assert.equal(itemContext.candidate.other_item_directory[0].item_id, "item-educat
 assert(!("facts" in itemContext.candidate.other_item_directory[0]));
 assert.deepEqual(itemContext.open_uncertainties.map((entry) => entry.uncertainty_id), ["uncertain-work-001"]);
 
+// ITEM context carries history only for the currently open Candidate Material.
+// The full durable conversation remains available for Human-visible history,
+// while unrelated material bodies are not sent to the Provider.
+const switchedMaterialMessages = [
+  Persistence.createUserMessage({ message_id: "history-user-work", conversation_id: session.conversation_id, turn_id: "history-turn-work", text: "Synthetic work question.", created_at: timestamp(20) }),
+  Persistence.createAssistantMessage({ message_id: "history-assistant-work", conversation_id: session.conversation_id, turn_id: "history-turn-work", text: "Synthetic work answer.", provider: "deepseek", model: "deepseek-v4-pro", runtime_snapshot_id: "runtime-snapshot-conversation", candidate_action_id: "history-action-work", created_at: timestamp(20, 1) }),
+  Persistence.createUserMessage({ message_id: "history-user-education", conversation_id: session.conversation_id, turn_id: "history-turn-education", text: "Synthetic education question.", created_at: timestamp(21) }),
+  Persistence.createAssistantMessage({ message_id: "history-assistant-education", conversation_id: session.conversation_id, turn_id: "history-turn-education", text: "Synthetic education answer.", provider: "deepseek", model: "deepseek-v4-pro", runtime_snapshot_id: "runtime-snapshot-conversation", candidate_action_id: "history-action-education", created_at: timestamp(21, 1) }),
+];
+const switchedMaterialActions = [
+  { conversation_id: session.conversation_id, turn_id: "history-turn-work", created_at: timestamp(20, 1), focus_snapshot: { type: "ITEM", item_id: "item-work-001" }, observed_working_model: { working_model_id: working.working_model_id, version: working.version, fingerprint: working.fingerprint }, application_result: { status: "APPLIED" } },
+  { conversation_id: session.conversation_id, turn_id: "history-turn-education", created_at: timestamp(21, 1), focus_snapshot: { type: "ITEM", item_id: "item-education-001" }, observed_working_model: { working_model_id: working.working_model_id, version: working.version, fingerprint: working.fingerprint }, application_result: { status: "APPLIED" } },
+];
+const switchedItemContext = Compiler.compileContext({ session, working_model: working, observation: itemObservation, messages: switchedMaterialMessages, actions: switchedMaterialActions, current_user_message: current });
+assert.deepEqual(switchedItemContext.bounded_history.map((turn) => turn.turn_id), ["history-turn-work"]);
+assert.equal(switchedItemContext.diagnostics.history_turn_count, 1);
+
 const draftItem = { ...structuredClone(working.payload.items[0]), title: "Unsaved synthetic title" };
 const draft = { item_id: draftItem.item_id, item: draftItem, draft_fingerprint: await Conversation.draftFingerprintFor(draftItem) };
 const draftObservation = Conversation.createObservation({ candidate_context_id: session.subject_id, working_model: working, focus: { type: "ITEM_DRAFT", item_id: draft.item_id, draft_fingerprint: draft.draft_fingerprint } });

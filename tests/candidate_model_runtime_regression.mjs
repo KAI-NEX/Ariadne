@@ -13,8 +13,8 @@ const CandidateModel = require("../public/candidate-model-runtime-domain.js");
 const Review = require("../public/local-candidate-review-domain.js");
 const productShell = fs.readFileSync(path.join(root, "public/product-shell-domain.js"), "utf8");
 
-const exactAuthority = Gate.authorityFrom({ mode: "model", provider: "deepseek", model: CandidateModel.MODEL_ID });
-const exactGate = Gate.operationGate("candidate_import", exactAuthority);
+const exactAuthority = Gate.authorityFrom({ mode: "model", provider: "deepseek", model: CandidateModel.MODEL_ID }, "candidate_image_import");
+const exactGate = Gate.operationGate("candidate_image_import", exactAuthority);
 assert.equal(exactGate.allowed, true);
 assert.equal(exactGate.capability, "candidate_model_structuring");
 assert.equal(exactAuthority.capabilities.vision, "supported");
@@ -23,7 +23,7 @@ const unknownGate = Gate.operationGate("candidate_import", Gate.authorityFrom({ 
 assert.equal(unknownGate.allowed, false);
 assert.equal(unknownGate.state, "unverified");
 
-const descriptor = Gate.modelDescriptorForRuntime(exactAuthority.runtime);
+const descriptor = Gate.modelDescriptorForRuntime(exactAuthority.runtime, "candidate_image_import");
 const snapshot = Runtime.createRuntimeSnapshot(exactAuthority.runtime, {
   modelDescriptor: descriptor,
   snapshotId: "runtime-snapshot-candidate-model-js-test",
@@ -32,10 +32,11 @@ const snapshot = Runtime.createRuntimeSnapshot(exactAuthority.runtime, {
   adapterVersion: CandidateModel.ADAPTER_VERSION,
   promptVersion: CandidateModel.PROMPT_VERSION,
   schemaVersion: CandidateModel.SCHEMA_VERSION,
+  operation: "CANDIDATE_IMAGE_IMPORT",
   deliveryMethod: CandidateModel.DELIVERY_METHOD,
 });
 assert.equal(snapshot.model, CandidateModel.MODEL_ID);
-assert.equal(snapshot.delivery_method, "rendered_pdf_pages");
+assert.equal(snapshot.delivery_method, "source_or_rendered_images");
 assert.equal(snapshot.credential_ref, CandidateModel.CREDENTIAL_REF);
 assert(Object.isFrozen(snapshot));
 assert.throws(() => { snapshot.model = "other"; }, TypeError);
@@ -222,7 +223,7 @@ assert.match(html, /deepseek-v4-flash-vision-exp/);
 assert.match(html, /这次操作会把当前文件内容发送到模型服务商进行候选人材料理解。/);
 assert.doesNotMatch(html, /candidate-model-consent-source|candidate-model-consent-outbound|v1-model-consent-note/);
 assert.ok(pages.indexOf("function openCandidateModelConsent") < pages.indexOf("function runCandidateModelProcessing"));
-assert.ok(consentFlow.indexOf("RawSource.resolveRawSource") < consentFlow.indexOf("dialog.showModal()"));
+assert.ok(consentFlow.indexOf("SourceInput.persistDurableBundle") < consentFlow.indexOf("dialog.showModal()"));
 assert.doesNotMatch(consentFlow, /fetch\(|candidate-model-structure/);
 assert.ok(modelRun.indexOf("RawSource.resolveRawSource") < modelRun.indexOf('fetch("/api/candidate-model-structure"'));
 assert.ok(modelRun.indexOf('"PENDING"') < modelRun.indexOf("RawSource.sourceDocumentForId"));
@@ -232,6 +233,7 @@ assert.match(modelRun, /CandidateModel\.claimProcessingRun/);
 assert.match(modelRun, /renderCandidateWorkingWorkspace/);
 assert.match(modelRun, /isCurrentOperation/);
 assert.doesNotMatch(modelRun, /persistDecision|candidate_context_revisions|context_review_decisions/);
+assert.doesNotMatch(modelRun, /processCandidateSource|processCandidateProposal|local-candidate-structure/);
 assert.match(modelRun, /Truth\.cancelProcessingRun/);
 assert.match(modelRun, /candidateModelAttemptGeneration/);
 assert.match(modelRun, /error\.candidateModelExecution = true/);
@@ -252,12 +254,12 @@ assert.doesNotMatch(styles, /candidate-source-mode|v1-source-mode-action/);
 assert.match(styles, /\.v1-saved-source-menu \{ z-index: 30; \}/);
 assert.match(styles, /data-candidate-import-runtime="model-ready"\][\s\S]*#personal-file-preview/);
 const savedSourceSelection = pages.slice(pages.indexOf("async function selectSavedCandidatePdf"), pages.indexOf("function proposalItemEditor"));
-const uploadedSourceSelection = pages.slice(pages.indexOf("const acceptCandidateFiles"), pages.indexOf("installFileDropzone"));
+const uploadedSourceSelection = pages.slice(pages.indexOf("const acceptCandidateFiles"), pages.indexOf("candidateSourceInputBinding = SourceInput.bind"));
 assert.match(savedSourceSelection, /selectedCandidateSources = \[\{/);
 assert.doesNotMatch(savedSourceSelection, /renderCandidateWorkingWorkspace/);
-assert.match(uploadedSourceSelection, /selectedCandidateSources = unique\.map/);
+assert.match(uploadedSourceSelection, /selectedCandidateSources = SourceInput\.mergeSources/);
 assert.doesNotMatch(uploadedSourceSelection, /renderCandidateWorkingWorkspace/);
-assert.match(uploadedSourceSelection, /if \(modelReady && selectedFiles\.length !== 1\) throw new Error\("candidate_model_pdf_required"\)/);
+assert.doesNotMatch(uploadedSourceSelection, /selectedFiles\.length !== 1/);
 assert.match(html, /id="candidate-ai-workspace"/);
 assert.doesNotMatch(html, /id="candidate-workspace-source-selector"/);
 assert.doesNotMatch(html, /id="candidate-workspace-back"/);
@@ -317,10 +319,10 @@ assert.doesNotMatch(styles, /\.v1-workspace-pane-header \{ border-bottom:/);
 assert.match(styles, /\.v1-workspace-content-footer \{[^}]*padding: 12px 24px 18px;/);
 assert.match(styles, /\.v1-workspace-content-footer \{[^}]*justify-content: flex-start;/);
 assert.doesNotMatch(styles, /\.v1-workspace-content-footer \{[^}]*border-top:/);
-assert.match(styles, /\.v1-workspace-composer-field:focus-within \{[^}]*border-color: #526fda;[^}]*box-shadow:/);
-assert.match(styles, /\.v1-workspace-composer textarea \{[^}]*background: transparent;[^}]*border: 0;[^}]*outline: 0;/);
-assert.match(styles, /\.v1-workspace-composer button \{ align-self: center; \}/);
-assert.match(styles, /\.v1-conversation-form\.v1-workspace-composer textarea \{[^}]*line-height: 20px;[^}]*padding: 11px;/);
+assert.match(styles, /\.v1-composer-field:focus-within \{[^}]*border-color: #526fda;[^}]*box-shadow:/);
+assert.match(styles, /\.v1-conversation-form textarea \{[^}]*background: transparent;[^}]*border: 0;[^}]*height: 44px;[^}]*outline: 0;/);
+assert.match(styles, /\.v1-conversation-form button \{[^}]*align-self: center;/);
+assert.match(styles, /\.v1-conversation-form textarea \{[^}]*line-height: 20px;[^}]*padding: 12px 13px;/);
 assert.match(styles, /#candidate-card-detail \.v1-workspace-back-icon::before \{[^}]*display: block;[^}]*position: static;/);
 assert.match(styles, /#candidate-card-detail-facts > div \{[^}]*grid-template-columns: 64px minmax\(0,1fr\);/);
 assert.match(styles, /#candidate-card-detail-facts small \{ white-space: nowrap; \}/);

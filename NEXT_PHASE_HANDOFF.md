@@ -1,5 +1,15 @@
 # JOB RADAR NEXT PHASE HANDOFF
 
+## CURRENT RUNTIME-ROUTING AUTHORITY — 2026-09-04
+
+- The earlier `READY FOR J1 HUMAN ACCEPTANCE — GLOBAL INTERACTION CONVERGED` statement was revoked by Human Acceptance and is historical only. Current implementation evidence supports the new runtime-routing stabilization gate; Human acceptance is still pending and no files are staged or committed.
+- Ariadne mode, operation, and model capability are separate owners. `public/runtime-capability-gate.js` is the shared operation-aware resolver. In MODEL mode, an incompatible operation fails closed as Model-unavailable; it never calls the Local semantic structurer, Local proposal, Local correction, or Local review path.
+- Candidate image/PDF import and Job image import use the configured `deepseek-v4-flash-vision-exp`; Job/Candidate conversation remains eligible for `deepseek-v4-pro`. Runtime load fills only missing configured pro conversation assignments, preserving existing Human choices. Do not restore the removed pro-backed Job import adapter or bind every operation to the current global conversation selection.
+- Job image import preserves one ordered source bundle, performs durable source persistence before Provider execution, runs only read-only technical Source Preparation locally, sends the ordered original images plus bounded prepared text to the vision runtime, and creates a non-authoritative Working Job. Human Save remains the only path to a confirmed immutable Job revision.
+- Desktop minibar authority is right-side + vertical center. While a Workspace is open, `.v1-page-shell` must not establish the fixed-position containing block, and `.v1-workspace-shell` reserves right-rail space. At `1280×720`, measured Workspace right edge is `1193` and minibar left edge is `1205`; hover does not move the minibar rectangle. Mobile behavior remains governed by the existing responsive fallback.
+- Latest real-browser proof used only synthetic fixtures on isolated origin `127.0.0.1:8001`: Candidate image → vision Working; ordered two-image Job bundle → vision Working Job; Job conversation → pro with current Candidate Working context. The negative pro-only image state was disabled and stayed MODEL. Server evidence showed no Local Job semantic endpoint in Model mode.
+- Latest automated baseline: `38` Node + `20` Python regression files passed; Local Candidate and Local Job were also run separately with Provider calls = 0. Do not stage or commit until Human Acceptance explicitly authorizes it.
+
 ## CURRENT REPO HANDOFF AUDIT — 2026-09-01
 
 > **Next-thread reading rule:** this audit is the current repository snapshot. Older dated UI/version notes below are retained as history only. Where an older note conflicts with this section, do not infer the intended result and do not change code; ask the user to confirm the contract first. This audit changed no product code and made no Provider/API call.
@@ -521,3 +531,64 @@ No RAG, MCP, Agent, Vector DB, automatic application, login automation, cloud de
 - Candidate prompt routing lives in `src/candidate_context.py`; Resume / Portfolio / Project / Other have distinct grounded guidance and unsupported types fail closed. Browser metadata records a prompt-profile ID, but a real Provider call still requires explicit authorization.
 - Current Figma file: <https://www.figma.com/design/3XdQUI6Dd1BhGCZVhFOncF?node-id=9-2>. Page `Ariadne — UI Screens` contains only the seven active design frames requested by the user. Do not bulk recapture over future user edits; inspect the edited node and synchronize selectively.
 - The only intentionally incomplete acceptance item is a real model-assisted duplicate fusion/ingestion call. It requires explicit authorization of provider, model, bounded test content and possible cost before implementation/testing continues.
+## Global interaction convergence acceptance handoff（2026-09-04）
+
+- Status: `READY FOR J1 HUMAN ACCEPTANCE — GLOBAL INTERACTION CONVERGED`; Human acceptance is pending.
+- Canonical evidence: `docs/current/ARIADNE_GLOBAL_INTERACTION_QA_REPORT.md` and `docs/current/ARIADNE_GLOBAL_INTERACTION_PARITY_AUDIT.md`.
+- Product state: shared Candidate/Job source input, ordered bundles, guarded clipboard paste, processing indicator, Working/detail/edit shells and conversation primitives are implemented. Three-image Model Job, grounded page-chrome exclusion, clipboard/text paste, exact edit/conversation symbol parity, real waiting animation, Candidate × Job reasoning, Local Provider=0 and failure without Local fallback passed browser/regression gates.
+- Next action: the Human reviews the retained browser Job Detail and QA screenshots, then records PASS or a concrete failing interaction. Do not begin J2 or alter frozen intelligence contracts unless acceptance reveals a regression.
+- Repository boundary: no files are staged; no commit was made.
+
+## Final product-contract addendum handoff（2026-09-04）
+
+- Runtime import authority is `AriadneProductShell.dispatchRuntimeImport`; source-first authority is `AriadneSourceInput.persistDurableBundle`. Do not reintroduce an import-level Local/AI selector or a Model-to-Local retry.
+- Job pasted text is now a first-class member of `selectedJobSources` and follows the same durable SourceDocument/body/integrity path as files, drag/drop and clipboard images.
+- Candidate/Job Model flows are regression-locked against Local semantic structurers and Local review surfaces. Unsupported domain/model capability is a visible fail-closed precondition, not permission to run Local.
+- Shared micro-feedback and reduced-motion contracts are in `public/styles.css`, driven by SourceInput, ProductShell, ModelWorkspaceUI, ConversationUI and ProcessingIndicator.
+- Addendum browser and all 57 automated suites passed. No new Provider request, staging or commit occurred. Next action remains Human acceptance only.
+
+## UI contract correction handoff（2026-09-04）
+
+- Keep `AriadneProcessingIndicator.setButton()` and `.v1-processing-loop` as the single loading language for import, conversation waiting and busy submit. Do not restore the prior ornamental mesh/orb/glow treatment or a plain disabled-looking submit button.
+- Keep every Candidate/Job composer on the exact ProductShell-required `.v1-conversation-form > .v1-composer-field > textarea + button` structure. Current shared geometry is `46 / 44 / 42 px`; do not add page-specific composer wrappers or dimensions.
+- Job Model import copy is `使用人工智能解析`. The source UI should show the source card/list/actions only; provenance bodies, URLs and hashes remain durable even though the two verbose inline explanations stay hidden.
+- Shared back/close hover is scale-only. The minibar is right-side and vertically centered; the top-right zone remains reserved for a future settings control, and no settings feature was added.
+- Real desktop/mobile browser checks, Candidate/Job composer measurements, import WORKING, conversation WAITING, light consent action, back motion and minibar placement passed. A synthetic Model import separately demonstrated fail-closed `MODEL_FAILED` on schema-invalid Provider output with no Local fallback.
+- Final automated gate is 58 suites (`38 Node + 20 Python`), 44 public JavaScript syntax checks and `git diff --check`; staged=0. Human acceptance is the only remaining action.
+
+## Candidate ↔ Job parity repair handoff（2026-09-04）
+
+- Status: Candidate current-card AI editing, shared Candidate/Job Detail edit shell and single ordered source preview are implemented and verified; Human acceptance remains pending.
+- Acceptance target: on Candidate Material Detail, the required role-wording replacement must show a Candidate Working diff for the active Candidate Material, keep confirmed data unchanged before save and expose no internal ID or Job schema. Ordinary questions must remain discussion.
+- Shared-shell target: Candidate and Job Edit must retain the same ProductShell roles and measured geometry. Keep Job canonical delete hidden unless the domain later gains an explicit, separately approved deletion contract.
+- Provenance target: keep one ordered preview list while preserving every original source body, bundle order, hash/integrity metadata and Source Retrieval. Do not restore the duplicate summary block.
+- Runtime boundary: Candidate conversation uses its own Provider tool contract and fails closed. Do not introduce Job semantics, Local semantic structuring or Model-to-Local fallback.
+- Final evidence gate: `38 Node + 20 Python`, `44` public JS syntax checks, Python compilation, real Candidate/Job browser checks, zero console errors and `git diff --check` passed. No staging or commit was performed. Next action is Human J1 acceptance only.
+
+## Detail behavioral wiring stabilization handoff（2026-09-04）
+
+- Status: the Human-reported Candidate submit, Job response projection and Edit focus failures were reproduced, traced to their first broken owners, repaired and re-verified in the real browser. The previous READY claim was not reused as evidence.
+- Keep `AriadneProductShell.bindConversationAdapter()` as the single shared composer binding. Bind once, then resolve domain availability and active target at submit; do not return to initialization-time conditional listeners.
+- Keep explicit adapters: Candidate targets the active Candidate item and projects `PATCH_ITEM` into Candidate Working; Job targets the active revision and compiles confirmed Job + CandidateContext + connected history. Neither adapter may mutate confirmed state before Human Save.
+- Keep `createDetailEditController()` as the owner of enter/cancel/preview/back/focus behavior for both detail forms. Do not reintroduce page-specific listener forks or center-scroll behavior that can leave the first Job field off-screen.
+- Provider validation must preserve `network_call_made=true` after transmission. Optional Job `source_need` advisory mismatches may be dropped, but the required action/message contract remains strict and fail-closed.
+- Acceptance evidence: fresh Candidate `把长期兼职改成兼职` → `PATCH_ITEM` → Working → Human Save; Job exact two-turn sequence → grounded Provider answers with no Working and no pre-save mutation; final browser errors and ID leaks zero.
+- Final automated gate: `39 Node + 20 Python`, 44 public JS syntax checks, Python compilation and diff checks. Model runtime is restored and the local service remains running. Human J1 acceptance is the only next action; do not start J2, stage or commit.
+
+## Computer-use-first E2E handoff（2026-09-05）
+
+- Status: final visible A–E is complete on the real Candidate and Job workspaces. Human J1 acceptance is the only next product decision; do not start J2.
+- Keep Candidate explicit replacement as Provider semantic `PATCH_ITEM` and Job explicit deletion as `PROPOSE_JOB_EDIT`. Discussion must remain non-mutating. Never introduce Model→Local fallback or local semantic correction.
+- Keep Candidate workspace-v2 direct Edit on the Working → Workspace Acceptance → confirmed revision route. Do not call the legacy proposal-review direct-edit path for workspace-v2 revisions, and clear obsolete Working UI after a successful direct Save.
+- Keep Job delete absent until an explicit canonical deletion contract is approved. Candidate delete is supported and remains visible.
+- Acceptance baseline: real Provider `deepseek-v4-pro`; Save-before/after isolation and reopen checks passed; no visible internal IDs; post-fix console errors `0`; Local Provider calls `0`.
+- Final gate: `40 Node + 20 Python`, `44` public JavaScript syntax checks, Python compilation and diff checks. No files were staged or committed; keep the local service available for Human acceptance.
+## Final J1 checkpoint handoff（2026-09-05）
+
+- J1 Candidate Material integrity is complete. Preserve the Candidate Material Card → Candidate Material Detail flow: durable source first, technical preparation, Provider semantics, NON_AUTHORITATIVE Working, Human Save, confirmed revision, reopen/current-state verification.
+- Preserve Candidate item-scoped context compiler v2 and the three-layer Human Copy boundary. Structured references may support grounding but must never render as Candidate/Job IDs, fingerprints, requirement refs, or turn-local aliases.
+- Preserve runtime isolation: Local Candidate and Local Job Provider calls are exactly zero; Model failure is `MODEL_FAILED`; never route a failed Model intent through Local semantics.
+- Preserve source provenance across click, drag/drop, clipboard image, ordered multi-image bundle, and pasted text. Do not discard original source bodies or regress Source Retrieval.
+- Frozen Job smoke is green. Do not broaden Job scope while using this checkpoint as the J1 baseline.
+- Regression baseline: Node `40/40`, executable Python `21/21`, JavaScript syntax `84/84`, Python compile PASS, HTTP `10/10`, final console errors `0`, visible-copy ID leaks `0`.
+- Deferred: J2, Web Search, automatic application, scoring, and general product polish.

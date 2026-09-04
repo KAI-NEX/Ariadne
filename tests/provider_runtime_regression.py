@@ -28,7 +28,7 @@ assert vision.runtime_capabilities["candidate_model_structuring"] == "supported"
 assert vision.runtime_capabilities["job_model_structuring"] == "unsupported"
 assert vision.runtime_capabilities["model_merge"] == "unsupported"
 assert vision.runtime_capabilities["ai_conversation"] == "unsupported"
-assert vision.adapter_version == "deepseek-candidate-pdf-v1" and vision.delivery_method == "rendered_pdf_pages"
+assert vision.adapter_version == "deepseek-candidate-multimodal-v2" and vision.delivery_method == "source_or_rendered_images"
 assert not is_multimodal(flash) and not is_multimodal(pro)  # provider-level vision cannot leak into text models
 assert not is_multimodal(unknown)
 assert descriptor_for("deepseek-v4-pro", descriptors) == pro

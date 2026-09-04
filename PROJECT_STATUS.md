@@ -1,5 +1,15 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-04 — Ariadne runtime capability routing stabilized（real browser verified）
+
+- Runtime ownership is now split into three independent contracts: Ariadne mode (`LOCAL` / `MODEL`), operation (`candidate_image_import`, `job_image_import`, Candidate/Job conversation, and text variants), and model capability. One shared operation-aware resolver persists compatible per-operation model assignments; Runtime load seeds only missing configured pro conversation assignments and never overwrites an existing Human conversation choice. MODEL failures remain MODEL failures and never dispatch the Local semantic path.
+- Candidate image/PDF and Job image imports resolve to the configured `deepseek-v4-flash-vision-exp` adapters. `deepseek-v4-pro` no longer carries a latent Job-import adapter and remains the verified Candidate/Job conversation runtime. Job image requests include ordered original image inputs plus bounded read-only Source Preparation; the Working proposal retains every ordered SourceDocument ID.
+- Real browser on isolated `127.0.0.1:8001`: a synthetic Candidate PNG produced one non-authoritative Working card through the vision Provider; two ordered synthetic Job PNGs produced one Working Job through the vision Provider; a subsequent Job conversation used `deepseek-v4-pro` and received the current synthetic Candidate Working snapshot. The incompatible pro-only image state was disabled as Model-unavailable and did not enter Local.
+- The shared minibar is fixed at the right edge and vertically centered. The import-page transform containing-block bug was removed while a Workspace is open; desktop Workspace width now reserves the rail. At `1280×720`, Workspace was `x=87…1193` and minibar `x=1205…1262`, with a 12 px gap. Hover expanded the rail while its bounding rectangle stayed byte-for-byte unchanged.
+- Browser diagnostics recorded two read-only `/api/local-source-read` Source Preparation calls, one `deepseek-v4-flash-vision-exp` Job import call, and one `deepseek-v4-pro` Job conversation call. No `/api/local-job-extract`, `/api/local-job-image-ocr`, Local semantic proposal, or Local review path executed in Model mode. Separate Local Candidate and Job regressions retained Provider calls = 0.
+- Regression: `38` Node regression files and `20` Python regression files passed. No staging or commit was performed. Human acceptance remains pending.
+- Checkpoint: Product Progress is operation-specific runtime routing plus real multimodal Candidate/Job proof. New Transferable Knowledge is that mode authority, operation requirements, and model capabilities must be resolved independently, and technical source reads must authorize semantic adapters without becoming semantic structuring. User-owned Capability Evidence is the Human Acceptance diagnosis and explicit routing/visual contracts. Implementation and QA are Tool-assisted. Remaining Gap is Human acceptance on the user's normal `:8000` session.
+
 ## 2026-08-31 — Figma parity、导入入口收敛与现有重复卡片融合
 
 - Workspace 已按 Figma `02 · 工作空间` 的几何重建：1280 设计基线为 1060 px 双栏、32 px gap、297 px 文件夹、58 px 顶栏；当前 982 px 浏览器实测为 `433 + 32 + 433`，y=190、h=297，背景固定 `#f7f7f9`，Ariadne 字标居中。文件夹纸张、前盖、标题与数量基线均按 Figma 比例落位，原内容与既有开合/fade motion 保留。
@@ -632,3 +642,120 @@ P4.1A Local is complete. The user has now explicitly approved P4.1B AI-Assisted 
 
 - Scope and privacy audit: no credentials, raw Provider reasoning, Human-visible local filesystem paths, persistent internal IDs, destructive migration, hidden Local fallback, Local Provider call, Web Search implementation, or runtime/provider switch was included in the J1 diff. Candidate evidence in this project status is represented only as a redacted field-level change description.
 - Functional scope is frozen after acceptance. Deferred work remains outside J1: Candidate Learning / CandidateUpdateProposal execution, Job clarification-to-Candidate learning, grounded resume optimization execution, project optimization-to-evidence updates, live Web/GitHub research, automatic application, and match percentage/scoring.
+## Ariadne global interaction convergence（2026-09-04，READY FOR J1 HUMAN ACCEPTANCE）
+
+- Shared interaction ownership: Candidate and Job now call the same `AriadneSourceInput`, `AriadneProcessingIndicator`, `AriadneConversationUI`, `AriadneProductShell` and `AriadneModelWorkspaceUI` primitives for common input, waiting, Working, detail, edit and conversation behavior. Schema, semantic structuring, actions and persistence authority remain domain-specific.
+- Source bundle: both domains accept ordered multi-image accumulation through click, drag/drop or guarded clipboard paste. Normal text paste in text inputs remains native. Model Job sends the bounded bundle once and retains every durable source ID; Local paths remain deterministic with Provider=0.
+- Semantic correction: the Model Job prompt now identifies the actual job-content region across the bundle and excludes navigation/header/footer/legal/privacy/copyright/site-service/recruiting CTA chrome from title, company, location, summary, responsibility and requirement fields. Missing or uncertain fields remain unknown rather than being invented.
+- Real-browser proof: a three-image DeepSeek Job import produced one Working Job directly, with sane grounded fields and ordered recoverable provenance; Candidate and Job clipboard intake, text-paste non-hijacking, shared Edit lifecycle, exact conversation symbols, live waiting animation, Candidate × Job reasoning and fail-closed Provider behavior all passed.
+- Automated proof: all 57 executable Candidate/Job Node/Python regression suites and final JavaScript syntax checks passed; `git diff --check` passed. No tests were removed.
+- Acceptance boundary: `READY FOR J1 HUMAN ACCEPTANCE — GLOBAL INTERACTION CONVERGED`. Human acceptance remains pending. No staging or commit was performed.
+
+### Learning checkpoint
+
+- Product Progress: Candidate and Job now behave as two domain adapters inside one interaction system, including source acquisition and perceptible async waiting rather than only a shared visual shell.
+- New Transferable Knowledge: source transport, semantic understanding and persistence authority are independent boundaries; UI reuse is proven by common callable symbols and state transitions, while model grounding must explicitly separate content regions from page chrome.
+- User-owned Capability Evidence: the user defined the convergence contract, page-chrome failure class, clipboard safety rule and real-browser readiness gates.
+- Tool-assisted Implementation: shared primitive extraction, Job bundle/model grounding, UI integration, real-browser execution, regressions and evidence documentation were performed by Codex.
+- Remaining Capability Gaps: final Human acceptance is still required; the implementation does not constitute independent user-authored engineering evidence.
+
+## Ariadne Candidate ↔ Job parity repair（2026-09-04，Human acceptance pending）
+
+- Product Progress: Candidate Material Detail now routes item-focused natural-language edits through the Candidate Provider contract and projects the resulting NON_AUTHORITATIVE Working into the existing review/save region. The required role-wording replacement produced a Candidate-only title diff while confirmed facts remained unchanged until Human Save; ordinary questions remain discussion turns.
+- Shared edit contract: Candidate and Job Detail now bind the same ProductShell edit-shell roles, field geometry, action region, Cancel, preview, apply/back and existing destructive-action pattern. Job canonical deletion remains unavailable because the current domain does not support it; no new deletion semantics were introduced.
+- Source preview: Candidate and Job import surfaces now show one ordered source list only. Single- and multi-image browser checks preserved bundle order, durable original bodies, provenance, hash validation and Source Retrieval.
+- Failure boundary: Candidate conversation transport now uses a Candidate-specific forced tool contract. It does not use the Job schema, Local semantic structuring, or a Local fallback; Provider failure remains visible and fail closed.
+- Verification: all `38` Node regression files, `20` Python regression files, `44` public JavaScript syntax checks, Python compilation and real-browser Candidate/Job checks passed. Final browser console errors were zero; the global runtime was restored to Model.
+
+### Learning checkpoint
+
+- New Transferable Knowledge: a shared visual shell is only stable when both domains bind the same semantic roles and acceptance authority; matching CSS alone does not prevent divergent behavior.
+- User-owned Capability Evidence: the user identified the exact Candidate edit, Job edit-shell and duplicate source-preview failures and specified the Human Save and provenance boundaries.
+- Tool-assisted Implementation: Provider contract repair, shared-shell extraction, UI integration, automated regressions and browser execution were performed by Codex.
+- Remaining Capability Gaps: Human J1 acceptance is still required. No J2 work, staging or commit is authorized.
+
+## Ariadne final product-contract addendum（2026-09-04，READY FOR J1 HUMAN ACCEPTANCE）
+
+- Runtime-driven import: Candidate and Job now dispatch through one `ProductShell.dispatchRuntimeImport()` contract. There is no import-level Local/AI selector. Local invokes only Local; Model invokes only Model; unavailable domain capability or Model failure fails closed and never invokes Local.
+- Model isolation: Candidate and Job Model slices were re-audited and regression-locked against Local semantic structuring, Local proposal generation and Local review rendering. Source decoding/OCR/read/hash/bounded preparation remains technical Source Preparation only.
+- Provenance correction: Job pasted text now joins `selectedJobSources`, so paste, click, drop and clipboard sources all reach the shared durable source-bundle gate. Both Model consent paths call `SourceInput.persistDurableBundle()` before consent/Provider, validate identity/hash, and preserve original bodies for Source Retrieval.
+- Micro-interactions: common source, button, input, Working transition, message, edit, save and failure feedback use shared Ariadne symbols. Motion is subtle; reduced-motion disables new entry/orb/pulse animation and collapses transitions.
+- Browser proof: Local Candidate/Job actions were selected automatically with zero per-import selectors; Candidate vision Runtime selected the Model action; Job Model pasted text reached source-first consent as one shared source. Consent was cancelled, so no new Provider call occurred. Shared input focus and loaded hover/pressed/message/reduced-motion rules were verified.
+- Verification: `36 Node + 21 Python = 57` suites, 44 public JS syntax checks and `git diff --check` passed; staged files remain zero.
+
+### Learning checkpoint
+
+- Product Progress: runtime authority and durable-source authority are now executable shared gates, including pasted text, rather than conventions duplicated in two event handlers.
+- New Transferable Knowledge: capability gating is distinct from fallback—a Model Runtime may fail closed before execution when its domain adapter is unverified, but it must never reroute the same intent through Local semantics.
+- User-owned Capability Evidence: the user specified runtime ownership, semantic-boundary and source-first invariants plus the micro-interaction acceptance surface.
+- Tool-assisted Implementation: shared dispatch/persistence helpers, pasted-text correction, motion/focus feedback, browser QA, regressions and documentation were performed by Codex.
+- Remaining Capability Gaps: final Human acceptance remains pending; no J2 work is authorized.
+
+## Ariadne UI contract correction（2026-09-04，READY FOR J1 HUMAN ACCEPTANCE）
+
+- Product Progress: Add Job now uses `使用人工智能解析`, hides the two verbose inline provenance explanations while retaining durable source metadata, and uses the shared light `确认并发送` action.
+- Shared interaction refinement: `AriadneProcessingIndicator.setButton()` applies the same restrained blue loop to import, conversation and submit waiting. `AriadneProductShell.CONTRACT.conversation.field` requires the same `v1-composer-field` wrapper in all four Candidate/Job workspace/detail composers; their field/input/button geometry is `46 / 44 / 42 px` with exact vertical centering and a contained focus ring.
+- Layout/motion: shared back/close controls use scale-only hover and milder press without lateral translation. The shared minibar is horizontally centered, leaving the top-right zone unoccupied for a future settings control. Reduced-motion removes the continuous loop and shortens shared transitions.
+- Browser evidence: desktop and 390 px mobile Job import, light consent action, Model import WORKING state, Job conversation WAITING state, Candidate/Job focused composer geometry, stable busy submit layout, scale-only back hover and centered minibar all passed. Final Add Job console errors were zero.
+- Failure evidence: the synthetic Model Job import returned a Provider payload that failed the existing schema and surfaced `MODEL_FAILED`; no Local fallback ran. The synthetic conversation waiting capture was cancelled by reload before Provider transmission.
+- Verification: `37 Node + 21 Python = 58` suites, 44 public JS syntax checks and `git diff --check` passed; staged files remain zero. No add/commit/reset/stash was performed.
+
+### Learning checkpoint
+
+- Product Progress: shared async feedback and composer geometry are now structural ProductShell contracts rather than page-level visual approximations.
+- New Transferable Knowledge: a loading state needs both semantic state (`aria-busy`, duplicate-submit prevention) and perceptible, layout-stable feedback; shared CSS alone is insufficient if pages do not share the required DOM wrapper and state setter.
+- User-owned Capability Evidence: the user identified the recurring oversized composer, frozen-looking submit state, ornamental loader, misplaced minibar and ambiguous Job action copy as concrete product-contract failures.
+- Tool-assisted Implementation: shared primitive refinement, regression coverage, desktop/mobile browser measurement and evidence updates were performed by Codex.
+- Remaining Capability Gaps: Human visual/interaction acceptance is pending; the synthetic Provider schema failure is a separate model-output quality observation, not evidence of a Local fallback.
+
+## Ariadne Detail behavioral wiring stabilization（2026-09-04，READY FOR J1 HUMAN ACCEPTANCE）
+
+- The earlier READY claim was revoked after Human observation exposed real Detail failures. The first broken owners were Candidate `UI_BINDING`, Job post-Provider `RESULT_PROJECTION` validation, and the shared Edit controller's entry/focus behavior.
+- Shared wiring: `AriadneProductShell.bindConversationAdapter()` now owns the single composer submit primitive and calls explicit Candidate/Job domain adapters with the current target and runtime capability. `createDetailEditController()` owns Edit/Cancel/Preview/Back and scrolls/focuses the first field consistently on both detail pages.
+- Candidate proof: the required role-wording replacement produced Provider `PATCH_ITEM`, created a NON_AUTHORITATIVE Working proposal, and left confirmed data unchanged. Human Save then confirmed the requested field-level change and retained the previous version.
+- Job proof: `这个职位最重要的三个要求是什么？` returned a Provider `EXPLAIN`; `按照我现在的个人资料，我最缺什么？` returned a grounded Provider answer using the current confirmed Job, CandidateContext and prior conversation. Neither turn created Working or mutated confirmed data.
+- Safe execution evidence records only submit/domain/operation/provider/model/result/Working/pre-save mutation fields. Candidate logged Provider=true, `deepseek-v4-pro`, `PATCH_ITEM`, Working=yes, pre-save mutation=no. Job logged Provider=true for both turns and remained fail-closed; no private source bodies, internal IDs or chain-of-thought were logged.
+- Edit parity was exercised end-to-end on Candidate and Job: enter, first-field focus, preview, back-to-edit, cancel, and shared action geometry. Final browser checks found zero error states and no persistent ID leakage.
+- Verification: `39/39` Node regression suites, `20/20` Python regression suites, `44/44` public JavaScript syntax checks and Python compilation passed. Human J1 acceptance remains pending; no J2 work, staging or commit was performed.
+
+### Learning checkpoint
+
+- Product Progress: Detail conversation and Edit behavior now have shared executable owners plus explicit domain adapters.
+- New Transferable Knowledge: a visible control can still be unwired when capability is resolved after initialization; availability must be evaluated at submit time, while the binding itself remains stable.
+- User-owned Capability Evidence: the user identified the exact Candidate and Job behavioral failures, required observation-first proof, and explicitly authorized the two real Job Provider turns.
+- Tool-assisted Implementation: fault tracing, shared binding/controller repair, semantic-validation normalization, regressions, Provider execution and browser verification were performed by Codex.
+- Remaining Capability Gaps: final Human J1 acceptance is still required; implementation work is not independent user-authored engineering evidence.
+
+## Ariadne Computer-use-first E2E acceptance gate（2026-09-05）
+
+- Final status: real in-app browser A–E passed after the last runtime/UI fix. Native Computer Use was attempted first but the host safety layer disallowed controlling the Codex app, so the same visible Candidate/Job flows were completed through Browser Control in the existing in-app browser.
+- Candidate discussion stayed non-mutating. The explicit role-wording replacement produced Provider `PATCH_ITEM`, visible NON_AUTHORITATIVE Working, no pre-Save confirmed mutation, Human Save, and a reopened confirmed revision with no internal ID in the UI.
+- Job discussion returned two real Candidate-grounded DeepSeek answers without Working or mutation. The explicit summary deletion produced `PROPOSE_JOB_EDIT`, visible Working, no pre-Save mutation, Human Save, and a reopened immutable revision.
+- Candidate/Job Edit share enter/focus/preview/back/cancel behavior. Direct Save was exercised on both. Candidate workspace-v2 direct edits now persist through a new Working + Workspace Acceptance + confirmed revision, keeping subsequent Candidate conversation context synchronized; obsolete Working UI is cleared after Save. Candidate delete remains available; Job delete remains absent because its canonical delete contract is not implemented.
+- Final verification: `40/40` Node suites, `20/20` Python suites, `44/44` public JavaScript syntax checks and Python compilation passed. The final post-fix A–E run produced zero new browser console errors, no Model→Local fallback and zero Local Provider calls. No staging or commit was performed.
+
+### Learning checkpoint
+
+- Product Progress: the final Candidate/Job interaction and persistence gates are now verified through visible Human actions rather than inferred from code or synthetic tests.
+- New Transferable Knowledge: a successful confirmed write is incomplete if its non-authoritative working projection remains stale; revision lineage, Working lineage, acceptance artifacts and rendered state must converge together.
+- User-owned Capability Evidence: the user defined the acceptance prompts, Save boundary, no-fallback rule, provenance/privacy constraints and the requirement to restart A–E after every code fix.
+- Tool-assisted Implementation: fault tracing, minimal fixes, real Provider calls, browser execution and regression verification were performed by Codex.
+- Remaining Capability Gaps: Human product acceptance remains the next decision; this implementation does not count as independent user-authored engineering evidence.
+## J1 Candidate Material integrity checkpoint（2026-09-05，COMPLETE）
+
+- Candidate Material Detail: real DeepSeek discussion and semantic mutation passed for Work Experience, Project, and Education. Work Experience additionally passed direct Edit, preview, Human Save, reload/reopen, and subsequent-conversation current-state checks. Confirmed state remained unchanged before Save; Provider output remained NON_AUTHORITATIVE Working.
+- Candidate Material coverage: deterministic/runtime regressions exercise every currently supported type: `work_experience`, `project`, `education`, `skill_group`, `language`, `award`, and `custom_section`.
+- Item/context integrity: context compiler v2 limits item history to the active Candidate Material and its current Working/version/fingerprint lineage. Stale turn-local aliases cannot retarget another item.
+- Human Copy boundary: Provider-facing structured references remain available for grounding, while server normalization, client projection, and render-time sanitation prevent Candidate/Job internal IDs or aliases from appearing in visible messages, including legacy persisted history.
+- Job regression: the frozen Job Detail completed one real CandidateContext-grounded DeepSeek smoke turn with no Working and no confirmed mutation.
+- Runtime/source isolation: Local Candidate and Local Job Provider calls remain exactly zero; Model failure is `MODEL_FAILED` and never falls back to Local. Model imports persist the original ordered source/source bundle before Provider execution and retain bodies for Source Retrieval.
+- Final verification: `40/40` Node regression suites, `21/21` executable Python regression suites, `84/84` JavaScript syntax checks, Python compilation, `10/10` HTTP checks, browser console checks, visible-copy ID checks, and `git diff --check` passed. The Python stub server was correctly excluded because it is a non-terminating test fixture, not an executable suite.
+- Scope: J1 only. J2, Web Search, automatic application, and general polish remain deferred.
+
+### Learning checkpoint
+
+- Product Progress: Candidate Material current-state integrity, shared interaction behavior, source-first provenance, and Candidate/Job Human Copy boundaries are now closed as one J1 foundation.
+- New Transferable Knowledge: semantic authority, durable source authority, current-item context, and visible Human Copy are separate contracts and need independent fail-closed validation.
+- User-owned Capability Evidence: the user defined the runtime, provenance, Human Save, Candidate Material parity, and real-provider acceptance gates and authorized repeated DeepSeek execution through completion.
+- Tool-assisted Implementation: runtime repairs, real Provider/browser execution, systematic coverage, privacy/scope audit, and regression verification were performed by Codex.
+- Remaining Capability Gaps: deferred J2 capabilities remain unimplemented by design.

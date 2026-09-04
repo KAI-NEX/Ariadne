@@ -13,10 +13,10 @@
   const PROVIDER_ID = "deepseek";
   const MODEL_ID = "deepseek-v4-flash-vision-exp";
   const PROTOCOL = "OPENAI_CHAT_COMPLETIONS";
-  const ADAPTER_VERSION = "deepseek-candidate-pdf-v1";
+  const ADAPTER_VERSION = "deepseek-candidate-multimodal-v2";
   const PROMPT_VERSION = "candidate_workspace_v1_auto_material";
   const SCHEMA_VERSION = "job-radar-candidate-context-v2-step1";
-  const DELIVERY_METHOD = "rendered_pdf_pages";
+  const DELIVERY_METHOD = "source_or_rendered_images";
   const CREDENTIAL_REF = "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision";
   const PAYLOAD_CONTRACT_ID = "ariadne-model-candidate-proposal-payload-v1";
   const id = (prefix) => `${prefix}-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
@@ -65,12 +65,15 @@
     return gate;
   }
 
-  function assertPdfSource(source) {
-    if (!source || source.source_type !== "PDF" || source.mime_type !== "application/pdf" || !String(source.file?.name || source.filename || "").toLowerCase().endsWith(".pdf")) {
-      throw new Error("candidate_model_pdf_required");
-    }
+  function assertMultimodalSource(source) {
+    const name = String(source?.file?.name || source?.filename || "").toLowerCase();
+    const pdf = source?.source_type === "PDF" && source?.mime_type === "application/pdf" && name.endsWith(".pdf");
+    const image = source?.source_type === "IMAGE" && ["image/png", "image/jpeg"].includes(source?.mime_type) && /\.(?:png|jpe?g)$/.test(name);
+    if (!pdf && !image) throw new Error("candidate_model_multimodal_source_required");
     return source;
   }
+
+  const assertPdfSource = assertMultimodalSource;
 
   function processingRunFor(source, snapshotId, status = "PENDING", createdAt = now(), patch = {}) {
     const terminal = ["SUCCEEDED", "FAILED", "CANCELLED"].includes(status);
@@ -178,7 +181,7 @@
   }
 
   function proposalsFor({ source, run, result, operationIdentity }) {
-    assertPdfSource(source);
+    assertMultimodalSource(source);
     if (result?.provider !== PROVIDER_ID || result?.model !== MODEL_ID || result?.protocol !== PROTOCOL
       || result?.adapter_version !== ADAPTER_VERSION || result?.delivery_method !== DELIVERY_METHOD
       || result?.runtime_snapshot_id !== run.runtime_snapshot_id || result?.processing_run_id !== run.run_id
@@ -330,13 +333,14 @@
   }
 
   function consentFor(source, snapshot, confirmedAt = now(), consentId = id("consent-candidate-model")) {
-    assertPdfSource(source);
+    assertMultimodalSource(source);
     return ModelImportLifecycle.consentFor({ source_document_id: source.source_document_id, snapshot, confirmed_at: confirmedAt, consent_id: consentId });
   }
 
   function requestFor({ source, sourceDocument, documentDataUrl, snapshot, run, consent, operationIdentity }) {
-    assertPdfSource(source);
-    if (!sourceDocument?.local_reference || !documentDataUrl?.startsWith("data:application/pdf;base64,")) throw new Error("candidate_model_source_not_resolved");
+    assertMultimodalSource(source);
+    const expectedPrefix = source.source_type === "PDF" ? "data:application/pdf;base64," : `data:${source.mime_type};base64,`;
+    if (!sourceDocument?.local_reference || !documentDataUrl?.startsWith(expectedPrefix)) throw new Error("candidate_model_source_not_resolved");
     return Object.freeze({
       source_document: structuredClone(sourceDocument),
       document_data_url: documentDataUrl,
@@ -379,6 +383,7 @@
     CREDENTIAL_REF,
     PAYLOAD_CONTRACT_ID,
     assertEligibleGate,
+    assertMultimodalSource,
     assertPdfSource,
     runtimeFingerprint,
     operationIdentityFor,

@@ -1075,7 +1075,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         self.send_json(HTTPStatus.OK, {key: value for key, value in result.items() if key not in {"ok", "status"}})
 
     def structure_model_candidate_proposal(self) -> None:
-        """Execute the one qualified Candidate PDF adapter after explicit consent."""
+        """Execute the qualified Candidate image/PDF adapter after explicit consent."""
         claimed_operation_id = None
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
@@ -1201,10 +1201,19 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         except CandidateConversationRuntimeError as error:
             if execution_id and generation:
                 CANDIDATE_CONVERSATION_EXECUTIONS.fail(execution_id, generation)
+            safe_diagnostics = candidate_conversation_failure_diagnostics(error)
+            print(
+                "candidate_conversation_failure "
+                f"provider_called={str(error.network_call_made).lower()} provider=deepseek "
+                f"model=deepseek-v4-pro stage={error.failure_layer} "
+                f"error_code={error.code} field_category={safe_diagnostics.get('field_category', 'unknown')} "
+                f"action_type={safe_diagnostics.get('action_type', 'unknown')} assistant_copy_source=NONE",
+                flush=True,
+            )
             status = HTTPStatus.PRECONDITION_REQUIRED if error.failure_layer == "credential" else HTTPStatus.BAD_GATEWAY if error.failure_layer in {"provider", "transport"} else HTTPStatus.UNPROCESSABLE_ENTITY
             self.send_json(status, {
                 "error": error.code, "failure_layer": error.failure_layer,
-                "network_call_made": error.network_call_made, "diagnostics": candidate_conversation_failure_diagnostics(error),
+                "network_call_made": error.network_call_made, "diagnostics": safe_diagnostics,
                 "persistence": "not_written",
             })
             return
@@ -1309,11 +1318,11 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         self.send_json(HTTPStatus.OK, result)
 
     def structure_model_job_proposal(self) -> None:
-        """Run one qualified Job Model Import over mechanically prepared source text."""
+        """Run one qualified Job Model Import with technical preparation and optional source images."""
         claimed_operation_id = None
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
-            if content_length <= 0 or content_length > 2_000_000:
+            if content_length <= 0 or content_length > 32_000_000:
                 raise JobModelRuntimeError("job_model_request_size_invalid", "request")
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
             validated = validate_job_model_request(payload)
@@ -1330,7 +1339,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             claimed_operation_id = validated.operation_id
 
             def provider_call(api_key: str, provider_payload: dict) -> tuple[int, dict]:
-                print("job_model_import_provider_call provider=deepseek model=deepseek-v4-pro", flush=True)
+                print("job_model_import_provider_call provider=deepseek model=deepseek-v4-flash-vision-exp", flush=True)
                 try:
                     return call_deepseek_chat_completions(api_key, provider_payload, response_limit=2_000_000)
                 except ValueError as error:
@@ -1850,7 +1859,15 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                 raise CareerDocumentError("invalid_source_read_request_size")
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
             snapshot = validate_runtime_snapshot(payload.get("runtime_snapshot"))
-            if snapshot.mode != "model" or snapshot.capabilities.ai_conversation != "supported":
+            source_read_capable = any(
+                capability == "supported"
+                for capability in (
+                    snapshot.capabilities.ai_conversation,
+                    snapshot.capabilities.candidate_model_structuring,
+                    snapshot.capabilities.job_model_structuring,
+                )
+            )
+            if snapshot.mode != "model" or not source_read_capable:
                 raise CareerDocumentError("source_read_model_mode_required")
             material_type = payload.get("material_type")
             source_id = payload.get("source_document_id")

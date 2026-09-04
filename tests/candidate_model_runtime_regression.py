@@ -40,6 +40,7 @@ def snapshot() -> dict:
         adapter_version=ADAPTER_VERSION,
         prompt_version=PROMPT_VERSION,
         schema_version=CONTRACT_ID,
+        operation="CANDIDATE_IMAGE_IMPORT",
         delivery_method=DELIVERY_METHOD,
     ).to_dict()
 
@@ -150,7 +151,7 @@ class CandidateModelRuntimeRegression(unittest.TestCase):
         result, observations = self.execute(request())
         self.assertEqual(observations, {"rendered": 1, "provider": 1, "images": 3})
         self.assertEqual(result["model"], MODEL_ID)
-        self.assertEqual(result["delivery_method"], "rendered_pdf_pages")
+        self.assertEqual(result["delivery_method"], "source_or_rendered_images")
         self.assertEqual(result["rendered_page_count"], 3)
         self.assertEqual(result["outbound_image_count"], 3)
         self.assertEqual(result["operation_id"], request()["operation_identity"]["operation_id"])
@@ -163,6 +164,37 @@ class CandidateModelRuntimeRegression(unittest.TestCase):
         self.assertEqual(observations, {"rendered": 1, "provider": 1, "images": 3})
         self.assertEqual(result["candidate_proposal"]["items"], [])
         self.assertEqual(result["candidate_proposal"]["material_type"], "other")
+
+    def test_direct_image_bypasses_pdf_renderer_and_reaches_multimodal_provider(self) -> None:
+        image_bytes = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
+        image_hash = "sha256:" + hashlib.sha256(image_bytes).hexdigest()
+        image_source_id = "source-candidate-" + image_hash.removeprefix("sha256:")
+        payload = request()
+        payload["source_document"] = {
+            **payload["source_document"], "source_document_id": image_source_id, "source_type": "IMAGE",
+            "filename": "synthetic-candidate.png", "mime_type": "image/png", "content_hash": image_hash,
+        }
+        payload["document_data_url"] = "data:image/png;base64," + base64.b64encode(image_bytes).decode("ascii")
+        payload["consent"]["source_document_id"] = image_source_id
+        fingerprint = runtime_fingerprint(payload["runtime_snapshot"])
+        operation_id = candidate_model_operation_id(image_source_id, fingerprint, payload["consent"]["consent_id"])
+        payload["processing_run_id"] = f"run-{operation_id}"
+        payload["operation_identity"] = {
+            **payload["operation_identity"], "operation_id": operation_id, "source_document_id": image_source_id,
+            "runtime_fingerprint": fingerprint,
+        }
+        calls = {"renderer": 0, "provider": 0, "image_mime": None}
+        def provider(_key, body):
+            calls["provider"] += 1
+            image = next(part for part in body["messages"][0]["content"] if part["type"] == "image_url")
+            calls["image_mime"] = image["image_url"]["url"].split(";", 1)[0]
+            return 200, response(content=json.dumps({"material_type": "other", "items": []}))
+        result = execute_candidate_model_request(
+            payload, lambda: "synthetic-key-from-reader",
+            lambda _body: calls.__setitem__("renderer", calls["renderer"] + 1) or [], provider,
+        )
+        self.assertEqual(calls, {"renderer": 0, "provider": 1, "image_mime": "data:image/png"})
+        self.assertEqual(result["outbound_image_count"], 1)
 
     def test_length_finish_is_explicit_truncation_and_never_repairs_json(self) -> None:
         truncated = response(

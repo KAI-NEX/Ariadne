@@ -30,6 +30,15 @@ assert.equal(otherItem.item_type, "OTHER");
 assert.equal(otherItem.title, "Project Support");
 assert.equal(otherItem.item_subtype, "custom_section");
 assert.equal(otherItem.facts.find((fact) => fact.value === "其他经历")?.label, "分类");
+for (const [entityType, data] of [
+  ["skill_group", { name: "Product Systems", keywords: "AI systems" }],
+  ["language", { language: "English", score: "Professional" }],
+  ["award", { name: "Synthetic Award", result: "Finalist" }],
+]) {
+  const typedItem = Proposal.itemFor({ entity_id: `entity-${entityType}`, entity_type: entityType, data, extraction: { confidence: "medium", warnings: [] }, limitations: [], field_provenance: {} }, artifact.source_refs);
+  assert.equal(typedItem.item_type, "OTHER");
+  assert.equal(typedItem.item_subtype, entityType);
+}
 const itemScopedProposals = Proposal.proposalsFor({ source, artifact, structuringRun: run, result: { entities: [entity, { entity_id: "entity-project-2", entity_type: "project", data: { name: "Project Two", rawDate: "2025" }, extraction: { confidence: "medium", warnings: [] }, limitations: [], field_provenance: { "/name": [{ source_document_id: source.source_document_id, source_location: "p. 2", source_excerpt: "Project Two" }] } }], warnings: [], status: "needs_review" } });
 assert.equal(itemScopedProposals.length, 2);
 assert.ok(itemScopedProposals.every((entry) => entry.payload.items.length === 1));

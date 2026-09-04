@@ -34,7 +34,9 @@ function writeLocalJson(key, value) {
 
 function persistSelectedRuntime() {
   if (!state.mode) return;
-  writeLocalJson(SELECTED_RUNTIME_STORAGE_KEY, { mode: state.mode, provider: state.provider, model: state.model });
+  const selected = { mode: state.mode, provider: state.provider, model: state.model };
+  writeLocalJson(SELECTED_RUNTIME_STORAGE_KEY, selected);
+  if (state.mode === "ai") window.JobRadarRuntimeGate?.recordOperationRuntimeSelection(selected);
 }
 
 function selectableModels() {
@@ -149,7 +151,7 @@ function renderModels() {
     button.className = "runtime-menu-item runtime-existing-model";
     button.type = "button"; button.setAttribute("role", "option"); button.setAttribute("aria-selected", "false"); button.dataset.model = model.model_id; button.dataset.provider = model.provider_id; button.style.setProperty("--runtime-menu-index", String(index));
     title.textContent = labelFor(model);
-    detail.textContent = model.runtime_capabilities?.ai_conversation === "supported" ? "职位 / 候选人对话" : model.multimodal_readiness === "VERIFIED" ? "图文模型" : "实验图文模型";
+    detail.textContent = model.runtime_capabilities?.ai_conversation === "supported" ? "职位 / 候选人对话" : model.multimodal_readiness === "VERIFIED" ? "图片 / PDF 导入" : "实验图文模型";
     button.append(title, detail); container.append(button);
   });
   document.querySelectorAll(".runtime-existing-model").forEach((button) => button.addEventListener("click", () => {
@@ -160,12 +162,24 @@ function renderModels() {
   }));
 }
 
+function seedConfiguredConversationRuntime() {
+  const model = selectableModels().find((item) => item.provider_id === "deepseek"
+    && item.model_id === "deepseek-v4-pro" && item.runtime_capabilities?.ai_conversation === "supported");
+  if (!model) return;
+  window.JobRadarRuntimeGate?.recordOperationRuntimeSelection(
+    { mode: "model", provider: model.provider_id, model: model.model_id },
+    localStorage,
+    { only_unassigned: true },
+  );
+}
+
 async function loadModels() {
   try {
     const response = await fetch("/api/runtime-options");
     const result = await response.json();
     if (!response.ok) throw Object.assign(new Error(result.error || "runtime_options_failed"), { result });
     state.models = result.models || [];
+    seedConfiguredConversationRuntime();
     if (!(["READY", "OFFICIAL_READY", "LOCAL_READY"].includes(state.phase) && (state.model || state.mode === "local"))) {
       const restoredModel = selectableModels().find((model) => model.provider_id === state.provider && model.model_id === state.model);
       if (restoredModel) applyReadyModel(restoredModel, false);

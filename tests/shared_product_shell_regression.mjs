@@ -19,16 +19,20 @@ assert.equal(ProductShell.CONTRACT.import.root, "v1-import-shell");
 assert.equal(ProductShell.CONTRACT.workspace.layer, "v1-workspace-layer");
 assert.equal(ProductShell.CONTRACT.workspace.content_pane, "v1-workspace-content-pane");
 assert.equal(ProductShell.CONTRACT.detail.root, "v1-detail-shell");
+assert.equal(ProductShell.CONTRACT.edit.shell, "v1-edit-form");
+assert.equal(ProductShell.CONTRACT.edit.field, "v1-edit-field");
+assert.equal(ProductShell.CONTRACT.edit.actions, "v1-edit-actions");
 assert.equal(ProductShell.CONTRACT.conversation.thread, "v1-conversation-thread");
 assert.equal(ProductShell.CONTRACT.conversation.human_bubble, "v1-conversation-message user");
 assert.equal(ProductShell.CONTRACT.conversation.assistant_bubble, "v1-conversation-message assistant");
-for (const symbol of ["bindImportShell", "bindWorkspaceShell", "bindDetailShell", "bindConversation", "showWorkspace", "hideWorkspace", "applyDetailRuntime", "createDetailPanelController"]) {
+assert.equal(ProductShell.CONTRACT.conversation.field, "v1-composer-field");
+for (const symbol of ["bindImportShell", "dispatchRuntimeImport", "setFeedback", "bindWorkspaceShell", "bindDetailShell", "bindConversation", "bindConversationAdapter", "bindDetailEditShell", "showWorkspace", "hideWorkspace", "applyDetailRuntime", "createDetailPanelController", "createDetailEditController"]) {
   assert.equal(typeof ProductShell[symbol], "function", `${symbol} must be one shared implementation`);
 }
 
-for (const html of [candidateImport, jobImport, candidateDetail, jobDetail]) {
-  assert.match(html, /product-shell-domain\.js\?v=shared-product-shell-v1/);
-}
+for (const html of [candidateImport, jobImport]) assert.match(html, /product-shell-domain\.js\?v=shared-product-shell-v4/);
+for (const html of [candidateDetail, jobDetail]) assert.match(html, /product-shell-domain\.js\?v=detail-behavior-v1/);
+for (const html of [candidateDetail, jobDetail]) assert.match(html, /v1-pages\.js\?v=computer-use-e2e-v3/);
 for (const html of [candidateImport, jobImport]) {
   assert.match(html, /class="v1-page-shell v1-import-shell"/);
   assert.match(html, /class="v1-workspace-layer hidden"/);
@@ -50,13 +54,26 @@ for (const html of [candidateDetail, jobDetail]) {
   assert.match(html, /class="v1-conversation-messages v1-conversation-thread"/);
   assert.match(html, /class="v1-conversation-form"/);
   assert.doesNotMatch(html, /class="v1-conversation-form v1-workspace-composer"/);
-  assert.doesNotMatch(html, /v1-workspace-composer-field/);
+  assert.match(html, /class="v1-composer-field"><textarea/);
   assert.match(html, /<button type="submit" aria-label="发送"><\/button>/);
+  assert.match(html, /class="v1-edit-form v1-detail-state-panel hidden" data-ariadne-edit-shell="detail"/);
+  assert.equal((html.match(/class="v1-edit-field" data-ariadne-edit-field/g) || []).length, 5);
+  assert.match(html, /class="v1-button-row v1-edit-actions" data-ariadne-edit-actions/);
+  assert.match(html, /data-edit-cancel/);
+  assert.match(html, /data-edit-preview/);
+  assert.match(html, /data-edit-destructive/);
+  assert.match(html, /class="v1-button-row" data-edit-preview-actions/);
+  assert.match(html, /data-edit-apply/);
+  assert.match(html, /data-edit-back/);
 }
+for (const html of [candidateImport, jobImport]) assert.match(html, /class="v1-composer-field"><textarea/);
 
 assert.equal((pages.match(/ProductShell\.bindWorkspaceShell\(document,/g) || []).length, 2);
 assert.equal((pages.match(/ProductShell\.bindImportShell\(document\)/g) || []).length, 2);
-assert.equal((pages.match(/ProductShell\.createDetailPanelController/g) || []).length, 2);
+assert.equal((pages.match(/ProductShell\.createDetailEditController/g) || []).length, 2);
+assert.equal((pages.match(/ProductShell\.dispatchRuntimeImport/g) || []).length, 2);
+assert.match(pages, /ProductShell\.setFeedback\(byId\("candidate-workspace-save-status"/);
+assert.match(pages, /ProductShell\.setFeedback\(byId\("job-workspace-save-status"/);
 assert.match(pages, /ProductShell\.bindDetailShell\(document,/);
 assert.match(pages, /ProductShell\.applyDetailRuntime\(shell,/);
 assert.match(pages, /ConversationUI\.renderMessages\(target, candidateWorkspaceConversation,/);

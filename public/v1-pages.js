@@ -6,6 +6,8 @@
   const RuntimeExecution = window.AriadneRuntimeExecution;
   const Truth = window.AriadneTruthPersistence;
   const RawSource = window.AriadneRawSourceStorage;
+  const SourceInput = window.AriadneSourceInput;
+  const ProcessingIndicator = window.AriadneProcessingIndicator;
   const LocalContextLifecycle = window.AriadneLocalContextLifecycle;
   const LocalCandidate = window.AriadneLocalCandidateExtraction;
   const LocalCandidateProposal = window.AriadneLocalCandidateProposal;
@@ -64,6 +66,7 @@
   let candidateWorkspaceConversation = [];
   let activeCandidateConversationSession = null;
   let candidateConversationTurnActive = false;
+  let candidateDetailConversationTurnActive = false;
   let candidateReviewSessionTotal = 0;
   let candidateReviewSessionResolved = 0;
   let candidateReviewSourceIds = [];
@@ -76,17 +79,21 @@
   let jobModelConsentSelectionVersion = null;
   let jobModelConsentRuntimeIdentity = null;
   let jobModelConsentId = null;
+  let jobModelConsentBundle = null;
   let activeJobModelOperation = null;
   let jobReviewSessionTotal = 0;
   let jobReviewSessionResolved = 0;
   let activeJobRevision = null;
   let activeJobWorkingProposal = null;
   let activeJobSourceDocument = null;
+  let activeJobSourceDocuments = [];
   let activeJobChangeProposal = null;
   let activeJobConversationSession = null;
   let jobConversationTurnActive = false;
   let candidateWorkspaceShell = null;
   let jobWorkspaceShell = null;
+  let candidateSourceInputBinding = null;
+  let jobSourceInputBinding = null;
 
   function currentOperationGate(operation) {
     try { return RuntimeGate.operationGate(operation); }
@@ -99,6 +106,29 @@
         authority: Object.freeze({ runtime: Object.freeze({ mode: "invalid", provider: null, model: null }), capabilities: Object.freeze({}) }),
       });
     }
+  }
+
+  function currentAriadneMode() {
+    try { return RuntimeExecution.normalizeCurrentRuntime(RuntimeGate.readStoredRuntime()).mode; }
+    catch (_error) { return "invalid"; }
+  }
+
+  function candidateImportOperation() {
+    const source = selectedCandidateSources[0];
+    // The candidate picker currently accepts files only. Before a file exists,
+    // gate the picker with the same multimodal operation it can actually start.
+    if (!source || ["PDF", "IMAGE"].includes(source.source_type)) return "candidate_image_import";
+    return "candidate_text_import";
+  }
+
+  function candidateSourceReadLabel(source, phase = "complete") {
+    const kind = source?.source_type === "IMAGE" ? "图片" : source?.source_type === "PDF" ? "PDF" : "材料";
+    return phase === "reading" ? `正在读取${kind}` : `${kind}已读取`;
+  }
+
+  function jobImportOperation() {
+    if (!selectedJobSources.length) return selectedJobImportType === "Paste" ? "job_text_import" : "job_image_import";
+    return selectedJobSources.some((source) => source?.source_type === "IMAGE") ? "job_image_import" : "job_text_import";
   }
 
   function candidateSharedWorkspace() {
@@ -184,6 +214,7 @@
       source_document_legacy_collision: "来源身份与旧版记录冲突；未覆盖任何已有资料。",
       source_document_canonical_collision: "来源身份与已有正式记录冲突；未覆盖任何已有资料。",
       candidate_model_runtime_not_eligible: "当前运行方式不支持这次模型整理；没有发送材料。",
+      candidate_model_multimodal_source_required: "当前模型导入需要一张图片或一个 PDF。",
       candidate_model_pdf_required: "当前模型导入只支持 PDF 文件。",
       candidate_model_source_not_resolved: "无法从本机恢复当前 PDF；没有发送材料。",
       candidate_model_consent_required: "发送前需要你的明确确认。",
@@ -193,6 +224,8 @@
       candidate_model_pdf_render_failed: "PDF 页面无法完整渲染；没有发送不完整内容。",
       candidate_model_request_size_invalid: "模型请求超过本地服务允许的大小；没有发送材料。",
       candidate_model_pdf_payload_invalid: "PDF 内容校验失败；没有发送材料。",
+      candidate_model_source_payload_invalid: "图片或 PDF 内容校验失败；没有发送材料。",
+      candidate_model_source_delivery_failed: "图片或 PDF 无法发送给图文模型；没有发送材料。",
       candidate_model_source_identity_mismatch: "PDF 来源身份校验失败；没有发送材料。",
       deepseek_network_error: "连接 DeepSeek 失败；未保存任何模型提案。",
       deepseek_provider_http_error: "DeepSeek 未能完成这次请求；未保存任何模型提案。",
@@ -258,7 +291,9 @@
   }
 
   function refreshCandidateImportGate() {
-    const gate = currentOperationGate("candidate_import");
+    const mode = currentAriadneMode();
+    const operation = mode === "model" ? candidateImportOperation() : "candidate_import";
+    const gate = currentOperationGate(operation);
     const button = byId("start-personal-processing");
     if (!button) return gate;
     const local = gate.authority.runtime.mode === "local";
@@ -267,19 +302,20 @@
     button.textContent = modelReady
       ? candidateExecutionState === "PROCESSING" ? "正在使用 DeepSeek 分析" : candidateExecutionState === "COMPLETE" ? "查看工作区" : "使用 DeepSeek 分析"
       : !local ? "模型导入尚不可用" : candidateExecutionState === "COMPLETED_SOURCE" ? "确认" : candidateExecutionState === "COMPLETE" ? "本地提取已完成" : candidateExecutionState === "PROCESSING" ? "正在本地提取" : "开始本地提取";
-    const modelSourceIneligible = modelReady && (selectedCandidateSources.length !== 1 || selectedCandidateSources[0]?.source_type !== "PDF");
+    const modelSourceIneligible = modelReady && (selectedCandidateSources.length !== 1 || !["PDF", "IMAGE"].includes(selectedCandidateSources[0]?.source_type));
     button.disabled = candidateProcessingInProgress || (!modelReady && candidateExecutionState === "COMPLETE") || candidateExecutionState === "COMPLETED_SOURCE" || !selectedCandidateSources.length || !gate.allowed || modelSourceIneligible;
     button.classList.toggle("hidden", modelReady && candidateExecutionState === "PROCESSING");
     byId("personal-file-input").disabled = (!local && !modelReady) || candidateProcessingInProgress;
-    byId("personal-file-input").multiple = !modelReady;
-    byId("personal-file-input").accept = modelReady ? ".pdf,application/pdf" : ".pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,image/png,image/jpeg";
+    byId("personal-file-input").multiple = true;
+    byId("personal-file-input").accept = ".pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,image/png,image/jpeg";
     byId("personal-dropzone").disabled = (!local && !modelReady) || candidateProcessingInProgress;
     byId("personal-dropzone").setAttribute("aria-disabled", String((!local && !modelReady) || candidateProcessingInProgress));
     byId("personal-import-types").querySelectorAll("button").forEach((item) => { item.disabled = (!local && !modelReady) || candidateProcessingInProgress; });
     byId("personal-runtime-summary").textContent = modelReady
-      ? ""
+      ? `本次模型导入：${runtimeLabel(gate.authority.runtime)} · 图像能力已验证`
       : local ? "当前运行：本地确定规则。材料不会发送给模型服务商。" : unavailableCopy(gate, "个人材料语义结构化");
-    byId("personal-processing-boundary").textContent = modelReady ? "正在处理当前 PDF；模型结果只进入非权威工作区" : "仅本地读取、提取与确定规则；不调用模型服务商";
+    const candidateBoundary = byId("personal-processing-boundary");
+    if (candidateBoundary) candidateBoundary.textContent = modelReady ? "正在处理当前 PDF；模型结果只进入非权威工作区" : "仅本地读取、提取与确定规则；不调用模型服务商";
     setRuntimeGateMessage("personal-page-message", gate.allowed ? "" : unavailableCopy(gate, "个人材料语义结构化"));
     return gate;
   }
@@ -289,24 +325,26 @@
     try { runtime = RuntimeGate.authorityFrom(RuntimeGate.readStoredRuntime()).runtime; }
     catch (_error) { runtime = { mode: "invalid", provider: null, model: null }; }
     const modelMode = runtime.mode === "model";
-    const gate = currentOperationGate(modelMode ? "job_model_import" : "job_import");
+    const gate = currentOperationGate(modelMode ? jobImportOperation() : "job_import");
     const button = byId("start-job-processing");
     if (!button) return gate;
     document.body.dataset.jobImportRuntime = modelMode ? "model" : "local";
     document.body.dataset.jobImportLifecycle = jobExecutionState;
     button.textContent = jobExecutionState === "REVIEWING" ? "请完成下方审核" : jobExecutionState === "WORKING" ? "查看 Working Job" : jobExecutionState === "SAVED" ? "职位已保存" : jobProcessingInProgress
-      ? modelMode ? "ARIADNE AI 正在理解" : "正在本地整理"
-      : modelMode ? "使用 ARIADNE AI 理解" : "开始本地整理";
-    button.disabled = jobProcessingInProgress || ["REVIEWING", "READY_TO_SAVE", "SAVED"].includes(jobExecutionState) || !selectedJobSource || !gate.allowed || (modelMode && selectedJobSources.length > 1);
+      ? modelMode ? "人工智能正在解析" : "正在本地整理"
+      : modelMode ? "使用人工智能解析" : "开始本地整理";
+    button.disabled = jobProcessingInProgress || ["REVIEWING", "READY_TO_SAVE", "SAVED"].includes(jobExecutionState) || !selectedJobSource || !gate.allowed;
     byId("job-file-input").disabled = jobProcessingInProgress || !gate.allowed;
-    byId("job-file-input").multiple = !modelMode;
+    byId("job-file-input").multiple = true;
     byId("job-dropzone").disabled = jobProcessingInProgress || !gate.allowed;
     byId("job-dropzone").setAttribute("aria-disabled", String(jobProcessingInProgress || !gate.allowed));
     byId("job-import-types")?.querySelectorAll("button").forEach((item) => { item.disabled = jobProcessingInProgress; });
-    byId("job-runtime-summary").textContent = modelMode
-      ? "ARIADNE AI 会读取真实来源的有界文本证据；模型结果先成为 NON_AUTHORITATIVE WORKING JOB，只有你在工作区保存后才成为正式职位版本。"
+    byId("job-runtime-summary").textContent = modelMode && gate.allowed
+      ? `本次模型导入：${runtimeLabel(gate.authority.runtime)} · ${gate.operation === "job_image_import" ? "图像能力已验证" : "文本语义能力已验证"}`
+      : modelMode ? unavailableCopy(gate, gate.operation === "job_image_import" ? "职位图片理解" : "职位文本理解")
       : "本地确定规则；不会调用模型服务商。";
-    byId("job-processing-boundary").textContent = modelMode
+    const jobBoundary = byId("job-processing-boundary");
+    if (jobBoundary) jobBoundary.textContent = modelMode
       ? "原始来源已持久保留 · 只读技术解析 · Provider 负责语义理解"
       : "本地读取真实内容 · 原始来源持久保留 · 无模型调用";
     setRuntimeGateMessage("job-page-message", gate.allowed ? "" : unavailableCopy(gate, modelMode ? "职位语义理解" : "本地职位整理"));
@@ -938,6 +976,29 @@
     return candidateRecords(sourceDocuments, proposals, runs, revisions, lifecycle, workingModels, workspaceAcceptances);
   }
 
+  async function persistCandidateWorkspaceAcceptance(database, workingModel) {
+    const checked = Truth.validateCandidateWorkingModel(workingModel);
+    const records = await readCandidateRecords(database);
+    const contextId = `candidate-workspace-context-${checked.source_document_id}`;
+    const currentRevision = records.candidate_context_revisions
+      .filter((revision) => revision.context_id === contextId)
+      .sort((left, right) => right.version - left.version)[0] || null;
+    const proposals = records.context_proposals.filter((proposal) => checked.proposal_ids.includes(proposal.proposal_id));
+    const acceptedAt = new Date().toISOString();
+    const outcome = Truth.applyWorkspaceAcceptance({
+      working_model: checked,
+      proposals,
+      current_revision: currentRevision,
+      expected_revision_version: currentRevision?.version || 0,
+      context_id: contextId,
+      acceptance_id: `workspace-acceptance-${crypto.randomUUID()}`,
+      revision_id: `candidate-workspace-revision-${crypto.randomUUID()}`,
+      accepted_at: acceptedAt,
+    });
+    await Truth.persistWorkspaceAcceptance(database, outcome);
+    return outcome;
+  }
+
   function workingCardMarkup(item) {
     const stateClass = item.dedupe_state === "needs_resolution" ? " needs-resolution" : "";
     const stateLabel = item.dedupe_state === "needs_resolution" ? '<span class="v1-working-state needs-resolution">需要确认</span>' : "";
@@ -953,6 +1014,15 @@
 
   function latestCandidateWorkingModel(records, sourceId) {
     return (records.candidate_working_models || []).filter((model) => model.source_document_id === sourceId).sort((left, right) => right.version - left.version)[0] || null;
+  }
+
+  async function candidateWorkingModelForDetail(database, sourceId, itemId) {
+    const models = await LocalCandidateReview.getAll(database, "candidate_working_models");
+    const matching = models.map(Truth.validateCandidateWorkingModel)
+      .filter((model) => model.source_document_id === sourceId && (model.payload?.items || []).some((item) => item.item_id === itemId))
+      .sort((left, right) => right.version - left.version || String(right.created_at || "").localeCompare(String(left.created_at || "")))[0] || null;
+    if (!matching) throw new Error("candidate_detail_item_not_in_working_model");
+    return matching;
   }
 
   function setCandidateWorkspaceProgress(steps, currentIndex = steps.length - 1) {
@@ -974,7 +1044,7 @@
   function renderCandidateWorkspaceConversation() {
     const target = byId("candidate-workspace-conversation");
     if (!target) return;
-    ConversationUI.renderMessages(target, candidateWorkspaceConversation, { empty_text: "你可以告诉 Ariadne 哪些内容需要调整。", text_for: (message) => message.text ?? message.content });
+    ConversationUI.renderMessages(target, candidateWorkspaceConversation, { empty_text: "你可以告诉 Ariadne 哪些内容需要调整。", text_for: (message) => ConversationUI.humanSafeText(message.text ?? message.content) });
   }
 
   function setCandidateConversationExecutionState(copy = "", active = candidateConversationTurnActive) {
@@ -1073,7 +1143,7 @@
     if (!workspaceViewIsCurrent(viewGeneration)) return [];
     showCandidateWorkspaceLayer(source?.filename || "当前 PDF", false);
     byId("candidate-working-groups").innerHTML = candidateWorkingGroupsMarkup(cards);
-    setCandidateWorkspaceProgress(["材料已准备", "PDF 已读取", "DeepSeek 已完成理解", `已生成 ${cards.length} 张候选卡片`]);
+    setCandidateWorkspaceProgress(["材料已准备", candidateSourceReadLabel(source), "DeepSeek 已完成理解", `已生成 ${cards.length} 张候选卡片`]);
     const questions = cards.flatMap((card) => card.uncertainties || []).filter((uncertainty) => uncertainty.status === "OPEN");
     byId("candidate-clarification-list").innerHTML = questions.length ? `<h3>有几处信息可以稍后确认</h3>${questions.map((uncertainty) => `<p data-entry-type="CLARIFYING_QUESTION">${escapeHtml(uncertainty.question)}</p>`).join("")}` : '<p data-entry-type="CLARIFYING_QUESTION_EMPTY">当前没有需要补充的问题。</p>';
     const accepted = records.candidate_workspace_acceptances.some((event) => event.working_model_id === activeCandidateWorkingModel.working_model_id);
@@ -1186,6 +1256,7 @@
     let database = null;
     candidateConversationTurnActive = true;
     setCandidateConversationExecutionState("正在理解…", true);
+    await ConversationUI.waitForIndicatorPaint();
     try {
       database = await Truth.openDatabase();
       const session = activeCandidateConversationSession?.source_document_id === sourceId
@@ -1252,6 +1323,87 @@
     }
   }
 
+  function renderCandidateDetailConversation(messages) {
+    ConversationUI.renderMessages(byId("candidate-conversation-messages"), messages || [], {
+      empty_text: "",
+      text_for: (message) => ConversationUI.humanSafeText(message.text ?? message.content),
+    });
+  }
+
+  function setCandidateDetailConversationExecutionState(copy = "", active = candidateDetailConversationTurnActive) {
+    ConversationUI.setExecutionState({
+      form: byId("candidate-conversation-form"),
+      status: byId("candidate-conversation-status"),
+      active,
+      copy,
+    });
+  }
+
+  async function submitCandidateDetailConversation({ sourceId, itemId, content }) {
+    const humanMessage = String(content || "").trim();
+    if (!humanMessage || !sourceId || !itemId || candidateDetailConversationTurnActive) return;
+    if (!CandidateWorkspaceConversationRuntime || !CandidateConversationPersistence) throw new Error("candidate_conversation_runtime_dependencies_unavailable");
+    let terminalCopy = "";
+    let database = null;
+    candidateDetailConversationTurnActive = true;
+    setCandidateDetailConversationExecutionState("正在理解…", true);
+    await ConversationUI.waitForIndicatorPaint();
+    try {
+      database = await Truth.openDatabase();
+      const workingModel = await candidateWorkingModelForDetail(database, sourceId, itemId);
+      const session = await CandidateWorkspaceConversationRuntime.resolveSession(database, sourceId);
+      activeCandidateConversationSession = session;
+      activeCandidateWorkingModel = workingModel;
+      const snapshot = CandidateWorkspaceConversationRuntime.createRuntimeSnapshot();
+      const outcome = await CandidateWorkspaceConversationRuntime.executeListTurn({
+        database,
+        session,
+        human_message: humanMessage,
+        focus: Object.freeze({ type: "ITEM", item_id: itemId }),
+        runtime_snapshot: snapshot,
+        call_runtime: callCandidateConversationRuntime,
+        on_user_persisted: async () => {
+          const restored = await CandidateConversationPersistence.restoreConversation(database, session.conversation_id);
+          renderCandidateDetailConversation(restored.messages);
+        },
+      });
+      const restored = await CandidateConversationPersistence.restoreConversation(database, session.conversation_id);
+      renderCandidateDetailConversation(restored.messages);
+      activeCandidateWorkingModel = outcome.working_model || await CandidateWorkspaceConversationRuntime.latestWorkingModel(database, sourceId);
+      const workingItem = activeCandidateWorkingModel.payload.items.find((item) => item.item_id === itemId);
+      const resultType = outcome.action?.normalized_action?.action || "UNKNOWN";
+      const proposalCreated = resultType === "PATCH_ITEM" && Boolean(workingItem);
+      const form = byId("candidate-conversation-form");
+      form.dataset.ariadneResultType = resultType;
+      form.dataset.ariadneWorkingProposalCreated = proposalCreated ? "yes" : "no";
+      form.dataset.ariadneConfirmedMutationBeforeSave = "no";
+      if (proposalCreated) {
+        showCandidateDetailWorkingProposal(activeCandidate, workingItem, outcome.assistant_message?.text);
+      }
+      if (outcome.status === "STALE") terminalCopy = "候选人信息已发生变化，请刷新后重试。";
+      return outcome;
+    } catch (error) {
+      const code = String(error?.code || error?.message || "");
+      terminalCopy = code === "RUNTIME_CONTRACT_VERSION_MISMATCH"
+        ? "服务版本已更新，请刷新页面后重试。"
+        : code === "EMPTY_RESPONSE"
+          ? "模型这次没有返回可用内容，请重试。"
+          : "这次没有完成，请重试。";
+      if (database && activeCandidateConversationSession?.conversation_id) {
+        try {
+          const restored = await CandidateConversationPersistence.restoreConversation(database, activeCandidateConversationSession.conversation_id);
+          renderCandidateDetailConversation(restored.messages);
+        } catch (_restoreError) { /* Preserve the bounded failure copy. */ }
+      }
+      return null;
+    } finally {
+      database?.close?.();
+      candidateDetailConversationTurnActive = false;
+      setCandidateDetailConversationExecutionState(terminalCopy, false);
+      ConversationUI.settle({ form: byId("candidate-conversation-form"), messages: byId("candidate-conversation-messages") });
+    }
+  }
+
   function returnToCandidateCardList() {
     byId("candidate-card-detail").classList.add("hidden");
     byId("candidate-card-list").classList.remove("hidden");
@@ -1295,27 +1447,12 @@
     const workingModel = Truth.validateCandidateWorkingModel(activeCandidateWorkingModel);
     const database = await Truth.openDatabase();
     try {
-      const records = await readCandidateRecords(database);
-      const contextId = `candidate-workspace-context-${workingModel.source_document_id}`;
-      const currentRevision = records.candidate_context_revisions.filter((revision) => revision.context_id === contextId).sort((left, right) => right.version - left.version)[0] || null;
-      const proposals = records.context_proposals.filter((proposal) => workingModel.proposal_ids.includes(proposal.proposal_id));
-      const acceptedAt = new Date().toISOString();
-      const outcome = Truth.applyWorkspaceAcceptance({
-        working_model: workingModel,
-        proposals,
-        current_revision: currentRevision,
-        expected_revision_version: currentRevision?.version || 0,
-        context_id: contextId,
-        acceptance_id: `workspace-acceptance-${crypto.randomUUID()}`,
-        revision_id: `candidate-workspace-revision-${crypto.randomUUID()}`,
-        accepted_at: acceptedAt,
-      });
-      await Truth.persistWorkspaceAcceptance(database, outcome);
-      byId("candidate-workspace-save-status").textContent = "已保存到个人资料。";
+      await persistCandidateWorkspaceAcceptance(database, workingModel);
+      ProductShell.setFeedback(byId("candidate-workspace-save-status"), { state: "SUCCESS", copy: "已保存到个人资料。" });
       byId("candidate-workspace-save").disabled = true;
     } catch (error) {
       if (["candidate_working_model_stale", "context_version_conflict"].includes(String(error?.code || error?.message))) {
-        byId("candidate-workspace-save-status").textContent = "内容已更新，请重新查看后再保存。";
+        ProductShell.setFeedback(byId("candidate-workspace-save-status"), { state: "FAILURE", copy: "内容已更新，请重新查看后再保存。" });
         return;
       }
       throw error;
@@ -1485,20 +1622,20 @@
   }
 
   function showCandidateSource(source) {
-    const batchSuffix = selectedCandidateSources.length > 1 ? ` · 共 ${selectedCandidateSources.length} 个文件` : "";
-    const file = source.file || source;
-    byId("personal-file-preview").classList.remove("hidden");
-    const selectedNames = selectedCandidateSources.map((item) => item.file?.name || item.name).filter(Boolean);
-    byId("personal-file-name").textContent = selectedNames.length > 1 ? selectedNames.join("、") : file.name || source.name;
-    const modelReady = currentOperationGate("candidate_import").authority.runtime.mode === "model";
-    byId("personal-file-meta").textContent = `${file.type || source.mime_type || selectedCandidateType} · ${source.sizeLabel || formatBytes(file.size) || "本地文件"}${batchSuffix} · ${modelReady ? "保存在本机；确认后发送渲染页面" : "仅本地"}`;
-    byId("personal-file-icon").textContent = (source.extension || file.name?.split(".").pop() || selectedCandidateType.slice(0, 3)).toUpperCase();
+    SourceInput.renderBundlePreview({
+      container: byId("personal-file-preview"), list: byId("personal-source-preview-list"),
+    }, selectedCandidateSources);
     refreshCandidateImportGate();
   }
 
   function setCandidateExtractionState(state, label) {
-    byId("personal-processing").dataset.state = state;
-    byId("personal-processing-state").textContent = label;
+    const active = !["READY_FOR_REVIEW", "CANCELLED", "FAILED", "COMPLETE"].includes(state);
+    ProcessingIndicator.set(byId("personal-processing"), {
+      active,
+      copy: label,
+      boundary: currentAriadneMode() === "model" ? "正在等待 DeepSeek 时不会改用本地结果" : "本地确定性处理 · Provider 调用 0",
+      state,
+    });
   }
 
   function setCompletedSourceSheet(open) {
@@ -1731,15 +1868,18 @@
     const selectionVersion = candidateSelectionVersion;
     const selectedRuntimeIdentity = runtimeIdentity(gate.authority.runtime);
     if (candidateProcessingInProgress || selectedCandidateSources.length !== 1) throw new Error("candidate_model_pdf_required");
-    const source = CandidateModel.assertPdfSource(selectedCandidateSources[0]);
+    const source = CandidateModel.assertMultimodalSource(selectedCandidateSources[0]);
     if (!["NEW", "RETRY", "WORKSPACE"].includes(source.import_state)) {
       throw new Error("candidate_model_processing_not_actionable");
     }
     const database = await Truth.openDatabase();
     try {
-      const existingDocument = await RawSource.readRecord(database, source.source_document_id);
-      if (existingDocument) await RawSource.resolveRawSource(database, source.source_document_id);
-      else await LocalCandidate.persistCanonicalSource(database, LocalCandidate.sourceDocumentFor(source), source.file);
+      await SourceInput.persistDurableBundle({
+        database,
+        sources: [source],
+        sourceDocumentFor: LocalCandidate.sourceDocumentFor,
+        persistDurableSource: LocalCandidate.persistCanonicalSource,
+      });
     } finally { database.close(); }
     if (selectionVersion !== candidateSelectionVersion || selectedRuntimeIdentity !== runtimeIdentity(CandidateModel.assertEligibleGate(refreshCandidateImportGate()).authority.runtime)) {
       throw new Error("candidate_model_consent_mismatch");
@@ -1768,8 +1908,8 @@
   async function executeCandidateModelProcessing(gate, confirmedAt, consentId) {
     CandidateModel.assertEligibleGate(gate);
     if (!RuntimeExecution || !Truth || !RawSource || !LocalCandidate || !CandidateModel) throw new Error("candidate_model_runtime_dependencies_unavailable");
-    const source = CandidateModel.assertPdfSource(selectedCandidateSources[0]);
-    const descriptor = RuntimeGate.modelDescriptorForRuntime(gate.authority.runtime);
+    const source = CandidateModel.assertMultimodalSource(selectedCandidateSources[0]);
+    const descriptor = RuntimeGate.modelDescriptorForRuntime(gate.authority.runtime, gate.operation);
     const snapshot = RuntimeExecution.createRuntimeSnapshot(gate.authority.runtime, {
       modelDescriptor: descriptor,
       credentialRef: CandidateModel.CREDENTIAL_REF,
@@ -1777,6 +1917,7 @@
       promptVersion: CandidateModel.PROMPT_VERSION,
       schemaVersion: CandidateModel.SCHEMA_VERSION,
       deliveryMethod: CandidateModel.DELIVERY_METHOD,
+      operation: gate.operation.toUpperCase(),
     });
     const consent = CandidateModel.consentFor(source, snapshot, confirmedAt, consentId);
     const operationIdentity = await CandidateModel.operationIdentityFor(source, snapshot, consent);
@@ -1792,8 +1933,9 @@
     showCandidateWorkspaceLayer(source.file.name, true);
     setCandidateWorkspaceProgress(["正在准备材料", "正在读取 PDF", "等待 DeepSeek 理解", "整理候选卡片"], 0);
     byId("candidate-clarification-list").innerHTML = '<p data-entry-type="CLARIFYING_QUESTION_EMPTY">完成理解后，需要补充的问题会显示在这里。</p>';
-    setCandidateExtractionState("PREPARING", "正在校验本机保存的原始 PDF");
+    setCandidateExtractionState("PREPARING", `正在校验本机保存的原始${source.source_type === "IMAGE" ? "图片" : "PDF"}`);
     refreshCandidateImportGate();
+    await ConversationUI.waitForIndicatorPaint();
     let database = null;
     let run = null;
     try {
@@ -1807,8 +1949,8 @@
       const startedAt = new Date().toISOString();
       run = CandidateModel.processingRunFor(source, snapshot.snapshot_id, "RUNNING", startedAt, { run_id: run.run_id, started_at: startedAt });
       await Truth.persistRecord(database, "processing_runs", run);
-      setCandidateExtractionState("EXTRACTING", "正在准备完整 PDF 渲染页面");
-      setCandidateWorkspaceProgress(["材料已准备", "正在读取 PDF", "等待 DeepSeek 理解", "整理候选卡片"], 1);
+      setCandidateExtractionState("EXTRACTING", source.source_type === "IMAGE" ? "正在准备原始图片" : "正在准备完整 PDF 渲染页面");
+      setCandidateWorkspaceProgress(["材料已准备", candidateSourceReadLabel(source, "reading"), "等待 DeepSeek 理解", "整理候选卡片"], 1);
       const documentDataUrl = await LocalCandidate.readAsDataURL(resolved.file, sourceDocument.mime_type);
       if (abortController.signal.aborted) throw Object.assign(new Error("candidate_model_cancelled"), { name: "AbortError" });
       const request = CandidateModel.requestFor({
@@ -1821,7 +1963,7 @@
         operationIdentity,
       });
       setCandidateExtractionState("STRUCTURING", `正在使用 DeepSeek 分析：${source.file.name}`);
-      setCandidateWorkspaceProgress(["材料已准备", "PDF 已读取", "DeepSeek 正在理解材料", "整理候选卡片"], 2);
+      setCandidateWorkspaceProgress(["材料已准备", candidateSourceReadLabel(source), "DeepSeek 正在理解材料", "整理候选卡片"], 2);
       const response = await fetch("/api/candidate-model-structure", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1856,7 +1998,7 @@
           activeCandidateWorkingModel = null;
           showCandidateWorkspaceLayer(source.file.name, false);
           byId("candidate-working-groups").innerHTML = '<p class="v1-conversation-empty">模型没有发现可形成卡片的候选信息。</p>';
-          setCandidateWorkspaceProgress(["材料已准备", "PDF 已读取", "DeepSeek 已完成理解", "没有发现可形成卡片的信息"]);
+          setCandidateWorkspaceProgress(["材料已准备", candidateSourceReadLabel(source), "DeepSeek 已完成理解", "没有发现可形成卡片的信息"]);
           byId("candidate-clarification-list").innerHTML = '<p data-entry-type="CLARIFYING_QUESTION_EMPTY">当前没有需要补充的问题。</p>';
           byId("candidate-workspace-save-status").textContent = "没有可保存的候选人信息。";
         }
@@ -1920,9 +2062,9 @@
       const card = button.closest("[data-proposal-id]");
       reviewCandidateProposal(card.dataset.proposalId, button.dataset.reviewAction, card).catch(showPersonalError);
     });
-    const handleCandidateFiles = (files) => {
+    const handleCandidateFiles = (files, options = {}) => {
       const selectionVersion = candidateSelectionVersion + 1;
-      acceptCandidateFiles(files).catch((error) => showPersonalError(error, selectionVersion));
+      acceptCandidateFiles(files, options).catch((error) => showPersonalError(error, selectionVersion));
     };
     byId("personal-import-types").addEventListener("click", (event) => {
       const button = event.target.closest("[data-import-type]");
@@ -1955,22 +2097,22 @@
       if (!button || candidateProcessingInProgress) return;
       selectSavedCandidatePdf(button.dataset.savedCandidateSource).catch(showPersonalError);
     });
-    const acceptCandidateFiles = async (files) => {
+    const acceptCandidateFiles = async (files, { replace = false, captured_via: capturedVia = "FILE_PICKER" } = {}) => {
       const selectionVersion = ++candidateSelectionVersion;
       const gate = refreshCandidateImportGate();
       const modelReady = gate.authority.runtime.mode === "model" && gate.allowed;
       if (modelReady) CandidateModel.assertEligibleGate(gate);
       const selectedFiles = Array.from(files || []);
-      if (modelReady && selectedFiles.length !== 1) throw new Error("candidate_model_pdf_required");
       closeCandidateWorkspaceLayer("import");
       setCompletedSourceSheet(false);
       byId("personal-page-message").textContent = "";
       byId("personal-page-message").classList.remove("error");
-      const batchId = `${modelReady ? "batch-candidate-model" : "batch-candidate-extraction"}-${crypto.randomUUID()}`;
+      const batchId = !replace && selectedCandidateSources[0]?.batch_id
+        ? selectedCandidateSources[0].batch_id
+        : `${modelReady ? "batch-candidate-model" : "batch-candidate-extraction"}-${crypto.randomUUID()}`;
       candidateExecutionState = "READY";
-      const prepared = await Promise.all(selectedFiles.map((file) => LocalCandidate.prepareSource(file, batchId, selectedCandidateType)));
+      const prepared = await Promise.all(selectedFiles.map(async (file) => ({ ...(await LocalCandidate.prepareSource(file, batchId, selectedCandidateType)), captured_via: capturedVia })));
       const unique = [...new Map(prepared.map((source) => [source.source_document_id, source])).values()];
-      if (modelReady) unique.forEach((source) => CandidateModel.assertPdfSource(source));
       const database = await Truth.openDatabase();
       let records;
       try {
@@ -1985,7 +2127,8 @@
         }
       } finally { database.close(); }
       if (selectionVersion !== candidateSelectionVersion) return;
-      selectedCandidateSources = unique.map((source) => ({ ...source, import_state: modelReady ? modelSourceImportState(source.source_document_id, records) : LocalCandidateReview.sourceImportState(source.source_document_id, records) }));
+      const incoming = unique.map((source) => ({ ...source, import_state: modelReady ? modelSourceImportState(source.source_document_id, records) : LocalCandidateReview.sourceImportState(source.source_document_id, records) }));
+      selectedCandidateSources = SourceInput.mergeSources(selectedCandidateSources, incoming, { replace });
       if (selectedCandidateSources[0]) showCandidateSource(selectedCandidateSources[0]);
       const pending = selectedCandidateSources.filter((source) => source.import_state === "PENDING_REVIEW");
       const active = selectedCandidateSources.filter((source) => source.import_state === "ACTIVE");
@@ -2003,24 +2146,35 @@
       refreshCandidateImportGate();
       await renderSavedCandidatePdfSources();
     };
-    installFileDropzone("personal-dropzone", "personal-file-input", handleCandidateFiles);
+    candidateSourceInputBinding = SourceInput.bind({
+      dropzone: byId("personal-dropzone"), input: byId("personal-file-input"), onFiles: handleCandidateFiles,
+      onAccepted: (count) => { byId("personal-page-message").textContent = `已从剪贴板添加 ${count} 张图片。`; },
+    });
+    byId("personal-source-preview-list").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-source-remove]");
+      if (!button || candidateProcessingInProgress) return;
+      selectedCandidateSources.splice(Number(button.dataset.sourceRemove), 1);
+      candidateSelectionVersion += 1;
+      if (selectedCandidateSources.length) showCandidateSource(selectedCandidateSources[0]);
+      else resetInvalidCandidateSelection();
+    });
     byId("replace-personal-file").addEventListener("click", () => {
       if (candidateProcessingInProgress) {
         candidateBatchAbortController?.abort();
-        setCandidateExtractionState("CANCELLING", currentOperationGate("candidate_import").authority.runtime.mode === "model" ? "正在取消本次模型分析" : "正在取消本次本地提取");
+        setCandidateExtractionState("CANCELLING", refreshCandidateImportGate().authority.runtime.mode === "model" ? "正在取消本次模型分析" : "正在取消本次本地提取");
         return;
       }
-      byId("personal-file-input").value = "";
-      byId("personal-file-input").click();
+      candidateSourceInputBinding.openChooser({ replace: false });
     });
     byId("start-personal-processing").addEventListener("click", () => {
       const gate = refreshCandidateImportGate();
       const sourceId = selectedCandidateSources[0]?.source_document_id;
-      const operation = gate.authority.runtime.mode === "model"
-        ? candidateExecutionState === "COMPLETE" && activeCandidateWorkingModel?.source_document_id === sourceId
+      const operation = ProductShell.dispatchRuntimeImport(gate, {
+        model: () => candidateExecutionState === "COMPLETE" && activeCandidateWorkingModel?.source_document_id === sourceId
           ? renderCandidateWorkingWorkspace(sourceId, { workingModel: activeCandidateWorkingModel })
-          : openCandidateModelConsent()
-        : runCandidateProcessing();
+          : openCandidateModelConsent(),
+        local: () => runCandidateProcessing(),
+      });
       Promise.resolve(operation).catch(showPersonalError);
     });
     byId("confirm-completed-source").addEventListener("click", () => {
@@ -2138,8 +2292,7 @@
       if (!dialog.open) dialog.showModal();
       return;
     }
-    byId("personal-page-message").textContent = `无法整理材料：${personalErrorCopy(error)}`;
-    byId("personal-page-message").classList.add("error");
+    ProductShell.setFeedback(byId("personal-page-message"), { state: "FAILURE", copy: `无法整理材料：${personalErrorCopy(error)}` });
     refreshCandidateImportGate();
     byId("personal-processing")?.classList.add("hidden");
   }
@@ -2179,33 +2332,6 @@
     return Object.freeze({ open, close });
   }
 
-  function installFileDropzone(dropzoneId, inputId, onFiles) {
-    const dropzone = byId(dropzoneId);
-    const input = byId(inputId);
-    if (!dropzone || !input) return;
-    const openChooser = () => {
-      if (input.disabled) return;
-      input.value = "";
-      input.click();
-    };
-    dropzone.addEventListener("click", openChooser);
-    input.addEventListener("change", (event) => onFiles(event.target.files));
-    const prevent = (event) => { event.preventDefault(); event.stopPropagation(); };
-    ["dragenter", "dragover"].forEach((type) => dropzone.addEventListener(type, (event) => {
-      prevent(event);
-      if (!input.disabled) dropzone.classList.add("is-dragover");
-    }));
-    dropzone.addEventListener("dragleave", (event) => {
-      prevent(event);
-      if (!event.relatedTarget || !dropzone.contains(event.relatedTarget)) dropzone.classList.remove("is-dragover");
-    });
-    dropzone.addEventListener("drop", (event) => {
-      prevent(event);
-      dropzone.classList.remove("is-dragover");
-      if (!input.disabled) onFiles(event.dataTransfer?.files);
-    });
-  }
-
   function renderCandidate(item) {
     activeCandidate = item;
     byId("candidate-type").textContent = candidateTypeLabel(item);
@@ -2220,6 +2346,42 @@
     byId("candidate-facts").innerHTML = item.facts.map((fact, index) => `<div><span>${String(index + 1).padStart(2, "0")}</span><p><b>${escapeHtml(candidateFactLabel(fact.label))}</b>${escapeHtml(fact.value)}</p></div>`).join("");
     byId("candidate-ownership").textContent = item.ownership || "未记录";
     byId("candidate-source").textContent = `${item.source_refs?.[0]?.location || "来源待核对"} · ${item.source_refs?.[0]?.excerpt_or_reference || "来源未记录"}`;
+  }
+
+  function candidateDetailChangeProjection(confirmedItem, workingItem) {
+    if (!confirmedItem || !workingItem || confirmedItem.item_id !== workingItem.item_id) return null;
+    const changes = [];
+    const add = (label, before, after) => {
+      const previous = String(before ?? "").trim();
+      const next = String(after ?? "").trim();
+      if (previous !== next) changes.push({ label, before: previous || "未填写", after: next || "未填写" });
+    };
+    [["标题", "title"], ["组织 / 副标题", "subtitle"], ["日期", "time"], ["摘要", "summary"], ["责任边界", "ownership"]]
+      .forEach(([label, field]) => add(label, confirmedItem[field], workingItem[field]));
+    const confirmedFacts = new Map((confirmedItem.facts || []).map((fact) => [fact.fact_id, fact]));
+    const workingFacts = new Map((workingItem.facts || []).map((fact) => [fact.fact_id, fact]));
+    new Set([...confirmedFacts.keys(), ...workingFacts.keys()]).forEach((factId) => {
+      const before = confirmedFacts.get(factId);
+      const after = workingFacts.get(factId);
+      add(candidateFactLabel(after?.label || before?.label), before?.value, after?.value);
+    });
+    if (!changes.length) return null;
+    return Object.freeze({
+      before: changes.map((change) => `${change.label}：${change.before}`).join("；"),
+      after: changes.map((change) => `${change.label}：${change.after}`).join("；"),
+    });
+  }
+
+  function showCandidateDetailWorkingProposal(confirmedItem, workingItem, reason = "") {
+    const projection = candidateDetailChangeProjection(confirmedItem, workingItem);
+    const panel = byId("candidate-patch-proposal");
+    panel.classList.toggle("hidden", !projection);
+    if (!projection) return false;
+    byId("candidate-patch-before").textContent = projection.before;
+    byId("candidate-patch-after").textContent = projection.after;
+    byId("candidate-patch-reason").textContent = reason || "这是非权威 Working 修改；确认保存前，个人资料中的已确认版本保持不变。";
+    panel.scrollIntoView({ behavior: "smooth", block: "center" });
+    return true;
   }
 
   function setDetailRuntimeMode(record, paneId, editButtonId, runtimeBadgeId, operation) {
@@ -2272,32 +2434,92 @@
     }
     renderCandidate(candidate);
     ConversationUI.renderMessages(byId("candidate-conversation-messages"), [], { empty_text: "" });
-    setDetailRuntimeMode(candidate, "candidate-ai-pane", "open-direct-edit", "candidate-ai-runtime", "candidate_conversation");
     const sourceIdFor = (record, revision) => {
       const allowed = new Set(revision?.provenance?.source_document_ids || []);
       const grounded = (record.source_refs || record.grounding_refs || []).map((ref) => ref.source_document_id).find((sourceId) => sourceId && (!allowed.size || allowed.has(sourceId)));
       return grounded || revision?.provenance?.source_document_ids?.[0] || null;
     };
-    const panels = ProductShell.createDetailPanelController({ trigger: byId("open-direct-edit"), stages: { edit: byId("candidate-edit-form") }, window });
-    const deletePopover = createDeletePopover("candidate-delete-popover");
-    const setDirectEditOpen = (open, focusTarget = true) => {
-      panels.show(open ? "edit" : "closed", { focusFirst: open && focusTarget });
-    };
-    byId("open-direct-edit").addEventListener("click", () => {
-      const opening = panels.current() === "closed";
-      if (!opening) { setDirectEditOpen(false, false); return; }
-      byId("candidate-edit-title").value = activeCandidate.title || "";
-      byId("candidate-edit-subtitle").value = activeCandidate.subtitle || "";
-      byId("candidate-edit-time").value = activeCandidate.time || "";
-      byId("candidate-edit-summary").value = activeCandidate.summary || "";
-      byId("candidate-edit-facts").value = activeCandidate.facts.map((fact) => fact.value).join("\n");
-      byId("direct-edit-preview").classList.add("hidden");
-      setDirectEditOpen(true);
+    const conversationAllowed = setDetailRuntimeMode(candidate, "candidate-ai-pane", "open-direct-edit", "candidate-ai-runtime", "candidate_conversation");
+    const candidateDetailSourceId = sourceIdFor(candidate, canonicalRevision);
+    const candidateConversationBinding = ProductShell.bindConversation({
+      messages: byId("candidate-conversation-messages"),
+      form: byId("candidate-conversation-form"),
+      status: byId("candidate-conversation-status"),
     });
+    ProductShell.bindConversationAdapter(candidateConversationBinding, {
+      domain: "candidate",
+      operation: "candidate_conversation",
+      isAvailable: () => {
+        const gate = currentOperationGate("candidate_conversation");
+        return gate.authority.runtime.mode === "model" && gate.allowed && Boolean(candidateDetailSourceId && canonicalRevision);
+      },
+      resolveTarget: () => candidateDetailSourceId && canonicalRevision ? Object.freeze({ sourceId: candidateDetailSourceId, itemId }) : null,
+      submit: ({ content, target }) => submitCandidateDetailConversation({ sourceId: target.sourceId, itemId: target.itemId, content }),
+    });
+    if (conversationAllowed) {
+      const form = byId("candidate-conversation-form");
+      if (candidateDetailSourceId && canonicalRevision) {
+        const database = await Truth.openDatabase();
+        try {
+          activeCandidateWorkingModel = await candidateWorkingModelForDetail(database, candidateDetailSourceId, itemId);
+          showCandidateDetailWorkingProposal(activeCandidate, activeCandidateWorkingModel.payload.items.find((item) => item.item_id === itemId));
+          activeCandidateConversationSession = await CandidateWorkspaceConversationRuntime.resolveSession(database, candidateDetailSourceId);
+          const restored = await CandidateConversationPersistence.restoreConversation(database, activeCandidateConversationSession.conversation_id);
+          renderCandidateDetailConversation(restored.messages);
+          const hasActiveTurn = restored.turns.some((turn) => CandidateConversationPersistence.ACTIVE_STATES.includes(turn.state));
+          setCandidateDetailConversationExecutionState(hasActiveTurn ? "正在理解…" : "", hasActiveTurn);
+        } catch (error) {
+          byId("candidate-detail-message").textContent = "当前材料的对话上下文尚不可用；不会改用本地结果。";
+          byId("candidate-detail-message").classList.add("error");
+          form.querySelector('button[type="submit"]').disabled = true;
+        } finally { database.close(); }
+      } else {
+        byId("candidate-detail-message").textContent = "演示材料不建立真实模型会话。";
+        form.querySelector('button[type="submit"]').disabled = true;
+      }
+    }
+    byId("accept-candidate-patch").addEventListener("click", async () => {
+      if (!activeCandidateWorkingModel || !canonicalRevision) return;
+      const button = byId("accept-candidate-patch");
+      button.disabled = true;
+      try {
+        const database = await Truth.openDatabase();
+        try {
+          const outcome = await persistCandidateWorkspaceAcceptance(database, activeCandidateWorkingModel);
+          canonicalRevision = outcome.revision;
+          const confirmedItem = canonicalRevision.payload.items.find((item) => item.item_id === itemId);
+          activeCandidate = { ...confirmedItem, data_class: "CANONICAL_CONFIRMED", context_id: canonicalRevision.context_id, source_refs: confirmedItem.grounding_refs || [] };
+        } finally { database.close(); }
+        renderCandidate(activeCandidate);
+        byId("candidate-patch-proposal").classList.add("hidden");
+        byId("candidate-detail-message").textContent = `Working 修改已由你确认并保存为第 ${canonicalRevision.version} 个确认版本；上一版本仍保留。`;
+        byId("candidate-detail-message").classList.remove("error");
+      } catch (error) {
+        byId("candidate-detail-message").textContent = ["candidate_working_model_stale", "context_version_conflict"].includes(String(error?.code || error?.message))
+          ? "内容已经变化，请刷新后重新查看再保存。"
+          : `无法保存 Working 修改：${personalErrorCopy(error)}`;
+        byId("candidate-detail-message").classList.add("error");
+      } finally { button.disabled = false; }
+    });
+    byId("reject-candidate-patch").addEventListener("click", () => {
+      byId("candidate-patch-proposal").classList.add("hidden");
+      byId("candidate-detail-message").textContent = "已暂不保存这版 Working 修改；个人资料中的已确认版本没有变化。";
+      byId("candidate-detail-message").classList.remove("error");
+    });
+    const editShell = ProductShell.createDetailEditController({
+      trigger: byId("open-direct-edit"), form: byId("candidate-edit-form"), preview: byId("direct-edit-preview"), window,
+      populate: () => {
+        byId("candidate-edit-title").value = activeCandidate.title || "";
+        byId("candidate-edit-subtitle").value = activeCandidate.subtitle || "";
+        byId("candidate-edit-time").value = activeCandidate.time || "";
+        byId("candidate-edit-summary").value = activeCandidate.summary || "";
+        byId("candidate-edit-facts").value = activeCandidate.facts.map((fact) => fact.value).join("\n");
+      },
+    });
+    const deletePopover = createDeletePopover("candidate-delete-popover");
     window.addEventListener("message", (event) => {
       if (event.origin === window.location.origin && event.data?.type === "job-radar-v1-open-detail-edit") byId("open-direct-edit").click();
     });
-    byId("cancel-direct-edit").addEventListener("click", () => setDirectEditOpen(false, false));
     byId("open-candidate-delete").addEventListener("click", (event) => deletePopover.open(event.currentTarget));
     document.querySelectorAll("[data-candidate-delete-scope]").forEach((button) => button.addEventListener("click", async () => {
       const scope = button.dataset.candidateDeleteScope;
@@ -2341,11 +2563,8 @@
       if (!pendingDirectEdit.title) return;
       byId("direct-before").textContent = `${activeCandidate.title} · ${activeCandidate.facts.length} 条事实`;
       byId("direct-after").textContent = `${pendingDirectEdit.title} · ${pendingDirectEdit.facts.length} 条事实`;
-      setDirectEditOpen(false, false);
-      byId("direct-edit-preview").classList.remove("hidden");
-      byId("direct-edit-preview").scrollIntoView({ behavior: "smooth", block: "center" });
+      editShell.showPreview();
     });
-    byId("back-to-direct-edit").addEventListener("click", () => { byId("direct-edit-preview").classList.add("hidden"); setDirectEditOpen(true); });
     byId("confirm-direct-edit").addEventListener("click", async () => {
       if (!pendingDirectEdit) return;
       const button = byId("confirm-direct-edit");
@@ -2356,7 +2575,19 @@
           const editedItem = { ...originalItem, ...pendingDirectEdit, content_origin: "USER_CONFIRMED", review_status: "CONFIRMED" };
           const database = await Truth.openDatabase();
           try {
-            const outcome = await LocalCandidateReview.persistUserEdit(database, canonicalRevision, itemId, editedItem);
+            let outcome;
+            if (canonicalRevision.contract_id === "ariadne-context-revision-v2") {
+              if (!CandidateModel || !activeCandidateWorkingModel) throw new Error("candidate_workspace_user_edit_requires_working_model");
+              const editedWorkingModel = await CandidateModel.editedCandidateWorkingModel(activeCandidateWorkingModel, itemId, {
+                ...pendingDirectEdit,
+                facts: pendingDirectEdit.facts.map((fact) => fact.value),
+              }, new Date().toISOString(), "USER_CONFIRMED");
+              await Truth.persistCandidateWorkingModel(database, editedWorkingModel);
+              outcome = await persistCandidateWorkspaceAcceptance(database, editedWorkingModel);
+              activeCandidateWorkingModel = editedWorkingModel;
+            } else {
+              outcome = await LocalCandidateReview.persistUserEdit(database, canonicalRevision, itemId, editedItem);
+            }
             canonicalRevision = outcome.revision;
             const confirmedItem = canonicalRevision.payload.items.find((item) => item.item_id === itemId);
             activeCandidate = { ...confirmedItem, data_class: "CANONICAL_CONFIRMED", context_id: contextId, source_refs: confirmedItem.grounding_refs || [] };
@@ -2368,8 +2599,8 @@
           byId("candidate-detail-message").textContent = "修改只保存到本地演示记录；未晋升为已确认候选信息。";
         }
         renderCandidate(activeCandidate);
-        byId("direct-edit-preview").classList.add("hidden");
-        panels.show("closed");
+        byId("candidate-patch-proposal").classList.add("hidden");
+        editShell.complete();
         pendingDirectEdit = null;
       } finally {
         button.disabled = false;
@@ -2455,11 +2686,21 @@
     ModelWorkspaceUI.renderProgress(byId("job-understanding-events"), steps, currentIndex);
   }
 
+  function setJobProcessingState(state, copy) {
+    const modelMode = refreshJobImportGate().authority.runtime.mode === "model";
+    ProcessingIndicator.set(byId("job-processing"), {
+      active: !["READY_FOR_REVIEW", "WORKING_READY", "CANCELLED", "FAILED"].includes(state),
+      copy,
+      boundary: modelMode ? "正在等待 DeepSeek 时不会改用本地结果" : "本地确定性处理 · Provider 调用 0",
+      state,
+    });
+  }
+
   function showJobModelProcessingWorkspace(sourceName) {
     activeJobWorkingProposal = null;
     activeJobConversationSession = null;
     byId("job-workspace-conversation").innerHTML = '<p class="v1-conversation-empty">职位理解完成后，可以在这里继续对话。</p>';
-    byId("job-workspace-conversation-status").textContent = "";
+    ProcessingIndicator.clear(byId("job-workspace-conversation-status"));
     ProductShell.showWorkspace(jobSharedWorkspace(), { source_name: sourceName || "当前职位来源", processing: true, model_workspace_ui: ModelWorkspaceUI, embedded: isEmbeddedDetail });
     setJobWorkspaceProgress(["正在读取职位材料", "正在理解职位内容", "正在提取职位要求", "正在生成职位信息"], 0);
   }
@@ -2476,14 +2717,17 @@
     byId("job-working-location").value = payload.location || "";
     byId("job-working-summary").value = payload.summary || "";
     byId("job-working-requirements").value = (payload.requirements || []).map((item) => item.detail).join("\n");
-    ProductShell.showWorkspace(jobSharedWorkspace(), { source_name: selectedJobSource?.name || "当前职位来源", processing: false, model_workspace_ui: ModelWorkspaceUI, embedded: isEmbeddedDetail });
-    byId("job-workspace-save").disabled = false;
-    byId("job-workspace-save-status").textContent = "";
     setJobWorkspaceProgress(["职位材料已准备", "职位内容已读取", "DeepSeek 已完成理解", "Working Job 已生成"]);
     byId("job-review-surface").classList.add("hidden");
     const database = await Truth.openDatabase();
     try {
-      activeJobSourceDocument = (await JobContext.getAll(database, "source_documents")).find((entry) => entry.source_document_id === checked.source_document_ids[0]) || null;
+      const sourceDocuments = await JobContext.getAll(database, "source_documents");
+      activeJobSourceDocuments = checked.source_document_ids.map((sourceId) => sourceDocuments.find((entry) => entry.source_document_id === sourceId)).filter(Boolean);
+      activeJobSourceDocument = activeJobSourceDocuments[0] || null;
+      const sourceName = activeJobSourceDocuments.map((entry) => entry.filename || entry.label).filter(Boolean).join("、") || selectedJobSource?.name || "当前职位来源";
+      ProductShell.showWorkspace(jobSharedWorkspace(), { source_name: sourceName, processing: false, model_workspace_ui: ModelWorkspaceUI, embedded: isEmbeddedDetail });
+      byId("job-workspace-save").disabled = false;
+      byId("job-workspace-save-status").textContent = "";
       const restored = await restoreJobConversation(database, JobContext.contextIdForProposal(checked));
       renderJobConversationMessages(restored.messages);
     } finally { database.close(); }
@@ -2503,30 +2747,26 @@
     if (!activeJobWorkingProposal) return;
     const button = byId("job-workspace-save");
     button.disabled = true;
-    byId("job-workspace-save-status").textContent = "正在保存…";
+    ProductShell.setFeedback(byId("job-workspace-save-status"), { state: "PENDING", copy: "正在保存…" });
     const database = await Truth.openDatabase();
     try {
       const outcome = await JobContext.persistReview(database, activeJobWorkingProposal, "CONFIRM", jobWorkingEdits());
       transitionJobImportLifecycle(ModelImportLifecycle.STATES.SAVED);
-      byId("job-workspace-save-status").textContent = "已保存为不可变职位版本。";
+      ProductShell.setFeedback(byId("job-workspace-save-status"), { state: "SUCCESS", copy: "已保存为不可变职位版本。" });
       const sourceKey = `job:${outcome.revision.context_id}`;
       if (!completeEmbeddedImport("jd", sourceKey)) window.location.assign(`/job-detail.html?job=${encodeURIComponent(outcome.revision.context_id)}`);
     } catch (error) {
       button.disabled = false;
-      byId("job-workspace-save-status").textContent = error?.message === "context_version_conflict" ? "职位版本已经变化，请重新打开后保存。" : "保存失败，请重试。";
+      ProductShell.setFeedback(byId("job-workspace-save-status"), { state: "FAILURE", copy: error?.message === "context_version_conflict" ? "职位版本已经变化，请重新打开后保存。" : "保存失败，请重试。" });
       throw error;
     } finally { database.close(); }
   }
 
   function showJobSource(source) {
     selectedJobSource = source;
-    const batchSuffix = selectedJobSources.length > 1 ? ` · 共 ${selectedJobSources.length} 个文件` : "";
-    const selectedNames = selectedJobSources.map((item) => item.name).filter(Boolean);
-    byId("job-file-preview").classList.remove("hidden");
-    byId("job-file-name").textContent = selectedNames.length > 1 ? selectedNames.join("、") : source.name;
-    const boundary = refreshJobImportGate().authority.runtime.mode === "model" ? "原始来源保存在本机；确认后发送有界文本证据" : "仅本地";
-    byId("job-file-meta").textContent = `${source.type || selectedJobImportType} · ${source.sizeLabel || "本地文本"}${batchSuffix} · ${boundary}`;
-    byId("job-file-icon").textContent = (source.extension || selectedJobImportType).slice(0, 4).toUpperCase();
+    SourceInput.renderBundlePreview({
+      container: byId("job-file-preview"), list: byId("job-source-preview-list"),
+    }, selectedJobImportType === "Paste" ? [source] : selectedJobSources);
     refreshJobImportGate();
   }
 
@@ -2534,6 +2774,7 @@
     jobSelectionVersion += 1;
     selectedJobSource = null;
     selectedJobSources = [];
+    jobModelConsentBundle = null;
     byId("job-file-preview").classList.add("hidden");
     byId("job-page-message").textContent = "";
     byId("job-page-message").classList.remove("error");
@@ -2568,20 +2809,21 @@
     return ["FAILED", "CANCELLED"].includes(latest?.status) ? "RETRY" : "RETRY";
   }
 
-  async function acceptJobFiles(files) {
+  async function acceptJobFiles(files, { replace = false, captured_via: capturedVia = "FILE_PICKER" } = {}) {
     const selectionVersion = ++jobSelectionVersion;
+    jobModelConsentBundle = null;
     const selectedFiles = Array.from(files || []);
     const modelMode = refreshJobImportGate().authority.runtime.mode === "model";
-    if (modelMode && selectedFiles.length !== 1) throw new Error("job_model_single_source_required");
-    const batchKey = `job-batch-${crypto.randomUUID()}`;
+    const batchKey = !replace && selectedJobSources[0]?.batch_id ? selectedJobSources[0].batch_id : `job-batch-${crypto.randomUUID()}`;
     const sourceUrl = byId("job-link-input")?.value.trim() || null;
     const settled = await Promise.allSettled(selectedFiles.map((file) => LocalJob.prepareSource(file, batchKey, { source_url: sourceUrl })));
-    const prepared = settled.filter((result) => result.status === "fulfilled").map((result) => ({ ...result.value, sizeLabel: formatBytes(result.value.size), import_type: "Document" }));
+    const prepared = settled.filter((result) => result.status === "fulfilled").map((result) => ({ ...result.value, captured_via: capturedVia, sizeLabel: formatBytes(result.value.size), import_type: "Document" }));
     if (selectionVersion !== jobSelectionVersion) return;
     const database = await Truth.openDatabase();
     try {
-      selectedJobSources = [];
-      for (const source of LocalContextLifecycle.uniqueSources(prepared)) selectedJobSources.push({ ...source, import_state: await jobSourceImportState(source.source_document_id, database, modelMode) });
+      const incoming = [];
+      for (const source of LocalContextLifecycle.uniqueSources(prepared)) incoming.push({ ...source, import_state: await jobSourceImportState(source.source_document_id, database, modelMode) });
+      selectedJobSources = SourceInput.mergeSources(selectedJobSources, incoming, { replace });
     } finally { database.close(); }
     if (selectedJobSources.some((source) => ["NEW", "RETRY"].includes(source.import_state))) beginJobImportLifecycle();
     else if (modelMode && selectedJobSources.some((source) => source.import_state === "WORKSPACE")) beginJobImportLifecycle(ModelImportLifecycle.STATES.WORKING);
@@ -2589,7 +2831,7 @@
     else beginJobImportLifecycle(ModelImportLifecycle.STATES.SAVED);
     if (selectedJobSources[0]) showJobSource(selectedJobSources[0]);
     else resetJobSource();
-    const duplicateCount = prepared.length - selectedJobSources.length;
+    const duplicateCount = prepared.length - LocalContextLifecycle.uniqueSources(prepared).length;
     const rejectedCount = settled.filter((result) => result.status === "rejected").length;
     const activeCount = selectedJobSources.filter((source) => source.import_state === "ACTIVE").length;
     const pendingCount = selectedJobSources.filter((source) => source.import_state === "PENDING_REVIEW").length;
@@ -2628,8 +2870,7 @@
 
   async function processJobSource(source, snapshot, database, signal) {
     if (snapshot.mode !== "local" || snapshot.capabilities.deterministic_structuring !== "supported") throw new Error("job_local_runtime_required");
-    byId("job-processing").dataset.state = "PREPARING";
-    byId("job-processing-state").textContent = "正在读取职位材料";
+    setJobProcessingState("PREPARING", "正在读取职位材料");
     const sourceDocument = LocalJob.sourceDocumentFor(source);
     const durable = await LocalJob.persistCanonicalSource(database, sourceDocument, source.file);
     if (signal.aborted) return { cancelled: true };
@@ -2638,8 +2879,7 @@
     await Truth.persistRecord(database, "processing_runs", extractionRun);
     extractionRun = LocalJob.processingRunFor(source, snapshot.snapshot_id, "RUNNING", { run_id: extractionRun.run_id });
     await Truth.persistRecord(database, "processing_runs", extractionRun);
-    byId("job-processing").dataset.state = "UNDERSTANDING";
-    byId("job-processing-state").textContent = "正在理解职位要求";
+    setJobProcessingState("UNDERSTANDING", "正在理解职位要求");
     let result;
     try {
       result = await extractJobSource({ ...source, file: durable.file }, snapshot, signal);
@@ -2654,8 +2894,7 @@
     await Truth.persistRecord(database, "processing_runs", extractionRun);
     if (signal.aborted) return { cancelled: true };
 
-    byId("job-processing").dataset.state = "BUILDING_CARDS";
-    byId("job-processing-state").textContent = "正在生成结构化职位草稿";
+    setJobProcessingState("BUILDING_CARDS", "正在生成结构化职位草稿");
     let structuringRun = JobContext.structuringRunFor(source, snapshot.snapshot_id, "RUNNING");
     await Truth.persistRecord(database, "processing_runs", structuringRun);
     let proposal;
@@ -2669,8 +2908,7 @@
     await Truth.persistRecord(database, "context_proposals", proposal);
     structuringRun = JobContext.structuringRunFor(source, snapshot.snapshot_id, "SUCCEEDED", { run_id: structuringRun.run_id, started_at: structuringRun.started_at, proposal_ids: [proposal.proposal_id] });
     await Truth.persistRecord(database, "processing_runs", structuringRun);
-    byId("job-processing").dataset.state = "READY_FOR_REVIEW";
-    byId("job-processing-state").textContent = "已生成真实内容的待审核职位草稿";
+    setJobProcessingState("READY_FOR_REVIEW", "已生成真实内容的待审核职位草稿");
     return { proposal, artifact, source_document: sourceDocument, provider_calls: 0 };
   }
 
@@ -2696,7 +2934,10 @@
     if (!response.ok || result?.read_only !== true || result?.writeback !== false || result?.model_call_made !== false || result?.network_call_made !== false) {
       throw new Error(result?.error || "job_model_source_preparation_invalid");
     }
-    return JobModel.sourcePreparationFor(sourceDocument, result);
+    return {
+      preparation_result: result,
+      source_input: image ? { source_document_id: sourceDocument.source_document_id, image_data_url: dataUrl } : null,
+    };
   }
 
   async function callJobModelRuntime(request, signal) {
@@ -2726,15 +2967,19 @@
   }
 
   async function openJobModelConsent() {
-    if (!JobModel || !selectedJobSource || selectedJobSources.length > 1) throw new Error("job_model_single_source_required");
+    if (!JobModel || !selectedJobSource || !selectedJobSources.length) throw new Error("job_model_source_bundle_invalid");
     const gate = JobModel.assertEligibleGate(refreshJobImportGate());
     const selectionVersion = jobSelectionVersion;
-    const source = selectedJobSource;
+    const sources = [...selectedJobSources];
     const database = await Truth.openDatabase();
+    let sourceDocuments;
     try {
-      const existing = await RawSource.readRecord(database, source.source_document_id);
-      if (existing) await RawSource.resolveRawSource(database, source.source_document_id);
-      else await LocalJob.persistCanonicalSource(database, LocalJob.sourceDocumentFor(source), source.file);
+      sourceDocuments = await SourceInput.persistDurableBundle({
+        database,
+        sources,
+        sourceDocumentFor: LocalJob.sourceDocumentFor,
+        persistDurableSource: LocalJob.persistCanonicalSource,
+      });
     } finally { database.close(); }
     const currentGate = refreshJobImportGate();
     if (selectionVersion !== jobSelectionVersion || currentGate.authority.runtime.mode !== "model") throw new Error("job_model_consent_mismatch");
@@ -2743,6 +2988,7 @@
     jobModelConsentSelectionVersion = selectionVersion;
     jobModelConsentRuntimeIdentity = runtimeIdentity(currentGate.authority.runtime);
     jobModelConsentId = `consent-job-model-import-${crypto.randomUUID()}`;
+    jobModelConsentBundle = await JobModel.sourceBundleFor(sources, sourceDocuments);
     const dialog = byId("job-model-consent-dialog");
     if (!dialog.open) dialog.showModal();
   }
@@ -2760,11 +3006,13 @@
 
   async function executeJobModelProcessing(gate, confirmedAt, consentId) {
     JobModel.assertEligibleGate(gate);
-    const source = selectedJobSource;
-    if (!source || selectedJobSources.length > 1) throw new Error("job_model_single_source_required");
-    const runtimeSnapshot = JobModel.createRuntimeSnapshot();
-    const consent = JobModel.consentFor(source, runtimeSnapshot, confirmedAt, consentId);
-    const operationIdentity = await JobModel.operationIdentityFor(source, runtimeSnapshot, consent);
+    const sources = [...selectedJobSources];
+    const source = sources[0];
+    const sourceBundle = jobModelConsentBundle;
+    if (!source || !sourceBundle || JSON.stringify(sourceBundle.source_document_ids) !== JSON.stringify(sources.map((entry) => entry.source_document_id))) throw new Error("job_model_source_bundle_invalid");
+    const runtimeSnapshot = JobModel.createRuntimeSnapshot({ operation: gate.operation });
+    const consent = JobModel.consentFor(sourceBundle, runtimeSnapshot, confirmedAt, consentId);
+    const operationIdentity = await JobModel.operationIdentityFor(sourceBundle, runtimeSnapshot, consent);
     const attemptGeneration = ++jobModelAttemptGeneration;
     const selectionVersion = jobSelectionVersion;
     const abortController = new AbortController();
@@ -2773,8 +3021,9 @@
     transitionJobImportLifecycle(ModelImportLifecycle.STATES.MODEL_PROCESSING);
     jobBatchAbortController = abortController;
     byId("replace-job-file").textContent = "取消本次理解";
-    showJobModelProcessingWorkspace(source.name);
+    showJobModelProcessingWorkspace(sources.map((entry) => entry.name).join("、"));
     refreshJobImportGate();
+    await ConversationUI.waitForIndicatorPaint();
     let database = null;
     let run = null;
     try {
@@ -2782,25 +3031,30 @@
       await Truth.persistRecord(database, "runtime_snapshots", runtimeSnapshot);
       run = JobModel.processingRunFor(source, runtimeSnapshot.snapshot_id, "PENDING", { run_id: `run-${operationIdentity.operation_id}` });
       if (!await JobModel.claimProcessingRun(database, run)) return;
-      const sourceDocument = await RawSource.sourceDocumentForId(database, source.source_document_id);
-      await RawSource.resolveRawSource(database, sourceDocument);
+      const sourceDocuments = [];
+      for (const entry of sources) {
+        const sourceDocument = await RawSource.sourceDocumentForId(database, entry.source_document_id);
+        await RawSource.resolveRawSource(database, sourceDocument);
+        sourceDocuments.push(sourceDocument);
+      }
       const startedAt = new Date().toISOString();
       run = JobModel.processingRunFor(source, runtimeSnapshot.snapshot_id, "RUNNING", { run_id: run.run_id, started_at: startedAt });
       await Truth.persistRecord(database, "processing_runs", run);
       setJobWorkspaceProgress(["职位材料已准备", "正在理解职位内容", "正在提取职位要求", "正在生成职位信息"], 1);
-      const preparation = await readJobSourceForModel(database, source, sourceDocument, runtimeSnapshot, abortController.signal);
+      const sourceReadResults = await Promise.all(sourceDocuments.map((sourceDocument, index) => readJobSourceForModel(database, sources[index], sourceDocument, runtimeSnapshot, abortController.signal)));
+      const preparations = JobModel.boundedBundlePreparations(sourceDocuments, sourceReadResults.map((entry) => entry.preparation_result));
+      const sourceInputs = sourceReadResults.map((entry) => entry.source_input).filter(Boolean);
       if (abortController.signal.aborted) throw Object.assign(new Error("job_model_import_cancelled"), { name: "AbortError" });
       setJobWorkspaceProgress(["职位材料已准备", "职位内容已读取", "正在提取职位要求", "正在生成职位信息"], 2);
-      const request = JobModel.requestFor({ source_document: sourceDocument, source_preparation: preparation, snapshot: runtimeSnapshot, run, consent, operation_identity: operationIdentity });
+      const request = JobModel.requestFor({ source_bundle: sourceBundle, source_documents: sourceDocuments, source_preparations: preparations, source_inputs: sourceInputs, snapshot: runtimeSnapshot, run, consent, operation_identity: operationIdentity });
       const result = await callJobModelRuntime(request, abortController.signal);
       setJobWorkspaceProgress(["职位材料已准备", "职位内容已读取", "职位要求已提取", "正在生成职位信息"], 3);
-      const proposal = JobModel.proposalFor({ source, source_document: sourceDocument, source_preparation: preparation, run, result });
-      const isCurrent = () => attemptGeneration === jobModelAttemptGeneration && selectionVersion === jobSelectionVersion && refreshJobImportGate().authority.runtime.mode === "model" && selectedJobSource?.source_document_id === source.source_document_id;
+      const proposal = JobModel.proposalFor({ sources, source_documents: sourceDocuments, source_preparations: preparations, source_bundle: sourceBundle, run, result });
+      const isCurrent = () => attemptGeneration === jobModelAttemptGeneration && selectionVersion === jobSelectionVersion && refreshJobImportGate().authority.runtime.mode === "model" && JSON.stringify(selectedJobSources.map((entry) => entry.source_document_id)) === JSON.stringify(sourceBundle.source_document_ids);
       await JobModel.persistSuccessfulResult(database, run, proposal, abortController.signal, isCurrent);
       if (!isCurrent()) throw new Error("job_model_processing_run_stale");
       transitionJobImportLifecycle(ModelImportLifecycle.STATES.WORKING);
-      byId("job-processing").dataset.state = "WORKING_READY";
-      byId("job-processing-state").textContent = "Working Job 已生成";
+      setJobProcessingState("WORKING_READY", "Working Job 已生成");
       await showJobWorkingWorkspace(proposal);
       byId("job-page-message").textContent = "已从真实来源生成非权威 Working Job；编辑或继续对话后，由你保存为正式职位。";
       byId("job-page-message").classList.remove("error");
@@ -2993,8 +3247,8 @@
       const importState = await jobSourceImportState(source.source_document_id, database, modelMode);
       database.close();
       if (selectionVersion !== jobSelectionVersion || event.target.value.trim() !== text) return;
-      selectedJobSources = [];
       selectedJobSource = { ...source, sizeLabel: `${text.length} 字符`, import_type: "Paste", import_state: importState };
+      selectedJobSources = [selectedJobSource];
       if (["NEW", "RETRY"].includes(selectedJobSource.import_state)) beginJobImportLifecycle();
       else if (modelMode && selectedJobSource.import_state === "WORKSPACE") beginJobImportLifecycle(ModelImportLifecycle.STATES.WORKING);
       else if (selectedJobSource.import_state === "PENDING_REVIEW") beginJobImportLifecycle(ModelImportLifecycle.STATES.REVIEWING);
@@ -3002,23 +3256,37 @@
       showJobSource(selectedJobSource);
       await renderAwaitingJobReviews({ reset: true });
     });
-    installFileDropzone("job-dropzone", "job-file-input", (files) => acceptJobFiles(files).catch(showJobError));
+    jobSourceInputBinding = SourceInput.bind({
+      dropzone: byId("job-dropzone"), input: byId("job-file-input"),
+      onFiles: (files, options) => acceptJobFiles(files, options).catch(showJobError),
+      onAccepted: (count) => { byId("job-page-message").textContent = `已从剪贴板添加 ${count} 张图片到当前职位来源组。`; },
+    });
+    byId("job-source-preview-list").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-source-remove]");
+      if (!button || jobProcessingInProgress || selectedJobImportType === "Paste") return;
+      selectedJobSources.splice(Number(button.dataset.sourceRemove), 1);
+      jobSelectionVersion += 1;
+      selectedJobSource = selectedJobSources[0] || null;
+      if (selectedJobSource) { beginJobImportLifecycle(); showJobSource(selectedJobSource); }
+      else resetJobSource();
+    });
     byId("replace-job-file").addEventListener("click", () => {
       if (jobProcessingInProgress) {
         jobBatchAbortController?.abort();
-        byId("job-processing-state").textContent = refreshJobImportGate().authority.runtime.mode === "model" ? "正在取消本次 ARIADNE AI 理解" : "正在取消本次职位整理";
+        setJobProcessingState("CANCELLING", refreshJobImportGate().authority.runtime.mode === "model" ? "正在取消本次 ARIADNE AI 理解" : "正在取消本次职位整理");
         return;
       }
       if (selectedJobImportType === "Paste") byId("job-paste-input").focus();
-      else byId("job-file-input").click();
+      else jobSourceInputBinding.openChooser({ replace: false });
     });
     byId("start-job-processing").addEventListener("click", () => {
-      const modelMode = refreshJobImportGate().authority.runtime.mode === "model";
-      const operation = modelMode
-        ? selectedJobSource?.import_state === "WORKSPACE"
+      const gate = refreshJobImportGate();
+      const operation = ProductShell.dispatchRuntimeImport(gate, {
+        model: () => selectedJobSource?.import_state === "WORKSPACE"
           ? savedModelJobProposalForSource(selectedJobSource.source_document_id).then((proposal) => proposal ? showJobWorkingWorkspace(proposal) : Promise.reject(new Error("job_working_proposal_missing")))
-          : openJobModelConsent()
-        : runJobProcessing();
+          : openJobModelConsent(),
+        local: () => runJobProcessing(),
+      });
       Promise.resolve(operation).catch(showJobError);
     });
     byId("job-workspace-save").addEventListener("click", () => saveJobWorkingWorkspace().catch(showJobError));
@@ -3060,8 +3328,7 @@
     jobProcessingInProgress = false;
     const modelFailure = error?.jobModelExecution === true;
     if (jobImportLifecycle?.state === ModelImportLifecycle?.STATES.MODEL_PROCESSING) transitionJobImportLifecycle(ModelImportLifecycle.STATES.MODEL_FAILED);
-    byId("job-page-message").textContent = modelFailure ? `MODEL_FAILED：${jobErrorCopy(error)} 没有自动执行本地整理。` : `无法整理职位：${jobErrorCopy(error)}`;
-    byId("job-page-message").classList.add("error");
+    ProductShell.setFeedback(byId("job-page-message"), { state: "FAILURE", copy: modelFailure ? `MODEL_FAILED：${jobErrorCopy(error)} 没有自动执行本地整理。` : `无法整理职位：${jobErrorCopy(error)}` });
     refreshJobImportGate();
     byId("job-processing")?.classList.add("hidden");
     if (modelFailure) {
@@ -3080,7 +3347,7 @@
       const latest = [...messages].sort((left, right) => String(left.created_at).localeCompare(String(right.created_at))).at(-1);
       if (latest?.role === "USER" && !visible.some((entry) => entry.message_id === latest.message_id)) visible.push(latest);
     }
-    ConversationUI.renderMessages(target, visible, { empty_text: "可以询问岗位要求、证据差距、项目或简历表达；结论不会自动改写职位或个人资料。" });
+    ConversationUI.renderMessages(target, visible, { empty_text: "可以询问岗位要求、证据差距、项目或简历表达；结论不会自动改写职位或个人资料。", text_for: (message) => ConversationUI.humanSafeText(message.content ?? message.text) });
   }
 
   function showJobChangeProposal(proposal) {
@@ -3203,6 +3470,7 @@
     const status = byId("job-workspace-conversation-status") || byId("job-conversation-status");
     const pageMessage = byId("job-detail-message");
     ConversationUI.setExecutionState({ form, status, active: true, copy: "正在理解…" });
+    await ConversationUI.waitForIndicatorPaint();
     if (pageMessage) {
       pageMessage.textContent = "正在基于当前职位与当前个人资料分析…";
       pageMessage.classList.remove("error");
@@ -3230,6 +3498,9 @@
       const request = JobConversation.createRuntimeRequest({ session, human_message: content, observation, compiled_context: compiledContext, candidate_snapshot: candidateSnapshot, candidate_delta: candidateDelta, source_excerpt_manifest: sourceManifest, runtime_snapshot: runtimeSnapshot, execution });
       const rawResult = await callJobConversationRuntime(request);
       const result = JobConversation.validateRuntimeResult(rawResult, execution, session, runtimeSnapshot, compiledContext);
+      form.dataset.ariadneResultType = result.output.action;
+      form.dataset.ariadneWorkingProposalCreated = result.output.job_edit ? "yes" : "no";
+      form.dataset.ariadneConfirmedMutationBeforeSave = "no";
       const [currentSubject, currentCandidate] = await Promise.all([
         activeJobWorkingProposal ? Promise.resolve(currentJobConversationSubject()) : canonicalJobRevision(jobSubject.context_id, database),
         JobCandidateContext.buildSnapshotFromDatabase(database),
@@ -3277,7 +3548,9 @@
       const database = await Truth.openDatabase();
       try {
         const sourceId = activeJobRevision.provenance.source_document_ids[0];
-        activeJobSourceDocument = (await JobContext.getAll(database, "source_documents")).find((entry) => entry.source_document_id === sourceId) || null;
+        const sourceDocuments = await JobContext.getAll(database, "source_documents");
+        activeJobSourceDocuments = activeJobRevision.provenance.source_document_ids.map((entry) => sourceDocuments.find((document) => document.source_document_id === entry)).filter(Boolean);
+        activeJobSourceDocument = activeJobSourceDocuments.find((document) => document.source_document_id === sourceId) || activeJobSourceDocuments[0] || null;
       } finally { database.close(); }
     }
     const storedJob = activeJobRevision ? null : await Demo.get(Demo.DEMO_STORES.jobs, jobId);
@@ -3293,8 +3566,8 @@
       byId("job-location").textContent = record.location;
       byId("job-summary").textContent = record.summary;
       const imported = record.imported_from || {};
-      byId("job-source").textContent = activeJobSourceDocument
-        ? `${sourceTypeLabels[activeJobSourceDocument.source_type] || activeJobSourceDocument.source_type} · ${activeJobSourceDocument.filename || activeJobSourceDocument.label || "本地来源"} · 原始来源可恢复`
+      byId("job-source").textContent = activeJobSourceDocuments.length
+        ? activeJobSourceDocuments.map((document, index) => `${index + 1}. ${sourceTypeLabels[document.source_type] || document.source_type} · ${document.filename || document.label || "本地来源"}`).join("  ·  ") + " · 原始来源可恢复"
         : imported.name ? `${sourceTypeLabels[imported.source_type] || "本地来源"} · ${imported.name}` : `${sourceTypeLabels[record.source?.source_type] || record.source?.source_type || "演示来源"} · ${record.source?.display_name || "来源未记录"}`;
       byId("job-requirements").innerHTML = (record.requirements || []).map((requirement, index) => `<div><span>${String(index + 1).padStart(2, "0")}</span><p><b>${escapeHtml(requirement.label)}</b>${escapeHtml(requirement.detail)}</p></div>`).join("");
     };
@@ -3305,22 +3578,36 @@
       byId("job-ai-pane").setAttribute("aria-hidden", "true");
     }
     if (activeJobRevision) byId("open-job-delete").classList.add("hidden");
-    const panels = ProductShell.createDetailPanelController({ trigger: byId("open-job-edit"), stages: { edit: byId("job-edit-form") }, window });
+    const editShell = ProductShell.createDetailEditController({
+      trigger: byId("open-job-edit"), form: byId("job-edit-form"), preview: byId("job-edit-preview"), window,
+      populate: () => {
+        byId("job-edit-title").value = activeJob.title || "";
+        byId("job-edit-company").value = activeJob.company || "";
+        byId("job-edit-location").value = activeJob.location || "";
+        byId("job-edit-summary").value = activeJob.summary || "";
+        byId("job-edit-requirements").value = (activeJob.requirements || []).map((item) => item.detail).join("\n");
+      },
+    });
+    const jobConversationBinding = ProductShell.bindConversation({
+      messages: byId("job-conversation-messages"),
+      form: byId("job-conversation-form"),
+      status: byId("job-conversation-status"),
+    });
+    ProductShell.bindConversationAdapter(jobConversationBinding, {
+      domain: "job",
+      operation: "job_conversation",
+      isAvailable: () => {
+        const gate = currentOperationGate("job_conversation");
+        return gate.authority.runtime.mode === "model" && gate.allowed && Boolean(activeJobRevision);
+      },
+      resolveTarget: () => activeJobRevision ? Object.freeze({ contextId: activeJobRevision.context_id }) : null,
+      submit: ({ content }) => submitJobConversation(content),
+    });
     const deletePopover = createDeletePopover("job-delete-popover");
     let pendingJobEdit = null;
-    const openEdit = (focusFirst = true) => {
-      byId("job-edit-title").value = activeJob.title || "";
-      byId("job-edit-company").value = activeJob.company || "";
-      byId("job-edit-location").value = activeJob.location || "";
-      byId("job-edit-summary").value = activeJob.summary || "";
-      byId("job-edit-requirements").value = (activeJob.requirements || []).map((item) => item.detail).join("\n");
-      panels.show("edit", { focusFirst });
-    };
-    byId("open-job-edit").addEventListener("click", () => panels.current() === "closed" ? openEdit() : panels.show("closed"));
     window.addEventListener("message", (event) => {
       if (event.origin === window.location.origin && event.data?.type === "job-radar-v1-open-detail-edit") byId("open-job-edit").click();
     });
-    byId("cancel-job-edit").addEventListener("click", () => panels.show("closed"));
     byId("open-job-delete").addEventListener("click", (event) => deletePopover.open(event.currentTarget));
     byId("preview-job-edit").addEventListener("click", () => {
       const title = byId("job-edit-title").value.trim();
@@ -3338,11 +3625,8 @@
       pendingJobEdit = { title, company: byId("job-edit-company").value.trim(), location: byId("job-edit-location").value.trim(), summary: byId("job-edit-summary").value.trim(), requirements };
       byId("job-edit-before").textContent = `${activeJob.title} · ${activeJob.requirements?.length || 0} 条要求`;
       byId("job-edit-after").textContent = `${pendingJobEdit.title} · ${pendingJobEdit.requirements.length} 条要求`;
-      panels.show("closed");
-      byId("job-edit-preview").classList.remove("hidden");
-      byId("job-edit-preview").scrollIntoView({ behavior: "smooth", block: "center" });
+      editShell.showPreview();
     });
-    byId("back-to-job-edit").addEventListener("click", () => { byId("job-edit-preview").classList.add("hidden"); openEdit(); });
     byId("confirm-job-edit").addEventListener("click", async () => {
       if (!pendingJobEdit) return;
       const button = byId("confirm-job-edit");
@@ -3365,7 +3649,7 @@
         if (isEmbeddedDetail && window.parent !== window) {
           window.parent.postMessage({ type: "job-radar-v1-detail-updated", library: "jd", sourceKey: `job:${activeJob.job_context_id}` }, window.location.origin);
         }
-        byId("job-edit-preview").classList.add("hidden");
+        editShell.complete();
         pendingJobEdit = null;
       } finally { button.disabled = false; }
     });
@@ -3373,14 +3657,8 @@
       const database = await Truth.openDatabase();
       try { await restoreJobConversation(database, activeJobRevision.context_id); }
       finally { database.close(); }
-      byId("job-conversation-form").addEventListener("submit", async (event) => {
-        event.preventDefault();
-        const input = byId("job-conversation-input");
-        const content = input.value.trim();
-        if (!content) return;
-        input.value = "";
-        await submitJobConversation(content);
-      });
+    }
+    if (activeJobRevision) {
       byId("accept-job-patch").addEventListener("click", async () => {
         if (!activeJobChangeProposal) return;
         const database = await Truth.openDatabase();

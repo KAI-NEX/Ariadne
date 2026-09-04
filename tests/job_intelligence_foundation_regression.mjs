@@ -214,6 +214,7 @@ assert.equal(compiled.turn_scope.referent, "CANDIDATE_GAPS_RELATIVE_TO_ACTIVE_JO
 assert.equal(compiled.turn_scope.ambiguity, "RESOLVED_BY_ACTIVE_JOB_SCOPE");
 assert.equal(compiled.turn_scope.job_edit_requested, false);
 assert.equal(Conversation.resolveJobDetailReferent("把这个职位地点改成深圳", candidateA).job_edit_requested, true);
+assert.equal(Conversation.resolveJobDetailReferent("摘要里删除任职要求", candidateA).job_edit_requested, true);
 const serializedProviderContext = JSON.stringify(compiled);
 for (const privateValue of [sourceDocument.source_document_id, modelAccepted.revision.revision_id, candidateA.aggregate_fingerprint, "indexeddb://", "/Users/"]) assert(!serializedProviderContext.includes(privateValue));
 assert(serializedProviderContext.includes("confirmed-candidate-1"));
@@ -246,8 +247,16 @@ const output = Conversation.validateSemanticOutput({
 const normalizedExplain = Conversation.validateSemanticOutput({ ...output, action: "ASK_CLARIFICATION" }, compiled);
 assert.equal(normalizedExplain.action, "EXPLAIN");
 assert.equal(normalizedExplain.message, output.message);
+const leakyHumanCopy = structuredClone(output);
+leakyHumanCopy.message = "最相关的是 AI evaluation project（confirmed-candidate-1），对应 job-requirement-1。";
+assert.throws(() => Conversation.validateSemanticOutput(leakyHumanCopy, compiled), /HUMAN_COPY_INTERNAL_ID_FORBIDDEN/);
 const normalizedClarification = Conversation.validateSemanticOutput({ ...output, clarification: "你指的是已确认项目还是 Working 项目？" }, compiled);
 assert.equal(normalizedClarification.action, "ASK_CLARIFICATION");
+const editCompiled = structuredClone(compiled);
+editCompiled.turn_scope.job_edit_requested = true;
+const normalizedEditClarification = Conversation.validateSemanticOutput({ ...output, action: "PROPOSE_JOB_EDIT", clarification: "请确认。", job_edit: { field: "summary", desired_value: "更新后的摘要", reason: "按用户要求删除指定片段。" } }, editCompiled);
+assert.equal(normalizedEditClarification.action, "PROPOSE_JOB_EDIT");
+assert.equal(normalizedEditClarification.clarification, null);
 const normalizedProjectAdvice = Conversation.validateSemanticOutput({ ...output, action: "PROPOSE_JOB_EDIT", job_edit: { field: "requirements", desired_value: "x", reason: "x" } }, compiled);
 assert.equal(normalizedProjectAdvice.action, "EXPLAIN");
 assert.equal(normalizedProjectAdvice.job_edit, null);

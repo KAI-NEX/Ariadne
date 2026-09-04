@@ -67,7 +67,7 @@ assert.match(pages, /const conversationAllowed = runtime\.mode === "model" && ga
 assert.match(pages, /ProductShell\.applyDetailRuntime\(shell,/);
 assert.match(read("product-shell-domain.js"), /shell\.edit\.classList\.toggle\("hidden", conversationAllowed\)/);
 assert.doesNotMatch(pages, /preview-source|appendDemoMessage|initCandidateConversation|initJobConversation/);
-assert.match(read("product-shell-domain.js"), /panel\.scrollIntoView\(\{ behavior: "smooth", block: "center" \}\)/);
+assert.match(read("product-shell-domain.js"), /panel\.scrollIntoView\(\{ behavior: "smooth", block: "start" \}\)/);
 
 // JD is separate, has five requirements, and no match surface.
 assert.doesNotMatch(jd, /v1-bottom-sheet|job-empty|open-job-import/);
@@ -81,9 +81,10 @@ assert.match(jobImport, /\.pdf,.png,.jpg,.jpeg,.docx/);
 assert.match(jobImport, /点击上传文件或直接拖拽文件至此/);
 assert.match(personalImport, /id="personal-file-input"[^>]*\bmultiple\b/);
 assert.match(jobImport, /id="job-file-input"[^>]*\bmultiple\b/);
-assert.match(pages, /function installFileDropzone\(dropzoneId, inputId, onFiles\)/);
-assert.match(pages, /dropzone\.addEventListener\("click", openChooser\)/);
-assert.match(pages, /input\.addEventListener\("change", \(event\) => onFiles\(event\.target\.files\)\)/);
+assert.doesNotMatch(pages, /function installFileDropzone\(dropzoneId, inputId, onFiles\)/);
+assert.match(read("source-input-domain.js"), /function bind\(\{ dropzone, input, onFiles/);
+assert.match(read("source-input-domain.js"), /dropzone\.addEventListener\("click"/);
+assert.match(read("source-input-domain.js"), /input\.addEventListener\("change"/);
 assert.match(pages, /byId\("job-paste-input"\)\.addEventListener\("input"/);
 assert.match(styles, /#job-paste-input \{ overflow-y: auto; resize: none; \}/);
 assert.match(styles, /\.v1-paste-input textarea \{[^}]*min-height: 130px[^}]*resize: vertical/s);
@@ -105,8 +106,7 @@ assert.deepEqual(jdBatchFixtures.map((job) => job.imported_from.source_url), jdB
 assert.match(jobDetail, /v1-type-chip">职位/);
 assert.match(jobDetail, /id="job-ai-pane"[\s\S]*job-conversation-form/);
 for (const detail of [candidateDetail, jobDetail]) {
-  assert.match(detail, /class="v1-conversation-form"[\s\S]*<textarea[^>]*>[\s\S]*<button type="submit" aria-label="发送"><\/button>/);
-  assert.doesNotMatch(detail, /v1-workspace-composer-field/);
+  assert.match(detail, /class="v1-conversation-form"[\s\S]*class="v1-composer-field"><textarea[^>]*>[\s\S]*<button type="submit" aria-label="发送"><\/button>/);
 }
 assert.doesNotMatch(jobDetail, /<button type="submit" aria-label="发送">↑<\/button>/);
 assert.match(jobDetail, /id="job-patch-proposal"/);
@@ -184,8 +184,8 @@ assert.match(pages, /restOpacity = item\.getAttribute\("aria-current"\) === "pag
 assert.match(pages, /states\[index\]\.restWidth \+ \(38 - states\[index\]\.restWidth\) \* influence/);
 assert.match(styles, /will-change: width, opacity, transform/);
 assert.match(styles, /\.v1-mini-tooltip\[data-visible="true"\]/);
-assert.match(styles, /\.v1-mini-sidebar \{[^}]*height: 53px[^}]*right: 9px[^}]*top: 0/s);
-assert.match(styles, /\.v1-mini-rail \{[^}]*gap: 0[^}]*top: 11px/s);
+assert.match(styles, /\.v1-mini-sidebar \{[^}]*height: 53px[^}]*right: 18px[^}]*top: 50%[^}]*translateY\(-50%\)/s);
+assert.match(styles, /\.v1-mini-rail \{[^}]*gap: 0[^}]*left: 50%[^}]*top: 50%[^}]*translate\(-50%, -50%\)/s);
 assert.match(styles, /\.v1-mini-item > span \{[^}]*width: 8px/s);
 assert.match(styles, /\.v1-mini-item > span \{[^}]*transform-origin: right center/s);
 assert.match(styles, /\.v1-mini-item \{[^}]*height: 7px/s);
@@ -302,11 +302,10 @@ assert.doesNotMatch(pages, /Demo\.mergeCandidateRecords/);
 assert.doesNotMatch(pages, /Demo\.persistCandidateImport/);
 assert.match(pages, /const acceptCandidateFiles =/);
 assert.match(pages, /Array\.from\(files \|\| \[\]\)/);
-assert.match(pages, /const batchId = `\$\{modelReady \? "batch-candidate-model" : "batch-candidate-extraction"\}-\$\{crypto\.randomUUID\(\)\}`/);
+assert.match(pages, /const batchId = !replace && selectedCandidateSources\[0\]\?\.batch_id/);
 assert.match(pages, /new Map\(prepared\.map\(\(source\) => \[source\.source_document_id, source\]\)\)/);
 assert.match(pages, /LocalCandidateReview\.sourceImportState\(source\.source_document_id, records\)/);
-assert.match(pages, /const batchSuffix = selectedCandidateSources\.length > 1 \? ` · 共 \$\{selectedCandidateSources\.length\} 个文件` : ""/);
-assert.match(pages, /\$\{source\.sizeLabel \|\| formatBytes\(file\.size\) \|\| "本地文件"\}\$\{batchSuffix\} · \$\{modelReady \? "保存在本机；确认后发送渲染页面" : "仅本地"\}/);
+assert.match(pages, /SourceInput\.renderBundlePreview\([\s\S]*selectedCandidateSources/);
 assert.doesNotMatch(pages, /支持多文件|可上传多个文件|批量上传/);
 assert.match(pages, /for \(let index = 0; index < sources\.length; index \+= 1\)/);
 assert.match(pages, /await processCandidateSource\(source, snapshot, database, candidateBatchAbortController\.signal\)/);
@@ -318,26 +317,27 @@ assert.match(pages, /if \(result\.cancelled\) \{/);
 assert.equal((pages.match(/completeEmbeddedImport\("personal"/g) || []).length, 4);
 assert.match(pages.slice(pages.indexOf("async function reviewCandidateProposal"), pages.indexOf("function showCandidateSource")), /completeEmbeddedImport\("personal"/);
 assert.match(pages.slice(pages.indexOf("async function initCandidateDetail"), pages.indexOf("function jobCardMarkup")), /persistRemoval\(database, canonicalRevision, itemId\)[\s\S]*completeEmbeddedImport\("personal"/);
-assert.match(pages, /if \(!input\.disabled\) onFiles\(event\.dataTransfer\?\.files\)/);
-assert.match(pages, /async function acceptJobFiles\(files\)/);
+assert.match(read("source-input-domain.js"), /accept\(event\.dataTransfer\?\.files/);
+assert.match(pages, /async function acceptJobFiles\(files, \{ replace = false/);
 assert.match(pages, /const selectedFiles = Array\.from\(files \|\| \[\]\)/);
 assert.match(pages, /Promise\.allSettled\(selectedFiles\.map/);
-assert.match(pages, /modelMode && selectedFiles\.length !== 1/);
-assert.match(pages, /const batchKey = `job-batch-\$\{crypto\.randomUUID\(\)\}`/);
+assert.doesNotMatch(pages, /modelMode && selectedFiles\.length !== 1/);
+assert.match(pages, /const batchKey = !replace && selectedJobSources\[0\]\?\.batch_id/);
 assert.match(pages, /LocalJob\.prepareSource/);
 assert.match(pages, /LocalContextLifecycle\.uniqueSources\(prepared\)/);
 assert.match(pages, /const sourceUrl = byId\("job-link-input"\)\?\.value\.trim\(\) \|\| null/);
 assert.match(pages, /LocalJob\.prepareSource\(file, batchKey, \{ source_url: sourceUrl \}\)/);
 assert.match(jobImport, /accept="\.pdf,\.png,\.jpg,\.jpeg,\.docx/);
-assert.match(pages, /const handleCandidateFiles = \(files\) => \{[\s\S]*showPersonalError\(error, selectionVersion\)/);
-assert.match(pages, /installFileDropzone\("personal-dropzone", "personal-file-input", handleCandidateFiles\)/);
-assert.match(pages, /installFileDropzone\("job-dropzone", "job-file-input", \(files\) => acceptJobFiles\(files\)\.catch\(showJobError\)\)/);
-assert.match(pages, /onFiles\(event\.dataTransfer\?\.files\)/);
-assert.match(pages, /const batchSuffix = selectedJobSources\.length > 1 \? ` · 共 \$\{selectedJobSources\.length\} 个文件` : ""/);
-assert.match(pages, /const boundary = refreshJobImportGate\(\)\.authority\.runtime\.mode === "model" \? "原始来源保存在本机；确认后发送有界文本证据" : "仅本地"/);
+assert.match(pages, /const handleCandidateFiles = \(files, options = \{\}\) => \{[\s\S]*showPersonalError\(error, selectionVersion\)/);
+assert.match(pages, /candidateSourceInputBinding = SourceInput\.bind/);
+assert.match(pages, /jobSourceInputBinding = SourceInput\.bind/);
+assert.match(read("source-input-domain.js"), /event\.dataTransfer\?\.files/);
+assert.match(pages, /SourceInput\.renderBundlePreview\([\s\S]*selectedJobSources/);
+assert.doesNotMatch(pages.slice(pages.indexOf("function showJobSource"), pages.indexOf("function resetJobSource")), /原始来源保存在本机；确认后发送有界文本证据/);
+assert.doesNotMatch(read("source-input-domain.js"), /\{ container, list, name, meta, icon \}|boundary/);
+assert.doesNotMatch(`${personalImport}\n${jobImport}`, /id="(?:personal|job)-file-(?:name|meta|icon)"/);
 assert.doesNotMatch(jobImport, /data-job-processing-mode|id="job-processing-modes"/);
 assert.doesNotMatch(pages, /selectedJobProcessingMode|configureJobProcessingMode/);
-assert.match(pages, /\$\{source\.sizeLabel \|\| "本地文本"\}\$\{batchSuffix\} · \$\{boundary\}/);
 assert.match(pages, /for \(const source of sources\)/);
 assert.match(pages, /await processJobSource\(source, snapshot, database, jobBatchAbortController\.signal\)/);
 assert.match(pages, /async function processJobSource\(source, snapshot, database, signal\)[\s\S]*LocalJob\.persistCanonicalSource[\s\S]*JobContext\.proposalFor/);
@@ -401,7 +401,7 @@ assert.match(jobDetail, /id="job-conversation-messages" class="v1-conversation-m
 assert.match(styles, /\.v1-conversation-thread \.v1-conversation-message \{ line-height: 1\.5; max-width: 92%; min-height: 0; padding: 10px 13px; \}/);
 for (const html of [personalImport, jobImport]) {
   assert.match(html, /class="v1-conversation-form v1-workspace-composer"/);
-  assert.match(html, /class="v1-workspace-composer-field"><textarea/);
+  assert.match(html, /class="v1-composer-field"><textarea/);
 }
 assert.match(pages, /ConversationUI\.renderMessages\(target, candidateWorkspaceConversation,/);
 assert.match(pages, /const visible = JobConversation\.connectedHistory\(messages\)/);

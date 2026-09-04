@@ -23,7 +23,9 @@
   const OPERATION = "JOB_CONVERSATION_TURN";
   const CREDENTIAL_REF = "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision";
   const CONTRACTS = Manifest.runtime_contracts;
-  const INTERNAL_ID_PATTERN = /(?:source-(?:candidate|job)-[a-f0-9]{16,}|sha256:[a-f0-9]{32,}|(?:revision|analysis|conversation|execution)[-_][a-z0-9:_-]{8,})/iu;
+  const PROVIDER_INTERNAL_ID_PATTERN = /(?:source-(?:candidate|job)-[a-f0-9]{16,}|sha256:[a-f0-9]{32,}|(?:revision|analysis|conversation|execution)[-_][a-z0-9:_-]{8,})/iu;
+  const HUMAN_COPY_INTERNAL_ID_PATTERN = /(?:source-(?:candidate|job)-[a-f0-9]{16,}|sha256:[a-f0-9]{32,}|(?:revision|analysis|conversation|execution)[-_][a-z0-9:_-]{8,}|(?:confirmed|working)-candidate-[a-z0-9:_-]+|job-requirement-[a-z0-9:_-]+)/iu;
+  const STRUCTURAL_REFERENCE_KEYS = new Set(["requirement_ref", "candidate_refs"]);
 
   class JobConversationError extends Error {
     constructor(code) { super(code); this.name = "JobConversationError"; this.code = code; }
@@ -41,8 +43,13 @@
   function assertHumanCopySafe(value) {
     if (value === null || value === undefined) return;
     if (Array.isArray(value)) { value.forEach(assertHumanCopySafe); return; }
-    if (isObject(value)) { Object.values(value).forEach(assertHumanCopySafe); return; }
-    if (typeof value === "string" && INTERNAL_ID_PATTERN.test(value)) throw new JobConversationError("HUMAN_COPY_INTERNAL_ID_FORBIDDEN");
+    if (isObject(value)) {
+      Object.entries(value).forEach(([key, nested]) => {
+        if (!STRUCTURAL_REFERENCE_KEYS.has(key)) assertHumanCopySafe(nested);
+      });
+      return;
+    }
+    if (typeof value === "string" && HUMAN_COPY_INTERNAL_ID_PATTERN.test(value)) throw new JobConversationError("HUMAN_COPY_INTERNAL_ID_FORBIDDEN");
   }
 
   function createSession(jobContextId, createdAt = nowIso()) {
@@ -131,7 +138,7 @@
     const message = requiredText(humanMessage, "human_message_invalid", Manifest.limits.human_message);
     const candidatePresent = candidateSnapshot?.structural_counts?.candidate_snapshot_present === true;
     const jobCandidatePrompt = /(?:我还需要补充什么|我还缺什么|我适合吗|哪里不够|我要补什么能力|还需要补充什么能力)/iu.test(message);
-    const jobEditRequested = /(?:(?:修改|改成|改为|更新|编辑|调整).{0,24}(?:职位|岗位|JD|公司|地点|标题|摘要)|(?:职位|岗位|JD|公司|地点|标题|摘要).{0,24}(?:修改|改成|改为|更新|编辑|调整))/iu.test(message);
+    const jobEditRequested = /(?:(?:修改|改成|改为|更新|编辑|调整|删除|移除|去掉|删掉).{0,24}(?:职位|岗位|JD|公司|地点|标题|摘要|任职要求)|(?:职位|岗位|JD|公司|地点|标题|摘要|任职要求).{0,24}(?:修改|改成|改为|更新|编辑|调整|删除|移除|去掉|删掉))/iu.test(message);
     return Object.freeze({
       scope: candidatePresent ? "CURRENT_CANDIDATE_X_ACTIVE_JOB" : "ACTIVE_JOB",
       referent: jobCandidatePrompt && candidatePresent ? "CANDIDATE_GAPS_RELATIVE_TO_ACTIVE_JOB" : "ACTIVE_JOB_WITH_CURRENT_CANDIDATE",
@@ -181,7 +188,7 @@
     };
     const serialized = JSON.stringify(context);
     if (serialized.length > 128000) throw new JobConversationError("job_context_size_invalid");
-    if (INTERNAL_ID_PATTERN.test(serialized)) throw new JobConversationError("PROVIDER_PAYLOAD_INTERNAL_ID_FORBIDDEN");
+    if (PROVIDER_INTERNAL_ID_PATTERN.test(serialized)) throw new JobConversationError("PROVIDER_PAYLOAD_INTERNAL_ID_FORBIDDEN");
     return Object.freeze(context);
   }
 
@@ -317,11 +324,11 @@
       desired_value: requiredText(value.job_edit?.desired_value, "job_edit_value_invalid", Manifest.limits.job_field_value),
       reason: requiredText(value.job_edit?.reason, "job_edit_reason_invalid", 4000),
     };
-    const clarification = value.clarification === null ? null : requiredText(value.clarification, "job_clarification_invalid", Manifest.limits.clarification);
+    let clarification = value.clarification === null ? null : requiredText(value.clarification, "job_clarification_invalid", Manifest.limits.clarification);
     let action = value.action;
     if (jobEditRequested && (action === "PROPOSE_JOB_EDIT") !== Boolean(edit)) throw new JobConversationError("job_edit_action_mismatch");
     if (edit) {
-      if (clarification) throw new JobConversationError("job_clarification_action_mismatch");
+      clarification = null;
     } else {
       action = clarification ? "ASK_CLARIFICATION" : "EXPLAIN";
     }

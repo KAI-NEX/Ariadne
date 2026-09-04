@@ -102,6 +102,24 @@ assert.equal(userEdit.revision.payload.items[0].title, "Principal Designer");
 assert.equal(userEdit.revision.payload.user_edits.at(-1).support_relation, "USER_CONFIRMED");
 assert.equal(confirmed.revision.payload.items[0].title, "Designer");
 
+const workspaceRevision = Truth.validateContextRevision({
+  contract_id: "ariadne-context-revision-v2",
+  context_type: "CANDIDATE",
+  context_id: confirmed.revision.context_id,
+  revision_id: `${confirmed.revision.context_id}-workspace-v1`,
+  version: 1,
+  previous_revision_id: null,
+  workspace_acceptance_id: "candidate-workspace-acceptance-direct-edit",
+  created_at: "2026-09-02T13:01:00Z",
+  provenance: confirmed.revision.provenance,
+  payload: confirmed.revision.payload,
+  authority: Truth.AUTHORITY.revision,
+});
+assert.throws(
+  () => Review.userEditOutcome(workspaceRevision, item.item_id, userEditedItem, "2026-09-02T13:02:00Z"),
+  /candidate_workspace_user_edit_requires_working_acceptance/,
+);
+
 const durableSource = Truth.validateSourceDocument({
   contract_id: "ariadne-source-document-v1", source_document_id: sourceId, source_type: "PDF", filename: "completed.pdf", label: null,
   mime_type: "application/pdf", content_hash: "sha256:completed-source", created_at: "2026-09-02T12:00:00Z", material_type: "CANDIDATE",

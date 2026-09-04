@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ariadne · 添加职位描述</title>
-    <link rel="stylesheet" href="/styles.css?v=shared-product-shell-v1">
+    <link rel="stylesheet" href="/styles.css?v=candidate-job-parity-v1">
   </head>
   <body class="v1-body" data-v1-page="job-import">
     <main class="v1-page-shell v1-import-shell">
@@ -30,9 +30,9 @@
           </section>
           <section id="job-file-section" class="v1-file-picker"><button id="job-dropzone" class="v1-file-dropzone" type="button" aria-controls="job-file-input"><span id="job-dropzone-copy">点击上传文件或直接拖拽文件至此</span></button><input id="job-file-input" class="v1-file-input" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,application/pdf,image/png,image/jpeg,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></section>
           <section id="job-paste-section" class="v1-paste-input hidden"><label for="job-paste-input">职位描述</label><textarea id="job-paste-input" placeholder="在此粘贴职位描述…"></textarea></section>
-          <section class="v1-link-input"><label for="job-link-input">职位链接 <span>选填</span></label><input id="job-link-input" type="url" inputmode="url" placeholder="https://example.com/jobs/…"><p>链接只作为来源信息保存在本地；本页不会自动访问或上传该网址。</p></section>
-          <section id="job-file-preview" class="v1-file-preview hidden"><div><span id="job-file-icon">TXT</span><p><b id="job-file-name"></b><small id="job-file-meta"></small></p></div><button id="replace-job-file" type="button">替换</button></section>
-          <section id="job-processing" class="v1-processing hidden" aria-live="polite"><div class="v1-processing-orbit" aria-hidden="true"></div><div><p id="job-processing-state">正在准备</p><small id="job-processing-boundary">本地读取真实内容 · 原始来源持久保留 · 无模型调用</small></div></section>
+          <section class="v1-link-input"><label for="job-link-input">职位链接 <span>选填</span></label><input id="job-link-input" type="url" inputmode="url" placeholder="https://example.com/jobs/…"></section>
+          <section id="job-file-preview" class="v1-file-preview hidden" aria-label="已选择的来源"><ol id="job-source-preview-list" class="v1-source-preview-list"></ol><button id="replace-job-file" type="button">添加来源</button></section>
+          <section id="job-processing" class="v1-processing v1-processing-indicator hidden" aria-live="polite"></section>
           <button id="start-job-processing" class="v1-primary-button v1-sheet-primary" type="button" disabled>开始本地整理</button>
         </div>
       </section>
@@ -43,7 +43,7 @@
             <section class="v1-workspace-content-pane" aria-labelledby="job-working-title">
               <header class="v1-workspace-pane-header"><div><h2 id="job-working-title">Working Job</h2><p id="job-working-source"></p></div></header>
               <div class="v1-workspace-scroll-region" tabindex="0">
-                <div id="job-workspace-processing" class="v1-workspace-processing"><span class="v1-workspace-processing-dot" aria-hidden="true"></span><p>正在整理职位信息…</p></div>
+                <div id="job-workspace-processing" class="v1-workspace-processing" data-processing-copy="正在整理职位信息"></div>
                 <form id="job-working-form" class="v1-edit-form v1-job-working-form hidden">
                   <p class="v1-working-authority">NON_AUTHORITATIVE WORKING JOB · 保存前不会成为正式职位</p>
                   <label>职位名称<input id="job-working-title-input" required></label>
@@ -56,16 +56,16 @@
               <footer class="v1-workspace-content-footer"><p id="job-workspace-save-status" aria-live="polite"></p><button id="job-workspace-save" class="v1-primary-button" type="button" disabled>保存职位</button></footer>
             </section>
             <aside class="v1-ariadne-pane" aria-labelledby="job-understanding-title">
-              <header class="v1-workspace-pane-header"><div><h2 id="job-understanding-title">Ariadne AI</h2><p id="job-workspace-runtime">DeepSeek · deepseek-v4-pro</p></div></header>
+              <header class="v1-workspace-pane-header"><div><h2 id="job-understanding-title">Ariadne AI</h2><p id="job-workspace-runtime">Conversation · DeepSeek · deepseek-v4-pro</p></div></header>
               <div id="job-workspace-history" class="v1-workspace-history" tabindex="0" aria-live="polite">
                 <ol id="job-understanding-events" class="v1-understanding-events"></ol>
                 <div id="job-workspace-authority" class="v1-clarification-list"><p>模型职位是非权威 Working 信息。你可以继续对话或编辑；只有“保存职位”会创建不可变的已确认版本。</p></div>
                 <div id="job-workspace-conversation" class="v1-workspace-conversation v1-conversation-messages v1-conversation-thread" aria-live="polite"></div>
-                <p id="job-workspace-conversation-status" class="v1-conversation-empty" aria-live="polite"></p>
+                <div id="job-workspace-conversation-status" class="v1-conversation-status hidden" aria-live="polite"></div>
               </div>
               <form id="job-workspace-composer" class="v1-conversation-form v1-workspace-composer">
                 <label class="sr-only" for="job-workspace-message">询问当前 Working Job</label>
-                <div class="v1-workspace-composer-field"><textarea id="job-workspace-message" placeholder="询问这份职位或它与你当前资料的关系"></textarea></div>
+                <div class="v1-composer-field"><textarea id="job-workspace-message" placeholder="询问这份职位或它与你当前资料的关系"></textarea></div>
                 <button type="submit" aria-label="发送">发送</button>
               </form>
             </aside>
@@ -80,9 +80,9 @@
     </main>
     <dialog id="job-model-consent-dialog" class="v1-model-consent-dialog" aria-labelledby="job-model-consent-title">
       <h2 id="job-model-consent-title">确认发送职位材料</h2>
-      <p>原始来源已经保存在本机。确认后，系统会先进行只读技术解析，再把有界文本证据发送给 DeepSeek 进行职位语义理解。</p>
-      <dl><div><dt>Provider</dt><dd>DeepSeek</dd></div><div><dt>Model</dt><dd>deepseek-v4-pro</dd></div></dl>
-      <div class="v1-button-row"><button id="confirm-job-model-consent" class="v1-primary-button" type="button">确认并发送</button><button id="cancel-job-model-consent" class="v1-tertiary-button" type="button">取消</button></div>
+      <p>原始来源已经保存在本机。确认后，系统会先进行只读技术解析；图片导入会把有界文本证据与按顺序排列的原始图片发送给 DeepSeek 进行职位语义理解。</p>
+      <dl><div><dt>Provider</dt><dd>DeepSeek</dd></div><div><dt>Model</dt><dd>deepseek-v4-flash-vision-exp</dd></div></dl>
+      <div class="v1-button-row"><button id="confirm-job-model-consent" class="v1-consent-action" type="button">确认并发送</button><button id="cancel-job-model-consent" class="v1-tertiary-button" type="button">取消</button></div>
     </dialog>
     <dialog id="job-model-failure-dialog" class="v1-error-dialog" aria-labelledby="job-model-failure-title">
       <h2 id="job-model-failure-title">MODEL_FAILED</h2>
@@ -94,9 +94,11 @@
     <script src="/runtime-capability-gate.js?v=runtime-gate-v1"></script>
     <script src="/truth-persistence-domain.js?v=job-intelligence-v1"></script>
     <script src="/raw-source-storage-domain.js?v=job-intelligence-v1"></script>
+    <script src="/source-input-domain.js?v=candidate-job-parity-v1"></script>
+    <script src="/processing-indicator-domain.js?v=ui-contract-addendum-v5"></script>
     <script src="/model-import-lifecycle-domain.js?v=job-model-import-v1"></script>
-    <script src="/product-shell-domain.js?v=shared-product-shell-v1"></script>
-    <script src="/model-workspace-ui-domain.js?v=product-convergence-v1"></script>
+    <script src="/product-shell-domain.js?v=shared-product-shell-v4"></script>
+    <script src="/model-workspace-ui-domain.js?v=product-convergence-v2"></script>
     <script src="/job-intelligence-contract-manifest.js?v=job-intelligence-v1"></script>
     <script src="/local-job-extraction-domain.js?v=job-intelligence-v1"></script>
     <script src="/job-context-domain.js?v=job-intelligence-v1"></script>
@@ -105,11 +107,11 @@
     <script src="/source-retrieval-domain.js?v=job-intelligence-v1"></script>
     <script src="/job-conversation-domain.js?v=product-convergence-v2"></script>
     <script src="/job-conversation-persistence-domain.js?v=product-convergence-v1"></script>
-    <script src="/conversation-ui-domain.js?v=shared-conversation-ui-v1"></script>
+    <script src="/conversation-ui-domain.js?v=shared-conversation-ui-v5"></script>
     <script src="/local-context-lifecycle-domain.js?v=lifecycle-final-v1"></script>
     <script src="/local-job-lifecycle-domain.js?v=lifecycle-final-v1"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
-    <script src="/v1-pages.js?v=shared-product-shell-v1"></script>
+    <script src="/v1-pages.js?v=candidate-job-parity-v1"></script>
   </body>
 </html>

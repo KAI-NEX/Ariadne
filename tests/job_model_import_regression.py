@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import sys
 from dataclasses import replace
@@ -131,7 +133,75 @@ assert len(failed_calls) == 1
 missing_key_calls = []
 expect("deepseek_key_not_configured", lambda: execute_job_model_request(request(), lambda: None, lambda *_: missing_key_calls.append(True)))
 assert missing_key_calls == []
-assert job_model_import_runtime_signature()["adapter_version"] == "deepseek-job-import-v1"
+assert job_model_import_runtime_signature()["adapter_version"] == "deepseek-job-multimodal-import-v2"
+
+second_image = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
+second_hash = "sha256:" + hashlib.sha256(second_image).hexdigest()
+second_source_id = "source-job-" + second_hash.removeprefix("sha256:")
+second_source = {
+    **source,
+    "source_document_id": second_source_id,
+    "content_hash": second_hash,
+    "filename": "job-page-2.png",
+    "source_type": "IMAGE",
+    "mime_type": "image/png",
+}
+second_preparation = {
+    **preparation,
+    "source_document_id": second_source_id,
+    "content_hash": second_hash,
+    "source_type": "IMAGE",
+    "mime_type": "image/png",
+    "blocks": [{"source_ref": "job-source-2-block-1", "location": "lines 1-4", "text": "任职要求\n具备 AI 产品系统经验\n网站服务\n隐私与法律信息"}],
+}
+second_preparation["character_count"] = sum(len(block["text"]) for block in second_preparation["blocks"])
+bundle_id = "job-source-bundle-" + "c" * 64
+bundle_snapshot = {**snapshot, "operation": "JOB_IMAGE_IMPORT", "snapshot_id": "runtime-snapshot-job-model-image-import"}
+bundle_consent = {**consent, "source_document_id": bundle_id, "consent_id": "consent-job-model-bundle-regression"}
+bundle_operation_id = job_model_operation_id(bundle_id, runtime_fingerprint(bundle_snapshot), bundle_consent["consent_id"])
+bundle_request = {
+    "contract_id": REQUEST_CONTRACT,
+    "source_bundle": {
+        "contract_id": "ariadne-source-bundle-v1",
+        "source_bundle_id": bundle_id,
+        "source_document_ids": [source_id, second_source_id],
+        "source_count": 2,
+        "ordering": "USER_SUPPLIED",
+    },
+    "source_documents": [source, second_source],
+    "source_preparations": [
+        {**preparation, "blocks": [{**blocks[0], "source_ref": "job-source-1-block-1"}], "character_count": len(blocks[0]["text"])},
+        second_preparation,
+    ],
+    "source_inputs": [{
+        "source_document_id": second_source_id,
+        "image_data_url": "data:image/png;base64," + base64.b64encode(second_image).decode("ascii"),
+    }],
+    "runtime_snapshot": bundle_snapshot,
+    "processing_run_id": f"run-{bundle_operation_id}",
+    "consent": bundle_consent,
+    "operation_identity": {
+        "operation_id": bundle_operation_id,
+        "operation_type": "JOB_MODEL_SEMANTIC_STRUCTURING",
+        "source_document_id": bundle_id,
+        "runtime_fingerprint": runtime_fingerprint(bundle_snapshot),
+        "consent_id": bundle_consent["consent_id"],
+    },
+}
+bundle_proposal = proposal()
+for field in ("title", "company", "location"):
+    bundle_proposal[field]["source_refs"] = ["job-source-1-block-1"]
+bundle_proposal["requirements"] = [{"label": "AI 产品系统", "detail": "具备 AI 产品系统经验", "source_refs": ["job-source-2-block-1"]}]
+bundle_proposal["summary"] = {"value": None, "source_refs": []}
+bundle_calls = []
+bundle_result = execute_job_model_request(bundle_request, lambda: "synthetic-key", lambda key, body: (bundle_calls.append(body) or (200, provider_response(bundle_proposal))))
+assert len(bundle_calls) == 1
+assert len(bundle_calls[0]["messages"][1]["content"]) == 3
+assert len(json.loads(bundle_calls[0]["messages"][1]["content"][0]["text"])["job_source"]["sources"]) == 2
+assert bundle_calls[0]["messages"][1]["content"][2]["image_url"]["url"].startswith("data:image/png;base64,")
+assert bundle_result["source_document_ids"] == [source_id, second_source_id]
+assert bundle_result["source_bundle_id"] == bundle_id
+assert "page chrome" in build_job_model_payload(validate_job_model_request(bundle_request))["messages"][0]["content"]
 
 print(json.dumps({
     "job_model_source_preparation_only": "pass",
@@ -139,4 +209,6 @@ print(json.dumps({
     "provider_calls_per_model_import": 1,
     "model_failure_no_local_fallback": "pass",
     "runtime_signature": "pass",
+    "ordered_multi_source_bundle": "pass",
+    "page_chrome_semantic_boundary": "pass",
 }))

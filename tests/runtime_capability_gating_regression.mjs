@@ -15,6 +15,11 @@ function storageWith(value) {
   return { getItem: (key) => key === Gate.CURRENT_RUNTIME_STORAGE_KEY ? value : null };
 }
 
+function memoryStorage(runtime) {
+  const values = new Map([[Gate.CURRENT_RUNTIME_STORAGE_KEY, JSON.stringify(runtime)]]);
+  return { getItem: (key) => values.get(key) || null, setItem: (key, value) => values.set(key, value) };
+}
+
 const localAuthority = Gate.currentAuthority(storageWith(JSON.stringify({ mode: "local", provider: "local", model: null })));
 assert.deepEqual(localAuthority.runtime, { mode: "local", provider: null, model: null });
 assert.equal(Gate.operationGate("candidate_import", localAuthority).capability, "deterministic_structuring");
@@ -24,11 +29,12 @@ for (const operation of ["ai_conversation", "model_merge", "legacy_candidate_sem
   assert.equal(Gate.operationGate(operation, localAuthority).allowed, false);
 }
 
-const modelAuthority = Gate.currentAuthority(storageWith(JSON.stringify({ mode: "ai", provider: "DeepSeek", model: "deepseek-v4-flash-vision-exp" })));
+const visionRuntime = { mode: "ai", provider: "DeepSeek", model: "deepseek-v4-flash-vision-exp" };
+const modelAuthority = Gate.authorityFrom(visionRuntime, "candidate_image_import");
 assert.deepEqual(modelAuthority.runtime, { mode: "model", provider: "deepseek", model: "deepseek-v4-flash-vision-exp" });
-assert.equal(Gate.operationGate("candidate_import", modelAuthority).allowed, true);
+assert.equal(Gate.operationGate("candidate_image_import", modelAuthority).allowed, true);
 for (const operation of ["job_import", "ai_conversation", "model_merge"]) assert.equal(Gate.operationGate(operation, modelAuthority).allowed, false);
-assert.equal(Gate.requireOperation("candidate_import", modelAuthority).capability, "candidate_model_structuring");
+assert.equal(Gate.requireOperation("candidate_image_import", modelAuthority).capability, "candidate_model_structuring");
 
 const conversationAuthority = Gate.authorityFrom({ mode: "model", provider: "deepseek", model: "deepseek-v4-pro" });
 assert.equal(Gate.operationGate("ai_conversation", conversationAuthority).allowed, true);
@@ -37,14 +43,27 @@ assert.equal(conversationAuthority.capabilities.vision, "unsupported");
 assert.equal(Gate.modelDescriptorForRuntime(conversationAuthority.runtime), Gate.CANDIDATE_CONVERSATION_MODEL_ADAPTER);
 assert.equal(Gate.modelDescriptorForRuntime(conversationAuthority.runtime, "candidate_conversation"), Gate.CANDIDATE_CONVERSATION_MODEL_ADAPTER);
 assert.equal(Gate.modelDescriptorForRuntime(conversationAuthority.runtime, "job_conversation"), Gate.JOB_CONVERSATION_MODEL_ADAPTER);
-assert.equal(Gate.modelDescriptorForRuntime(conversationAuthority.runtime, "job_model_import"), Gate.JOB_MODEL_IMPORT_ADAPTER);
+assert.equal(Gate.modelDescriptorForRuntime(conversationAuthority.runtime, "job_model_import"), Gate.DEEPSEEK_PRO_MODEL_DESCRIPTOR);
 const jobModelImportAuthority = Gate.authorityFrom(conversationAuthority.runtime, "job_model_import");
-assert.equal(Gate.operationGate("job_model_import", jobModelImportAuthority).allowed, true);
-assert.equal(jobModelImportAuthority.capabilities.job_model_structuring, "supported");
+assert.equal(Gate.operationGate("job_model_import", jobModelImportAuthority).allowed, false);
+assert.equal(jobModelImportAuthority.capabilities.job_model_structuring, "unsupported");
 assert.equal(conversationAuthority.capabilities.job_model_structuring, "unsupported");
+const jobImageAuthority = Gate.authorityFrom(visionRuntime, "job_image_import");
+assert.equal(Gate.operationGate("job_image_import", jobImageAuthority).allowed, true);
+assert.equal(jobImageAuthority.capabilities.vision, "supported");
+assert.equal(Gate.modelDescriptorForRuntime(jobImageAuthority.runtime, "job_image_import"), Gate.JOB_MULTIMODAL_IMPORT_ADAPTER);
 assert.equal(Gate.authorityFrom(conversationAuthority.runtime, "candidate_conversation").capabilities.ai_conversation, "supported");
 assert.equal(Gate.authorityFrom(conversationAuthority.runtime, "job_conversation").capabilities.ai_conversation, "supported");
 assert.equal(Gate.operationGate("candidate_conversation").operation, "candidate_conversation");
+
+const routedStorage = memoryStorage({ mode: "ai", provider: "deepseek", model: "deepseek-v4-pro" });
+Gate.recordOperationRuntimeSelection({ mode: "model", provider: "deepseek", model: "deepseek-v4-pro" }, routedStorage);
+Gate.recordOperationRuntimeSelection({ mode: "model", provider: "deepseek", model: "deepseek-v4-flash-vision-exp" }, routedStorage);
+assert.equal(Gate.runtimeForOperation("job_conversation", routedStorage).model, "deepseek-v4-pro");
+assert.equal(Gate.runtimeForOperation("candidate_image_import", routedStorage).model, "deepseek-v4-flash-vision-exp");
+assert.equal(Gate.runtimeForOperation("job_image_import", routedStorage).model, "deepseek-v4-flash-vision-exp");
+const incompatibleStorage = memoryStorage({ mode: "ai", provider: "deepseek", model: "deepseek-v4-pro" });
+assert.equal(Gate.operationGate("job_image_import", Gate.operationAuthority("job_image_import", incompatibleStorage)).allowed, false);
 
 assert.equal(Gate.currentAuthority(storageWith(null)).runtime.mode, "local");
 assert.throws(() => Gate.currentAuthority(storageWith("{not-json")), (error) => error.code === "current_runtime_storage_malformed");
@@ -60,7 +79,7 @@ assert.equal(Gate.legacyProviderAction({ provider: "gemini", capability: "candid
 assert.equal(Gate.legacyProviderAction({ provider: "deepseek", capability: "job_model_structuring" }, localAuthority).allowed, false);
 
 let providerCallsBeforeConsent = 0;
-if (Gate.operationGate("candidate_import", modelAuthority).allowed && false /* explicit consent absent */) providerCallsBeforeConsent += 1;
+if (Gate.operationGate("candidate_image_import", modelAuthority).allowed && false /* explicit consent absent */) providerCallsBeforeConsent += 1;
 assert.equal(providerCallsBeforeConsent, 0);
 
 const historicalRecord = Demo.clone({
@@ -90,8 +109,8 @@ for (const html of [candidateDetail, jobDetail, personalImport, jobImport]) {
 }
 assert.match(candidateDetail, /id="candidate-ai-pane" class="v1-conversation-pane hidden"/);
 assert.match(jobDetail, /id="job-ai-pane" class="v1-conversation-pane hidden"/);
-assert.match(personalImport, /仅本地读取、提取与确定规则；不调用模型服务商/);
-assert.match(jobImport, /本地读取真实内容 · 原始来源持久保留 · 无模型调用/);
+assert.match(pages, /仅本地读取、提取与确定规则；不调用模型服务商/);
+assert.match(pages, /本地读取真实内容 · 原始来源持久保留 · 无模型调用/);
 assert.match(personalImport, /开始本地提取/);
 assert.match(jobImport, /开始本地整理/);
 assert.doesNotMatch(jobImport, /data-job-processing-mode|id="job-processing-modes"/);
@@ -101,8 +120,8 @@ assert.match(jobImport, /local-job-extraction-domain\.js/);
 assert.match(jobImport, /job-context-domain\.js/);
 
 assert.doesNotMatch(pages, /localStorage|preview-source|appendDemoMessage|createConversation|candidatePatchFor|jobPatchFor/);
-assert.match(pages, /currentOperationGate\("candidate_import"\)/);
-assert.match(pages, /currentOperationGate\(modelMode \? "job_model_import" : "job_import"\)/);
+assert.match(pages, /candidateImportOperation\(\)/);
+assert.match(pages, /jobImportOperation\(\)/);
 assert.match(pages, /currentOperationGate\(operation\)/);
 assert.match(pages, /"candidate_conversation"/);
 assert.match(pages, /"job_conversation"/);
@@ -141,7 +160,7 @@ assert.match(jobCancel, /当前来源未形成成功结果/);
 assert.match(jobRun, /剩余文件没有处理/);
 const jobGate = pages.slice(pages.indexOf("function refreshJobImportGate"), pages.indexOf("function formatBytes"));
 assert.match(jobGate, /RuntimeGate\.readStoredRuntime\(\)/);
-assert.match(jobGate, /currentOperationGate\(modelMode \? "job_model_import" : "job_import"\)/);
+assert.match(jobGate, /currentOperationGate\(modelMode \? jobImportOperation\(\) : "job_import"\)/);
 assert.match(jobGate, /byId\("job-file-input"\)\.disabled = jobProcessingInProgress \|\| !gate\.allowed/);
 assert.match(jobGate, /byId\("job-dropzone"\)\.disabled = jobProcessingInProgress \|\| !gate\.allowed/);
 assert.doesNotMatch(jobGate, /authorityFrom\(\{ mode: "(?:local|model)"/);

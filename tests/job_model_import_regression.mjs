@@ -86,13 +86,13 @@ const jobText = [
 ].join("\n");
 const source = await LocalJob.preparePastedText(jobText, "job-batch-model-regression");
 const sourceDocument = LocalJob.sourceDocumentFor(source, "2026-09-04T04:00:00.000Z");
-const authority = Gate.authorityFrom({ mode: "model", provider: "deepseek", model: "deepseek-v4-pro" }, "job_model_import");
-const gate = JobModel.assertEligibleGate(Gate.operationGate("job_model_import", authority));
+const authority = Gate.authorityFrom({ mode: "model", provider: "deepseek", model: "deepseek-v4-flash-vision-exp" }, "job_text_import");
+const gate = JobModel.assertEligibleGate(Gate.operationGate("job_text_import", authority));
 assert.equal(gate.allowed, true);
 assert.equal(Gate.DEEPSEEK_PRO_MODEL_DESCRIPTOR.runtime_capabilities.job_model_structuring, "unsupported");
-assert.equal(Gate.JOB_MODEL_IMPORT_ADAPTER.runtime_capabilities.job_model_structuring, "supported");
+assert.equal(Gate.JOB_MULTIMODAL_IMPORT_ADAPTER.runtime_capabilities.job_model_structuring, "supported");
 
-const snapshot = JobModel.createRuntimeSnapshot({ snapshot_id: "runtime-snapshot-job-model-regression", captured_at: "2026-09-04T04:00:01.000Z" });
+const snapshot = JobModel.createRuntimeSnapshot({ operation: "job_text_import", snapshot_id: "runtime-snapshot-job-model-regression", captured_at: "2026-09-04T04:00:01.000Z" });
 const preparation = JobModel.sourcePreparationFor(sourceDocument, {
   content_hash: sourceDocument.content_hash,
   extracted_text: jobText,
@@ -134,9 +134,9 @@ const modelProposal = {
 const result = {
   contract_id: JobModel.CONTRACTS.result_contract_version,
   provider: "deepseek",
-  model: "deepseek-v4-pro",
+  model: JobModel.MODEL_ID,
   protocol: "OPENAI_CHAT_COMPLETIONS",
-  adapter_version: "deepseek-job-import-v1",
+  adapter_version: JobModel.CONTRACTS.adapter_version,
   runtime_snapshot_id: snapshot.snapshot_id,
   source_document_id: source.source_document_id,
   processing_run_id: runningRun.run_id,
@@ -169,7 +169,7 @@ assert.match(progressTarget.innerHTML, /is-current[^>]*><span[^>]*><\/span>under
 
 const pages = fs.readFileSync(path.join(root, "public/v1-pages.js"), "utf8");
 const modelFlow = pages.slice(pages.indexOf("async function executeJobModelProcessing"), pages.indexOf("async function runJobProcessing"));
-assert.match(modelFlow, /persistCanonicalSource|readJobSourceForModel/);
+assert.match(modelFlow, /readJobSourceForModel/);
 assert.match(modelFlow, /callJobModelRuntime|JobModel\.proposalFor|persistSuccessfulResult/);
 assert.match(modelFlow, /showJobModelProcessingWorkspace|setJobWorkspaceProgress|showJobWorkingWorkspace/);
 assert.match(modelFlow, /ModelImportLifecycle\.STATES\.WORKING/);
@@ -187,8 +187,11 @@ assert.match(pages, /const assistantMessage = JobConversation\.createMessage\(se
 assert.match(pages, /const visible = JobConversation\.connectedHistory\(messages\)/);
 assert.match(pages, /include_pending_user: true/);
 assert.doesNotMatch(modelFailure, /确认并创建职位版本[^<]*<\/button>[\s\S]*model_generated_non_authoritative/);
-assert.match(pages, /currentOperationGate\(modelMode \? "job_model_import" : "job_import"\)/);
+assert.match(pages, /currentOperationGate\(modelMode \? jobImportOperation\(\) : "job_import"\)/);
 assert.doesNotMatch(pages, /selectedJobProcessingMode|configureJobProcessingMode/);
+const consentFlow = pages.slice(pages.indexOf("async function openJobModelConsent"), pages.indexOf("function runJobModelProcessing"));
+assert.ok(consentFlow.indexOf("SourceInput.persistDurableBundle") < consentFlow.indexOf("dialog.showModal()"));
+assert.match(pages, /selectedJobSources = \[selectedJobSource\]/);
 const lifecycle = ImportLifecycle.createStateMachine();
 assert.equal(lifecycle.transition(ImportLifecycle.STATES.SOURCE_STORED), "SOURCE_STORED");
 assert.equal(lifecycle.transition(ImportLifecycle.STATES.MODEL_PROCESSING), "MODEL_PROCESSING");

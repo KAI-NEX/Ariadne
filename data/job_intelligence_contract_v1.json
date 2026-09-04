@@ -14,19 +14,19 @@
   "job_model_import_source_preparation_version": "ariadne-job-model-source-preparation-v1",
   "job_model_import_proposal_version": "ariadne-job-model-proposal-v1",
   "job_model_import_runtime_contracts": {
-    "request_contract_version": "ariadne-job-model-import-runtime-request-v1",
-    "result_contract_version": "ariadne-job-model-import-runtime-result-v1",
-    "adapter_version": "deepseek-job-import-v1",
-    "prompt_version": "ariadne-job-model-import-prompt-v1",
-    "request_config_version": "deepseek-job-model-import-request-v1",
-    "delivery_method": "prepared_text_blocks"
+    "request_contract_version": "ariadne-job-model-import-runtime-request-v2",
+    "result_contract_version": "ariadne-job-model-import-runtime-result-v2",
+    "adapter_version": "deepseek-job-multimodal-import-v2",
+    "prompt_version": "ariadne-job-model-import-prompt-v2",
+    "request_config_version": "deepseek-job-model-import-request-v2",
+    "delivery_method": "source_images_with_prepared_text"
   },
   "runtime_contracts": {
     "request_contract_version": "ariadne-job-conversation-runtime-request-v3",
     "result_contract_version": "ariadne-job-conversation-runtime-result-v2",
-    "adapter_version": "deepseek-job-conversation-v8",
-    "prompt_version": "ariadne-job-intelligence-prompt-v7",
-    "request_config_version": "deepseek-job-conversation-request-v8"
+    "adapter_version": "deepseek-job-conversation-v9",
+    "prompt_version": "ariadne-job-intelligence-prompt-v8",
+    "request_config_version": "deepseek-job-conversation-request-v9"
   },
   "gap_types": [
     "CAPABILITY_GAP",

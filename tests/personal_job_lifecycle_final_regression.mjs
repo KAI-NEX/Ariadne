@@ -78,8 +78,9 @@ assert.match(jobLifecycle, /content_read_for_identity_only: true/);
 assert.match(jobLifecycle, /database\.transaction\(\[storeName, sourceStoreName\], "readwrite"\)/);
 
 assert.match(pages, /function createDeletePopover\(popoverId\)/);
-assert.match(pages, /ProductShell\.createDetailPanelController/);
+assert.match(pages, /ProductShell\.createDetailEditController/);
 assert.match(productShell, /function createDetailPanelController/);
+assert.match(productShell, /function createDetailEditController/);
 assert.match(pages, /rect\.right - width/);
 assert.match(pages, /createDeletePopover\("candidate-delete-popover"\)/);
 assert.match(pages, /createDeletePopover\("job-delete-popover"\)/);

@@ -73,7 +73,7 @@ Replace SOURCE_DOCUMENT_ID with the supplied ID. Use EXPLICIT_SOURCE for direct 
 
 
 def build_deepseek_candidate_proposal_payload(
-    source_document_id: str, model: str, rendered_pages: list[tuple[str, bytes]],
+    source_document_id: str, model: str, rendered_pages: list[tuple[str, bytes]], media_type: str = "image/jpeg",
 ) -> dict[str, Any]:
     """Build a JSON-mode vision request for one already-consented career material."""
     if not source_document_id or not model or not rendered_pages:
@@ -83,7 +83,7 @@ def build_deepseek_candidate_proposal_payload(
         if not image_bytes:
             raise CandidateProposalError("candidate_proposal_page_missing")
         content.append({"type": "text", "text": f"Career-material page {page_number}. Source document ID: {source_document_id}."})
-        content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64.b64encode(image_bytes).decode('ascii')}"}})
+        content.append({"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{base64.b64encode(image_bytes).decode('ascii')}"}})
     return {
         "model": model,
         "messages": [{"role": "user", "content": content}],

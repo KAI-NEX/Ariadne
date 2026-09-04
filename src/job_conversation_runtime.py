@@ -36,6 +36,11 @@ FORBIDDEN_PROVIDER_VALUES = re.compile(
     r"(?:source-(?:candidate|job)-[a-f0-9]{16,}|sha256:[a-f0-9]{32,}|indexeddb://|/(?:Users|home)/)",
     re.IGNORECASE,
 )
+HUMAN_COPY_TURN_REFERENCE = re.compile(
+    r"(?:\s*[（(](?:(?:confirmed|working)-candidate|job-requirement)-[a-z0-9:_-]+[）)])"
+    r"|(?:(?:confirmed|working)-candidate|job-requirement)-[a-z0-9:_-]+",
+    re.IGNORECASE,
+)
 
 
 class JobConversationRuntimeError(ValueError):
@@ -82,6 +87,14 @@ def _text(value: Any, code: str, maximum: int = 12000) -> str:
     if not isinstance(value, str) or not value.strip() or len(value.strip()) > maximum:
         raise JobConversationRuntimeError(code, "contract_validation")
     return value.strip()
+
+
+def _human_copy(value: Any, code: str, maximum: int = 12000) -> str:
+    text = _text(value, code, maximum)
+    sanitized = HUMAN_COPY_TURN_REFERENCE.sub("", text)
+    sanitized = re.sub(r"[ \t]{2,}", " ", sanitized)
+    sanitized = re.sub(r"\s+([，。；：！？,.!?:;])", r"\1", sanitized).strip()
+    return _text(sanitized, code, maximum)
 
 
 def _assert_provider_safe(value: Any) -> None:
@@ -208,11 +221,13 @@ Honor context.turn_scope. When its ambiguity is RESOLVED_BY_ACTIVE_JOB_SCOPE, do
 Only populate job_edit when context.turn_scope.job_edit_requested is true. Project improvement and resume advice are not Job edits; keep job_edit null for those turns.
 When context.candidate_delta includes current_candidate or changed_fields, treat those exact records as the change. Do not substitute another Candidate record with the same or a similar title, and do not claim that unchanged fields were newly added.
 References must use only the turn-local requirement_ref, candidate_ref and excerpt_ref values supplied in context.
+Turn-local references are only for structured fields. Never print requirement_ref, candidate_ref or excerpt_ref values in Human-visible message, explanations, uncertainties, recommendations, clarification or edit reasons; name the actual Job requirement or Candidate Material instead.
 For ordinary conversation use action exactly EXPLAIN. The only other valid actions are PROPOSE_JOB_EDIT and ASK_CLARIFICATION.
 If auxiliary findings are not essential, return empty fit_findings, gap_findings and recommendations. If you include them, copy every requirement_ref and candidate_ref byte-for-byte from active_context; never substitute a title, label, index or newly invented reference.
 Valid fit assessments are SUPPORTED, PARTIALLY_SUPPORTED, UNSUPPORTED and UNKNOWN. Valid gap types are CAPABILITY_GAP, EVIDENCE_GAP, PRESENTATION_GAP, RELEVANCE_GAP, UNKNOWN and NEEDS_CLARIFICATION. Valid recommendation kinds are RESUME_POSITIONING, PROJECT_POSITIONING, PROJECT_IMPROVEMENT, LEARNING and EVIDENCE_COLLECTION.
 When no clarification, source retrieval or Job edit is required, set clarification, source_need and job_edit to null.
 For a Human request to edit the active Job, emit PROPOSE_JOB_EDIT with semantic field and desired value. Never emit IDs, storage targets, revision values, source identities or fingerprints.
+An explicit delete, remove, or replace request naming one editable Job field is complete mutation intent. Compute the full desired field value, emit PROPOSE_JOB_EDIT immediately, and set clarification to null. Do not ask the Human to confirm the wording: the visible Working proposal and Human Save are the confirmation boundary. In the Human-facing message say that a reviewable Working change was created and that Confirmed remains unchanged until Save; never claim that Confirmed was already updated.
 For ambiguity emit ASK_CLARIFICATION. Set source_need to null when supplied context is enough. Otherwise source needs are explicit future-turn requests; do not assume a hidden retry.
 Analysis and recommendations are non-authoritative. Do not produce match percentages."""
 
@@ -315,7 +330,7 @@ def validate_semantic_output(value: Any, compiled_context: Mapping[str, Any]) ->
         item = _mapping(raw, "FIT_FINDING_INVALID")
         if set(item) != {"requirement_ref", "candidate_refs", "assessment", "explanation", "uncertainty"} or item.get("requirement_ref") not in allowed_requirements or item.get("assessment") not in MANIFEST["fit_assessments"]:
             raise JobConversationRuntimeError("FIT_FINDING_INVALID", "semantic")
-        fit.append({**dict(item), "candidate_refs": _validate_refs(item["candidate_refs"], allowed_candidates, "CANDIDATE_REF_INVALID"), "explanation": _text(item["explanation"], "FIT_FINDING_INVALID", 4000), "uncertainty": _optional_text(item["uncertainty"], "FIT_FINDING_INVALID", 2000)})
+        fit.append({**dict(item), "candidate_refs": _validate_refs(item["candidate_refs"], allowed_candidates, "CANDIDATE_REF_INVALID"), "explanation": _human_copy(item["explanation"], "FIT_FINDING_INVALID", 4000), "uncertainty": None if item["uncertainty"] is None else _human_copy(item["uncertainty"], "FIT_FINDING_INVALID", 2000)})
     gaps = []
     if not isinstance(output["gap_findings"], list) or len(output["gap_findings"]) > MANIFEST["limits"]["findings"]:
         raise JobConversationRuntimeError("GAP_FINDINGS_INVALID", "semantic")
@@ -323,7 +338,7 @@ def validate_semantic_output(value: Any, compiled_context: Mapping[str, Any]) ->
         item = _mapping(raw, "GAP_FINDING_INVALID")
         if set(item) != {"requirement_ref", "candidate_refs", "gap_type", "explanation", "uncertainty", "clarification_needed"} or item.get("requirement_ref") not in allowed_requirements or item.get("gap_type") not in MANIFEST["gap_types"] or not isinstance(item.get("clarification_needed"), bool):
             raise JobConversationRuntimeError("GAP_FINDING_INVALID", "semantic")
-        gaps.append({**dict(item), "candidate_refs": _validate_refs(item["candidate_refs"], allowed_candidates, "CANDIDATE_REF_INVALID"), "explanation": _text(item["explanation"], "GAP_FINDING_INVALID", 4000), "uncertainty": _optional_text(item["uncertainty"], "GAP_FINDING_INVALID", 2000)})
+        gaps.append({**dict(item), "candidate_refs": _validate_refs(item["candidate_refs"], allowed_candidates, "CANDIDATE_REF_INVALID"), "explanation": _human_copy(item["explanation"], "GAP_FINDING_INVALID", 4000), "uncertainty": None if item["uncertainty"] is None else _human_copy(item["uncertainty"], "GAP_FINDING_INVALID", 2000)})
     recommendations = []
     if not isinstance(output["recommendations"], list) or len(output["recommendations"]) > MANIFEST["limits"]["recommendations"]:
         raise JobConversationRuntimeError("RECOMMENDATIONS_INVALID", "semantic")
@@ -331,8 +346,8 @@ def validate_semantic_output(value: Any, compiled_context: Mapping[str, Any]) ->
         item = _mapping(raw, "RECOMMENDATION_INVALID")
         if set(item) != {"kind", "text", "evidence_state"} or item.get("kind") not in MANIFEST["recommendation_kinds"] or item.get("evidence_state") not in {"EXISTING_EVIDENCE", "POSSIBLE_RELEVANCE", "MISSING_EVIDENCE"}:
             raise JobConversationRuntimeError("RECOMMENDATION_INVALID", "semantic")
-        recommendations.append({"kind": item["kind"], "text": _text(item["text"], "RECOMMENDATION_INVALID", 4000), "evidence_state": item["evidence_state"]})
-    clarification = _optional_text(output["clarification"], "CLARIFICATION_INVALID", MANIFEST["limits"]["clarification"])
+        recommendations.append({"kind": item["kind"], "text": _human_copy(item["text"], "RECOMMENDATION_INVALID", 4000), "evidence_state": item["evidence_state"]})
+    clarification = None if output["clarification"] is None else _human_copy(output["clarification"], "CLARIFICATION_INVALID", MANIFEST["limits"]["clarification"])
     turn_scope = compiled_context.get("turn_scope")
     job_edit_requested = isinstance(turn_scope, Mapping) and turn_scope.get("job_edit_requested") is True
     job_edit = output["job_edit"] if job_edit_requested else None
@@ -340,32 +355,44 @@ def validate_semantic_output(value: Any, compiled_context: Mapping[str, Any]) ->
         job_edit = dict(_mapping(job_edit, "JOB_EDIT_INVALID"))
         if set(job_edit) != {"field", "desired_value", "reason"} or job_edit.get("field") not in MANIFEST["editable_job_fields"]:
             raise JobConversationRuntimeError("JOB_EDIT_INVALID", "semantic")
-        job_edit = {"field": job_edit["field"], "desired_value": _text(job_edit["desired_value"], "JOB_EDIT_INVALID", MANIFEST["limits"]["job_field_value"]), "reason": _text(job_edit["reason"], "JOB_EDIT_INVALID", 4000)}
+        job_edit = {"field": job_edit["field"], "desired_value": _human_copy(job_edit["desired_value"], "JOB_EDIT_INVALID", MANIFEST["limits"]["job_field_value"]), "reason": _human_copy(job_edit["reason"], "JOB_EDIT_INVALID", 4000)}
     action = output["action"]
     if job_edit_requested and (action == "PROPOSE_JOB_EDIT") != bool(job_edit):
         raise JobConversationRuntimeError("JOB_EDIT_ACTION_MISMATCH", "semantic")
     if job_edit:
-        if clarification:
-            raise JobConversationRuntimeError("CLARIFICATION_ACTION_MISMATCH", "semantic")
+        # The editable field and complete desired value are the semantic action.
+        # Some OpenAI-compatible providers still repeat a confirmation question
+        # in the optional clarification slot. Human Save is the confirmation
+        # boundary, so discard only that redundant control-plane text.
+        clarification = None
     else:
         # EXPLAIN vs ASK_CLARIFICATION is a redundant, non-mutating discriminator.
         # Canonicalize it from the actual clarification payload so a harmless enum
         # mismatch cannot discard otherwise valid Provider-authored copy.
         action = "ASK_CLARIFICATION" if clarification else "EXPLAIN"
-    source_need = output["source_need"]
-    if source_need is not None:
-        source_need = dict(_mapping(source_need, "SOURCE_NEED_INVALID"))
-        if set(source_need) != {"purpose", "reason"} or source_need.get("purpose") not in MANIFEST["source_retrieval"]["allowed_purposes"]:
-            raise JobConversationRuntimeError("SOURCE_NEED_INVALID", "semantic")
-        source_need["reason"] = _text(source_need["reason"], "SOURCE_NEED_INVALID", 2000)
+    # source_need is an optional, non-authoritative future-turn hint. Some
+    # OpenAI-compatible providers can return a shape outside the nested enum
+    # even when a forced tool schema is supplied. That advisory mismatch must
+    # not discard an otherwise valid Provider-authored answer; an invalid hint
+    # is safely treated as no retrieval request.
+    source_need_value = output["source_need"]
+    source_need = None
+    if isinstance(source_need_value, Mapping):
+        candidate_source_need = dict(source_need_value)
+        if set(candidate_source_need) == {"purpose", "reason"} and candidate_source_need.get("purpose") in MANIFEST["source_retrieval"]["allowed_purposes"]:
+            try:
+                candidate_source_need["reason"] = _human_copy(candidate_source_need["reason"], "SOURCE_NEED_INVALID", 2000)
+            except JobConversationRuntimeError:
+                candidate_source_need = None
+            source_need = candidate_source_need
     validated = {
         "contract_id": SEMANTIC_OUTPUT_CONTRACT,
         "action": action,
-        "message": _text(output["message"], "MESSAGE_INVALID", MANIFEST["limits"]["analysis_message"]),
+        "message": _human_copy(output["message"], "MESSAGE_INVALID", MANIFEST["limits"]["analysis_message"]),
         "fit_findings": fit,
         "gap_findings": gaps,
         "recommendations": recommendations,
-        "candidate_delta_interpretation": _optional_text(output["candidate_delta_interpretation"], "DELTA_INTERPRETATION_INVALID", 4000),
+        "candidate_delta_interpretation": None if output["candidate_delta_interpretation"] is None else _human_copy(output["candidate_delta_interpretation"], "DELTA_INTERPRETATION_INVALID", 4000),
         "clarification": clarification,
         "source_need": source_need,
         "job_edit": job_edit,
@@ -415,7 +442,10 @@ def normalize_job_conversation_response(provider_response: Any, request: JobConv
         raw = _parse_provider_json(content)
     else:
         raise JobConversationRuntimeError("MALFORMED_RESPONSE", "model_output", True)
-    output = validate_semantic_output(raw, request.compiled_context)
+    try:
+        output = validate_semantic_output(raw, request.compiled_context)
+    except JobConversationRuntimeError as error:
+        raise JobConversationRuntimeError(error.code, error.failure_layer, True) from error
     usage = response.get("usage") if isinstance(response.get("usage"), Mapping) else {}
     return output, dict(usage)
 
@@ -444,8 +474,10 @@ def execute_job_conversation_request(
     status, response = provider_call(credential, provider_payload)
     output, usage = normalize_job_conversation_response(response, request, status)
     print(
-        "job_conversation_acceptance provider_called=true provider=deepseek "
-        "model=deepseek-v4-pro assistant_copy_source=PROVIDER",
+        "job_conversation_acceptance submit_event=fired domain=job "
+        f"operation={OPERATION} provider_called=true provider=deepseek model=deepseek-v4-pro "
+        f"result_type={output['action']} working_proposal_created={'yes' if output['job_edit'] else 'no'} "
+        "confirmed_mutation_before_save=no assistant_copy_source=PROVIDER",
         flush=True,
     )
     return {

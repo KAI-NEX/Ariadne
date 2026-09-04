@@ -158,7 +158,8 @@ conflicting_edit = semantic("PROPOSE_JOB_EDIT")
 conflicting_edit["clarification"] = "你要修改地点吗？"
 edit_context = json.loads(json.dumps(COMPILED_CONTEXT))
 edit_context["turn_scope"]["job_edit_requested"] = True
-expect("CLARIFICATION_ACTION_MISMATCH", lambda: validate_semantic_output(conflicting_edit, edit_context))
+normalized_edit = validate_semantic_output(conflicting_edit, edit_context)
+assert normalized_edit["action"] == "PROPOSE_JOB_EDIT" and normalized_edit["clarification"] is None
 spurious_project_edit = semantic("PROPOSE_JOB_EDIT")
 spurious_project_edit["job_edit"]["field"] = "requirements"
 normalized_project_advice = validate_semantic_output(spurious_project_edit, COMPILED_CONTEXT)
@@ -181,6 +182,16 @@ expect("GAP_FINDING_INVALID", lambda: validate_semantic_output(invalid_gap, COMP
 invalid_ref = semantic()
 invalid_ref["fit_findings"][0]["candidate_refs"] = ["persistent-candidate-id"]
 expect("CANDIDATE_REF_INVALID", lambda: validate_semantic_output(invalid_ref, COMPILED_CONTEXT))
+invalid_source_need = semantic()
+invalid_source_need["source_need"] = {"purpose": "UNSUPPORTED_PROVIDER_HINT", "reason": "Need more context."}
+normalized_source_need = validate_semantic_output(invalid_source_need, COMPILED_CONTEXT)
+assert normalized_source_need["source_need"] is None
+leaky_copy = semantic()
+leaky_copy["message"] = "最相关的是 AI evaluation project（confirmed-candidate-1），对应 job-requirement-1。"
+leaky_copy["fit_findings"][0]["explanation"] = "confirmed-candidate-1 支持 job-requirement-1。"
+sanitized_copy = validate_semantic_output(leaky_copy, COMPILED_CONTEXT)
+assert sanitized_copy["message"] == "最相关的是 AI evaluation project，对应。"
+assert sanitized_copy["fit_findings"][0]["explanation"] == "支持。"
 
 calls = []
 result = execute_job_conversation_request(
@@ -191,6 +202,14 @@ assert len(calls) == 1
 assert result["network_call_made"] is True and result["persistence"] == "not_written"
 assert result["provider_called"] is True and result["assistant_copy_source"] == "PROVIDER"
 assert result["output"]["gap_findings"][0]["gap_type"] == "EVIDENCE_GAP"
+
+invalid_source_need_calls = []
+invalid_source_need_result = execute_job_conversation_request(
+    request(), lambda: "synthetic-key",
+    lambda key, body: (invalid_source_need_calls.append((key, body)) or (200, provider_response(invalid_source_need))),
+)
+assert len(invalid_source_need_calls) == 1
+assert invalid_source_need_result["output"]["source_need"] is None
 
 edit_calls = []
 edit_request = request("把这个职位地点改成深圳")

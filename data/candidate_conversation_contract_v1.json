@@ -1,12 +1,12 @@
 {
-  "manifest_version": "ariadne-candidate-conversation-contract-manifest-v3",
-  "semantic_action_version": "ariadne-semantic-candidate-action-v3",
+  "manifest_version": "ariadne-candidate-conversation-contract-manifest-v7",
+  "semantic_action_version": "ariadne-semantic-candidate-action-v4",
   "runtime_contracts": {
     "request_contract_version": "ariadne-candidate-conversation-runtime-request-v3",
     "result_contract_version": "ariadne-candidate-conversation-runtime-result-v3",
-    "adapter_version": "deepseek-candidate-conversation-v3",
-    "prompt_version": "candidate-conversation-semantic-prompt-v3",
-    "request_config_version": "deepseek-candidate-conversation-request-v3"
+    "adapter_version": "deepseek-candidate-conversation-v7",
+    "prompt_version": "candidate-conversation-semantic-prompt-v7",
+    "request_config_version": "deepseek-candidate-conversation-request-v8"
   },
   "canonical_action_version": "ariadne-candidate-conversation-action-v1",
   "actions": [
@@ -240,6 +240,7 @@
       "work_arrangement",
       "location",
       "ownership",
+      "education_detail",
       "referenced_field",
       "supplemental_information",
       "uncertainty_status"
@@ -261,6 +262,11 @@
       "job_title": "role_title",
       "date_range": "time_range",
       "period": "time_range",
+      "degree": "education_detail",
+      "education": "education_detail",
+      "education_information": "education_detail",
+      "study_program": "education_detail",
+      "programme": "education_detail",
       "field_by_current_value": "referenced_field",
       "other_field": "referenced_field",
       "supplemental": "supplemental_information",
@@ -356,12 +362,7 @@
     {
       "concept": "role_title",
       "item_types": [
-        "WORK",
-        "WORK_EXPERIENCE"
-      ],
-      "item_subtypes": [
-        "employment",
-        "work_experience"
+        "*"
       ],
       "destination": {
         "kind": "FACT_BY_LABEL",
@@ -478,6 +479,19 @@
       "allowed_intents": [
         "SET",
         "CLEAR"
+      ]
+    },
+    {
+      "concept": "education_detail",
+      "item_types": [
+        "EDUCATION"
+      ],
+      "destination": {
+        "kind": "FIELD_BY_SEMANTIC_KEY",
+        "semantic_key": "EDUCATION_DETAIL"
+      },
+      "allowed_intents": [
+        "SET"
       ]
     },
     {

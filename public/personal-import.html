@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ariadne · 添加个人材料</title>
-    <link rel="stylesheet" href="/styles.css?v=shared-product-shell-v1">
+    <link rel="stylesheet" href="/styles.css?v=candidate-job-parity-v1">
   </head>
   <body class="v1-body" data-v1-page="personal-import">
     <main class="v1-page-shell v1-import-shell">
@@ -43,13 +43,11 @@
             </button>
             <input id="personal-file-input" class="v1-file-input" type="file" multiple accept=".pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,image/png,image/jpeg">
           </section>
-          <section id="personal-file-preview" class="v1-file-preview hidden">
-            <div><span id="personal-file-icon">PDF</span><p><b id="personal-file-name"></b><small id="personal-file-meta"></small></p></div>
-            <button id="replace-personal-file" type="button">替换</button>
+          <section id="personal-file-preview" class="v1-file-preview hidden" aria-label="已选择的来源">
+            <ol id="personal-source-preview-list" class="v1-source-preview-list"></ol>
+            <button id="replace-personal-file" type="button">添加来源</button>
           </section>
-          <section id="personal-processing" class="v1-processing hidden" aria-live="polite">
-            <div class="v1-processing-orbit" aria-hidden="true"></div><div><p id="personal-processing-state">正在准备</p><small id="personal-processing-boundary">仅本地读取、提取与确定规则；不调用模型服务商</small></div>
-          </section>
+          <section id="personal-processing" class="v1-processing v1-processing-indicator hidden" aria-live="polite"></section>
           <button id="start-personal-processing" class="v1-primary-button v1-sheet-primary" type="button" disabled>开始本地提取</button>
         </div>
       </section>
@@ -60,7 +58,7 @@
             <section class="v1-workspace-content-pane" aria-labelledby="candidate-pane-title">
               <header class="v1-workspace-pane-header"><div><h2 id="candidate-pane-title">Candidate</h2><p id="candidate-working-source"></p></div></header>
               <div id="candidate-workspace-left-scroll" class="v1-workspace-scroll-region" tabindex="0">
-                <div id="candidate-workspace-processing" class="v1-workspace-processing"><span class="v1-workspace-processing-dot" aria-hidden="true"></span><p>正在整理候选人信息…</p></div>
+                <div id="candidate-workspace-processing" class="v1-workspace-processing" data-processing-copy="正在整理候选人信息"></div>
                 <div id="candidate-card-list" class="v1-candidate-card-list hidden"><div id="candidate-working-groups" class="v1-working-groups"></div></div>
                 <section id="candidate-card-detail" class="v1-workspace-card-detail hidden" aria-labelledby="candidate-card-detail-title">
                   <div class="v1-workspace-detail-toolbar"><button id="candidate-card-back" class="v1-back v1-workspace-back-icon" type="button" aria-label="返回全部卡片"></button><button id="candidate-card-edit" class="v1-detail-edit-button" type="button">编辑</button></div>
@@ -88,11 +86,11 @@
                 <ol id="candidate-understanding-events" class="v1-understanding-events"></ol>
                 <div id="candidate-clarification-list" class="v1-clarification-list"></div>
                 <div id="candidate-workspace-conversation" class="v1-workspace-conversation v1-conversation-messages v1-conversation-thread" aria-live="polite"></div>
-                <p id="candidate-workspace-conversation-status" class="v1-conversation-empty" aria-live="polite"></p>
+                <div id="candidate-workspace-conversation-status" class="v1-conversation-status hidden" aria-live="polite"></div>
               </div>
               <form id="candidate-workspace-composer" class="v1-conversation-form v1-workspace-composer">
                 <label class="sr-only" for="candidate-workspace-message">告诉 Ariadne 哪里需要调整</label>
-                <div class="v1-workspace-composer-field"><textarea id="candidate-workspace-message" placeholder="告诉 Ariadne 哪里需要调整"></textarea></div>
+                <div class="v1-composer-field"><textarea id="candidate-workspace-message" placeholder="告诉 Ariadne 哪里需要调整"></textarea></div>
                 <button type="submit" aria-label="发送修改请求">发送</button>
               </form>
             </aside>
@@ -131,7 +129,7 @@
         <div><dt>Model</dt><dd id="candidate-model-consent-model">deepseek-v4-flash-vision-exp</dd></div>
       </dl>
       <div class="v1-button-row">
-        <button id="confirm-candidate-model-consent" class="v1-primary-button" type="button">确认并发送</button>
+        <button id="confirm-candidate-model-consent" class="v1-consent-action" type="button">确认并发送</button>
         <button id="cancel-candidate-model-consent" class="v1-tertiary-button" type="button">取消</button>
       </div>
     </dialog>
@@ -152,23 +150,25 @@
     <script src="/runtime-capability-gate.js?v=candidate-model-runtime-v1"></script>
     <script src="/truth-persistence-domain.js?v=candidate-workspace-authority-v1"></script>
     <script src="/raw-source-storage-domain.js?v=source-storage-v1"></script>
+    <script src="/source-input-domain.js?v=candidate-job-parity-v1"></script>
+    <script src="/processing-indicator-domain.js?v=ui-contract-addendum-v5"></script>
     <script src="/model-import-lifecycle-domain.js?v=job-model-import-v1"></script>
-    <script src="/product-shell-domain.js?v=shared-product-shell-v1"></script>
-    <script src="/model-workspace-ui-domain.js?v=product-convergence-v1"></script>
+    <script src="/product-shell-domain.js?v=shared-product-shell-v4"></script>
+    <script src="/model-workspace-ui-domain.js?v=product-convergence-v2"></script>
     <script src="/candidate-context-domain.js?v=model-e2e-stabilization-v1"></script>
     <script src="/candidate-model-runtime-domain.js?v=candidate-workspace-authority-v1"></script>
     <script src="/local-context-lifecycle-domain.js?v=lifecycle-final-v1"></script>
     <script src="/local-candidate-extraction-domain.js?v=source-storage-v1"></script>
     <script src="/local-candidate-proposal-domain.js?v=personal-lifecycle-v1"></script>
-    <script src="/local-candidate-review-domain.js?v=candidate-workspace-authority-v1"></script>
+    <script src="/local-candidate-review-domain.js?v=computer-use-e2e-v2"></script>
     <script src="/candidate-conversation-contract-manifest.js?v=candidate-conversation-resolution-v1"></script>
     <script src="/candidate-conversation-domain.js?v=candidate-conversation-resolution-v1"></script>
     <script src="/candidate-conversation-persistence-domain.js?v=candidate-conversation-slice-a-v1"></script>
-    <script src="/candidate-conversation-context-compiler.js?v=candidate-conversation-slice-a-v1"></script>
+    <script src="/candidate-conversation-context-compiler.js?v=candidate-conversation-context-v2"></script>
     <script src="/candidate-workspace-conversation-runtime.js?v=candidate-conversation-route-contract-v2"></script>
-    <script src="/conversation-ui-domain.js?v=shared-conversation-ui-v1"></script>
+    <script src="/conversation-ui-domain.js?v=shared-conversation-ui-v5"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
-    <script src="/v1-pages.js?v=shared-product-shell-v1"></script>
+    <script src="/v1-pages.js?v=candidate-job-parity-v1"></script>
   </body>
 </html>

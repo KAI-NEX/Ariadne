@@ -24,18 +24,32 @@
       content_pane: "v1-structured-pane",
       conversation_pane: "v1-conversation-pane",
     }),
+    edit: Object.freeze({
+      shell: "v1-edit-form",
+      field: "v1-edit-field",
+      actions: "v1-edit-actions",
+      cancel: "[data-edit-cancel]",
+      preview: "[data-edit-preview]",
+      destructive: "[data-edit-destructive]",
+      preview_panel: "v1-patch-card",
+      preview_actions: "[data-edit-preview-actions]",
+      apply: "[data-edit-apply]",
+      back: "[data-edit-back]",
+    }),
     conversation: Object.freeze({
       messages: "v1-conversation-messages",
       thread: "v1-conversation-thread",
       human_bubble: "v1-conversation-message user",
       assistant_bubble: "v1-conversation-message assistant",
       composer: "v1-conversation-form",
+      field: "v1-composer-field",
       input: "textarea",
       send: 'button[type="submit"]',
     }),
   });
 
   const panelTimers = new WeakMap();
+  const conversationAdapters = new WeakMap();
 
   function requireElement(value, code) {
     if (!value) throw new Error(code);
@@ -54,13 +68,55 @@
     return Object.freeze({ shell, card });
   }
 
+  function dispatchRuntimeImport(gate, { local, model }) {
+    const mode = gate?.authority?.runtime?.mode;
+    if (mode === "local" && typeof local === "function") return local();
+    if (mode === "model" && typeof model === "function") return model();
+    throw new Error("product_runtime_import_unavailable");
+  }
+
+  function setFeedback(target, { state = "IDLE", copy = "" } = {}) {
+    if (!target) return;
+    target.textContent = copy;
+    target.dataset.feedbackState = state;
+    target.classList.add("v1-feedback");
+    target.classList.toggle("error", state === "FAILURE");
+  }
+
   function bindConversation({ messages, form, status = null }) {
     requireClass(messages, CONTRACT.conversation.messages, "product_conversation_messages_missing");
     requireClass(messages, CONTRACT.conversation.thread, "product_conversation_thread_missing");
     requireClass(form, CONTRACT.conversation.composer, "product_conversation_composer_missing");
+    const field = requireClass(form.querySelector(`.${CONTRACT.conversation.field}`), CONTRACT.conversation.field, "product_conversation_field_missing");
     const input = requireElement(form.querySelector(CONTRACT.conversation.input), "product_conversation_input_missing");
     const send = requireElement(form.querySelector(CONTRACT.conversation.send), "product_conversation_send_missing");
-    return Object.freeze({ messages, form, input, send, status });
+    return Object.freeze({ messages, form, field, input, send, status });
+  }
+
+  function bindConversationAdapter(binding, adapter) {
+    const form = requireClass(binding?.form, CONTRACT.conversation.composer, "product_conversation_composer_missing");
+    const input = requireElement(binding.input, "product_conversation_input_missing");
+    if (!adapter || typeof adapter.domain !== "string" || typeof adapter.operation !== "string" || typeof adapter.submit !== "function") {
+      throw new Error("product_conversation_adapter_invalid");
+    }
+    conversationAdapters.set(form, adapter);
+    form.dataset.ariadneConversationDomain = adapter.domain;
+    form.dataset.ariadneConversationOperation = adapter.operation;
+    if (form.dataset.ariadneConversationBound === "true") return binding;
+    form.dataset.ariadneConversationBound = "true";
+    form.dataset.ariadneSubmitEvent = "idle";
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      form.dataset.ariadneSubmitEvent = "fired";
+      const activeAdapter = conversationAdapters.get(form);
+      const content = String(input.value || "").trim();
+      const available = typeof activeAdapter?.isAvailable === "function" ? activeAdapter.isAvailable() : true;
+      const target = typeof activeAdapter?.resolveTarget === "function" ? activeAdapter.resolveTarget() : Object.freeze({});
+      if (!content || !available || !target) return;
+      input.value = "";
+      await activeAdapter.submit(Object.freeze({ content, target, binding }));
+    });
+    return binding;
   }
 
   function bindWorkspaceShell(documentObject, ids) {
@@ -163,8 +219,8 @@
           windowObject.requestAnimationFrame(() => {
             panel.classList.add("is-active");
             if (focusFirst) {
-              panel.scrollIntoView({ behavior: "smooth", block: "center" });
-              firstVisibleEditableControl(panel, windowObject)?.focus({ preventScroll: true });
+              panel.scrollIntoView({ behavior: "smooth", block: "start" });
+              firstVisibleEditableControl(panel, windowObject)?.focus({ preventScroll: false });
             }
           });
         } else {
@@ -178,5 +234,49 @@
     return Object.freeze({ show, current: () => current });
   }
 
-  return Object.freeze({ CONTRACT, bindImportShell, bindWorkspaceShell, bindDetailShell, bindConversation, setWorkspaceView, showWorkspace, hideWorkspace, applyDetailRuntime, createDetailPanelController });
+  function bindDetailEditShell({ trigger, form, preview }) {
+    const shell = requireClass(form, CONTRACT.edit.shell, "product_detail_edit_shell_missing");
+    const fields = [...shell.querySelectorAll(`.${CONTRACT.edit.field}`)];
+    if (!fields.length) throw new Error("product_detail_edit_fields_missing");
+    const actions = requireClass(shell.querySelector(`.${CONTRACT.edit.actions}`), CONTRACT.edit.actions, "product_detail_edit_actions_missing");
+    const cancel = requireElement(actions.querySelector(CONTRACT.edit.cancel), "product_detail_edit_cancel_missing");
+    const previewAction = requireElement(actions.querySelector(CONTRACT.edit.preview), "product_detail_edit_preview_missing");
+    const destructive = actions.querySelector(CONTRACT.edit.destructive);
+    const previewPanel = requireClass(preview, CONTRACT.edit.preview_panel, "product_detail_edit_preview_panel_missing");
+    const previewActions = requireElement(previewPanel.querySelector(CONTRACT.edit.preview_actions), "product_detail_edit_preview_actions_missing");
+    const apply = requireElement(previewActions.querySelector(CONTRACT.edit.apply), "product_detail_edit_apply_missing");
+    const back = requireElement(previewActions.querySelector(CONTRACT.edit.back), "product_detail_edit_back_missing");
+    return Object.freeze({ trigger, shell, fields: Object.freeze(fields), actions, cancel, previewAction, destructive, previewPanel, previewActions, apply, back });
+  }
+
+  function createDetailEditController({ trigger, form, preview, window: windowObject, populate }) {
+    const binding = bindDetailEditShell({ trigger, form, preview });
+    const panels = createDetailPanelController({ trigger, stages: { edit: binding.shell }, window: windowObject });
+    const open = ({ focusFirst = true, resetPreview = true } = {}) => {
+      populate?.();
+      if (resetPreview) binding.previewPanel.classList.add("hidden");
+      panels.show("edit", { focusFirst });
+    };
+    const close = () => panels.show("closed");
+    const toggle = () => panels.current() === "closed" ? open() : close();
+    const showPreview = () => {
+      close();
+      binding.previewPanel.classList.remove("hidden");
+      binding.previewPanel.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    };
+    const backToEdit = () => {
+      binding.previewPanel.classList.add("hidden");
+      open({ resetPreview: false });
+    };
+    const complete = () => {
+      binding.previewPanel.classList.add("hidden");
+      close();
+    };
+    binding.trigger.addEventListener("click", toggle);
+    binding.cancel.addEventListener("click", close);
+    binding.back.addEventListener("click", backToEdit);
+    return Object.freeze({ ...binding, open, close, toggle, showPreview, backToEdit, complete, current: panels.current });
+  }
+
+  return Object.freeze({ CONTRACT, bindImportShell, dispatchRuntimeImport, setFeedback, bindWorkspaceShell, bindDetailShell, bindConversation, bindConversationAdapter, bindDetailEditShell, setWorkspaceView, showWorkspace, hideWorkspace, applyDetailRuntime, createDetailPanelController, createDetailEditController });
 }));

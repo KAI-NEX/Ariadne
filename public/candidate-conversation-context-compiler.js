@@ -14,7 +14,7 @@
   if (!Truth || !Conversation || !Persistence) throw new Error("candidate_conversation_context_compiler_dependency_required");
 
   const CONTRACT_ID = "ariadne-candidate-conversation-context-v1";
-  const COMPILER_VERSION = "candidate-conversation-context-compiler-v1";
+  const COMPILER_VERSION = "candidate-conversation-context-compiler-v2";
   const HISTORY_TURN_LIMIT = 8;
   const DEFAULT_MAX_SERIALIZED_BYTES = 64 * 1024;
   const FORBIDDEN_KEY = /(?:api[_-]?key|authorization|credential|access[_-]?token|refresh[_-]?token|raw[_-]?(?:pdf|response|http)|pdf[_-]?bytes|rendered[_-]?page|image[_-]?data)/i;
@@ -141,7 +141,18 @@
     };
   }
 
-  function completeHistory(messages, actions, currentMessage) {
+  function actionMatchesFocus(action, focus, observation) {
+    if (focus.type === "CANDIDATE") return true;
+    return action?.focus_snapshot?.item_id === focus.item_id
+      && ["ITEM", "ITEM_DRAFT"].includes(action.focus_snapshot.type)
+      && action?.observed_working_model?.working_model_id === observation.working_model_id
+      && action?.observed_working_model?.version === observation.version
+      && action?.observed_working_model?.fingerprint === observation.fingerprint;
+  }
+
+  function completeHistory(messages, actions, currentMessage, focus, observation) {
+    const relevantActions = (actions || []).filter((entry) => entry?.conversation_id === currentMessage.conversation_id && actionMatchesFocus(entry, focus, observation));
+    const actionsByTurn = new Map(relevantActions.map((entry) => [entry.turn_id, entry]));
     const byTurn = new Map();
     (messages || []).forEach((raw) => {
       if (raw?.contract_id !== Persistence.MESSAGE_CONTRACT || raw.message_id === currentMessage.message_id) return;
@@ -152,13 +163,14 @@
       turn[message.role.toLowerCase()] = message;
       byTurn.set(message.turn_id, turn);
     });
-    const complete = [...byTurn.entries()].filter(([, pair]) => pair.user && pair.assistant).map(([turnId, pair]) => ({
+    const complete = [...byTurn.entries()].filter(([turnId, pair]) => pair.user && pair.assistant
+      && (focus.type === "CANDIDATE" || actionsByTurn.has(turnId))).map(([turnId, pair]) => ({
       turn_id: turnId,
       user: { message_id: pair.user.message_id, text: pair.user.text, created_at: pair.user.created_at },
       assistant: { message_id: pair.assistant.message_id, text: pair.assistant.text, created_at: pair.assistant.created_at },
     })).sort((left, right) => left.user.created_at.localeCompare(right.user.created_at) || left.turn_id.localeCompare(right.turn_id));
     const recent = complete.slice(-HISTORY_TURN_LIMIT);
-    const latestAction = (actions || []).filter((entry) => entry?.conversation_id === currentMessage.conversation_id).sort((left, right) => String(left.created_at).localeCompare(String(right.created_at))).at(-1);
+    const latestAction = relevantActions.sort((left, right) => String(left.created_at).localeCompare(String(right.created_at))).at(-1);
     if (latestAction?.application_result?.status === "NEEDS_CLARIFICATION" && !recent.some((turn) => turn.turn_id === latestAction.turn_id)) {
       const clarificationTurn = complete.find((turn) => turn.turn_id === latestAction.turn_id);
       if (clarificationTurn) return { turns: [clarificationTurn, ...recent.slice(-(HISTORY_TURN_LIMIT - 1))].sort((left, right) => left.user.created_at.localeCompare(right.user.created_at)), total: complete.length };
@@ -191,9 +203,9 @@
       || observation.version !== working.version || observation.fingerprint !== working.fingerprint) throw new CandidateConversationContextError("STALE_WORKING_OBSERVATION");
     const focus = Conversation.validateFocus(observation.focus, working);
     const candidateData = compileCandidateData(working, focus, draft);
-    const historySelection = completeHistory(messages, actions, current);
+    const historySelection = completeHistory(messages, actions, current, focus, observation);
     const history = historySelection.turns;
-    const latestAction = (actions || []).filter((entry) => entry?.conversation_id === current.conversation_id).sort((left, right) => String(left.created_at).localeCompare(String(right.created_at))).at(-1);
+    const latestAction = (actions || []).filter((entry) => entry?.conversation_id === current.conversation_id && actionMatchesFocus(entry, focus, observation)).sort((left, right) => String(left.created_at).localeCompare(String(right.created_at))).at(-1);
     const protectedClarificationTurnId = latestAction?.application_result?.status === "NEEDS_CLARIFICATION" ? latestAction.turn_id : null;
     const openUncertainties = focus.type === "CANDIDATE"
       ? candidateData.candidate_items.flatMap((item) => item.open_uncertainties.map((entry) => ({ item_id: item.item_id, ...entry })))

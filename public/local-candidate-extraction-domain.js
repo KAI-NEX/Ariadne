@@ -111,7 +111,7 @@
       material_type: "CANDIDATE",
       local_reference: RawSource.localReferenceFor(source.source_document_id),
       batch_id: source.batch_id,
-      provenance: { supplied_by: "USER", captured_via: "PERSONAL_FILE_PICKER", raw_source_recoverability: "DURABLE_BROWSER_LOCAL" },
+      provenance: { supplied_by: "USER", captured_via: source.captured_via || "PERSONAL_FILE_PICKER", raw_source_recoverability: "DURABLE_BROWSER_LOCAL" },
       authority: Truth.AUTHORITY.source,
     });
   }

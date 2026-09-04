@@ -350,7 +350,7 @@ def _validate_compiled_context(value: Any, conversation: dict[str, Any], observa
         "contract_id", "compiler_version", "conversation_subject", "observed_working_model", "focus",
         "candidate", "open_uncertainties", "bounded_history", "current_user_message", "summary", "diagnostics",
     }, "COMPILED_CONTEXT_INVALID")
-    if context.get("contract_id") != "ariadne-candidate-conversation-context-v1" or context.get("compiler_version") != "candidate-conversation-context-compiler-v1":
+    if context.get("contract_id") != "ariadne-candidate-conversation-context-v1" or context.get("compiler_version") != "candidate-conversation-context-compiler-v2":
         raise CandidateConversationRuntimeError("COMPILED_CONTEXT_INVALID", "context")
     subject = _exact(context.get("conversation_subject"), {"conversation_id", "subject_type", "candidate_context_id", "source_document_id"}, "COMPILED_CONTEXT_INVALID")
     observed = _exact(context.get("observed_working_model"), {"working_model_id", "version", "fingerprint"}, "COMPILED_CONTEXT_INVALID")
@@ -634,6 +634,17 @@ _AUTHORITY_ESCALATION = re.compile(
     r"(?:已保存到个人资料|已确认|已写入正式资料|confirmed\s+profile|saved\s+to\s+(?:the\s+)?profile)",
     re.IGNORECASE,
 )
+_HUMAN_COPY_CARD_REFERENCE = re.compile(
+    r"(?:\s*[（(]card-[0-9]+[）)])|(?:\bcard-[0-9]+\b)",
+    re.IGNORECASE,
+)
+
+
+def _human_copy(value: str) -> str:
+    sanitized = _HUMAN_COPY_CARD_REFERENCE.sub("", value)
+    sanitized = re.sub(r"[ \t]{2,}", " ", sanitized)
+    sanitized = re.sub(r"\s+([，。；：！？,.!?:;])", r"\1", sanitized).strip()
+    return sanitized
 
 
 def _canonical_clarification(request: CandidateConversationRequest, copy: str) -> dict[str, Any]:
@@ -815,6 +826,10 @@ def resolve_semantic_candidate_action_with_verifications(raw_action: Any, reques
             item = item_by_id[focus["item_id"]]
             return _canonical_clarification(request, _field_clarification(item)), []
         return _canonical_clarification(request, "请用卡片标题、机构或时间说明要修改哪张卡片。"), []
+    if semantic["message"]:
+        semantic["message"] = _human_copy(semantic["message"])
+    if semantic["clarification"]:
+        semantic["clarification"] = _human_copy(semantic["clarification"])
     user_copy = semantic["clarification"] if action_type == "ASK_CLARIFICATION" else semantic["message"]
     if _AUTHORITY_ESCALATION.search(user_copy or ""):
         raise _failure("AUTHORITY_COPY_INVALID", "authority", "AUTHORITY", "semantic_action.user_copy", action_type)
@@ -829,7 +844,9 @@ def resolve_semantic_candidate_action_with_verifications(raw_action: Any, reques
         card_ref = semantic_patch.get("card_ref")
         if action_type == "PATCH_ITEM" and focus["type"] in {"ITEM", "ITEM_DRAFT"}:
             if card_ref is not None:
-                raise _failure("SEMANTIC_SCHEMA_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.patch.card_ref", action_type)
+                referenced_target = card_references.get(card_ref)
+                if referenced_target != focus["item_id"]:
+                    raise _failure("FOCUS_VIOLATION", "focus", "SEMANTIC_GUARD", "semantic_action.patch.card_ref", action_type)
             target = focus["item_id"]
         else:
             if card_ref is None:
@@ -906,7 +923,7 @@ def candidate_conversation_prompt() -> str:
     return f"""You are Ariadne's Candidate conversation semantic action planner.
 Return exactly one JSON object and no Markdown or reasoning.
 Follow this versioned semantic schema exactly: {semantic_prompt_schema_fragment()}
-When focus is ITEM or ITEM_DRAFT, natural references such as this card, here, this project, or this experience mean the active focused item. For an ordinary PATCH_ITEM, omit card_ref; the system always binds it to the active focused item. A card_ref on an ordinary ITEM PATCH_ITEM is invalid.
+When focus is ITEM or ITEM_DRAFT, natural references such as this card, here, this project, or this experience mean the active focused item. For an ordinary PATCH_ITEM, prefer omitting card_ref because the system always binds it to the active focused item. If you include a turn-local card_ref anyway, it must identify that same active item; the system verifies it and rejects focus escape.
 For Candidate focus, choose a Card only with the turn-local card_ref shown in the current input. A Candidate PATCH_ITEM must include that card_ref unless there is exactly one Card. Never output or infer a persistent item ID. If the Human target is not unique, return ASK_CLARIFICATION.
 PATCH_MULTIPLE_ITEMS requires one turn-local card_ref per patch and is allowed only for explicit multi-Card Human intent. In ITEM focus it must include the active Card as one target; the lower canonical focus guard remains authoritative.
 Express changes only as semantic intent + concept + desired value. Do not output storage fields, fact IDs, contract IDs, Working observation echoes, origin, authority, provenance, or evidence_refs.
@@ -914,9 +931,53 @@ When the Human identifies an existing field by its visible label, value, or unce
 Use PATCH_MULTIPLE_ITEMS only when the literal human message explicitly requests all/every/both/multiple items. Otherwise ambiguity must return ASK_CLARIFICATION.
 The final USER message is the current turn intent and overrides history. History only supplies context; it never proves that the current request was already applied.
 For every mutation request, return PATCH_ITEM or PATCH_MULTIPLE_ITEMS even when the desired value may already be present. The system alone determines NO_CHANGE from current state after semantic resolution.
+For an ITEM request of the form “把 X 改成 Y” or an equivalent explicit replacement, if one visible field or fact contains X, select that existing value, use intent SET, and return the complete desired value with X replaced by Y. REPLACE is not a valid intent. Another field already containing Y does not create ambiguity. Do not ask whether to add Y and do not ask for confirmation: the reviewable Working state plus Human Save is the confirmation boundary.
 Never create, remove, merge, or delete items. Never invent references. Explain-only requests return EXPLAIN.
 Never place item IDs, fact IDs, uncertainty IDs, Working IDs, fingerprints, source/session/turn/action IDs, or other internal identities in Human-facing message or clarification copy.
+Turn-local card_ref values are control-plane aliases only. Never print values such as card-1 in Human-facing message or clarification; name the Candidate Material by its visible title instead.
 System-owned fields and canonical typed mutations are bound and validated locally."""
+
+
+def candidate_conversation_tool() -> dict[str, Any]:
+    """Force one Candidate-specific semantic action without exposing storage IDs."""
+    nullable_string = {"anyOf": [{"type": "string"}, {"type": "null"}]}
+    return {
+        "type": "function",
+        "function": {
+            "name": "deliver_candidate_action",
+            "description": "Deliver exactly one non-authoritative Candidate semantic action for local validation.",
+            "strict": False,
+            "parameters": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["action"],
+                "properties": {
+                    "action": {"type": "string", "enum": list(CONTRACT_MANIFEST["semantic_actions"])},
+                    "message": {"type": "string", "description": "Human answer for EXPLAIN only; omit for mutations."},
+                    "patches": {"type": "array", "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["changes"],
+                        "properties": {
+                            "card_ref": {"type": "string"},
+                            "changes": {"type": "array", "items": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "required": ["intent", "concept"],
+                                "properties": {
+                                    "intent": {"type": "string", "enum": list(CONTRACT_MANIFEST["semantic_contract"]["intents"])},
+                                    "concept": {"type": "string", "enum": list(CONTRACT_MANIFEST["semantic_contract"]["concepts"])},
+                                    "value": {"type": "string"},
+                                    "selector": {"type": "string"},
+                                },
+                            }},
+                        },
+                    }},
+                    "clarification": nullable_string,
+                },
+            },
+        },
+    }
 
 
 def _provider_item(item: Mapping[str, Any], card_ref: str, *, directory: bool = False) -> dict[str, Any]:
@@ -1002,7 +1063,8 @@ def build_candidate_conversation_payload(request: CandidateConversationRequest) 
     return {
         "model": MODEL_ID,
         "messages": messages,
-        "response_format": {"type": "json_object"},
+        "tools": [candidate_conversation_tool()],
+        "tool_choice": {"type": "function", "function": {"name": "deliver_candidate_action"}},
         "thinking": {"type": "disabled"},
         "temperature": 0,
         "max_tokens": 1400,
@@ -1070,10 +1132,20 @@ def _normalize_candidate_conversation_response_with_verifications(
         raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "parsing", True, {**diagnostics, **_diagnostic("PROVIDER_ENVELOPE", "MALFORMED_RESPONSE")})
     if choices[0].get("finish_reason") == "length":
         raise CandidateConversationRuntimeError("TRUNCATED_OUTPUT", "model_output", True, {**diagnostics, **_diagnostic("FINISH_REASON", "TRUNCATED_OUTPUT")})
-    if choices[0].get("finish_reason") != "stop":
-        raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "model_output", True, {**diagnostics, **_diagnostic("FINISH_REASON", "MALFORMED_RESPONSE")})
     message = choices[0].get("message")
-    content = message.get("content") if isinstance(message, Mapping) else None
+    finish_reason = choices[0].get("finish_reason")
+    if finish_reason == "tool_calls" and isinstance(message, Mapping):
+        tool_calls = message.get("tool_calls")
+        if not isinstance(tool_calls, list) or len(tool_calls) != 1 or not isinstance(tool_calls[0], Mapping):
+            raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "model_output", True, {**diagnostics, **_diagnostic("PROVIDER_ENVELOPE", "MALFORMED_RESPONSE")})
+        function = tool_calls[0].get("function")
+        if not isinstance(function, Mapping) or function.get("name") != "deliver_candidate_action" or not isinstance(function.get("arguments"), str):
+            raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "model_output", True, {**diagnostics, **_diagnostic("PROVIDER_ENVELOPE", "MALFORMED_RESPONSE")})
+        content = function["arguments"]
+    elif finish_reason == "stop":
+        content = message.get("content") if isinstance(message, Mapping) else None
+    else:
+        raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "model_output", True, {**diagnostics, **_diagnostic("FINISH_REASON", "MALFORMED_RESPONSE")})
     if not isinstance(content, str) or not content.strip():
         if not isinstance(content, str):
             classification = "EMPTY_RESPONSE_UNEXPECTED_MESSAGE_SHAPE"
@@ -1127,6 +1199,13 @@ def execute_candidate_conversation_request(
     provider_payload = build_candidate_conversation_payload(request)
     http_status, provider_response = provider_call(credential, provider_payload)
     action, _resolution_verifications, usage = _normalize_candidate_conversation_response_with_verifications(provider_response, request, http_status)
+    print(
+        "candidate_conversation_acceptance submit_event=fired domain=candidate "
+        f"operation={OPERATION} provider_called=true provider=deepseek model=deepseek-v4-pro "
+        f"result_type={action['action']} working_proposal_created={'yes' if action['patches'] else 'no'} "
+        "confirmed_mutation_before_save=no",
+        flush=True,
+    )
     return {
         "contract_id": RUNTIME_RESULT_CONTRACT_VERSION,
         "execution_id": request.execution_id,

@@ -103,6 +103,7 @@
     const payload = structuredClone(current.payload);
     payload.items[itemIndex] = structuredClone(editedItem);
     payload.user_edits = [...(payload.user_edits || []), { support_relation: "USER_CONFIRMED", edited_at: reviewedAt, paths: [`/items/${itemIndex}`] }];
+    if (current.contract_id === "ariadne-context-revision-v2") throw new Error("candidate_workspace_user_edit_requires_working_acceptance");
     const review = Truth.validateReviewDecision({ contract_id: "ariadne-context-review-decision-v1", review_id: id("review-candidate-edit"), proposal_id: current.confirmed_from_proposal_id, decision: "EDIT_AND_CONFIRM", reviewed_at: reviewedAt, accepted_payload: payload, authority: Truth.AUTHORITY.review });
     const revision = Truth.validateContextRevision({ ...current, revision_id: `${current.context_id}-v${current.version + 1}-${id("revision").slice(-8)}`, version: current.version + 1, previous_revision_id: current.revision_id, review_decision_id: review.review_id, created_at: reviewedAt, payload });
     return Object.freeze({ review_decision: review, revision });
@@ -121,7 +122,7 @@
           transaction.abort();
           return;
         }
-        transaction.objectStore("context_review_decisions").add(structuredClone(outcome.review_decision));
+        if (outcome.review_decision) transaction.objectStore("context_review_decisions").add(structuredClone(outcome.review_decision));
         transaction.objectStore("candidate_context_revisions").add(structuredClone(outcome.revision));
       };
       request.onerror = () => { contractError = request.error || new Error("candidate_revision_read_failed"); transaction.abort(); };

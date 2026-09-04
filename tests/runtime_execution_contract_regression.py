@@ -134,13 +134,13 @@ verified_conversation = create_runtime_snapshot(
     operation="CANDIDATE_CONVERSATION_TURN",
     capability_basis="adapter_verified",
     action_schema_version="ariadne-candidate-conversation-action-v1",
-    request_config_version="deepseek-candidate-conversation-request-v3",
+    request_config_version="deepseek-candidate-conversation-request-v8",
 )
 assert verified_conversation.capabilities.ai_conversation == "supported"
 assert verified_conversation.capabilities.candidate_model_structuring == "unsupported"
 assert verified_conversation.operation == "CANDIDATE_CONVERSATION_TURN"
 assert verified_conversation.action_schema_version == "ariadne-candidate-conversation-action-v1"
-assert verified_conversation.request_config_version == "deepseek-candidate-conversation-request-v3"
+assert verified_conversation.request_config_version == "deepseek-candidate-conversation-request-v8"
 legacy_snapshot = {key: value for key, value in verified_conversation.to_dict().items() if key in SNAPSHOT_FIELDS}
 assert validate_runtime_snapshot(legacy_snapshot).operation is None
 

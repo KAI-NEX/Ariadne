@@ -108,8 +108,8 @@ def deepseek_model_descriptors(model_ids: list[str]) -> list[ModelDescriptor]:
                     "ai_conversation": "unsupported",
                     "vision": "supported",
                 },
-                "deepseek-candidate-pdf-v1",
-                "rendered_pdf_pages",
+                "deepseek-candidate-multimodal-v2",
+                "source_or_rendered_images",
             ))
         else:
             descriptors.append(ModelDescriptor("deepseek", model_id, f"DeepSeek · {model_id}", ACCOUNT_EXPERIMENTAL, (), "account_discovered"))
