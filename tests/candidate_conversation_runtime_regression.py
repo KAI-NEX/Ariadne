@@ -23,12 +23,15 @@ from src.candidate_conversation_runtime import (  # noqa: E402
     OPERATION,
     PROMPT_VERSION,
     REQUEST_CONFIG_VERSION,
+    RUNTIME_REQUEST_CONTRACT_VERSION,
     CandidateConversationExecutionRegistry,
     CandidateConversationRuntimeError,
     build_candidate_conversation_payload,
+    candidate_field_descriptors,
     execute_candidate_conversation_request,
     normalize_candidate_conversation_response,
     resolve_semantic_candidate_action,
+    resolve_semantic_candidate_action_with_verifications,
     semantic_prompt_schema_fragment,
     validate_candidate_action,
     validate_candidate_conversation_request,
@@ -100,7 +103,7 @@ SNAPSHOT = create_runtime_snapshot(
 
 def request_for(message: str = "请解释这一项。", focus: dict | None = None) -> dict:
     return {
-        "contract_id": f"{CONTRACT_ID}-runtime-request-v1",
+        "contract_id": RUNTIME_REQUEST_CONTRACT_VERSION,
         "conversation": {
             "contract_id": CONTRACT_ID,
             "conversation_id": f"candidate-conversation:{CONTEXT_ID}",
@@ -122,6 +125,26 @@ def request_for(message: str = "请解释这一项。", focus: dict | None = Non
         "draft": None,
         "turn": {"execution_id": "turn-synthetic-001", "generation": "generation-synthetic-001"},
     }
+
+
+def work_request_for(message: str, include_role: bool = True) -> dict:
+    """A synthetic Work card with independently addressable title, role, and arrangement."""
+    payload = json.loads(json.dumps(WORKING_MODEL["payload"]))
+    payload["items"] = [{
+        "item_id": "item-work-001", "item_type": "WORK_EXPERIENCE", "item_subtype": "work_experience",
+        "title": "Synthetic Experience Title", "subtitle": "Synthetic Organization", "time": "2025",
+        "summary": "Synthetic work card.", "ownership": None,
+        "facts": ([{"fact_id": "fact-role-001", "label": "角色", "value": "Synthetic Collaborator"}] if include_role else []) + [
+            {"fact_id": "fact-arrangement-001", "label": "工作性质", "value": "Synthetic Part-time"},
+        ],
+        "grounding_refs": [], "uncertainties": [], "review_status": "NEEDS_REVIEW",
+        "item_version": 1, "content_origin": "MODEL_PROPOSAL",
+    }]
+    fingerprint = "sha256:" + hashlib.sha256(json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")).hexdigest()
+    request = request_for(message, {"type": "ITEM", "item_id": "item-work-001"})
+    request["working_model"] = {**WORKING_MODEL, "working_model_id": "synthetic-work-role-model-v1", "payload": payload, "fingerprint": fingerprint}
+    request["observation"] = {**request["observation"], "working_model_id": "synthetic-work-role-model-v1", "fingerprint": fingerprint}
+    return request
 
 
 def compiled_context_for(request: dict) -> dict:
@@ -206,25 +229,23 @@ def patch(target: str, operation: dict, evidence_refs: list[str] | None = None) 
     }
 
 
-def semantic_no_change_basis(value: str = "Royal College of Art RCA") -> dict:
-    return {"target_item_id": "item-edu-001", "concept": "institution_name", "value": value}
-
-
-def semantic_action(action: str, patches=None, message: str = "Synthetic response.", clarification: str | None = None, no_change_basis: dict | None = None) -> dict:
-    result = {"action": action, "message": message}
+def semantic_action(action: str, patches=None, message: str = "Synthetic response.", clarification: str | None = None) -> dict:
+    result = {"action": action}
     if patches is not None:
         result["patches"] = patches
     if clarification is not None:
         result["clarification"] = clarification
-    if action == "NO_CHANGE":
-        result["no_change_basis"] = no_change_basis or semantic_no_change_basis()
+    if action == "EXPLAIN":
+        result["message"] = message
     return result
 
 
-def semantic_patch(target: str | None, concept: str, value: str, intent: str = "SET") -> dict:
+def semantic_patch(card_ref: str | None, concept: str, value: str, intent: str = "SET", selector: str | None = None) -> dict:
     result = {"changes": [{"intent": intent, "concept": concept, "value": value}]}
-    if target is not None:
-        result["target_item_id"] = target
+    if selector is not None:
+        result["changes"][0]["selector"] = selector
+    if card_ref is not None:
+        result["card_ref"] = card_ref
     return result
 
 
@@ -259,6 +280,8 @@ assert "SET_ITEM_FIELD" not in provider_payload["messages"][0]["content"]
 serialized_provider_request = json.dumps(provider_payload, ensure_ascii=False)
 assert "%PDF" not in serialized_provider_request and "document_data_url" not in serialized_provider_request
 assert "consent" not in serialized_provider_request and "CANDIDATE_MODEL_STRUCTURING" not in serialized_provider_request
+assert "item-edu-001" not in serialized_provider_request and "fact-degree-001" not in serialized_provider_request
+assert json.loads(provider_payload["messages"][1]["content"])["candidate"]["candidate_items"][0]["card_ref"] == "card-1"
 
 # Compiled context is separately auditable: action rules, bounded context/history, then the exact current Human message.
 compiled_request = request_for("Current synthetic compiled instruction.")
@@ -310,6 +333,8 @@ validate_candidate_action(action_for(base_request, "EXPLAIN", message="这是一
 expect_error("INVALID_TARGET", lambda: validate_candidate_action(action_for(base_request, "PATCH_ITEM", [patch("missing-item", {"operation": "SET_ITEM_FIELD", "field": "title", "value": "No"})]), validated_request))
 validated_item = validate_candidate_conversation_request(item_request)
 expect_error("FOCUS_VIOLATION", lambda: validate_candidate_action(action_for(item_request, "PATCH_ITEM", [two_patches[1]]), validated_item))
+explicit_item_multi_request = request_for("把所有教育项目中的 RCA 都统一展开。", focus={"type": "ITEM", "item_id": "item-edu-001"})
+validate_candidate_action(action_for(explicit_item_multi_request, "PATCH_MULTIPLE_ITEMS", two_patches, "Updated all requested items."), validate_candidate_conversation_request(explicit_item_multi_request))
 expect_error("UNSUPPORTED_ACTION", lambda: validate_candidate_action(action_for(base_request, "REMOVE_ITEM"), validated_request))
 with_extra = action_for(base_request, "NO_CHANGE", message="No change is needed.")
 with_extra["bypass"] = True
@@ -318,73 +343,63 @@ expect_error("UNSUPPORTED_OPERATION", lambda: validate_candidate_action(action_f
 expect_error("INVALID_EVIDENCE_REF", lambda: validate_candidate_action(action_for(base_request, "PATCH_ITEM", [patch("item-edu-001", {"operation": "SET_ITEM_FIELD", "field": "title", "value": "X"}, ["invented-grounding"])]), validated_request))
 
 # K-N: model identity and output failure taxonomy use the model-facing semantic contract.
-valid_action = semantic_action("NO_CHANGE", message="No change is needed.")
+valid_action = semantic_action("EXPLAIN", message="Synthetic explanation.")
 valid_response = {"id": "response-synthetic", "model": MODEL_ID, "choices": [{"finish_reason": "stop", "message": {"content": json.dumps(valid_action)}}], "usage": {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120}}
 action, usage = normalize_candidate_conversation_response(valid_response, validated_request)
-assert action["action"] == "NO_CHANGE" and usage["total_tokens"] == 120
+assert action["action"] == "EXPLAIN" and usage["total_tokens"] == 120
 expect_error("WRONG_RETURNED_MODEL", lambda: normalize_candidate_conversation_response({**valid_response, "model": "wrong-model"}, validated_request))
 expect_error("MALFORMED_RESPONSE", lambda: normalize_candidate_conversation_response({**valid_response, "choices": [{"finish_reason": "stop", "message": {"content": "{bad"}}]}, validated_request))
 expect_error("EMPTY_RESPONSE", lambda: normalize_candidate_conversation_response({**valid_response, "choices": [{"finish_reason": "stop", "message": {"content": " "}}]}, validated_request))
 expect_error("TRUNCATED_OUTPUT", lambda: normalize_candidate_conversation_response({**valid_response, "choices": [{"finish_reason": "length", "message": {"content": "{}"}}]}, validated_request))
 
-# Semantic action message contract is action-specific and manifest-driven. ASK_CLARIFICATION
-# alone permits an omitted or empty message because its user-facing copy is clarification.
+# Mutation copy and deterministic NO_CHANGE proof are system-owned. Only EXPLAIN
+# carries Provider-authored message copy.
 semantic_action_fixtures = {
-    "PATCH_ITEM": semantic_action("PATCH_ITEM", [semantic_patch("item-edu-001", "institution_name", "Royal College of Art")]),
+    "PATCH_ITEM": semantic_action("PATCH_ITEM", [semantic_patch("card-1", "institution_name", "Royal College of Art")]),
     "PATCH_MULTIPLE_ITEMS": semantic_action("PATCH_MULTIPLE_ITEMS", [
-        semantic_patch("item-edu-001", "institution_name", "Royal College of Art"),
-        semantic_patch("item-edu-002", "institution_name", "Service Design Exchange — Royal College of Art"),
+        semantic_patch("card-1", "institution_name", "Royal College of Art"),
+        semantic_patch("card-2", "institution_name", "Service Design Exchange — Royal College of Art"),
     ]),
     "ASK_CLARIFICATION": semantic_action("ASK_CLARIFICATION", [], clarification="Which synthetic education item do you mean?"),
     "EXPLAIN": semantic_action("EXPLAIN", []),
-    "NO_CHANGE": semantic_action("NO_CHANGE", []),
 }
 for action_type, fixture in semantic_action_fixtures.items():
     assert validate_semantic_candidate_action(fixture)["action"] == action_type
-    missing = dict(fixture)
-    missing.pop("message", None)
-    if action_type == "ASK_CLARIFICATION":
-        assert validate_semantic_candidate_action(missing)["message"] == ""
-    else:
+    if action_type == "EXPLAIN":
+        missing = dict(fixture)
+        missing.pop("message", None)
         expect_error("ACTION_MESSAGE_SHAPE_INVALID", lambda value=missing: validate_semantic_candidate_action(value))
-    for invalid_message in (None, "", "   ", "x" * (CONTRACT_MANIFEST["limits"]["message"] + 1), 7):
-        malformed = {**fixture, "message": invalid_message}
-        if action_type == "ASK_CLARIFICATION" and invalid_message in {"", "   "}:
-            assert validate_semantic_candidate_action(malformed)["message"] == ""
-        else:
-            expect_error("ACTION_MESSAGE_SHAPE_INVALID", lambda value=malformed: validate_semantic_candidate_action(value))
+    else:
+        expect_error("ACTION_MESSAGE_SHAPE_INVALID", lambda value={**fixture, "message": "obsolete mutation copy"}: validate_semantic_candidate_action(value))
 
 # Provider-shaped local acceptance: a clear correction resolves to one canonical PATCH_ITEM.
 provider_patch_response = {**valid_response, "choices": [{"finish_reason": "stop", "message": {"content": json.dumps({
-    "action": "PATCH_ITEM", "message": "Updated the synthetic institution.",
-    "patch": {"target": "item-edu-001", "changes": [{"intent": "SET", "concept": "school_name", "value": "Royal College of Art"}]},
+    "action": "PATCH_ITEM",
+    "patches": [{"card_ref": "card-1", "changes": [{"intent": "SET", "concept": "school_name", "value": "Royal College of Art"}]}],
 })}}]}
 provider_patch_action, _ = normalize_candidate_conversation_response(provider_patch_response, validated_request)
 assert provider_patch_action["action"] == "PATCH_ITEM"
 assert provider_patch_action["patches"][0]["operations"] == [{"operation": "SET_ITEM_FIELD", "field": "title", "value": "Royal College of Art"}]
 
-# Provider-shaped NO_CHANGE is valid only when its model-owned basis matches the current canonical value.
-provider_no_change_response = {**valid_response, "choices": [{"finish_reason": "stop", "message": {"content": json.dumps(semantic_action("NO_CHANGE", [], "Synthetic value already matches."))}}]}
+# NO_CHANGE is derived from the resolved current state rather than Model proof.
+provider_no_change_response = {**valid_response, "choices": [{"finish_reason": "stop", "message": {"content": json.dumps(
+    semantic_action("PATCH_ITEM", [semantic_patch("card-1", "institution_name", "Royal College of Art RCA")])
+)}}]}
 provider_no_change_action, _ = normalize_candidate_conversation_response(provider_no_change_response, validated_request)
 assert provider_no_change_action["action"] == "NO_CHANGE" and provider_no_change_action["patches"] == []
-wrong_no_change_response = {**valid_response, "choices": [{"finish_reason": "stop", "message": {"content": json.dumps(semantic_action("NO_CHANGE", [], "Synthetic value already matches.", no_change_basis=semantic_no_change_basis("Royal College of Art")))}}]}
-expect_error("NO_CHANGE_STATE_MISMATCH", lambda: normalize_candidate_conversation_response(wrong_no_change_response, validated_request))
-missing_no_change_basis = semantic_action("NO_CHANGE", [], "Synthetic value already matches.")
-missing_no_change_basis.pop("no_change_basis")
-expect_error("SEMANTIC_SCHEMA_INVALID", lambda: validate_semantic_candidate_action(missing_no_change_basis))
+expect_error("UNSUPPORTED_ACTION", lambda: validate_semantic_candidate_action({"action": "NO_CHANGE"}))
 
 # Response resolution: the old storage-level path rejects this representation, while the bounded semantic path normalizes it.
 representation_fixture = {
     "action": "PATCH_ITEM",
-    "message": "Updated the synthetic institution name.",
-    "patch": {
-        "target": "item-edu-001",
+    "patches": [{
+        "card_ref": "card-1",
         "changes": [{"intent": "SET", "concept": "institution", "value": "Royal College of Art"}],
-    },
+    }],
 }
 expect_error("ACTION_TOP_LEVEL_SHAPE_INVALID", lambda: validate_candidate_action(representation_fixture, validated_request))
 semantic_normalized = validate_semantic_candidate_action(representation_fixture)
-assert semantic_normalized["patches"][0]["target_item_id"] == "item-edu-001"
+assert semantic_normalized["patches"][0]["card_ref"] == "card-1"
 assert semantic_normalized["patches"][0]["changes"][0]["concept"] == "institution_name"
 resolved = resolve_semantic_candidate_action(representation_fixture, validated_request)
 assert resolved["contract_id"] == ACTION_SCHEMA_VERSION
@@ -394,49 +409,159 @@ assert resolved["patches"][0]["origin"] == "MODEL_PROPOSAL"
 assert resolved["patches"][0]["evidence_refs"] == []
 assert resolved["patches"][0]["operations"] == [{"operation": "SET_ITEM_FIELD", "field": "title", "value": "Royal College of Art"}]
 
+# Work Card semantics keep the visible experience title, role fact, and work arrangement independent.
+work_request = work_request_for("我的角色是 Synthetic Designer。")
+validated_work_request = validate_candidate_conversation_request(work_request)
+role_resolved = resolve_semantic_candidate_action(
+    semantic_action("PATCH_ITEM", [semantic_patch(None, "role", "Synthetic Designer")], "Updated role."),
+    validated_work_request,
+)
+assert role_resolved["patches"][0]["operations"] == [{"operation": "SET_FACT_VALUE", "fact_id": "fact-role-001", "value": "Synthetic Designer"}]
+assert all(operation.get("field") != "title" for operation in role_resolved["patches"][0]["operations"])
+
+title_resolved = resolve_semantic_candidate_action(
+    semantic_action("PATCH_ITEM", [semantic_patch(None, "experience_title", "Synthetic Revised Experience")], "Updated title."),
+    validated_work_request,
+)
+assert title_resolved["patches"][0]["operations"] == [{"operation": "SET_ITEM_FIELD", "field": "title", "value": "Synthetic Revised Experience"}]
+
+arrangement_resolved = resolve_semantic_candidate_action(
+    semantic_action("PATCH_ITEM", [semantic_patch(None, "work_arrangement", "Synthetic Internship")], "Updated arrangement."),
+    validated_work_request,
+)
+assert arrangement_resolved["patches"][0]["operations"] == [{"operation": "SET_FACT_VALUE", "fact_id": "fact-arrangement-001", "value": "Synthetic Internship"}]
+
+# CandidateFieldDescriptor supplies stable identity/display semantics without changing facts[] persistence.
+descriptor_map = {descriptor["storage_target"].get("field") or descriptor["storage_target"].get("fact_id"): descriptor
+                  for descriptor in candidate_field_descriptors(validated_work_request.working_model["payload"]["items"][0])}
+assert descriptor_map["subtitle"]["semantic_key"] == "SUBTITLE"
+assert descriptor_map["subtitle"]["canonical_display_label"] == "副标题"
+assert descriptor_map["fact-role-001"]["canonical_display_label"] == "角色"
+assert descriptor_map["fact-arrangement-001"]["canonical_display_label"] == "工作性质"
+
+# ITEM focus + literal exact current value resolves one duplicate-looking legacy field only.
+duplicate_request = request_for("把补充信息里现在是2025的那项改成RCA硕士作业。", {"type": "ITEM", "item_id": "item-project-001"})
+duplicate_payload = json.loads(json.dumps(WORKING_MODEL["payload"]))
+duplicate_payload["items"] = [{
+    "item_id": "item-project-001", "item_type": "PROJECT", "item_subtype": "project",
+    "title": "Synthetic Project", "subtitle": "Design Research", "time": "2025", "summary": "Synthetic project.", "ownership": None,
+    "facts": [
+        {"fact_id": "synthetic-a", "label": "unknown-a", "value": "2025"},
+        {"fact_id": "synthetic-b", "label": "unknown-b", "value": "HTML + JavaScript"},
+        {"fact_id": "synthetic-supplemental", "label": "Supplemental Information", "value": "Synthetic note"},
+    ],
+    "grounding_refs": [], "uncertainties": [], "review_status": "NEEDS_REVIEW", "item_version": 1, "content_origin": "MODEL_PROPOSAL",
+}]
+duplicate_fingerprint = "sha256:" + hashlib.sha256(json.dumps(duplicate_payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")).hexdigest()
+duplicate_request["working_model"] = {**WORKING_MODEL, "working_model_id": "synthetic-duplicate-working-v1", "payload": duplicate_payload, "fingerprint": duplicate_fingerprint}
+duplicate_request["observation"] = {**duplicate_request["observation"], "working_model_id": "synthetic-duplicate-working-v1", "fingerprint": duplicate_fingerprint}
+validated_duplicate = validate_candidate_conversation_request(duplicate_request)
+duplicate_semantic = {
+    "action": "PATCH_ITEM",
+    "patches": [{"changes": [{"intent": "SET", "concept": "referenced_field", "selector": "2025", "value": "RCA硕士作业"}]}],
+}
+duplicate_action, duplicate_verifications = resolve_semantic_candidate_action_with_verifications(duplicate_semantic, validated_duplicate)
+assert duplicate_action["patches"][0]["target_item_id"] == "item-project-001"
+assert duplicate_action["patches"][0]["operations"] == [{"operation": "SET_FACT_VALUE", "fact_id": "synthetic-a", "value": "RCA硕士作业"}]
+assert len(duplicate_verifications) == 1
+assert duplicate_verifications[0]["semantic_key"] == "UNKNOWN_LEGACY"
+assert duplicate_verifications[0]["canonical_display_label"] == "未分类信息"
+assert duplicate_verifications[0]["expected_before_value"] == "2025"
+assert duplicate_verifications[0]["storage_target"] == {"kind": "FACT", "fact_id": "synthetic-a"}
+assert candidate_field_descriptors(duplicate_payload["items"][0])[1]["canonical_display_label"] == "副标题"
+fact_labels = {descriptor["storage_target"].get("fact_id"): descriptor["canonical_display_label"]
+               for descriptor in candidate_field_descriptors(duplicate_payload["items"][0]) if descriptor["storage_target"]["kind"] == "FACT"}
+assert fact_labels == {"synthetic-a": "未分类信息", "synthetic-b": "未分类信息", "synthetic-supplemental": "补充信息"}
+unmatched_selector = resolve_semantic_candidate_action(
+    {"action": "PATCH_ITEM", "patches": [{"changes": [{"intent": "SET", "concept": "referenced_field", "selector": "invented", "value": "No"}]}]},
+    validated_duplicate,
+)
+assert unmatched_selector["action"] == "ASK_CLARIFICATION"
+friendly_ask = resolve_semantic_candidate_action(
+    {"action": "ASK_CLARIFICATION", "patches": [], "clarification": "Choose item-project-001 or synthetic-a."},
+    validated_duplicate,
+)
+assert friendly_ask["action"] == "ASK_CLARIFICATION"
+assert "item-project-001" not in friendly_ask["clarification"] and "synthetic-a" not in friendly_ask["clarification"]
+# Unique semantic labels remain concise; values only disambiguate genuinely
+# duplicate labels.  The assistant's wording must use the same manifest label
+# as the Card Detail row rather than collapsing fields into supplemental copy.
+assert "「未分类信息」（当前值：「2025」）" in friendly_ask["clarification"]
+assert "「补充信息」" in friendly_ask["clarification"]
+assert "Synthetic note" not in friendly_ask["clarification"]
+
+unique_clarification_request = work_request_for("请补充这一项。")
+unique_clarification = resolve_semantic_candidate_action(
+    {"action": "ASK_CLARIFICATION", "patches": [], "clarification": "Untrusted model wording."},
+    validate_candidate_conversation_request(unique_clarification_request),
+)
+assert unique_clarification["clarification"] == "你想添加到「角色」还是「工作性质」？"
+assert "当前值" not in unique_clarification["clarification"]
+
+# A missing role destination is safe ambiguity; it may never fall back to the Card title.
+validated_work_without_role = validate_candidate_conversation_request(work_request_for("我的角色是 Synthetic Designer。", include_role=False))
+missing_role_result = resolve_semantic_candidate_action(
+    semantic_action("PATCH_ITEM", [semantic_patch(None, "role_title", "Synthetic Designer")], "Updated role."),
+    validated_work_without_role,
+)
+assert missing_role_result["action"] == "ASK_CLARIFICATION" and missing_role_result["patches"] == []
+ambiguous_role_request = work_request_for("我的角色是 Synthetic Designer。")
+ambiguous_role_payload = json.loads(json.dumps(ambiguous_role_request["working_model"]["payload"]))
+ambiguous_role_payload["items"][0]["facts"].append({"fact_id": "fact-role-002", "label": "职位", "value": "Synthetic Duplicate Role"})
+ambiguous_role_fingerprint = "sha256:" + hashlib.sha256(json.dumps(ambiguous_role_payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")).hexdigest()
+ambiguous_role_request["working_model"] = {**ambiguous_role_request["working_model"], "payload": ambiguous_role_payload, "fingerprint": ambiguous_role_fingerprint}
+ambiguous_role_request["observation"] = {**ambiguous_role_request["observation"], "fingerprint": ambiguous_role_fingerprint}
+ambiguous_role_result = resolve_semantic_candidate_action(
+    semantic_action("PATCH_ITEM", [semantic_patch(None, "role_title", "Synthetic Designer")], "Updated role."),
+    validate_candidate_conversation_request(ambiguous_role_request),
+)
+assert ambiguous_role_result["action"] == "ASK_CLARIFICATION" and ambiguous_role_result["patches"] == []
+
 # Missing exact target is clarification-safe when Candidate focus contains multiple Cards.
-ambiguous_target = semantic_action("PATCH_ITEM", semantic_patch(None, "institution_name", "Royal College of Art"), "Update the institution.")
+ambiguous_target = semantic_action("PATCH_ITEM", [semantic_patch(None, "institution_name", "Royal College of Art")])
 ambiguous_target_resolved = resolve_semantic_candidate_action(ambiguous_target, validated_request)
 assert ambiguous_target_resolved["action"] == "ASK_CLARIFICATION" and ambiguous_target_resolved["patches"] == []
 
-# Negative semantic safety: no unknown concepts, targets, implicit multi, focus escape, authority escalation, or extra keys.
-expect_error("UNKNOWN_CONCEPT", lambda: resolve_semantic_candidate_action(
-    semantic_action("PATCH_ITEM", [semantic_patch("item-edu-001", "imagined_concept", "No")], "No."), validated_request,
-))
+# Unknown concepts are ordinary semantic uncertainty and clarify safely.
+unknown_concept = resolve_semantic_candidate_action(
+    semantic_action("PATCH_ITEM", [semantic_patch("card-1", "imagined_concept", "No")]), validated_request,
+)
+assert unknown_concept["action"] == "ASK_CLARIFICATION"
 expect_error("INVALID_TARGET", lambda: resolve_semantic_candidate_action(
-    semantic_action("PATCH_ITEM", [semantic_patch("hallucinated-item", "institution_name", "No")], "No."), validated_request,
+    semantic_action("PATCH_ITEM", [semantic_patch("card-999", "institution_name", "No")]), validated_request,
 ))
 semantic_multi = semantic_action("PATCH_MULTIPLE_ITEMS", [
-    semantic_patch("item-edu-001", "institution_name", "Royal College of Art"),
-    semantic_patch("item-edu-002", "institution_name", "Royal College of Art"),
+    semantic_patch("card-1", "institution_name", "Royal College of Art"),
+    semantic_patch("card-2", "institution_name", "Royal College of Art"),
 ], "Updated both.")
 expect_error("IMPLICIT_MULTI_VIOLATION", lambda: resolve_semantic_candidate_action(semantic_multi, validate_candidate_conversation_request(implicit_request)))
-expect_error("FOCUS_VIOLATION", lambda: resolve_semantic_candidate_action(
-    semantic_action("PATCH_ITEM", [semantic_patch("item-edu-002", "institution_name", "No")], "No."), validated_item,
+expect_error("SEMANTIC_SCHEMA_INVALID", lambda: resolve_semantic_candidate_action(
+    semantic_action("PATCH_ITEM", [semantic_patch("card-2", "institution_name", "No")]), validated_item,
 ))
 expect_error("UNSUPPORTED_ACTION", lambda: validate_semantic_candidate_action({"action": "CREATE_ITEM", "message": "No."}))
 expect_error("UNSUPPORTED_ACTION", lambda: validate_semantic_candidate_action({"action": "REMOVE_ITEM", "message": "No."}))
 expect_error("UNSUPPORTED_ACTION", lambda: validate_semantic_candidate_action({"action": "MERGE_ITEMS", "message": "No."}))
 expect_error("UNSUPPORTED_ACTION", lambda: validate_semantic_candidate_action({"action": "DELETE_ITEM", "message": "No."}))
 expect_error("UNSUPPORTED_MUTATION", lambda: resolve_semantic_candidate_action({
-    "action": "PATCH_ITEM", "message": "No.", "patches": [{"target_item_id": "item-edu-001", "changes": [{"intent": "CLEAR", "concept": "institution_name"}]}],
+    "action": "PATCH_ITEM", "patches": [{"card_ref": "card-1", "changes": [{"intent": "CLEAR", "concept": "institution_name"}]}],
 }, validated_request))
 expect_error("UNSUPPORTED_MUTATION", lambda: validate_semantic_candidate_action({
-    "action": "PATCH_ITEM", "message": "No.", "patches": [{"target_item_id": "item-edu-001", "changes": [{"intent": "DELETE", "concept": "institution_name"}]}],
+    "action": "PATCH_ITEM", "patches": [{"card_ref": "card-1", "changes": [{"intent": "DELETE", "concept": "institution_name"}]}],
 }))
 expect_error("SEMANTIC_SCHEMA_INVALID", lambda: validate_semantic_candidate_action({**valid_action, "arbitrary": True}))
 expect_error("SEMANTIC_SCHEMA_INVALID", lambda: validate_semantic_candidate_action({
-    "action": "PATCH_ITEM", "message": "No.", "patches": [{**semantic_patch("item-edu-001", "institution_name", "No"), "evidence_refs": ["invented"]}],
+    "action": "PATCH_ITEM", "patches": [{**semantic_patch("card-1", "institution_name", "No"), "evidence_refs": ["invented"]}],
 }))
 expect_error("AUTHORITY_COPY_INVALID", lambda: resolve_semantic_candidate_action(
-    semantic_action("NO_CHANGE", message="已保存到个人资料。"), validated_request,
+    semantic_action("EXPLAIN", message="已保存到个人资料。"), validated_request,
 ))
 expect_error("INVALID_UNCERTAINTY_STATUS", lambda: resolve_semantic_candidate_action({
-    "action": "PATCH_ITEM", "message": "No.", "patches": [{"target_item_id": "item-edu-001", "changes": [{"intent": "SET_STATUS", "concept": "uncertainty_status", "reference_id": "uncertain-edu-001", "value": "CONFIRMED"}]}],
+    "action": "PATCH_ITEM", "patches": [{"card_ref": "card-1", "changes": [{"intent": "SET_STATUS", "concept": "uncertainty_status", "selector": "Synthetic question", "value": "CONFIRMED"}]}],
 }, validated_request))
-expect_error("INVALID_OPERATION_TARGET", lambda: resolve_semantic_candidate_action({
-    "action": "PATCH_ITEM", "message": "No.", "patches": [{"target_item_id": "item-edu-001", "changes": [{"intent": "SET_STATUS", "concept": "uncertainty_status", "reference_id": "invented-uncertainty", "value": "RESOLVED"}]}],
-}, validated_request))
+unknown_uncertainty = resolve_semantic_candidate_action({
+    "action": "PATCH_ITEM", "patches": [{"card_ref": "card-1", "changes": [{"intent": "SET_STATUS", "concept": "uncertainty_status", "selector": "invented uncertainty", "value": "RESOLVED"}]}],
+}, validated_request)
+assert unknown_uncertainty["action"] == "ASK_CLARIFICATION"
 
 # An actual Working item with two equally valid fact destinations is clarification-safe, never guessed.
 ambiguous_mapping_request = request_for("把 location 改成 Synthetic City。")
@@ -450,23 +575,45 @@ ambiguous_mapping_request["working_model"]["fingerprint"] = "sha256:" + hashlib.
 ambiguous_mapping_request["observation"]["fingerprint"] = ambiguous_mapping_request["working_model"]["fingerprint"]
 ambiguous_mapping_validated = validate_candidate_conversation_request(ambiguous_mapping_request)
 ambiguous_mapping_result = resolve_semantic_candidate_action(
-    semantic_action("PATCH_ITEM", [semantic_patch("item-edu-001", "location", "Synthetic City")], "Updated location."),
+    semantic_action("PATCH_ITEM", [semantic_patch("card-1", "location", "Synthetic City")]),
     ambiguous_mapping_validated,
 )
 assert ambiguous_mapping_result["action"] == "ASK_CLARIFICATION"
 
 # Safe diagnostics identify the stage/category without response content or Candidate values.
-diagnostic_response = {**valid_response, "choices": [{"finish_reason": "stop", "message": {"content": json.dumps({"action": "PATCH_ITEM", "message": "No.", "patches": [{"target_item_id": "item-edu-001", "changes": [{"intent": "SET", "concept": "unknown", "value": "Private-like value must not appear"}]}]})}}]}
+diagnostic_response = {**valid_response, "choices": [{"finish_reason": "stop", "message": {"content": json.dumps({"action": "PATCH_ITEM", "patches": [{"target_item_id": "item-edu-001", "changes": [{"intent": "SET", "concept": "unknown", "value": "Private-like value must not appear"}]}]})}}]}
 try:
     normalize_candidate_conversation_response(diagnostic_response, validated_request)
     raise AssertionError("expected safe response diagnostic")
 except CandidateConversationRuntimeError as error:
-    assert error.code == "UNKNOWN_CONCEPT"
-    assert error.diagnostics["stage"] == "RESOLUTION"
-    assert error.diagnostics["field_category"] == "semantic_action.change.concept"
+    assert error.code == "SEMANTIC_SCHEMA_INVALID"
+    assert error.diagnostics["stage"] == "SEMANTIC_SCHEMA"
+    assert error.diagnostics["field_category"] == "semantic_action.patch"
     assert error.diagnostics["action_type"] == "PATCH_ITEM"
     serialized_diagnostics = json.dumps(error.diagnostics, ensure_ascii=False)
     assert "Private-like value" not in serialized_diagnostics and "item-edu-001" not in serialized_diagnostics
+
+# Provider-shaped HTTP 200 with no message content is a retained, zero-mutation Model failure.
+empty_provider_response = {**valid_response, "usage": {"prompt_tokens": 100, "completion_tokens": 0, "total_tokens": 100}, "choices": [{"finish_reason": "stop", "message": {"content": ""}}]}
+try:
+    normalize_candidate_conversation_response(empty_provider_response, validated_request)
+    raise AssertionError("expected EMPTY_RESPONSE")
+except CandidateConversationRuntimeError as error:
+    assert error.code == "EMPTY_RESPONSE" and error.network_call_made is True
+    assert error.diagnostics["stage"] == "JSON_PARSE" and error.diagnostics["content_length"] == 0
+    assert error.diagnostics["empty_response_classification"] == "EMPTY_RESPONSE_ZERO_COMPLETION"
+    assert error.diagnostics["content_type"] == "string"
+    assert error.diagnostics["reasoning_content_present"] is False
+
+reasoning_only_response = {**valid_response, "usage": {"prompt_tokens": 100, "completion_tokens": 12, "total_tokens": 112}, "choices": [{"finish_reason": "stop", "message": {"role": "assistant", "content": "", "reasoning_content": "synthetic-reasoning-never-persisted"}}]}
+try:
+    normalize_candidate_conversation_response(reasoning_only_response, validated_request)
+    raise AssertionError("expected EMPTY_RESPONSE")
+except CandidateConversationRuntimeError as error:
+    assert error.diagnostics["empty_response_classification"] == "EMPTY_RESPONSE_REASONING_ONLY"
+    assert error.diagnostics["reasoning_content_present"] is True
+    assert error.diagnostics["reasoning_content_length"] == len("synthetic-reasoning-never-persisted")
+    assert "synthetic-reasoning-never-persisted" not in json.dumps(error.diagnostics, ensure_ascii=False)
 
 # O: old response cannot bind to another Working head.
 stale_request = request_for()
@@ -491,15 +638,17 @@ def fake_provider_call(_credential: str, payload: dict) -> tuple[int, dict]:
 result = execute_candidate_conversation_request(base_request, lambda: "synthetic-credential-never-logged", fake_provider_call)
 assert result["authority"] == "NON_AUTHORITATIVE_WORKING_ACTION"
 assert result["persistence"] == "not_written"
+assert "resolution_receipts" not in result
 assert "workspace_acceptance" not in result and "confirmed_context" not in result
 assert captured["model"] == MODEL_ID
 
-# R/S: the frozen runtime remains separate while Slice A wires the Workspace list root.
+# R/S: the frozen runtime remains separate while Workspace List and Detail share its adapter.
 pages_source = (ROOT / "public" / "v1-pages.js").read_text(encoding="utf-8")
-assert "applyCandidateWorkspaceCorrection" in pages_source
+assert "applyCandidateWorkspaceCorrection" not in pages_source
 assert "CandidateModel.editedCandidateWorkingModel" in pages_source
 assert 'fetch("/api/candidate-conversation-turn"' in pages_source
 assert "CandidateWorkspaceConversationRuntime.executeListTurn" in pages_source
+assert 'Object.freeze({ type: "ITEM", item_id: activeCandidateWorkspaceItemId })' in pages_source
 truth_source = (ROOT / "public" / "truth-persistence-domain.js").read_text(encoding="utf-8")
 assert 'name: "conversation_sessions"' in truth_source
 assert 'name: "conversation_messages"' in truth_source

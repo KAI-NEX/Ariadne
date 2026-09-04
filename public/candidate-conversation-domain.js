@@ -21,6 +21,10 @@
   const ITEM_FIELDS = Object.freeze([...ContractManifest.canonical_item_fields]);
   const CLEARABLE_ITEM_FIELDS = Object.freeze([...ContractManifest.canonical_clearable_item_fields]);
   const UNCERTAINTY_STATUSES = Object.freeze([...ContractManifest.uncertainty_statuses]);
+  const FIELD_IDENTITY = ContractManifest.field_identity_contract;
+  const FIELD_DISPLAY_LABELS = Object.freeze({ ...FIELD_IDENTITY.canonical_display_labels });
+  const ITEM_FIELD_SEMANTIC_KEYS = Object.freeze({ ...FIELD_IDENTITY.item_field_semantic_keys });
+  const FACT_LABEL_SEMANTIC_KEYS = Object.freeze({ ...FIELD_IDENTITY.fact_label_semantic_keys });
   const LIMITS = ContractManifest.limits;
   const STATES = Object.freeze(["CREATED", "SENDING", "RECEIVED", "VALIDATING", "APPLIED", "NO_CHANGE", "NEEDS_CLARIFICATION", "FAILED", "CANCELLED", "STALE"]);
   const TERMINAL_STATES = Object.freeze(["APPLIED", "NO_CHANGE", "NEEDS_CLARIFICATION", "FAILED", "CANCELLED", "STALE"]);
@@ -76,72 +80,84 @@
     return requiredString(value, code, maximum);
   }
 
-  function semanticObject(value, required, optional, aliases, code = "SEMANTIC_SCHEMA_INVALID") {
-    if (!isPlainObject(value)) throw new CandidateConversationError(code);
-    const normalized = {};
-    Object.entries(value).forEach(([rawKey, rawValue]) => {
-      const key = aliases[rawKey] || rawKey;
-      if (![...required, ...optional].includes(key) || Object.hasOwn(normalized, key)) throw new CandidateConversationError(code);
-      normalized[key] = rawValue;
-    });
-    if (![...required].every((key) => Object.hasOwn(normalized, key))) throw new CandidateConversationError(code);
-    return normalized;
+  function normalizedFieldValue(value) {
+    return String(value ?? "").normalize("NFKC").trim().replace(/\s+/gu, " ");
   }
 
-  function semanticText(value, code, maximum = LIMITS.message) {
-    if (typeof value !== "string" || value.trim().length > maximum) throw new CandidateConversationError(code);
-    return value.trim();
+  function normalizedFieldLabel(value) {
+    return normalizedFieldValue(value).toLocaleLowerCase();
   }
 
-  function validateSemanticAction(rawAction) {
-    const semantic = ContractManifest.semantic_contract;
-    const top = semanticObject(rawAction, semantic.top_level_required, semantic.top_level_optional, semantic.key_aliases.top_level);
-    const action = top.action;
-    if (UNSUPPORTED_ACTIONS.includes(action) || !ACTIONS.includes(action)) throw new CandidateConversationError("UNSUPPORTED_ACTION");
-    const shape = semantic.action_shapes[action];
-    const message = semanticText(Object.hasOwn(top, "message") ? top.message : "", "ACTION_MESSAGE_SHAPE_INVALID");
-    if (shape.message === "REQUIRED_NONEMPTY_STRING" && !message) throw new CandidateConversationError("ACTION_MESSAGE_SHAPE_INVALID");
-    const clarification = Object.hasOwn(top, "clarification") ? top.clarification : semantic.defaults.clarification;
-    if (clarification !== null && (!semanticText(clarification, "ACTION_CLARIFICATION_SHAPE_INVALID", LIMITS.clarification))) {
-      throw new CandidateConversationError("ACTION_CLARIFICATION_SHAPE_INVALID");
+  function semanticKeyForFactLabel(label) {
+    return FACT_LABEL_SEMANTIC_KEYS[normalizedFieldLabel(label)] || FIELD_IDENTITY.unknown_legacy_semantic_key;
+  }
+
+  function readableLegacyLabel(label) {
+    const value = normalizedFieldValue(label);
+    if (!value) return null;
+    if (/[\u3400-\u9fff]/u.test(value)) return value;
+    if (/^[A-Za-z][A-Za-z ]{1,48}$/u.test(value)) return value;
+    return null;
+  }
+
+  function canonicalDisplayLabel(semanticKey, legacyLabel = null) {
+    if (semanticKey === FIELD_IDENTITY.unknown_legacy_semantic_key) {
+      return readableLegacyLabel(legacyLabel) || FIELD_IDENTITY.unknown_legacy_display_label;
     }
-    if (action === "ASK_CLARIFICATION" && (clarification === null || !String(clarification).trim())) throw new CandidateConversationError("ACTION_CLARIFICATION_SHAPE_INVALID");
-    if (action !== "ASK_CLARIFICATION" && clarification !== null) throw new CandidateConversationError("ACTION_CLARIFICATION_SHAPE_INVALID");
-    let rawPatches = Object.hasOwn(top, "patches") ? top.patches : semantic.defaults.patches;
-    if (isPlainObject(rawPatches) && semantic.allow_single_patch_object) rawPatches = [rawPatches];
-    if (!Array.isArray(rawPatches) || rawPatches.length > LIMITS.patches) throw new CandidateConversationError("ACTION_PATCH_SHAPE_INVALID");
-    const patches = rawPatches.map((rawPatch) => {
-      const patch = semanticObject(rawPatch, semantic.patch_required, semantic.patch_optional, semantic.key_aliases.patch, "ACTION_PATCH_SHAPE_INVALID");
-      if (Object.hasOwn(patch, "target_item_id")) requiredString(patch.target_item_id, "INVALID_TARGET", LIMITS.identifier);
-      if (!Array.isArray(patch.changes) || !patch.changes.length || patch.changes.length > LIMITS.changes_per_patch) throw new CandidateConversationError("ACTION_PATCH_SHAPE_INVALID");
-      return {
-        ...patch,
-        changes: patch.changes.map((rawChange) => {
-          const change = semanticObject(rawChange, semantic.change_required, semantic.change_optional, semantic.key_aliases.change, "SEMANTIC_SCHEMA_INVALID");
-          if (!semantic.intents.includes(change.intent)) throw new CandidateConversationError("UNSUPPORTED_OPERATION");
-          if (typeof change.concept !== "string" || !change.concept.trim()) throw new CandidateConversationError("SEMANTIC_SCHEMA_INVALID");
-          const concept = semantic.concept_aliases[change.concept.trim()] || change.concept.trim();
-          if (!semantic.concepts.includes(concept)) throw new CandidateConversationError("UNKNOWN_CONCEPT");
-          if (change.intent === "SET" && !semanticText(change.value, "SEMANTIC_SCHEMA_INVALID")) throw new CandidateConversationError("SEMANTIC_SCHEMA_INVALID");
-          if (change.intent === "CLEAR" && (Object.hasOwn(change, "value") || Object.hasOwn(change, "reference_id"))) throw new CandidateConversationError("SEMANTIC_SCHEMA_INVALID");
-          if (change.intent === "SET_STATUS" && (!semanticText(change.value, "SEMANTIC_SCHEMA_INVALID", 64) || !requiredString(change.reference_id, "INVALID_OPERATION_TARGET", LIMITS.identifier))) throw new CandidateConversationError("SEMANTIC_SCHEMA_INVALID");
-          return { ...change, concept };
-        }),
-      };
+    return FIELD_DISPLAY_LABELS[semanticKey] || FIELD_IDENTITY.unknown_legacy_display_label;
+  }
+
+  function candidateFieldDescriptors(item) {
+    if (!isPlainObject(item) || typeof item.item_id !== "string" || !item.item_id.trim()) {
+      throw new CandidateConversationError("INVALID_TARGET");
+    }
+    const itemIdentity = item.item_id.trim();
+    const descriptors = Object.entries(ITEM_FIELD_SEMANTIC_KEYS).map(([field, semanticKey]) => Object.freeze({
+      canonical_target_identity: `item:${itemIdentity}:field:${field}`,
+      item_identity: itemIdentity,
+      storage_target: Object.freeze({ kind: "ITEM_FIELD", field }),
+      semantic_key: semanticKey,
+      canonical_display_label: canonicalDisplayLabel(semanticKey),
+      current_value: item[field] ?? null,
+    }));
+    (item.facts || []).forEach((fact) => {
+      if (!isPlainObject(fact) || typeof fact.fact_id !== "string" || !fact.fact_id.trim()) return;
+      const semanticKey = semanticKeyForFactLabel(fact.label);
+      descriptors.push(Object.freeze({
+        canonical_target_identity: `item:${itemIdentity}:fact:${fact.fact_id.trim()}`,
+        item_identity: itemIdentity,
+        storage_target: Object.freeze({ kind: "FACT", fact_id: fact.fact_id.trim() }),
+        semantic_key: semanticKey,
+        canonical_display_label: canonicalDisplayLabel(semanticKey, fact.label),
+        current_value: fact.value ?? null,
+      }));
     });
-    if (patches.length < shape.patches.minimum || patches.length > shape.patches.maximum) throw new CandidateConversationError("ACTION_CARDINALITY_INVALID");
-    let noChangeBasis = null;
-    if (shape.no_change_basis === "REQUIRED_CURRENT_VALUE_ASSERTION") {
-      const basis = semanticObject(top.no_change_basis, semantic.no_change_basis_required, semantic.no_change_basis_optional, {}, "NO_CHANGE_BASIS_SHAPE_INVALID");
-      const concept = typeof basis.concept === "string" ? (semantic.concept_aliases[basis.concept.trim()] || basis.concept.trim()) : "";
-      if (!concept || !semantic.concepts.includes(concept) || !requiredString(basis.target_item_id, "INVALID_TARGET", LIMITS.identifier) || !requiredString(basis.value, "NO_CHANGE_BASIS_SHAPE_INVALID")) {
-        throw new CandidateConversationError("NO_CHANGE_BASIS_SHAPE_INVALID");
-      }
-      noChangeBasis = { target_item_id: basis.target_item_id.trim(), concept, value: basis.value.trim() };
-    } else if (Object.hasOwn(top, "no_change_basis")) {
-      throw new CandidateConversationError("NO_CHANGE_BASIS_SHAPE_INVALID");
+    (item.uncertainties || []).forEach((entry) => {
+      if (!isPlainObject(entry) || typeof entry.uncertainty_id !== "string" || !entry.uncertainty_id.trim()) return;
+      descriptors.push(Object.freeze({
+        canonical_target_identity: `item:${itemIdentity}:uncertainty:${entry.uncertainty_id.trim()}`,
+        item_identity: itemIdentity,
+        storage_target: Object.freeze({ kind: "UNCERTAINTY", uncertainty_id: entry.uncertainty_id.trim() }),
+        semantic_key: "UNCERTAINTY_STATUS",
+        canonical_display_label: canonicalDisplayLabel("UNCERTAINTY_STATUS"),
+        current_value: entry.status ?? null,
+      }));
+    });
+    return Object.freeze(descriptors);
+  }
+
+  function fieldDescriptorForOperation(item, operation) {
+    const descriptors = candidateFieldDescriptors(item);
+    if (operation.operation === "SET_ITEM_FIELD" || operation.operation === "CLEAR_ITEM_FIELD") {
+      return descriptors.find((descriptor) => descriptor.storage_target.kind === "ITEM_FIELD" && descriptor.storage_target.field === operation.field) || null;
     }
-    return Object.freeze({ action, message, patches: Object.freeze(patches), clarification: clarification === null ? null : clarification.trim(), no_change_basis: noChangeBasis });
+    if (operation.operation === "SET_FACT_VALUE") {
+      return descriptors.find((descriptor) => descriptor.storage_target.kind === "FACT" && descriptor.storage_target.fact_id === operation.fact_id) || null;
+    }
+    if (operation.operation === "SET_UNCERTAINTY_STATUS") {
+      return descriptors.find((descriptor) => descriptor.storage_target.kind === "UNCERTAINTY" && descriptor.storage_target.uncertainty_id === operation.uncertainty_id) || null;
+    }
+    return null;
   }
 
   function canonicalJson(value) {
@@ -438,6 +454,7 @@
       state: "CREATED",
       state_history: Object.freeze([{ state: "CREATED", at }]),
       failure_code: null,
+      failure_diagnostics: null,
       result_action: null,
       created_at: at,
       updated_at: at,
@@ -445,7 +462,7 @@
     });
   }
 
-  function transitionExecution(execution, nextState, { at = new Date(), failure_code: failureCode = null, result_action: resultAction = null } = {}) {
+  function transitionExecution(execution, nextState, { at = new Date(), failure_code: failureCode = null, failure_diagnostics: failureDiagnostics = null, result_action: resultAction = null } = {}) {
     if (!STATES.includes(execution?.state) || TERMINAL_STATES.includes(execution.state)) throw new CandidateConversationError("TURN_STATE_INVALID");
     const transitions = { CREATED: ["SENDING", "CANCELLED", "FAILED"], SENDING: ["RECEIVED", "CANCELLED", "FAILED"], RECEIVED: ["VALIDATING", "CANCELLED", "FAILED"], VALIDATING: TERMINAL_STATES };
     if (!transitions[execution.state]?.includes(nextState)) throw new CandidateConversationError("TURN_TRANSITION_INVALID");
@@ -455,6 +472,7 @@
       ...clone(execution), state: nextState,
       state_history: Object.freeze([...(execution.state_history || []), { state: nextState, at: timestamp }]),
       failure_code: nextState === "FAILED" ? failureCode : null,
+      failure_diagnostics: nextState === "FAILED" ? failureDiagnostics : null,
       result_action: resultAction,
       updated_at: timestamp,
       cancelled_at: nextState === "CANCELLED" ? timestamp : null,
@@ -483,8 +501,10 @@
     CONTRACT_ID, ACTION_CONTRACT_ID, OPERATION, SUBJECT_TYPE, ACTIONS, UNSUPPORTED_ACTIONS, OPERATIONS,
     ITEM_FIELDS, CLEARABLE_ITEM_FIELDS, UNCERTAINTY_STATUSES, STATES, TERMINAL_STATES, FAILURES,
     CONTRACT_MANIFEST: ContractManifest, LIMITS,
+    FIELD_DISPLAY_LABELS, ITEM_FIELD_SEMANTIC_KEYS, FACT_LABEL_SEMANTIC_KEYS,
     CandidateConversationError, conversationIdFor, createSession, validateSession, validateFocus,
-    createObservation, observedWorkingModel, assertCurrentObservation, draftFingerprintFor, hasExplicitMultiIntent, validateSemanticAction,
+    createObservation, observedWorkingModel, assertCurrentObservation, draftFingerprintFor, hasExplicitMultiIntent,
+    normalizedFieldValue, semanticKeyForFactLabel, canonicalDisplayLabel, candidateFieldDescriptors, fieldDescriptorForOperation,
     validateAction, provenanceFor, applyAction, createTurnExecution, transitionExecution,
     cancelExecution, applyExecutionResult,
   });

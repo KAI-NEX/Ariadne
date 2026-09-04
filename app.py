@@ -53,6 +53,7 @@ from src.candidate_conversation_runtime import (
     CandidateConversationRuntimeError,
     execute_candidate_conversation_request,
     validate_candidate_conversation_request,
+    candidate_conversation_runtime_signature,
 )
 
 
@@ -318,6 +319,36 @@ def read_deepseek_key() -> str | None:
         timeout=15,
     )
     return result.stdout.strip() if result.returncode == 0 and result.stdout.strip() else None
+
+
+def candidate_conversation_failure_diagnostics(error: CandidateConversationRuntimeError) -> dict:
+    """Persistable/public allowlist; never forwards Provider or Candidate payloads."""
+    raw = error.diagnostics if isinstance(error.diagnostics, dict) else {}
+    result = {
+        "stage": raw.get("stage") if isinstance(raw.get("stage"), str) else "RUNTIME",
+        "error_code": error.code,
+        "provider_called": error.network_call_made is True,
+        "provider_response_received": error.network_call_made is True and error.code not in {"PROVIDER_HTTP_ERROR", "PROVIDER_TRANSPORT_ERROR"},
+        "json_parse_passed": raw.get("stage") not in {"PROVIDER_ENVELOPE", "MODEL_IDENTITY", "FINISH_REASON", "JSON_PARSE"},
+        "semantic_schema_passed": raw.get("stage") not in {"PROVIDER_ENVELOPE", "MODEL_IDENTITY", "FINISH_REASON", "JSON_PARSE", "SEMANTIC_SCHEMA"},
+        "resolution_passed": raw.get("stage") not in {"PROVIDER_ENVELOPE", "MODEL_IDENTITY", "FINISH_REASON", "JSON_PARSE", "SEMANTIC_SCHEMA", "RESOLUTION"},
+        "canonical_schema_passed": raw.get("stage") not in {"PROVIDER_ENVELOPE", "MODEL_IDENTITY", "FINISH_REASON", "JSON_PARSE", "SEMANTIC_SCHEMA", "RESOLUTION", "CANONICAL_SCHEMA"},
+        "semantic_guard_passed": raw.get("stage") not in {"SEMANTIC_GUARD", "STALE", "AUTHORITY"},
+        "persistence_reached": False,
+        "runtime_signature_compatible": True,
+    }
+    for key in ("field_category", "action_type"):
+        if isinstance(raw.get(key), str): result[key] = raw[key]
+    for key in ("provider_http_status", "content_length", "prompt_tokens", "completion_tokens", "total_tokens", "reasoning_content_length"):
+        if raw.get(key) is None or isinstance(raw.get(key), int): result[key] = raw.get(key)
+    for key in ("exact_returned_model_match", "reasoning_content_present", "refusal_present", "tool_calls_present"):
+        if isinstance(raw.get(key), bool): result[key] = raw[key]
+    for key in ("finish_reason", "content_type", "empty_response_classification"):
+        if isinstance(raw.get(key), str) and len(raw[key]) <= 128: result[key] = raw[key]
+    if isinstance(raw.get("message_key_names"), list) and len(raw["message_key_names"]) <= 32:
+        key_names = [name for name in raw["message_key_names"] if isinstance(name, str) and len(name) <= 128]
+        if len(key_names) == len(raw["message_key_names"]): result["message_key_names"] = key_names
+    return result
 
 
 def call_deepseek_chat_completions(api_key: str, payload: dict, *, response_limit: int, timeout: int = 240) -> tuple[int, dict]:
@@ -815,6 +846,9 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/runtime-options":
             self.runtime_options()
             return
+        if parsed.path == "/api/candidate-conversation-runtime-signature":
+            self.send_json(HTTPStatus.OK, {"runtime_signature": candidate_conversation_runtime_signature(), "network_call_made": False})
+            return
         if parsed.path == "/api/ai-career-ingestion-config":
             self.send_json(HTTPStatus.OK, {
                 "providers": provider_catalog({"deepseek": bool(read_deepseek_key()), "gemini": bool(read_gemini_key())}),
@@ -1113,7 +1147,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             status = HTTPStatus.PRECONDITION_REQUIRED if error.failure_layer == "credential" else HTTPStatus.BAD_GATEWAY if error.failure_layer in {"provider", "transport"} else HTTPStatus.UNPROCESSABLE_ENTITY
             self.send_json(status, {
                 "error": error.code, "failure_layer": error.failure_layer,
-                "network_call_made": error.network_call_made, "diagnostics": error.diagnostics,
+                "network_call_made": error.network_call_made, "diagnostics": candidate_conversation_failure_diagnostics(error),
                 "persistence": "not_written",
             })
             return

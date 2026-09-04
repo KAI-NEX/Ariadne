@@ -68,32 +68,6 @@ function expect(code, callback) {
   assert.throws(callback, (error) => error instanceof Conversation.CandidateConversationError && error.code === code);
 }
 
-// The browser-facing contract reads the same manifest as the Python adapter.
-// Every action's message semantics are explicit; only ASK permits omission/empty.
-const semanticNoChangeBasis = { target_item_id: "item-edu-001", concept: "institution_name", value: "Royal College of Art RCA" };
-const semanticFixtures = {
-  PATCH_ITEM: { action: "PATCH_ITEM", message: "Updated synthetic title.", patches: [{ target_item_id: "item-edu-001", changes: [{ intent: "SET", concept: "school_name", value: "Royal College of Art" }] }] },
-  PATCH_MULTIPLE_ITEMS: { action: "PATCH_MULTIPLE_ITEMS", message: "Updated synthetic titles.", patches: [
-    { target_item_id: "item-edu-001", changes: [{ intent: "SET", concept: "school_name", value: "Royal College of Art" }] },
-    { target_item_id: "item-edu-002", changes: [{ intent: "SET", concept: "school_name", value: "Service Design Exchange — Royal College of Art" }] },
-  ] },
-  ASK_CLARIFICATION: { action: "ASK_CLARIFICATION", message: "", clarification: "Which synthetic item do you mean?", patches: [] },
-  EXPLAIN: { action: "EXPLAIN", message: "Synthetic explanation.", patches: [] },
-  NO_CHANGE: { action: "NO_CHANGE", message: "Synthetic value already matches.", patches: [], no_change_basis: semanticNoChangeBasis },
-};
-for (const [actionType, fixture] of Object.entries(semanticFixtures)) {
-  assert.equal(Conversation.validateSemanticAction(fixture).action, actionType);
-  const missing = { ...fixture }; delete missing.message;
-  if (actionType === "ASK_CLARIFICATION") assert.equal(Conversation.validateSemanticAction(missing).message, "");
-  else expect("ACTION_MESSAGE_SHAPE_INVALID", () => Conversation.validateSemanticAction(missing));
-  for (const malformed of [null, "", "   ", "x".repeat(manifest.limits.message + 1), 7]) {
-    const candidate = { ...fixture, message: malformed };
-    if (actionType === "ASK_CLARIFICATION" && ["", "   "].includes(malformed)) assert.equal(Conversation.validateSemanticAction(candidate).message, "");
-    else expect("ACTION_MESSAGE_SHAPE_INVALID", () => Conversation.validateSemanticAction(candidate));
-  }
-}
-expect("NO_CHANGE_BASIS_SHAPE_INVALID", () => Conversation.validateSemanticAction({ action: "NO_CHANGE", message: "Synthetic value already matches.", patches: [] }));
-
 Conversation.validateAction(action(candidateObservation, "NO_CHANGE", [], "No change is needed."), { observation: candidateObservation, working_model: working, human_message: "保持不变" });
 Conversation.validateAction(action(candidateObservation, "ASK_CLARIFICATION", [], "", "你指的是哪张卡片？"), { observation: candidateObservation, working_model: working, human_message: "改一下" });
 Conversation.validateAction(action(candidateObservation, "EXPLAIN", [], "Synthetic explanation."), { observation: candidateObservation, working_model: working, human_message: "解释一下" });
@@ -136,6 +110,11 @@ const multiApplied = await Conversation.applyAction({
   human_message: "把所有教育项目里的 RCA 都统一展开。", created_at: "2026-09-03T07:06:00Z",
 });
 assert.deepEqual(multiApplied.working_model.payload.items.map((item) => item.item_version), [2, 2]);
+const itemFocusedMultiApplied = await Conversation.applyAction({
+  action: action(itemObservation, "PATCH_MULTIPLE_ITEMS", patches), observation: itemObservation, session, current_working_model: working,
+  human_message: "把所有教育项目里的 RCA 都统一展开。", created_at: "2026-09-03T07:06:01Z",
+});
+assert.deepEqual(itemFocusedMultiApplied.working_model.payload.items.map((item) => item.item_version), [2, 2]);
 
 // Atomic fail: one invalid target means no returned Working state and the input remains untouched.
 const invalidMulti = action(candidateObservation, "PATCH_MULTIPLE_ITEMS", [patches[0], patch("missing-item", { operation: "SET_ITEM_FIELD", field: "title", value: "No" })]);
@@ -177,7 +156,38 @@ assert.equal(draftApplication.mutation, "ITEM_DRAFT_ONLY");
 assert.equal(draftApplication.working_model.working_model_id, working.working_model_id);
 assert.equal(draftApplication.draft.item.subtitle, null);
 
+// Semantic Field Identity is a deterministic projection, not a persisted facts[] migration.
+const descriptorItem = {
+  ...structuredClone(working.payload.items[0]),
+  item_id: "synthetic-field-identity-item",
+  subtitle: "Design Research",
+  facts: [
+    { fact_id: "synthetic-role", label: "position", value: "Designer" },
+    { fact_id: "synthetic-arrangement", label: "employment type", value: "Part-time" },
+    { fact_id: "synthetic-supplemental", label: "Supplemental Information", value: "Synthetic note" },
+    { fact_id: "synthetic-legacy", label: "unknown-a", value: "2025" },
+  ],
+};
+const descriptors = Conversation.candidateFieldDescriptors(descriptorItem);
+const byField = (field) => descriptors.find((descriptor) => descriptor.storage_target.kind === "ITEM_FIELD" && descriptor.storage_target.field === field);
+const byFact = (factId) => descriptors.find((descriptor) => descriptor.storage_target.kind === "FACT" && descriptor.storage_target.fact_id === factId);
+assert.equal(byField("title").canonical_display_label, "标题");
+assert.equal(byField("subtitle").semantic_key, "SUBTITLE");
+assert.equal(byField("subtitle").canonical_display_label, "副标题");
+assert.equal(byField("time").canonical_display_label, "时间");
+assert.equal(byField("summary").canonical_display_label, "摘要");
+assert.equal(byFact("synthetic-role").canonical_display_label, "角色");
+assert.equal(byFact("synthetic-arrangement").canonical_display_label, "工作性质");
+assert.equal(byFact("synthetic-supplemental").semantic_key, "SUPPLEMENTAL_INFORMATION");
+assert.equal(byFact("synthetic-supplemental").canonical_display_label, "补充信息");
+assert.equal(byFact("synthetic-legacy").semantic_key, "UNKNOWN_LEGACY");
+assert.equal(byFact("synthetic-legacy").canonical_display_label, "未分类信息");
+assert.notEqual(byFact("synthetic-legacy").canonical_display_label, "补充信息");
+assert.equal(Conversation.canonicalDisplayLabel("ROLE"), "角色");
+assert.equal(Conversation.canonicalDisplayLabel("ROLE"), byFact("synthetic-role").canonical_display_label);
+
 const source = fs.readFileSync(path.join(root, "public", "v1-pages.js"), "utf8");
-assert.match(source, /fetch\("\/api\/candidate-conversation-turn"/); // Slice A wires only the Workspace list root.
-assert.match(source, /applyCandidateWorkspaceCorrection/); // Frozen Detail behavior remains for Slice B.
+assert.match(source, /fetch\("\/api\/candidate-conversation-turn"/); // Workspace List and Detail share the real conversation route.
+assert.doesNotMatch(source, /applyCandidateWorkspaceCorrection/);
+assert.equal(typeof Conversation.validateSemanticAction, "undefined"); // Provider semantics are server-owned; browser keeps canonical validation.
 console.log("candidate_conversation_domain=pass");

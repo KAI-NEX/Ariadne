@@ -1,9 +1,22 @@
 {
-  "manifest_version": "ariadne-candidate-conversation-contract-manifest-v1",
-  "semantic_action_version": "ariadne-semantic-candidate-action-v1",
+  "manifest_version": "ariadne-candidate-conversation-contract-manifest-v3",
+  "semantic_action_version": "ariadne-semantic-candidate-action-v3",
+  "runtime_contracts": {
+    "request_contract_version": "ariadne-candidate-conversation-runtime-request-v3",
+    "result_contract_version": "ariadne-candidate-conversation-runtime-result-v3",
+    "adapter_version": "deepseek-candidate-conversation-v3",
+    "prompt_version": "candidate-conversation-semantic-prompt-v3",
+    "request_config_version": "deepseek-candidate-conversation-request-v3"
+  },
   "canonical_action_version": "ariadne-candidate-conversation-action-v1",
   "actions": [
     "NO_CHANGE",
+    "PATCH_ITEM",
+    "PATCH_MULTIPLE_ITEMS",
+    "ASK_CLARIFICATION",
+    "EXPLAIN"
+  ],
+  "semantic_actions": [
     "PATCH_ITEM",
     "PATCH_MULTIPLE_ITEMS",
     "ASK_CLARIFICATION",
@@ -33,6 +46,102 @@
     "time",
     "ownership"
   ],
+  "field_identity_contract": {
+    "canonical_display_labels": {
+      "TITLE": "标题",
+      "SUBTITLE": "副标题",
+      "TIME": "时间",
+      "SUMMARY": "摘要",
+      "OWNERSHIP": "负责内容",
+      "ROLE": "角色",
+      "WORK_ARRANGEMENT": "工作性质",
+      "LOCATION": "地点",
+      "ORGANIZATION_OR_INSTITUTION": "机构",
+      "CAPABILITY": "技术",
+      "RESPONSIBILITY": "职责",
+      "OUTCOME": "成果",
+      "CONTEXT": "背景",
+      "EDUCATION_DETAIL": "教育信息",
+      "SUPPLEMENTAL_INFORMATION": "补充信息",
+      "UNKNOWN_LEGACY": "未分类信息",
+      "UNCERTAINTY_STATUS": "待确认状态"
+    },
+    "item_field_semantic_keys": {
+      "title": "TITLE",
+      "subtitle": "SUBTITLE",
+      "time": "TIME",
+      "summary": "SUMMARY",
+      "ownership": "OWNERSHIP"
+    },
+    "fact_label_semantic_keys": {
+      "role": "ROLE",
+      "角色": "ROLE",
+      "position": "ROLE",
+      "职位": "ROLE",
+      "职务": "ROLE",
+      "work arrangement": "WORK_ARRANGEMENT",
+      "employment type": "WORK_ARRANGEMENT",
+      "工作方式": "WORK_ARRANGEMENT",
+      "工作性质": "WORK_ARRANGEMENT",
+      "location": "LOCATION",
+      "地点": "LOCATION",
+      "所在地": "LOCATION",
+      "organization": "ORGANIZATION_OR_INSTITUTION",
+      "company": "ORGANIZATION_OR_INSTITUTION",
+      "institution": "ORGANIZATION_OR_INSTITUTION",
+      "school": "ORGANIZATION_OR_INSTITUTION",
+      "机构": "ORGANIZATION_OR_INSTITUTION",
+      "公司": "ORGANIZATION_OR_INSTITUTION",
+      "学校": "ORGANIZATION_OR_INSTITUTION",
+      "keywords": "CAPABILITY",
+      "skills": "CAPABILITY",
+      "skill": "CAPABILITY",
+      "technology": "CAPABILITY",
+      "technologies": "CAPABILITY",
+      "tech stack": "CAPABILITY",
+      "technology stack": "CAPABILITY",
+      "技能": "CAPABILITY",
+      "核心能力": "CAPABILITY",
+      "技术": "CAPABILITY",
+      "技术栈": "CAPABILITY",
+      "responsibilities": "RESPONSIBILITY",
+      "responsibility": "RESPONSIBILITY",
+      "职责": "RESPONSIBILITY",
+      "achievements": "OUTCOME",
+      "achievement": "OUTCOME",
+      "outputs": "OUTCOME",
+      "outcomes": "OUTCOME",
+      "result": "OUTCOME",
+      "成果": "OUTCOME",
+      "产出": "OUTCOME",
+      "结果": "OUTCOME",
+      "context": "CONTEXT",
+      "background": "CONTEXT",
+      "背景": "CONTEXT",
+      "上下文": "CONTEXT",
+      "area": "EDUCATION_DETAIL",
+      "major": "EDUCATION_DETAIL",
+      "degree": "EDUCATION_DETAIL",
+      "score": "EDUCATION_DETAIL",
+      "专业": "EDUCATION_DETAIL",
+      "学位": "EDUCATION_DETAIL",
+      "成绩": "EDUCATION_DETAIL",
+      "rawdate": "TIME",
+      "date": "TIME",
+      "time": "TIME",
+      "year": "TIME",
+      "日期": "TIME",
+      "时间": "TIME",
+      "年份": "TIME",
+      "summary": "SUMMARY",
+      "摘要": "SUMMARY",
+      "supplemental information": "SUPPLEMENTAL_INFORMATION",
+      "supplemental": "SUPPLEMENTAL_INFORMATION",
+      "补充信息": "SUPPLEMENTAL_INFORMATION"
+    },
+    "unknown_legacy_semantic_key": "UNKNOWN_LEGACY",
+    "unknown_legacy_display_label": "未分类信息"
+  },
   "uncertainty_statuses": [
     "OPEN",
     "RESOLVED",
@@ -98,14 +207,13 @@
     "top_level_optional": [
       "message",
       "patches",
-      "clarification",
-      "no_change_basis"
+      "clarification"
     ],
     "patch_required": [
       "changes"
     ],
     "patch_optional": [
-      "target_item_id"
+      "card_ref"
     ],
     "change_required": [
       "intent",
@@ -113,14 +221,8 @@
     ],
     "change_optional": [
       "value",
-      "reference_id"
+      "selector"
     ],
-    "no_change_basis_required": [
-      "target_item_id",
-      "concept",
-      "value"
-    ],
-    "no_change_basis_optional": [],
     "intents": [
       "SET",
       "CLEAR",
@@ -129,12 +231,17 @@
     "concepts": [
       "institution_name",
       "organization_name",
+      "experience_title",
+      "item_title",
+      "subtitle",
       "role_title",
       "time_range",
       "summary",
       "work_arrangement",
       "location",
       "ownership",
+      "referenced_field",
+      "supplemental_information",
       "uncertainty_status"
     ],
     "concept_aliases": {
@@ -144,21 +251,25 @@
       "organization": "organization_name",
       "company": "organization_name",
       "company_name": "organization_name",
+      "experience": "experience_title",
+      "experience_name": "experience_title",
+      "card_title": "item_title",
+      "title": "item_title",
+      "secondary_title": "subtitle",
       "role": "role_title",
+      "position": "role_title",
       "job_title": "role_title",
       "date_range": "time_range",
-      "period": "time_range"
+      "period": "time_range",
+      "field_by_current_value": "referenced_field",
+      "other_field": "referenced_field",
+      "supplemental": "supplemental_information",
+      "other": "supplemental_information"
     },
     "key_aliases": {
-      "top_level": {
-        "patch": "patches"
-      },
-      "patch": {
-        "target": "target_item_id"
-      },
-      "change": {
-        "concept_name": "concept"
-      }
+      "top_level": {},
+      "patch": {},
+      "change": {}
     },
     "defaults": {
       "patches": [],
@@ -166,37 +277,26 @@
     },
     "action_shapes": {
       "PATCH_ITEM": {
-        "message": "REQUIRED_NONEMPTY_STRING",
+        "message": "OMITTED",
         "clarification": "OMITTED_OR_NULL",
-        "patches": { "minimum": 1, "maximum": 1 },
-        "no_change_basis": "OMITTED"
+        "patches": { "minimum": 1, "maximum": 1 }
       },
       "PATCH_MULTIPLE_ITEMS": {
-        "message": "REQUIRED_NONEMPTY_STRING",
+        "message": "OMITTED",
         "clarification": "OMITTED_OR_NULL",
-        "patches": { "minimum": 2, "maximum": 32 },
-        "no_change_basis": "OMITTED"
+        "patches": { "minimum": 2, "maximum": 32 }
       },
       "ASK_CLARIFICATION": {
-        "message": "OPTIONAL_STRING_EMPTY_ALLOWED",
+        "message": "OMITTED",
         "clarification": "REQUIRED_NONEMPTY_STRING",
-        "patches": { "minimum": 0, "maximum": 0 },
-        "no_change_basis": "OMITTED"
+        "patches": { "minimum": 0, "maximum": 0 }
       },
       "EXPLAIN": {
         "message": "REQUIRED_NONEMPTY_STRING",
         "clarification": "OMITTED_OR_NULL",
-        "patches": { "minimum": 0, "maximum": 0 },
-        "no_change_basis": "OMITTED"
-      },
-      "NO_CHANGE": {
-        "message": "REQUIRED_NONEMPTY_STRING",
-        "clarification": "OMITTED_OR_NULL",
-        "patches": { "minimum": 0, "maximum": 0 },
-        "no_change_basis": "REQUIRED_CURRENT_VALUE_ASSERTION"
+        "patches": { "minimum": 0, "maximum": 0 }
       }
-    },
-    "allow_single_patch_object": true
+    }
   },
   "concept_mappings": [
     {
@@ -236,7 +336,7 @@
       ]
     },
     {
-      "concept": "role_title",
+      "concept": "experience_title",
       "item_types": [
         "WORK",
         "WORK_EXPERIENCE"
@@ -248,6 +348,30 @@
       "destination": {
         "kind": "ITEM_FIELD",
         "field": "title"
+      },
+      "allowed_intents": [
+        "SET"
+      ]
+    },
+    {
+      "concept": "role_title",
+      "item_types": [
+        "WORK",
+        "WORK_EXPERIENCE"
+      ],
+      "item_subtypes": [
+        "employment",
+        "work_experience"
+      ],
+      "destination": {
+        "kind": "FACT_BY_LABEL",
+        "labels": [
+          "role",
+          "角色",
+          "position",
+          "职位",
+          "职务"
+        ]
       },
       "allowed_intents": [
         "SET"
@@ -324,6 +448,58 @@
           "工作方式",
           "工作性质"
         ]
+      },
+      "allowed_intents": [
+        "SET"
+      ]
+    },
+    {
+      "concept": "item_title",
+      "item_types": [
+        "*"
+      ],
+      "destination": {
+        "kind": "ITEM_FIELD",
+        "field": "title"
+      },
+      "allowed_intents": [
+        "SET"
+      ]
+    },
+    {
+      "concept": "subtitle",
+      "item_types": [
+        "*"
+      ],
+      "destination": {
+        "kind": "ITEM_FIELD",
+        "field": "subtitle"
+      },
+      "allowed_intents": [
+        "SET",
+        "CLEAR"
+      ]
+    },
+    {
+      "concept": "referenced_field",
+      "item_types": [
+        "*"
+      ],
+      "destination": {
+        "kind": "DESCRIPTOR_BY_VALUE"
+      },
+      "allowed_intents": [
+        "SET"
+      ]
+    },
+    {
+      "concept": "supplemental_information",
+      "item_types": [
+        "*"
+      ],
+      "destination": {
+        "kind": "FIELD_BY_SEMANTIC_KEY",
+        "semantic_key": "SUPPLEMENTAL_INFORMATION"
       },
       "allowed_intents": [
         "SET"

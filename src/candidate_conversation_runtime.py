@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import hashlib
 import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
@@ -24,9 +25,6 @@ from src.truth_persistence import TruthPersistenceError, validate_candidate_work
 PROVIDER_ID = "deepseek"
 MODEL_ID = "deepseek-v4-pro"
 PROTOCOL = OPENAI_CHAT_COMPLETIONS
-ADAPTER_VERSION = "deepseek-candidate-conversation-v1"
-PROMPT_VERSION = "candidate-conversation-semantic-prompt-v1"
-REQUEST_CONFIG_VERSION = "deepseek-candidate-conversation-request-v1"
 CAPABILITY_BASIS = "adapter_verified"
 CREDENTIAL_REF = "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision"
 OPERATION = "CANDIDATE_CONVERSATION_TURN"
@@ -35,6 +33,13 @@ SUBJECT_TYPE = "CANDIDATE"
 
 CONTRACT_MANIFEST_PATH = Path(__file__).resolve().parents[1] / "data" / "candidate_conversation_contract_v1.json"
 CONTRACT_MANIFEST = json.loads(CONTRACT_MANIFEST_PATH.read_text(encoding="utf-8"))
+MANIFEST_VERSION = CONTRACT_MANIFEST["manifest_version"]
+RUNTIME_CONTRACTS = CONTRACT_MANIFEST["runtime_contracts"]
+RUNTIME_REQUEST_CONTRACT_VERSION = RUNTIME_CONTRACTS["request_contract_version"]
+RUNTIME_RESULT_CONTRACT_VERSION = RUNTIME_CONTRACTS["result_contract_version"]
+ADAPTER_VERSION = RUNTIME_CONTRACTS["adapter_version"]
+PROMPT_VERSION = RUNTIME_CONTRACTS["prompt_version"]
+REQUEST_CONFIG_VERSION = RUNTIME_CONTRACTS["request_config_version"]
 ACTION_SCHEMA_VERSION = CONTRACT_MANIFEST["canonical_action_version"]
 SEMANTIC_ACTION_SCHEMA_VERSION = CONTRACT_MANIFEST["semantic_action_version"]
 ACTIONS = set(CONTRACT_MANIFEST["actions"])
@@ -49,9 +54,13 @@ PATCH_KEYS = set(CONTRACT_MANIFEST["canonical_keys"]["patch"])
 OPERATION_KEYS = {name: set(keys) for name, keys in CONTRACT_MANIFEST["canonical_keys"]["operations"].items()}
 LIMITS = CONTRACT_MANIFEST["limits"]
 SEMANTIC_CONTRACT = CONTRACT_MANIFEST["semantic_contract"]
-SEMANTIC_ACTIONS = set(CONTRACT_MANIFEST["actions"])
+SEMANTIC_ACTIONS = set(CONTRACT_MANIFEST["semantic_actions"])
 SEMANTIC_INTENTS = set(SEMANTIC_CONTRACT["intents"])
 SEMANTIC_CONCEPTS = set(SEMANTIC_CONTRACT["concepts"])
+FIELD_IDENTITY = CONTRACT_MANIFEST["field_identity_contract"]
+FIELD_DISPLAY_LABELS = FIELD_IDENTITY["canonical_display_labels"]
+ITEM_FIELD_SEMANTIC_KEYS = FIELD_IDENTITY["item_field_semantic_keys"]
+FACT_LABEL_SEMANTIC_KEYS = FIELD_IDENTITY["fact_label_semantic_keys"]
 DIAGNOSTIC_STAGES = {
     "PROVIDER_ENVELOPE", "MODEL_IDENTITY", "FINISH_REASON", "JSON_PARSE", "SEMANTIC_SCHEMA",
     "RESOLUTION", "CANONICAL_SCHEMA", "SEMANTIC_GUARD", "STALE", "AUTHORITY", "PERSISTENCE",
@@ -86,6 +95,20 @@ def _diagnostic(stage: str, code: str, field_category: str | None = None, action
 
 def _failure(code: str, layer: str, stage: str, field_category: str | None = None, action_type: Any = None) -> CandidateConversationRuntimeError:
     return CandidateConversationRuntimeError(code, layer, diagnostics=_diagnostic(stage, code, field_category, action_type))
+
+
+def candidate_conversation_runtime_signature() -> dict[str, str]:
+    """Public, allowlisted runtime identity used to prevent browser/server skew."""
+    return {
+        "manifest_version": MANIFEST_VERSION,
+        "semantic_action_schema_version": SEMANTIC_ACTION_SCHEMA_VERSION,
+        "canonical_action_schema_version": ACTION_SCHEMA_VERSION,
+        "runtime_request_contract_version": RUNTIME_REQUEST_CONTRACT_VERSION,
+        "runtime_result_contract_version": RUNTIME_RESULT_CONTRACT_VERSION,
+        "adapter_version": ADAPTER_VERSION,
+        "prompt_version": PROMPT_VERSION,
+        "request_config_version": REQUEST_CONFIG_VERSION,
+    }
 
 
 @dataclass(frozen=True)
@@ -160,6 +183,79 @@ def _string(value: Any, code: str = "EXACT_SCHEMA_FAILURE", maximum: int = 8000)
 
 def _has_explicit_multi_intent(message: str) -> bool:
     return any(pattern.search(message) for pattern in MULTI_INTENT_PATTERNS)
+
+
+def _normalized_field_value(value: Any) -> str:
+    return " ".join(unicodedata.normalize("NFKC", str(value if value is not None else "")).strip().split())
+
+
+def _normalized_field_label(value: Any) -> str:
+    return _normalized_field_value(value).casefold()
+
+
+def _semantic_key_for_fact_label(label: Any) -> str:
+    return FACT_LABEL_SEMANTIC_KEYS.get(_normalized_field_label(label), FIELD_IDENTITY["unknown_legacy_semantic_key"])
+
+
+def _readable_legacy_label(label: Any) -> str | None:
+    value = _normalized_field_value(label)
+    if not value:
+        return None
+    if re.search(r"[\u3400-\u9fff]", value):
+        return value
+    if re.fullmatch(r"[A-Za-z][A-Za-z ]{1,48}", value):
+        return value
+    return None
+
+
+def _canonical_display_label(semantic_key: str, legacy_label: Any = None) -> str:
+    if semantic_key == FIELD_IDENTITY["unknown_legacy_semantic_key"]:
+        return _readable_legacy_label(legacy_label) or FIELD_IDENTITY["unknown_legacy_display_label"]
+    return FIELD_DISPLAY_LABELS.get(semantic_key, FIELD_IDENTITY["unknown_legacy_display_label"])
+
+
+def candidate_field_descriptors(item: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Project stable runtime identities from the frozen Working item shape."""
+    item_identity = _string(item.get("item_id"), "INVALID_TARGET", LIMITS["identifier"])
+    descriptors: list[dict[str, Any]] = []
+    for field, semantic_key in ITEM_FIELD_SEMANTIC_KEYS.items():
+        descriptors.append({
+            "canonical_target_identity": f"item:{item_identity}:field:{field}",
+            "item_identity": item_identity,
+            "storage_target": {"kind": "ITEM_FIELD", "field": field},
+            "semantic_key": semantic_key,
+            "canonical_display_label": _canonical_display_label(semantic_key),
+            "current_value": item.get(field),
+        })
+    for fact in item.get("facts") or []:
+        if not isinstance(fact, Mapping) or not isinstance(fact.get("fact_id"), str) or not fact["fact_id"].strip():
+            continue
+        fact_identity = fact["fact_id"].strip()
+        semantic_key = _semantic_key_for_fact_label(fact.get("label"))
+        descriptors.append({
+            "canonical_target_identity": f"item:{item_identity}:fact:{fact_identity}",
+            "item_identity": item_identity,
+            "storage_target": {"kind": "FACT", "fact_id": fact_identity},
+            "semantic_key": semantic_key,
+            "canonical_display_label": _canonical_display_label(semantic_key, fact.get("label")),
+            "legacy_label": _readable_legacy_label(fact.get("label")),
+            "semantic_selector_values": [fact.get("label"), fact.get("value")],
+            "current_value": fact.get("value"),
+        })
+    for entry in item.get("uncertainties") or []:
+        if not isinstance(entry, Mapping) or not isinstance(entry.get("uncertainty_id"), str) or not entry["uncertainty_id"].strip():
+            continue
+        uncertainty_identity = entry["uncertainty_id"].strip()
+        descriptors.append({
+            "canonical_target_identity": f"item:{item_identity}:uncertainty:{uncertainty_identity}",
+            "item_identity": item_identity,
+            "storage_target": {"kind": "UNCERTAINTY", "uncertainty_id": uncertainty_identity},
+            "semantic_key": "UNCERTAINTY_STATUS",
+            "canonical_display_label": _canonical_display_label("UNCERTAINTY_STATUS"),
+            "semantic_selector_values": [entry.get("question"), entry.get("affects"), entry.get("status")],
+            "current_value": entry.get("status"),
+        })
+    return descriptors
 
 
 def _fingerprint(value: Any) -> str:
@@ -281,7 +377,7 @@ def validate_candidate_conversation_request(payload: Any) -> CandidateConversati
     base_keys = {"contract_id", "conversation", "human_message", "observation", "working_model", "runtime_snapshot", "draft", "turn"}
     if set(request) not in (base_keys, base_keys | {"compiled_context"}):
         raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation")
-    if request.get("contract_id") != f"{CONTRACT_ID}-runtime-request-v1":
+    if request.get("contract_id") != RUNTIME_REQUEST_CONTRACT_VERSION:
         raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation")
     conversation = _validate_conversation(request.get("conversation"))
     human_message = _string(request.get("human_message"), "HUMAN_MESSAGE_INVALID", LIMITS["human_message"])
@@ -453,7 +549,7 @@ def _semantic_object(
 
 
 def validate_semantic_candidate_action(raw_action: Any) -> dict[str, Any]:
-    """Validate and apply only manifest-declared representation normalization."""
+    """Validate the deliberately small model-facing semantic representation."""
     top_required = set(SEMANTIC_CONTRACT["top_level_required"])
     top_optional = set(SEMANTIC_CONTRACT["top_level_optional"])
     top_aliases = SEMANTIC_CONTRACT["key_aliases"]["top_level"]
@@ -467,38 +563,16 @@ def validate_semantic_candidate_action(raw_action: Any) -> dict[str, Any]:
     message = action.get("message", "")
     clarification = action.get("clarification", SEMANTIC_CONTRACT["defaults"]["clarification"])
     patches_value = action.get("patches", SEMANTIC_CONTRACT["defaults"]["patches"])
-    no_change_basis_value = action.get("no_change_basis")
-    if isinstance(patches_value, Mapping) and SEMANTIC_CONTRACT["allow_single_patch_object"]:
-        patches_value = [patches_value]
     if not isinstance(message, str) or len(message.strip()) > LIMITS["message"]:
         raise _failure("ACTION_MESSAGE_SHAPE_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.message", action_type)
     if action_shape["message"] == "REQUIRED_NONEMPTY_STRING" and not message.strip():
+        raise _failure("ACTION_MESSAGE_SHAPE_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.message", action_type)
+    if action_shape["message"] == "OMITTED" and "message" in action:
         raise _failure("ACTION_MESSAGE_SHAPE_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.message", action_type)
     if clarification is not None and (not isinstance(clarification, str) or not clarification.strip() or len(clarification.strip()) > LIMITS["clarification"]):
         raise _failure("ACTION_CLARIFICATION_SHAPE_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.clarification", action_type)
     if not isinstance(patches_value, list) or len(patches_value) > LIMITS["patches"]:
         raise _failure("ACTION_PATCH_SHAPE_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.patches", action_type)
-
-    no_change_basis = None
-    if action_shape["no_change_basis"] == "REQUIRED_CURRENT_VALUE_ASSERTION":
-        no_change_basis = _semantic_object(
-            no_change_basis_value,
-            set(SEMANTIC_CONTRACT["no_change_basis_required"]),
-            set(SEMANTIC_CONTRACT["no_change_basis_optional"]),
-            {},
-            "semantic_action.no_change_basis",
-            action_type,
-        )
-        target = _string(no_change_basis.get("target_item_id"), "INVALID_TARGET", LIMITS["identifier"])
-        concept_value = no_change_basis.get("concept")
-        if not isinstance(concept_value, str) or not concept_value.strip():
-            raise _failure("NO_CHANGE_BASIS_SHAPE_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.no_change_basis.concept", action_type)
-        concept = SEMANTIC_CONTRACT["concept_aliases"].get(concept_value.strip(), concept_value.strip())
-        if concept not in SEMANTIC_CONCEPTS:
-            raise _failure("UNKNOWN_CONCEPT", "contract_validation", "RESOLUTION", "semantic_action.no_change_basis.concept", action_type)
-        no_change_basis = {"target_item_id": target, "concept": concept, "value": _string(no_change_basis.get("value"), "NO_CHANGE_BASIS_SHAPE_INVALID", LIMITS["message"])}
-    elif no_change_basis_value is not None or "no_change_basis" in action:
-        raise _failure("NO_CHANGE_BASIS_SHAPE_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.no_change_basis", action_type)
 
     patch_required = set(SEMANTIC_CONTRACT["patch_required"])
     patch_optional = set(SEMANTIC_CONTRACT["patch_optional"])
@@ -509,9 +583,9 @@ def validate_semantic_candidate_action(raw_action: Any) -> dict[str, Any]:
     patches: list[dict[str, Any]] = []
     for patch_value in patches_value:
         semantic_patch = _semantic_object(patch_value, patch_required, patch_optional, patch_aliases, "semantic_action.patch", action_type)
-        target = semantic_patch.get("target_item_id")
-        if target is not None:
-            semantic_patch["target_item_id"] = _string(target, "INVALID_TARGET", LIMITS["identifier"])
+        card_ref = semantic_patch.get("card_ref")
+        if card_ref is not None:
+            semantic_patch["card_ref"] = _string(card_ref, "INVALID_TARGET", LIMITS["identifier"])
         changes_value = semantic_patch.get("changes")
         if not isinstance(changes_value, list) or not 1 <= len(changes_value) <= LIMITS["changes_per_patch"]:
             raise _failure("ACTION_PATCH_SHAPE_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.patch.changes", action_type)
@@ -525,19 +599,18 @@ def validate_semantic_candidate_action(raw_action: Any) -> dict[str, Any]:
             if not isinstance(concept_value, str) or not concept_value.strip():
                 raise _failure("SEMANTIC_SCHEMA_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.change.concept", action_type)
             concept = SEMANTIC_CONTRACT["concept_aliases"].get(concept_value.strip(), concept_value.strip())
-            if concept not in SEMANTIC_CONCEPTS:
-                raise _failure("UNKNOWN_CONCEPT", "contract_validation", "RESOLUTION", "semantic_action.change.concept", action_type)
             normalized_change: dict[str, Any] = {"intent": intent, "concept": concept}
             if intent == "SET":
                 normalized_change["value"] = _string(change.get("value"), "SEMANTIC_SCHEMA_INVALID", LIMITS["message"])
-                if "reference_id" in change:
-                    raise _failure("SEMANTIC_SCHEMA_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.change.reference_id", action_type)
             elif intent == "CLEAR":
-                if "value" in change or "reference_id" in change:
+                if "value" in change:
                     raise _failure("SEMANTIC_SCHEMA_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.change.clear", action_type)
             else:
                 normalized_change["value"] = _string(change.get("value"), "SEMANTIC_SCHEMA_INVALID", 64)
-                normalized_change["reference_id"] = _string(change.get("reference_id"), "INVALID_OPERATION_TARGET", LIMITS["identifier"])
+            if "selector" in change:
+                normalized_change["selector"] = _string(change.get("selector"), "SEMANTIC_SCHEMA_INVALID", 1000)
+            if intent == "SET_STATUS" and "selector" not in normalized_change:
+                raise _failure("SEMANTIC_SCHEMA_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.change.selector", action_type)
             changes.append(normalized_change)
         semantic_patch["changes"] = changes
         patches.append(semantic_patch)
@@ -554,7 +627,6 @@ def validate_semantic_candidate_action(raw_action: Any) -> dict[str, Any]:
         "message": message.strip(),
         "patches": patches,
         "clarification": clarification.strip() if isinstance(clarification, str) else None,
-        "no_change_basis": no_change_basis,
     }
 
 
@@ -592,10 +664,64 @@ def _matching_concept_mappings(item: Mapping[str, Any], concept: str) -> list[Ma
     return matches
 
 
-def _resolve_semantic_change(change: Mapping[str, Any], item: Mapping[str, Any], action_type: str) -> dict[str, Any] | None:
+def _operation_for_descriptor(descriptor: Mapping[str, Any], change: Mapping[str, Any], action_type: str) -> dict[str, Any]:
+    intent = change["intent"]
+    storage_target = descriptor["storage_target"]
+    if storage_target["kind"] == "ITEM_FIELD":
+        field = storage_target["field"]
+        if intent == "SET":
+            return {"operation": "SET_ITEM_FIELD", "field": field, "value": change["value"]}
+        if intent == "CLEAR" and field in CLEARABLE_ITEM_FIELDS:
+            return {"operation": "CLEAR_ITEM_FIELD", "field": field}
+    elif storage_target["kind"] == "FACT" and intent == "SET":
+        return {"operation": "SET_FACT_VALUE", "fact_id": storage_target["fact_id"], "value": change["value"]}
+    elif storage_target["kind"] == "UNCERTAINTY" and intent == "SET_STATUS":
+        return {"operation": "SET_UNCERTAINTY_STATUS", "uncertainty_id": storage_target["uncertainty_id"], "status": change["value"]}
+    raise _failure("UNSUPPORTED_MUTATION", "contract_validation", "SEMANTIC_GUARD", "semantic_action.change.intent", action_type)
+
+
+def _resolution_verification(descriptor: Mapping[str, Any], operation: Mapping[str, Any], change: Mapping[str, Any]) -> dict[str, Any]:
+    desired_after = operation.get("value", operation.get("status"))
+    if operation["operation"] == "CLEAR_ITEM_FIELD":
+        desired_after = None
+    return {
+        "active_item_identity": descriptor["item_identity"],
+        "resolved_field_identity": descriptor["canonical_target_identity"],
+        "semantic_key": descriptor["semantic_key"],
+        "canonical_display_label": descriptor["canonical_display_label"],
+        "expected_before_value": descriptor["current_value"],
+        "desired_after_value": desired_after,
+        "canonical_operation": dict(operation),
+        "storage_target": dict(descriptor["storage_target"]),
+    }
+
+
+def _descriptor_candidates_for_mapping(item: Mapping[str, Any], mapping: Mapping[str, Any]) -> list[dict[str, Any]]:
+    descriptors = candidate_field_descriptors(item)
+    destination = mapping["destination"]
+    if destination["kind"] == "ITEM_FIELD":
+        return [descriptor for descriptor in descriptors
+                if descriptor["storage_target"].get("kind") == "ITEM_FIELD"
+                and descriptor["storage_target"].get("field") == destination["field"]]
+    if destination["kind"] == "FACT_BY_LABEL":
+        semantic_keys = {_semantic_key_for_fact_label(label) for label in destination["labels"]}
+        return [descriptor for descriptor in descriptors
+                if descriptor["storage_target"].get("kind") == "FACT" and descriptor["semantic_key"] in semantic_keys]
+    if destination["kind"] == "FIELD_BY_SEMANTIC_KEY":
+        return [descriptor for descriptor in descriptors if descriptor["semantic_key"] == destination["semantic_key"]]
+    if destination["kind"] == "DESCRIPTOR_BY_VALUE":
+        return [descriptor for descriptor in descriptors if descriptor["storage_target"].get("kind") == "FACT"]
+    return []
+
+
+def _resolve_semantic_change(
+    change: Mapping[str, Any], item: Mapping[str, Any], action_type: str
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
     mappings = _matching_concept_mappings(item, str(change["concept"]))
     if not mappings:
-        raise _failure("CONCEPT_MAPPING_NOT_FOUND", "contract_validation", "RESOLUTION", "semantic_action.change.concept", action_type)
+        # A recognized semantic concept can be absent from this Card shape.  That is
+        # ambiguity for the Human, not a reason to guess another storage target.
+        return None
     if len(mappings) != 1:
         return None
     mapping = mappings[0]
@@ -603,113 +729,170 @@ def _resolve_semantic_change(change: Mapping[str, Any], item: Mapping[str, Any],
     if intent not in mapping["allowed_intents"]:
         raise _failure("UNSUPPORTED_MUTATION", "contract_validation", "SEMANTIC_GUARD", "semantic_action.change.intent", action_type)
     destination = mapping["destination"]
-    if destination["kind"] == "ITEM_FIELD":
-        field = destination["field"]
-        if intent == "SET":
-            return {"operation": "SET_ITEM_FIELD", "field": field, "value": change["value"]}
-        if field not in CLEARABLE_ITEM_FIELDS:
-            raise _failure("UNSUPPORTED_MUTATION", "contract_validation", "SEMANTIC_GUARD", "semantic_action.change.intent", action_type)
-        return {"operation": "CLEAR_ITEM_FIELD", "field": field}
-    if destination["kind"] == "FACT_BY_LABEL":
-        labels = {str(label).strip().casefold() for label in destination["labels"]}
-        facts = [fact for fact in item.get("facts") or [] if isinstance(fact, Mapping) and str(fact.get("label") or "").strip().casefold() in labels]
-        if not facts:
-            raise _failure("CONCEPT_MAPPING_NOT_FOUND", "contract_validation", "RESOLUTION", "semantic_action.change.concept", action_type)
-        if len(facts) != 1:
-            return None
-        fact_id = facts[0].get("fact_id")
-        if not isinstance(fact_id, str) or not fact_id.strip():
-            raise _failure("INVALID_OPERATION_TARGET", "contract_validation", "SEMANTIC_GUARD", "semantic_action.change.reference", action_type)
-        return {"operation": "SET_FACT_VALUE", "fact_id": fact_id, "value": change["value"]}
-    reference_id = change.get("reference_id")
-    if change.get("value") not in UNCERTAINTY_STATUSES:
-        raise _failure("INVALID_UNCERTAINTY_STATUS", "contract_validation", "SEMANTIC_GUARD", "semantic_action.change.value", action_type)
-    if reference_id not in {entry.get("uncertainty_id") for entry in item.get("uncertainties") or [] if isinstance(entry, Mapping)}:
-        raise _failure("INVALID_OPERATION_TARGET", "contract_validation", "SEMANTIC_GUARD", "semantic_action.change.reference", action_type)
-    return {"operation": "SET_UNCERTAINTY_STATUS", "uncertainty_id": reference_id, "status": change["value"]}
-
-
-def _assert_no_change_basis(basis: Mapping[str, Any], item_by_id: Mapping[str, Mapping[str, Any]], request: CandidateConversationRequest) -> None:
-    target = basis["target_item_id"]
-    item = item_by_id.get(target)
-    if item is None:
-        raise _failure("INVALID_TARGET", "contract_validation", "SEMANTIC_GUARD", "semantic_action.no_change_basis.target", "NO_CHANGE")
-    focus = request.observation["focus"]
-    if focus["type"] in {"ITEM", "ITEM_DRAFT"} and target != focus["item_id"]:
-        raise _failure("FOCUS_VIOLATION", "focus", "SEMANTIC_GUARD", "semantic_action.no_change_basis.target", "NO_CHANGE")
-    operation = _resolve_semantic_change({"intent": "SET", "concept": basis["concept"], "value": basis["value"]}, item, "NO_CHANGE")
-    if operation is None:
-        raise _failure("NO_CHANGE_BASIS_UNRESOLVED", "contract_validation", "SEMANTIC_GUARD", "semantic_action.no_change_basis", "NO_CHANGE")
-    if operation["operation"] == "SET_ITEM_FIELD":
-        current_value = item.get(operation["field"])
-        expected_value = operation["value"]
-    elif operation["operation"] == "SET_FACT_VALUE":
-        current_value = next((fact.get("value") for fact in item.get("facts") or [] if isinstance(fact, Mapping) and fact.get("fact_id") == operation["fact_id"]), None)
-        expected_value = operation["value"]
+    if destination["kind"] == "UNCERTAINTY_BY_ID":
+        if change.get("value") not in UNCERTAINTY_STATUSES:
+            raise _failure("INVALID_UNCERTAINTY_STATUS", "contract_validation", "SEMANTIC_GUARD", "semantic_action.change.value", action_type)
+        candidates = [descriptor for descriptor in candidate_field_descriptors(item)
+                      if descriptor["storage_target"].get("kind") == "UNCERTAINTY"]
     else:
-        current_value = next((entry.get("status") for entry in item.get("uncertainties") or [] if isinstance(entry, Mapping) and entry.get("uncertainty_id") == operation["uncertainty_id"]), None)
-        expected_value = operation["status"]
-    if not isinstance(current_value, str) or current_value.strip() != str(expected_value).strip():
-        raise _failure("NO_CHANGE_STATE_MISMATCH", "contract_validation", "SEMANTIC_GUARD", "semantic_action.no_change_basis", "NO_CHANGE")
+        candidates = _descriptor_candidates_for_mapping(item, mapping)
+
+    selector = _normalized_field_value(change.get("selector"))
+    if selector:
+        candidates = [descriptor for descriptor in candidates if selector in {
+            _normalized_field_value(descriptor.get("current_value")),
+            _normalized_field_value(descriptor.get("canonical_display_label")),
+            _normalized_field_value(descriptor.get("legacy_label")),
+            *(_normalized_field_value(value) for value in descriptor.get("semantic_selector_values") or []),
+        }]
+    elif destination["kind"] in {"DESCRIPTOR_BY_VALUE", "UNCERTAINTY_BY_ID"}:
+        return None
+
+    if not candidates:
+        return None
+    if len(candidates) != 1:
+        return None
+    operation = _operation_for_descriptor(candidates[0], change, action_type)
+    return operation, _resolution_verification(candidates[0], operation, change)
 
 
-def resolve_semantic_candidate_action(raw_action: Any, request: CandidateConversationRequest) -> dict[str, Any]:
+def _field_clarification(item: Mapping[str, Any], selector: Any = None) -> str:
+    fact_descriptors = [descriptor for descriptor in candidate_field_descriptors(item)
+                        if descriptor["storage_target"].get("kind") == "FACT"]
+    if selector is not None:
+        expected = _normalized_field_value(selector)
+        matches = [descriptor for descriptor in fact_descriptors if expected in {
+            _normalized_field_value(descriptor.get("current_value")),
+            _normalized_field_value(descriptor.get("canonical_display_label")),
+            _normalized_field_value(descriptor.get("legacy_label")),
+        }]
+        if not matches:
+            return f"没有找到当前值为「{expected}」的现有字段，请确认字段名称或当前值。"
+        fact_descriptors = matches
+    visible = [descriptor for descriptor in fact_descriptors if _normalized_field_value(descriptor.get("current_value"))]
+    labels = [str(descriptor["canonical_display_label"]) for descriptor in visible]
+    duplicate_labels = {label for label in labels if labels.count(label) > 1}
+    if visible:
+        choices = [
+            (f"「{descriptor['canonical_display_label']}」（当前值：「{_normalized_field_value(descriptor.get('current_value'))}」）"
+             if descriptor["canonical_display_label"] in duplicate_labels else f"「{descriptor['canonical_display_label']}」")
+            for descriptor in visible[:6]
+        ]
+        return f"你想添加到{'、'.join(choices[:-1]) + '还是' if len(choices) > 1 else ''}{choices[-1]}？"
+    return "请说明你想修改这张卡片的哪个字段，例如标题、副标题、时间或摘要。"
+
+
+def _card_reference_map(request: CandidateConversationRequest) -> dict[str, str]:
+    item_ids = [str(item.get("item_id")) for item in request.working_model["payload"].get("items") or [] if isinstance(item, Mapping)]
+    if request.draft is not None and request.draft["item_id"] not in item_ids:
+        item_ids.append(request.draft["item_id"])
+    return {f"card-{index}": item_id for index, item_id in enumerate(item_ids, 1)}
+
+
+def _same_semantic_value(left: Any, right: Any) -> bool:
+    return _normalized_field_value(left) == _normalized_field_value(right)
+
+
+def _no_change_copy(verifications: list[Mapping[str, Any]]) -> str:
+    if not verifications:
+        return "当前内容已经符合你的要求，无需修改。"
+    details = "；".join(
+        f"「{verification['canonical_display_label']}」已经是「{_normalized_field_value(verification['expected_before_value'])}」"
+        for verification in verifications[:4]
+    )
+    return f"{details}，无需修改。"
+
+
+def resolve_semantic_candidate_action_with_verifications(raw_action: Any, request: CandidateConversationRequest) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     semantic = validate_semantic_candidate_action(raw_action)
     action_type = semantic["action"]
+    item_by_id = {str(item.get("item_id")): item for item in request.working_model["payload"].get("items") or [] if isinstance(item, Mapping)}
+    if request.draft is not None:
+        item_by_id[request.draft["item_id"]] = request.draft["item"]
+    focus = request.observation["focus"]
+    if action_type == "ASK_CLARIFICATION":
+        if focus["type"] in {"ITEM", "ITEM_DRAFT"}:
+            item = item_by_id[focus["item_id"]]
+            return _canonical_clarification(request, _field_clarification(item)), []
+        return _canonical_clarification(request, "请用卡片标题、机构或时间说明要修改哪张卡片。"), []
     user_copy = semantic["clarification"] if action_type == "ASK_CLARIFICATION" else semantic["message"]
     if _AUTHORITY_ESCALATION.search(user_copy or ""):
         raise _failure("AUTHORITY_COPY_INVALID", "authority", "AUTHORITY", "semantic_action.user_copy", action_type)
     if action_type == "PATCH_MULTIPLE_ITEMS" and not _has_explicit_multi_intent(request.human_message):
         raise _failure("IMPLICIT_MULTI_VIOLATION", "intent", "SEMANTIC_GUARD", "semantic_action.cardinality", action_type)
 
-    item_by_id = {str(item.get("item_id")): item for item in request.working_model["payload"].get("items") or [] if isinstance(item, Mapping)}
-    if request.draft is not None:
-        item_by_id[request.draft["item_id"]] = request.draft["item"]
-    if action_type == "NO_CHANGE":
-        _assert_no_change_basis(semantic["no_change_basis"], item_by_id, request)
+    card_references = _card_reference_map(request)
     canonical_patches: list[dict[str, Any]] = []
+    resolution_verifications: list[dict[str, Any]] = []
+    no_change_verifications: list[dict[str, Any]] = []
     for semantic_patch in semantic["patches"]:
-        target = semantic_patch.get("target_item_id")
-        if target is None:
-            focus = request.observation["focus"]
-            if focus["type"] in {"ITEM", "ITEM_DRAFT"}:
-                target = focus["item_id"]
-            elif len(item_by_id) == 1:
-                target = next(iter(item_by_id))
+        card_ref = semantic_patch.get("card_ref")
+        if action_type == "PATCH_ITEM" and focus["type"] in {"ITEM", "ITEM_DRAFT"}:
+            if card_ref is not None:
+                raise _failure("SEMANTIC_SCHEMA_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.patch.card_ref", action_type)
+            target = focus["item_id"]
+        else:
+            if card_ref is None:
+                if action_type == "PATCH_ITEM" and focus["type"] == "CANDIDATE" and len(item_by_id) == 1:
+                    target = next(iter(item_by_id))
+                else:
+                    return _canonical_clarification(request, "请用卡片标题、机构或时间说明要修改哪张卡片。"), []
             else:
-                return _canonical_clarification(request, "请明确要修改哪一张 Candidate Card。")
+                target = card_references.get(card_ref)
+                if target is None:
+                    raise _failure("INVALID_TARGET", "contract_validation", "SEMANTIC_GUARD", "semantic_action.patch.card_ref", action_type)
         item = item_by_id.get(target)
         if item is None:
             raise _failure("INVALID_TARGET", "contract_validation", "SEMANTIC_GUARD", "semantic_action.patch.target", action_type)
         operations: list[dict[str, Any]] = []
         for change in semantic_patch["changes"]:
-            operation = _resolve_semantic_change(change, item, action_type)
-            if operation is None:
-                return _canonical_clarification(request, "请确认这项信息应更新到哪个现有字段。")
-            operations.append(operation)
-        canonical_patches.append({
-            "target_item_id": target,
-            "operations": operations,
-            "reason": "Resolved from a bounded semantic candidate action.",
-            "origin": "MODEL_PROPOSAL",
-            "evidence_refs": [],
-        })
+            if change["concept"] not in SEMANTIC_CONCEPTS:
+                return _canonical_clarification(request, _field_clarification(item, change.get("selector"))), []
+            resolved = _resolve_semantic_change(change, item, action_type)
+            if resolved is None:
+                return _canonical_clarification(request, _field_clarification(item, change.get("selector"))), []
+            operation, verification = resolved
+            if _same_semantic_value(verification["expected_before_value"], verification["desired_after_value"]):
+                no_change_verifications.append(verification)
+            else:
+                operations.append(operation)
+                resolution_verifications.append(verification)
+        if operations:
+            canonical_patches.append({
+                "target_item_id": target,
+                "operations": operations,
+                "reason": "Resolved from a bounded semantic candidate action.",
+                "origin": "MODEL_PROPOSAL",
+                "evidence_refs": [],
+            })
+
+    if not canonical_patches and semantic["patches"]:
+        action_type = "NO_CHANGE"
+    elif action_type in {"PATCH_ITEM", "PATCH_MULTIPLE_ITEMS"}:
+        action_type = "PATCH_MULTIPLE_ITEMS" if len({patch["target_item_id"] for patch in canonical_patches}) > 1 else "PATCH_ITEM"
 
     canonical = {
         "contract_id": ACTION_SCHEMA_VERSION,
         "action": action_type,
-        "message": semantic["message"],
+        "message": (_no_change_copy(no_change_verifications) if action_type == "NO_CHANGE"
+                    else semantic["message"] if action_type == "EXPLAIN"
+                    else "候选人信息变更已解析，等待本地验证。"),
         "observed_working_model": {key: request.observation[key] for key in OBSERVED_KEYS},
         "patches": canonical_patches,
-        "clarification": semantic["clarification"],
+        "clarification": semantic["clarification"] if action_type == "ASK_CLARIFICATION" else None,
     }
-    return validate_candidate_action(canonical, request)
+    return validate_candidate_action(canonical, request), resolution_verifications
+
+
+def resolve_semantic_candidate_action(raw_action: Any, request: CandidateConversationRequest) -> dict[str, Any]:
+    action, _verifications = resolve_semantic_candidate_action_with_verifications(raw_action, request)
+    return action
 
 
 def semantic_prompt_schema_fragment() -> str:
     fragment = {
         "schema_version": SEMANTIC_ACTION_SCHEMA_VERSION,
-        "actions": CONTRACT_MANIFEST["actions"],
+        "actions": CONTRACT_MANIFEST["semantic_actions"],
         "unsupported_actions": CONTRACT_MANIFEST["unsupported_actions"],
         "shape": CONTRACT_MANIFEST["semantic_contract"],
         "concepts": CONTRACT_MANIFEST["semantic_contract"]["concepts"],
@@ -723,34 +906,75 @@ def candidate_conversation_prompt() -> str:
     return f"""You are Ariadne's Candidate conversation semantic action planner.
 Return exactly one JSON object and no Markdown or reasoning.
 Follow this versioned semantic schema exactly: {semantic_prompt_schema_fragment()}
-Use only exact item_id values present in the input when a target is clear. Never guess a Card by nearest name. If no unique target is clear, return ASK_CLARIFICATION.
+When focus is ITEM or ITEM_DRAFT, natural references such as this card, here, this project, or this experience mean the active focused item. For an ordinary PATCH_ITEM, omit card_ref; the system always binds it to the active focused item. A card_ref on an ordinary ITEM PATCH_ITEM is invalid.
+For Candidate focus, choose a Card only with the turn-local card_ref shown in the current input. A Candidate PATCH_ITEM must include that card_ref unless there is exactly one Card. Never output or infer a persistent item ID. If the Human target is not unique, return ASK_CLARIFICATION.
+PATCH_MULTIPLE_ITEMS requires one turn-local card_ref per patch and is allowed only for explicit multi-Card Human intent. In ITEM focus it must include the active Card as one target; the lower canonical focus guard remains authoritative.
 Express changes only as semantic intent + concept + desired value. Do not output storage fields, fact IDs, contract IDs, Working observation echoes, origin, authority, provenance, or evidence_refs.
+When the Human identifies an existing field by its visible label, value, or uncertainty question, put that Human-visible phrase in selector. The selector is only a semantic disambiguator; the system reads and verifies the actual current state. Never output fact IDs, uncertainty IDs, expected-before values, or proof objects.
 Use PATCH_MULTIPLE_ITEMS only when the literal human message explicitly requests all/every/both/multiple items. Otherwise ambiguity must return ASK_CLARIFICATION.
 The final USER message is the current turn intent and overrides history. History only supplies context; it never proves that the current request was already applied.
-Compare that final USER message against the current value in the supplied Candidate Working item. If a clear requested desired value differs from that current value, return PATCH_ITEM or ASK_CLARIFICATION, never NO_CHANGE.
-NO_CHANGE is allowed only when a current value already satisfies the final USER request. Its required no_change_basis must name the exact target_item_id, manifest concept, and current value that proves this. Do not use NO_CHANGE when that proof is unavailable.
-Never create, remove, merge, or delete items. Never invent IDs. Explain-only requests return EXPLAIN; already-satisfied requests return NO_CHANGE.
+For every mutation request, return PATCH_ITEM or PATCH_MULTIPLE_ITEMS even when the desired value may already be present. The system alone determines NO_CHANGE from current state after semantic resolution.
+Never create, remove, merge, or delete items. Never invent references. Explain-only requests return EXPLAIN.
+Never place item IDs, fact IDs, uncertainty IDs, Working IDs, fingerprints, source/session/turn/action IDs, or other internal identities in Human-facing message or clarification copy.
 System-owned fields and canonical typed mutations are bound and validated locally."""
 
 
-def _model_input(request: CandidateConversationRequest) -> dict[str, Any]:
-    items = []
-    for item in request.working_model["payload"].get("items") or []:
-        if not isinstance(item, Mapping):
-            continue
-        items.append({
-            key: item.get(key)
-            for key in ("item_id", "item_type", "item_subtype", "title", "subtitle", "time", "summary", "facts", "ownership", "uncertainties")
-        })
+def _provider_item(item: Mapping[str, Any], card_ref: str, *, directory: bool = False) -> dict[str, Any]:
+    result = {
+        "card_ref": card_ref,
+        "item_type": item.get("item_type"),
+        "item_subtype": item.get("item_subtype"),
+        "title": item.get("title"),
+        "subtitle": item.get("subtitle"),
+        "time": item.get("time"),
+        "summary": item.get("summary"),
+    }
+    if directory:
+        return result
+    result.update({
+        "ownership": item.get("ownership"),
+        "facts": [{"label": fact.get("label"), "value": fact.get("value")}
+                  for fact in item.get("facts") or [] if isinstance(fact, Mapping)],
+        "open_uncertainties": [{"question": entry.get("question"), "affects": entry.get("affects"), "status": entry.get("status")}
+                               for entry in item.get("uncertainties") or [] if isinstance(entry, Mapping) and entry.get("status") == "OPEN"],
+    })
+    return result
+
+
+def _provider_candidate_context(request: CandidateConversationRequest) -> dict[str, Any]:
+    reference_map = _card_reference_map(request)
+    reference_by_id = {item_id: card_ref for card_ref, item_id in reference_map.items()}
+    item_by_id = {str(item.get("item_id")): item for item in request.working_model["payload"].get("items") or [] if isinstance(item, Mapping)}
     if request.draft is not None:
-        draft_id = request.draft["item_id"]
-        items = [item for item in items if item.get("item_id") != draft_id]
-        items.append({key: request.draft["item"].get(key) for key in ("item_id", "item_type", "item_subtype", "title", "subtitle", "time", "summary", "facts", "ownership", "uncertainties")})
+        item_by_id[request.draft["item_id"]] = request.draft["item"]
+    focus = request.observation["focus"]
+    if focus["type"] == "CANDIDATE":
+        candidate = {
+            "target_mode": "CANDIDATE",
+            "candidate_items": [_provider_item(item_by_id[item_id], card_ref) for card_ref, item_id in reference_map.items()],
+            "current_item": None,
+            "other_item_directory": [],
+        }
+        provider_focus = {"type": "CANDIDATE"}
+    else:
+        active_id = focus["item_id"]
+        active_ref = reference_by_id[active_id]
+        candidate = {
+            "target_mode": focus["type"],
+            "candidate_items": [],
+            "current_item": _provider_item(item_by_id[active_id], active_ref),
+            "other_item_directory": [_provider_item(item_by_id[item_id], card_ref, directory=True)
+                                     for card_ref, item_id in reference_map.items() if item_id != active_id],
+        }
+        provider_focus = {"type": focus["type"], "active_card_ref": active_ref}
+    return {"focus": provider_focus, "candidate": candidate}
+
+
+def _model_input(request: CandidateConversationRequest) -> dict[str, Any]:
+    context = _provider_candidate_context(request)
     return {
-        "conversation": {"subject_type": SUBJECT_TYPE, "subject_id": request.conversation["subject_id"]},
-        "observed_working_model": {key: request.observation[key] for key in OBSERVED_KEYS},
-        "focus": request.observation["focus"],
-        "candidate_working_items": items,
+        "conversation": {"subject_type": SUBJECT_TYPE},
+        **context,
         "human_message": request.human_message,
     }
 
@@ -762,7 +986,11 @@ def build_candidate_conversation_payload(request: CandidateConversationRequest) 
             {"role": "user", "content": json.dumps(_model_input(request), ensure_ascii=False, separators=(",", ":"))},
         ]
     else:
-        context_only = {key: value for key, value in request.compiled_context.items() if key not in {"bounded_history", "current_user_message"}}
+        context_only = {
+            **_provider_candidate_context(request),
+            "conversation_subject": {"subject_type": SUBJECT_TYPE},
+            "summary": request.compiled_context.get("summary"),
+        }
         messages = [
             {"role": "system", "content": candidate_conversation_prompt()},
             {"role": "user", "content": json.dumps({"message_type": "COMPILED_CANDIDATE_CONTEXT", "context": context_only}, ensure_ascii=False, separators=(",", ":"))},
@@ -782,17 +1010,43 @@ def build_candidate_conversation_payload(request: CandidateConversationRequest) 
 
 
 def response_diagnostics(provider_response: Any, http_status: int | None = None) -> dict[str, Any]:
-    diagnostics: dict[str, Any] = {"http_status": http_status, "response_type": type(provider_response).__name__}
+    """Return only allowlisted Provider envelope metadata; never response text."""
+    diagnostics: dict[str, Any] = {
+        "provider_http_status": http_status,
+        "response_type": type(provider_response).__name__,
+        "exact_returned_model_match": False,
+        "finish_reason": None,
+        "content_type": "missing",
+        "content_length": None,
+        "prompt_tokens": None,
+        "completion_tokens": None,
+        "total_tokens": None,
+        "reasoning_content_present": False,
+        "reasoning_content_length": None,
+        "refusal_present": False,
+        "tool_calls_present": False,
+        "message_key_names": [],
+    }
     if not isinstance(provider_response, Mapping):
         return diagnostics
     diagnostics["returned_model"] = provider_response.get("model") if isinstance(provider_response.get("model"), str) else None
+    diagnostics["exact_returned_model_match"] = diagnostics["returned_model"] == MODEL_ID
     choices = provider_response.get("choices")
     diagnostics["choices_count"] = len(choices) if isinstance(choices, list) else None
     if isinstance(choices, list) and choices and isinstance(choices[0], Mapping):
         diagnostics["finish_reason"] = choices[0].get("finish_reason")
         message = choices[0].get("message")
-        content = message.get("content") if isinstance(message, Mapping) else None
-        diagnostics["content_length"] = len(content) if isinstance(content, str) else None
+        if isinstance(message, Mapping):
+            diagnostics["message_key_names"] = sorted(str(key) for key in message.keys())
+            content = message.get("content")
+            diagnostics["content_type"] = "string" if isinstance(content, str) else "null" if content is None else type(content).__name__
+            diagnostics["content_length"] = len(content) if isinstance(content, str) else None
+            reasoning = message.get("reasoning_content")
+            diagnostics["reasoning_content_present"] = reasoning is not None
+            diagnostics["reasoning_content_length"] = len(reasoning) if isinstance(reasoning, str) else None
+            diagnostics["refusal_present"] = message.get("refusal") is not None
+            tool_calls = message.get("tool_calls")
+            diagnostics["tool_calls_present"] = bool(tool_calls) if isinstance(tool_calls, list) else tool_calls is not None
     usage = provider_response.get("usage")
     if isinstance(usage, Mapping):
         for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
@@ -801,7 +1055,9 @@ def response_diagnostics(provider_response: Any, http_status: int | None = None)
     return diagnostics
 
 
-def normalize_candidate_conversation_response(provider_response: Any, request: CandidateConversationRequest, http_status: int = 200) -> tuple[dict[str, Any], dict[str, Any]]:
+def _normalize_candidate_conversation_response_with_verifications(
+    provider_response: Any, request: CandidateConversationRequest, http_status: int = 200
+) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
     diagnostics = response_diagnostics(provider_response, http_status)
     if http_status != 200:
         raise CandidateConversationRuntimeError("PROVIDER_HTTP_ERROR", "provider", True, {**diagnostics, **_diagnostic("PROVIDER_ENVELOPE", "PROVIDER_HTTP_ERROR")})
@@ -819,13 +1075,27 @@ def normalize_candidate_conversation_response(provider_response: Any, request: C
     message = choices[0].get("message")
     content = message.get("content") if isinstance(message, Mapping) else None
     if not isinstance(content, str) or not content.strip():
-        raise CandidateConversationRuntimeError("EMPTY_RESPONSE", "parsing", True, {**diagnostics, **_diagnostic("JSON_PARSE", "EMPTY_RESPONSE")})
+        if not isinstance(content, str):
+            classification = "EMPTY_RESPONSE_UNEXPECTED_MESSAGE_SHAPE"
+        elif diagnostics["reasoning_content_present"] and (diagnostics["reasoning_content_length"] or 0) > 0:
+            classification = "EMPTY_RESPONSE_REASONING_ONLY"
+        elif diagnostics["completion_tokens"] == 0:
+            classification = "EMPTY_RESPONSE_ZERO_COMPLETION"
+        elif isinstance(diagnostics["completion_tokens"], int) and diagnostics["completion_tokens"] > 0:
+            classification = "EMPTY_RESPONSE_NONZERO_COMPLETION"
+        else:
+            classification = "EMPTY_RESPONSE_UNCLASSIFIED"
+        raise CandidateConversationRuntimeError("EMPTY_RESPONSE", "parsing", True, {
+            **diagnostics,
+            **_diagnostic("JSON_PARSE", "EMPTY_RESPONSE"),
+            "empty_response_classification": classification,
+        })
     try:
         raw_action = json.loads(content)
     except json.JSONDecodeError as error:
         raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "parsing", True, {**diagnostics, **_diagnostic("JSON_PARSE", "MALFORMED_RESPONSE")}) from error
     try:
-        action = resolve_semantic_candidate_action(raw_action, request)
+        action, resolution_verifications = resolve_semantic_candidate_action_with_verifications(raw_action, request)
     except CandidateConversationRuntimeError as error:
         error_diagnostics = error.diagnostics
         if not error_diagnostics:
@@ -833,7 +1103,12 @@ def normalize_candidate_conversation_response(provider_response: Any, request: C
             error_diagnostics = _diagnostic(stage, error.code)
         raise CandidateConversationRuntimeError(error.code, error.failure_layer, True, {**diagnostics, **error_diagnostics}) from error
     usage = provider_response.get("usage") if isinstance(provider_response.get("usage"), Mapping) else {}
-    return action, dict(usage)
+    return action, resolution_verifications, dict(usage)
+
+
+def normalize_candidate_conversation_response(provider_response: Any, request: CandidateConversationRequest, http_status: int = 200) -> tuple[dict[str, Any], dict[str, Any]]:
+    action, _resolution_verifications, usage = _normalize_candidate_conversation_response_with_verifications(provider_response, request, http_status)
+    return action, usage
 
 
 def execute_candidate_conversation_request(
@@ -851,9 +1126,9 @@ def execute_candidate_conversation_request(
         raise CandidateConversationRuntimeError(error.code, error.failure_layer) from error
     provider_payload = build_candidate_conversation_payload(request)
     http_status, provider_response = provider_call(credential, provider_payload)
-    action, usage = normalize_candidate_conversation_response(provider_response, request, http_status)
+    action, _resolution_verifications, usage = _normalize_candidate_conversation_response_with_verifications(provider_response, request, http_status)
     return {
-        "contract_id": f"{CONTRACT_ID}-runtime-result-v1",
+        "contract_id": RUNTIME_RESULT_CONTRACT_VERSION,
         "execution_id": request.execution_id,
         "generation": request.generation,
         "conversation_id": request.conversation["conversation_id"],

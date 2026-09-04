@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import app  # noqa: E402
-from src.candidate_conversation_runtime import ACTION_SCHEMA_VERSION, CONTRACT_MANIFEST, MODEL_ID  # noqa: E402
+from src.candidate_conversation_runtime import ACTION_SCHEMA_VERSION, CONTRACT_MANIFEST, MODEL_ID, RUNTIME_RESULT_CONTRACT_VERSION  # noqa: E402
 
 
 NODE = os.environ.get("ARIADNE_NODE_BINARY") or shutil.which("node") or str(Path(sys.executable).resolve().parents[2] / "node" / "bin" / "node")
@@ -38,10 +38,12 @@ provider_fixture = {"mode": "valid"}
 def fake_deepseek_transport(_credential: str, provider_payload: dict, *, response_limit: int) -> tuple[int, dict]:
     """Accept the production provider payload without contacting any provider."""
     provider_calls.append({"model": provider_payload.get("model"), "message_count": len(provider_payload.get("messages") or [])})
-    assert "ariadne-semantic-candidate-action-v1" in provider_payload["messages"][0]["content"]
+    assert "ariadne-semantic-candidate-action-v3" in provider_payload["messages"][0]["content"]
     assert "final USER message is the current turn intent" in provider_payload["messages"][0]["content"]
     compiled_context = json.loads(provider_payload["messages"][1]["content"])["context"]
     assert compiled_context["candidate"]["candidate_items"][0]["title"] == "Royal College of Art RCA"
+    assert compiled_context["candidate"]["candidate_items"][0]["card_ref"] == "card-1"
+    assert "item_id" not in compiled_context["candidate"]["candidate_items"][0]
     expected_human_message = "Royal College of Art RCA → Royal College of Art"
     assert "current_user_message" not in compiled_context
     assert "bounded_history" not in compiled_context
@@ -50,15 +52,14 @@ def fake_deepseek_transport(_credential: str, provider_payload: dict, *, respons
     assert all(message.get("content") != expected_human_message for message in provider_payload["messages"][:-1])
     action = {
         "action": "PATCH_ITEM",
-        "message": "Synthetic semantic route contract accepted.",
-        "patch": {
-            "target": "item-edu-001",
+        "patches": [{
+            "card_ref": "card-1",
             "changes": [{"intent": "SET", "concept": "school_name", "value": "Royal College of Art"}],
-        },
+        }],
     }
     if provider_fixture["mode"] == "unknown_concept":
-        action["patch"]["changes"][0]["concept"] = "unknown_private_like_concept"
-        action["patch"]["changes"][0]["value"] = "Synthetic value that diagnostics must not retain"
+        action["patches"][0]["changes"][0]["concept"] = "unknown_private_like_concept"
+        action["patches"][0]["changes"][0]["value"] = "Synthetic value that diagnostics must not retain"
     return HTTPStatus.OK, {
         "id": "synthetic-route-provider-response",
         "model": MODEL_ID,
@@ -67,10 +68,10 @@ def fake_deepseek_transport(_credential: str, provider_payload: dict, *, respons
     }
 
 
-def post(port: int, body: dict) -> tuple[int, dict, str]:
+def post(port: int, body: dict, path: str = "/api/candidate-conversation-turn") -> tuple[int, dict, str]:
     connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
     encoded = json.dumps(body, ensure_ascii=False).encode("utf-8")
-    connection.request("POST", "/api/candidate-conversation-turn", encoded, {"Content-Type": "application/json"})
+    connection.request("POST", path, encoded, {"Content-Type": "application/json"})
     response = connection.getresponse()
     payload_body = json.loads(response.read().decode("utf-8"))
     content_type = response.getheader("Content-Type") or ""
@@ -93,7 +94,7 @@ try:
     status, result, content_type = post(port, payload)
     assert status == HTTPStatus.OK
     assert content_type.startswith("application/json")
-    assert result["contract_id"] == "ariadne-candidate-conversation-v1-runtime-result-v1"
+    assert result["contract_id"] == RUNTIME_RESULT_CONTRACT_VERSION
     assert result["model"] == "deepseek-v4-pro"
     assert result["operation"] == "CANDIDATE_CONVERSATION_TURN"
     assert result["action"]["action"] == "PATCH_ITEM"
@@ -119,14 +120,9 @@ try:
 
     provider_fixture["mode"] = "unknown_concept"
     status, rejected, _ = post(port, payload)
-    assert status == HTTPStatus.UNPROCESSABLE_ENTITY
-    assert rejected["error"] == "UNKNOWN_CONCEPT"
-    assert rejected["failure_layer"] == "contract_validation"
-    assert rejected["diagnostics"]["stage"] == "RESOLUTION"
-    assert rejected["diagnostics"]["field_category"] == "semantic_action.change.concept"
-    assert rejected["diagnostics"]["action_type"] == "PATCH_ITEM"
-    serialized_diagnostics = json.dumps(rejected["diagnostics"], ensure_ascii=False)
-    assert "Synthetic value" not in serialized_diagnostics and "synthetic-route-item" not in serialized_diagnostics
+    assert status == HTTPStatus.OK
+    assert rejected["action"]["action"] == "ASK_CLARIFICATION"
+    assert rejected["action"]["patches"] == []
     provider_fixture["mode"] = "valid"
 
     unknown = deepcopy(payload)

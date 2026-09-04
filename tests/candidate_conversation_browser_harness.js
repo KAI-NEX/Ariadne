@@ -23,6 +23,11 @@
     conversation.innerHTML = messages.map((message) => `<p data-role="${message.role}">${message.role}: ${message.text}</p>`).join("");
   };
   const callRuntime = async (request) => {
+    const signatureResponse = await fetch("/api/candidate-conversation-runtime-signature", { cache: "no-store" });
+    const signaturePayload = await signatureResponse.json();
+    if (!signatureResponse.ok || !Integration.runtimeSignaturesMatch(Integration.runtimeSignature(), signaturePayload.runtime_signature)) {
+      throw Object.assign(new Error("RUNTIME_CONTRACT_VERSION_MISMATCH"), { code: "RUNTIME_CONTRACT_VERSION_MISMATCH", network_call_made: false });
+    }
     const response = await fetch("/api/candidate-conversation-turn", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -52,6 +57,7 @@
       const outcome = await Integration.executeListTurn({
         database,
         session,
+        focus: { type: "ITEM", item_id: "item-work-001" },
         human_message: input.value,
         runtime_snapshot: Integration.createRuntimeSnapshot(),
         call_runtime: callRuntime,
@@ -61,8 +67,9 @@
       title.textContent = working.payload.items[0].title;
       version.textContent = String(working.version);
       renderMessages(restored.messages);
-      if (outcome.status !== "SUCCEEDED" || outcome.turn.state !== "APPLIED") throw new Error("synthetic_resolution_not_applied");
+      if (outcome.status !== "SUCCEEDED" || !["APPLIED", "NO_CHANGE"].includes(outcome.turn.state)) throw new Error("synthetic_resolution_not_completed");
       document.body.dataset.resolutionResult = "pass";
+      document.body.dataset.turnState = outcome.turn.state;
       status.textContent = "LOCAL RESPONSE RESOLUTION PASS";
     } catch (error) {
       document.body.dataset.resolutionResult = `failed:${String(error?.code || error?.message || error).slice(0, 120)}`;

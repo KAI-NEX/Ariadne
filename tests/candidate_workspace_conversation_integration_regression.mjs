@@ -103,7 +103,7 @@ const initialPayload = {
       summary: "Synthetic education A.", ownership: null,
       facts: [{ fact_id: "synthetic-fact-a", label: "Degree", value: "Synthetic Degree A" }],
       grounding_refs: [{ grounding_ref_id: "synthetic-ground-a", source_document_id: "source-synthetic-workspace-conversation", location: "synthetic:1", excerpt_or_reference: "Synthetic evidence A." }],
-      uncertainties: [], review_status: "NEEDS_REVIEW", item_version: 1, content_origin: "MODEL_PROPOSAL",
+      uncertainties: [], review_status: "ACCEPTED", item_version: 1, content_origin: "USER_SELECTED",
     },
     {
       item_id: "synthetic-education-exchange", item_type: "EDUCATION", item_subtype: "education",
@@ -111,7 +111,7 @@ const initialPayload = {
       summary: "Synthetic education B.", ownership: null,
       facts: [{ fact_id: "synthetic-fact-b", label: "Course", value: "Synthetic Course B" }],
       grounding_refs: [{ grounding_ref_id: "synthetic-ground-b", source_document_id: "source-synthetic-workspace-conversation", location: "synthetic:2", excerpt_or_reference: "Synthetic evidence B." }],
-      uncertainties: [], review_status: "NEEDS_REVIEW", item_version: 1, content_origin: "MODEL_PROPOSAL",
+      uncertainties: [], review_status: "ACCEPTED", item_version: 1, content_origin: "USER_SELECTED",
     },
   ],
 };
@@ -120,9 +120,9 @@ const initialWorking = Truth.validateCandidateWorkingModel({
   contract_id: "ariadne-candidate-working-model-v1",
   working_model_id: "synthetic-workspace-working-v1",
   source_document_id: "source-synthetic-workspace-conversation",
-  processing_run_id: "run-synthetic-workspace-conversation",
-  runtime_snapshot_id: "runtime-snapshot-synthetic-source",
-  proposal_ids: ["proposal-synthetic-workspace-conversation"],
+  processing_run_id: "run-local-synthetic-workspace-conversation",
+  runtime_snapshot_id: "runtime-snapshot-local-synthetic-source",
+  proposal_ids: ["proposal-local-synthetic-workspace-conversation"],
   version: 1,
   previous_working_model_id: null,
   fingerprint: await fingerprint(initialPayload),
@@ -133,6 +133,22 @@ const initialWorking = Truth.validateCandidateWorkingModel({
 
 function snapshot() {
   return Integration.createRuntimeSnapshot({ snapshot_id: idFactory("runtime-snapshot-conversation"), captured_at: now() });
+}
+
+function receiptFor(request, patch, operation) {
+  const item = request.working_model.payload.items.find((candidate) => candidate.item_id === patch.target_item_id);
+  const descriptor = Conversation.fieldDescriptorForOperation(item, operation);
+  assert(descriptor, "synthetic operation must resolve to a field descriptor");
+  return {
+    active_item_identity: patch.target_item_id,
+    resolved_field_identity: descriptor.canonical_target_identity,
+    semantic_key: descriptor.semantic_key,
+    canonical_display_label: descriptor.canonical_display_label,
+    expected_before_value: descriptor.current_value,
+    desired_after_value: operation.operation === "CLEAR_ITEM_FIELD" ? null : operation.operation === "SET_UNCERTAINTY_STATUS" ? operation.status : operation.value,
+    canonical_operation: structuredClone(operation),
+    storage_target: structuredClone(descriptor.storage_target),
+  };
 }
 
 function runtimeResult(request, action) {
@@ -170,23 +186,33 @@ database.records.get("source_documents").set(initialWorking.source_document_id, 
 const session = await Integration.resolveSession(database, initialWorking.source_document_id, "2026-09-03T08:01:00Z");
 assert.equal(session.subject_id, Integration.candidateContextIdFor(initialWorking.source_document_id));
 
-// A — one list-root PATCH_ITEM produces a durable new Working head and Assistant.
+// A — Local-origin material already in Working becomes Model context without
+// source re-analysis; the root turn creates only a non-authoritative Working head.
+let modelConversationCalls = 0;
 const patchOne = await Integration.executeListTurn({
   database, session, human_message: "RCA 不要重复。", runtime_snapshot: snapshot(), id_factory: idFactory, now,
-  call_runtime: async (request) => runtimeResult(request, {
-    contract_id: Conversation.ACTION_CONTRACT_ID,
-    action: "PATCH_ITEM",
-    message: "已更新这条 Candidate Working 信息。",
-    observed_working_model: Conversation.observedWorkingModel(request.observation),
-    patches: [{ target_item_id: "synthetic-education-rca", operations: [{ operation: "SET_ITEM_FIELD", field: "title", value: "Royal College of Art" }], reason: "Remove a synthetic duplicate abbreviation.", origin: "MODEL_PROPOSAL", evidence_refs: [] }],
-    clarification: null,
-  }),
+  call_runtime: async (request) => {
+    modelConversationCalls += 1;
+    assert.equal(request.working_model.runtime_snapshot_id, "runtime-snapshot-local-synthetic-source");
+    assert.equal(request.compiled_context.candidate.candidate_items[0].title, "Royal College of Art RCA");
+    assert.equal(database.records.get("candidate_context_revisions").size, 0);
+    return runtimeResult(request, {
+      contract_id: Conversation.ACTION_CONTRACT_ID,
+      action: "PATCH_ITEM",
+      message: "已更新这条 Candidate Working 信息。",
+      observed_working_model: Conversation.observedWorkingModel(request.observation),
+      patches: [{ target_item_id: "synthetic-education-rca", operations: [{ operation: "SET_ITEM_FIELD", field: "title", value: "Royal College of Art" }], reason: "Remove a synthetic duplicate abbreviation.", origin: "MODEL_PROPOSAL", evidence_refs: [] }],
+      clarification: null,
+    });
+  },
 });
 assert.equal(patchOne.status, "SUCCEEDED");
 assert.equal(patchOne.turn.state, "APPLIED");
 assert.equal(patchOne.working_model.version, 2);
 assert.equal(patchOne.working_model.payload.items[0].title, "Royal College of Art");
 assert.equal(patchOne.working_model.authority, Truth.AUTHORITY.working);
+assert.equal(modelConversationCalls, 1);
+assert.equal(database.records.get("candidate_context_revisions").size, 0);
 
 // B — explicit multi intent permits one atomic two-item Working update.
 const patchMulti = await Integration.executeListTurn({
@@ -204,20 +230,78 @@ assert.equal(patchMulti.turn.state, "APPLIED");
 assert.equal(patchMulti.working_model.version, 3);
 assert.deepEqual(patchMulti.working_model.payload.items.map((item) => item.subtitle), ["Example Programme A", "Example Programme B"]);
 
+// ITEM focus reuses the Candidate-scoped session and applies only to the active stable item id.
+let capturedItemFocus = null;
+const itemPatch = await Integration.executeListTurn({
+  database, session, focus: { type: "ITEM", item_id: "synthetic-education-rca" }, human_message: "这里的时间改成 2026 年 4 月。", runtime_snapshot: snapshot(), id_factory: idFactory, now,
+  call_runtime: async (request) => {
+    capturedItemFocus = request.observation.focus;
+    assert.equal(request.conversation.conversation_id, session.conversation_id);
+    return runtimeResult(request, {
+      contract_id: Conversation.ACTION_CONTRACT_ID,
+      action: "PATCH_ITEM",
+      message: "已更新当前 Candidate Working Card 的时间。",
+      observed_working_model: Conversation.observedWorkingModel(request.observation),
+      patches: [{ target_item_id: "synthetic-education-rca", operations: [{ operation: "SET_ITEM_FIELD", field: "time", value: "2026 年 4 月" }], reason: "Synthetic item-focus time update.", origin: "MODEL_PROPOSAL", evidence_refs: [] }],
+      clarification: null,
+    });
+  },
+});
+assert.deepEqual(capturedItemFocus, { type: "ITEM", item_id: "synthetic-education-rca" });
+assert.equal(itemPatch.working_model.version, 4);
+assert.equal(itemPatch.working_model.payload.items[0].time, "2026 年 4 月");
+
+// An ITEM-focused response cannot escape to another card; USER and failed turn remain, with zero mutation/action/Assistant.
+const beforeFocusEscape = await Integration.latestWorkingModel(database, initialWorking.source_document_id);
+const beforeFocusEscapeConversation = await Persistence.restoreConversation(database, session.conversation_id);
+await assert.rejects(Integration.executeListTurn({
+  database, session, focus: { type: "ITEM", item_id: "synthetic-education-rca" }, human_message: "只修改当前卡片。", runtime_snapshot: snapshot(), id_factory: idFactory, now,
+  call_runtime: async (request) => runtimeResult(request, {
+    contract_id: Conversation.ACTION_CONTRACT_ID,
+    action: "PATCH_ITEM",
+    message: "This escaped patch must not persist.",
+    observed_working_model: Conversation.observedWorkingModel(request.observation),
+    patches: [{ target_item_id: "synthetic-education-exchange", operations: [{ operation: "SET_ITEM_FIELD", field: "time", value: "Never" }], reason: "Synthetic focus escape.", origin: "MODEL_PROPOSAL", evidence_refs: [] }],
+    clarification: null,
+  }),
+}), (error) => error.code === "FOCUS_VIOLATION");
+const afterFocusEscape = await Integration.latestWorkingModel(database, initialWorking.source_document_id);
+const afterFocusEscapeConversation = await Persistence.restoreConversation(database, session.conversation_id);
+assert.equal(afterFocusEscape.working_model_id, beforeFocusEscape.working_model_id);
+assert.equal(afterFocusEscapeConversation.messages.length, beforeFocusEscapeConversation.messages.length + 1);
+assert.equal(afterFocusEscapeConversation.messages.at(-1).role, "USER");
+assert.equal(afterFocusEscapeConversation.turns.at(-1).state, "FAILED");
+assert.equal(afterFocusEscapeConversation.turns.at(-1).failure_code, "FOCUS_VIOLATION");
+assert(!afterFocusEscapeConversation.actions.some((action) => action.normalized_action.message === "This escaped patch must not persist."));
+
+// ITEM clarification/explanation share the same durable history and make no Working mutation.
+const itemClarify = await Integration.executeListTurn({
+  database, session, focus: { type: "ITEM", item_id: "synthetic-education-rca" }, human_message: "把这里改一下。", runtime_snapshot: snapshot(), id_factory: idFactory, now,
+  call_runtime: async (request) => noPatches(request, "ASK_CLARIFICATION", "", "你希望修改当前卡片的哪一项？"),
+});
+assert.equal(itemClarify.turn.state, "NEEDS_CLARIFICATION");
+assert.equal(itemClarify.working_model.working_model_id, itemPatch.working_model.working_model_id);
+const itemExplain = await Integration.executeListTurn({
+  database, session, focus: { type: "ITEM", item_id: "synthetic-education-rca" }, human_message: "解释这张卡片的当前时间。", runtime_snapshot: snapshot(), id_factory: idFactory, now,
+  call_runtime: async (request) => noPatches(request, "EXPLAIN", "当前卡片时间来自这轮 synthetic working update。"),
+});
+assert.equal(itemExplain.turn.state, "NO_CHANGE");
+assert.equal(itemExplain.working_model.working_model_id, itemPatch.working_model.working_model_id);
+
 // C/D — clarification and explanation add durable Assistant turns with zero mutation.
 const clarify = await Integration.executeListTurn({
   database, session, human_message: "把这段时间改成 2026 年 4 月。", runtime_snapshot: snapshot(), id_factory: idFactory, now,
   call_runtime: async (request) => noPatches(request, "ASK_CLARIFICATION", "", "你指的是哪一条 synthetic 教育经历？"),
 });
 assert.equal(clarify.turn.state, "NEEDS_CLARIFICATION");
-assert.equal(clarify.working_model.working_model_id, patchMulti.working_model.working_model_id);
+assert.equal(clarify.working_model.working_model_id, itemPatch.working_model.working_model_id);
 
 const explain = await Integration.executeListTurn({
   database, session, human_message: "为什么这两张卡片没有合并？", runtime_snapshot: snapshot(), id_factory: idFactory, now,
   call_runtime: async (request) => noPatches(request, "EXPLAIN", "它们是两条不同的 synthetic 教育经历，因此保持分开。"),
 });
 assert.equal(explain.turn.state, "NO_CHANGE");
-assert.equal(explain.working_model.working_model_id, patchMulti.working_model.working_model_id);
+assert.equal(explain.working_model.working_model_id, itemPatch.working_model.working_model_id);
 
 const noChange = await Integration.executeListTurn({
   database, session, human_message: "保持现在的内容。", runtime_snapshot: snapshot(), id_factory: idFactory, now,
@@ -231,11 +315,27 @@ let userPersistedBeforeFailure = false;
 await assert.rejects(Integration.executeListTurn({
   database, session, human_message: "Synthetic provider failure request.", runtime_snapshot: snapshot(), id_factory: idFactory, now,
   on_user_persisted: () => { userPersistedBeforeFailure = true; },
-  call_runtime: async () => { throw Object.assign(new Error("PROVIDER_TRANSPORT_ERROR"), { code: "PROVIDER_TRANSPORT_ERROR" }); },
-}), (error) => error.code === "PROVIDER_TRANSPORT_ERROR");
+  call_runtime: async () => {
+    throw Object.assign(new Error("EMPTY_RESPONSE"), {
+      code: "EMPTY_RESPONSE",
+      diagnostics: {
+        stage: "JSON_PARSE", provider_http_status: 200, exact_returned_model_match: true,
+        content_type: "string", content_length: 0, completion_tokens: 0,
+        reasoning_content_present: false, refusal_present: false, tool_calls_present: false,
+        message_key_names: ["content", "role"], empty_response_classification: "EMPTY_RESPONSE_ZERO_COMPLETION",
+        unsafe_raw_content: "synthetic provider text must never persist",
+      },
+    });
+  },
+}), (error) => error.code === "EMPTY_RESPONSE");
 assert.equal(userPersistedBeforeFailure, true);
 const afterFailureHead = await Integration.latestWorkingModel(database, initialWorking.source_document_id);
 assert.equal(afterFailureHead.working_model_id, beforeFailureHead.working_model_id);
+const afterFailureConversation = await Persistence.restoreConversation(database, session.conversation_id);
+const persistedFailure = afterFailureConversation.turns.find((turn) => turn.failure_code === "EMPTY_RESPONSE");
+assert.equal(persistedFailure.failure_diagnostics.provider_http_status, 200);
+assert.equal(persistedFailure.failure_diagnostics.empty_response_classification, "EMPTY_RESPONSE_ZERO_COMPLETION");
+assert.equal(JSON.stringify(persistedFailure.failure_diagnostics).includes("synthetic provider text"), false);
 
 // Stale — a concurrent durable head wins; the old response produces no Assistant/action.
 const staleOutcome = await Integration.executeListTurn({
@@ -262,26 +362,213 @@ assert.equal(staleOutcome.status, "STALE");
 assert.equal(staleOutcome.turn.state, "STALE");
 assert.equal(staleOutcome.working_model.payload.items[0].title, "Concurrent Durable Title");
 
+// A focused Card removed by a concurrent durable update makes the late response stale and retains the Candidate session.
+const beforeRemovedCardConversation = await Persistence.restoreConversation(database, session.conversation_id);
+const removedCardOutcome = await Integration.executeListTurn({
+  database, session, focus: { type: "ITEM", item_id: "synthetic-education-exchange" }, human_message: "更新这张稍后会被移除的 synthetic 卡片。", runtime_snapshot: snapshot(), id_factory: idFactory, now,
+  call_runtime: async (request) => {
+    const removedPayload = structuredClone(request.working_model.payload);
+    removedPayload.items = removedPayload.items.filter((item) => item.item_id !== "synthetic-education-exchange");
+    const removedFingerprint = await fingerprint(removedPayload);
+    const removedHead = Truth.validateCandidateWorkingModel({
+      ...request.working_model,
+      working_model_id: `${request.working_model.source_document_id}-working-v${request.working_model.version + 1}-synthetic-removed`,
+      version: request.working_model.version + 1,
+      previous_working_model_id: request.working_model.working_model_id,
+      fingerprint: removedFingerprint,
+      created_at: now().toISOString(),
+      payload: removedPayload,
+    });
+    await Truth.persistCandidateWorkingModel(database, removedHead);
+    return runtimeResult(request, {
+      contract_id: Conversation.ACTION_CONTRACT_ID,
+      action: "PATCH_ITEM",
+      message: "This removed-card response must not persist.",
+      observed_working_model: Conversation.observedWorkingModel(request.observation),
+      patches: [{ target_item_id: "synthetic-education-exchange", operations: [{ operation: "SET_ITEM_FIELD", field: "time", value: "Never" }], reason: "Synthetic removed-card late result.", origin: "MODEL_PROPOSAL", evidence_refs: [] }],
+      clarification: null,
+    });
+  },
+});
+assert.equal(removedCardOutcome.status, "STALE");
+assert.equal(removedCardOutcome.session.conversation_id, session.conversation_id);
+assert.equal(removedCardOutcome.working_model.payload.items.some((item) => item.item_id === "synthetic-education-exchange"), false);
+const afterRemovedCardConversation = await Persistence.restoreConversation(database, session.conversation_id);
+assert.equal(afterRemovedCardConversation.messages.length, beforeRemovedCardConversation.messages.length + 1);
+assert.equal(afterRemovedCardConversation.messages.at(-1).role, "USER");
+assert(!afterRemovedCardConversation.actions.some((action) => action.normalized_action.message === "This removed-card response must not persist."));
+
 // F — reopen resolves the identical session and durable history in order.
 const reopenedSession = await Integration.resolveSession(database, initialWorking.source_document_id, "2026-09-03T09:00:00Z");
 assert.equal(reopenedSession.conversation_id, session.conversation_id);
 const restored = await Persistence.restoreConversation(database, session.conversation_id);
-assert.equal(restored.messages.filter((message) => message.role === "USER").length, 7);
-assert.equal(restored.messages.filter((message) => message.role === "ASSISTANT").length, 5);
-assert.equal(restored.turns.find((turn) => turn.state === "FAILED")?.failure_code, "PROVIDER_TRANSPORT_ERROR");
+assert.equal(restored.messages.filter((message) => message.role === "USER").length, 12);
+assert.equal(restored.messages.filter((message) => message.role === "ASSISTANT").length, 8);
+assert(restored.turns.some((turn) => turn.state === "FAILED" && turn.failure_code === "EMPTY_RESPONSE"));
 assert(restored.turns.some((turn) => turn.state === "STALE"));
 assert(!restored.actions.some((action) => action.normalized_action.message === "This stale result must not persist."));
 assert.equal((await Integration.latestWorkingModel(database, initialWorking.source_document_id)).payload.items[0].title, "Concurrent Durable Title");
 
-// UI wiring evidence: list root uses the integration function; deterministic helper remains Detail-only.
+// Work Card field semantics: role, experience title, and work arrangement project to distinct durable destinations.
+const workPayload = {
+  contract_id: "ariadne-candidate-working-payload-v1", material_type: "resume",
+  items: [{
+    item_id: "synthetic-work-role-card", item_type: "WORK_EXPERIENCE", item_subtype: "work_experience",
+    title: "Synthetic Experience Title", subtitle: "Synthetic Studio", time: "2025", summary: "Synthetic work card.", ownership: null,
+    facts: [
+      { fact_id: "synthetic-role-fact", label: "角色", value: "Synthetic Collaborator" },
+      { fact_id: "synthetic-arrangement-fact", label: "工作性质", value: "Synthetic Part-time" },
+    ],
+    grounding_refs: [], uncertainties: [], review_status: "NEEDS_REVIEW", item_version: 1, content_origin: "MODEL_PROPOSAL",
+  }],
+};
+const workInitial = Truth.validateCandidateWorkingModel({
+  ...initialWorking,
+  working_model_id: "synthetic-work-role-working-v1",
+  source_document_id: "source-synthetic-work-role-card",
+  version: 1,
+  previous_working_model_id: null,
+  fingerprint: await fingerprint(workPayload),
+  payload: workPayload,
+});
+const workDatabase = memoryDatabase();
+workDatabase.records.get("candidate_working_models").set(workInitial.working_model_id, structuredClone(workInitial));
+workDatabase.records.get("source_documents").set(workInitial.source_document_id, { source_document_id: workInitial.source_document_id });
+const workSession = await Integration.resolveSession(workDatabase, workInitial.source_document_id, "2026-09-03T08:00:00Z");
+const workTurn = async (human_message, operation, providerMessage) => Integration.executeListTurn({
+  database: workDatabase, session: workSession, focus: { type: "ITEM", item_id: "synthetic-work-role-card" }, human_message,
+  runtime_snapshot: snapshot(), id_factory: idFactory, now,
+  call_runtime: async (request) => runtimeResult(request, {
+    contract_id: Conversation.ACTION_CONTRACT_ID, action: "PATCH_ITEM", message: providerMessage,
+    observed_working_model: Conversation.observedWorkingModel(request.observation),
+    patches: [{ target_item_id: "synthetic-work-role-card", operations: [operation], reason: "Synthetic Work semantic field update.", origin: "MODEL_PROPOSAL", evidence_refs: [] }], clarification: null,
+  }),
+});
+
+const roleTurn = await workTurn("我的角色是 Synthetic Designer。", { operation: "SET_FACT_VALUE", fact_id: "synthetic-role-fact", value: "Synthetic Designer" }, "已更新经历标题。");
+assert.equal(roleTurn.working_model.payload.items[0].title, "Synthetic Experience Title");
+assert.equal(roleTurn.working_model.payload.items[0].facts.find((fact) => fact.fact_id === "synthetic-role-fact").value, "Synthetic Designer");
+assert.equal(roleTurn.assistant_message.text, "已将这张卡片的「角色」（原值：「Synthetic Collaborator」）改为「Synthetic Designer」。");
+assert.equal(roleTurn.action.normalized_action.message, roleTurn.assistant_message.text);
+
+const titleTurn = await workTurn("这段经历的标题改成 Synthetic Revised Experience。", { operation: "SET_ITEM_FIELD", field: "title", value: "Synthetic Revised Experience" }, "已更新角色。");
+assert.equal(titleTurn.working_model.payload.items[0].title, "Synthetic Revised Experience");
+assert.equal(titleTurn.working_model.payload.items[0].facts.find((fact) => fact.fact_id === "synthetic-role-fact").value, "Synthetic Designer");
+assert.equal(titleTurn.assistant_message.text, "已将这张卡片的「标题」（原值：「Synthetic Experience Title」）改为「Synthetic Revised Experience」。");
+
+const arrangementTurn = await workTurn("这里的工作性质改成 Synthetic Internship。", { operation: "SET_FACT_VALUE", fact_id: "synthetic-arrangement-fact", value: "Synthetic Internship" }, "已更新角色。");
+assert.equal(arrangementTurn.working_model.payload.items[0].title, "Synthetic Revised Experience");
+assert.equal(arrangementTurn.working_model.payload.items[0].facts.find((fact) => fact.fact_id === "synthetic-role-fact").value, "Synthetic Designer");
+assert.equal(arrangementTurn.working_model.payload.items[0].facts.find((fact) => fact.fact_id === "synthetic-arrangement-fact").value, "Synthetic Internship");
+assert.equal(arrangementTurn.assistant_message.text, "已将这张卡片的「工作性质」（原值：「Synthetic Part-time」）改为「Synthetic Internship」。");
+const restoredWorkConversation = await Persistence.restoreConversation(workDatabase, workSession.conversation_id);
+assert.equal(restoredWorkConversation.messages.at(-1).text, arrangementTurn.assistant_message.text);
+assert.equal(restoredWorkConversation.actions.at(-1).normalized_action.message, arrangementTurn.assistant_message.text);
+
+// Duplicate-looking legacy fields remain distinct by descriptor identity and exact before value.
+const duplicatePayload = {
+  contract_id: "ariadne-candidate-working-payload-v1", material_type: "project",
+  items: [{
+    item_id: "synthetic-project-card", item_type: "PROJECT", item_subtype: "project",
+    title: "Synthetic Project", subtitle: "Design Research", time: "2025", summary: "Synthetic project.", ownership: null,
+    facts: [
+      { fact_id: "synthetic-a", label: "unknown-a", value: "2025" },
+      { fact_id: "synthetic-b", label: "unknown-b", value: "HTML + JavaScript" },
+      { fact_id: "synthetic-real-supplemental", label: "Supplemental Information", value: "Synthetic note" },
+    ],
+    grounding_refs: [], uncertainties: [], review_status: "NEEDS_REVIEW", item_version: 1, content_origin: "MODEL_PROPOSAL",
+  }],
+};
+const duplicateInitial = Truth.validateCandidateWorkingModel({
+  ...initialWorking, working_model_id: "synthetic-duplicate-working-v1", source_document_id: "source-synthetic-duplicate-fields",
+  version: 1, previous_working_model_id: null, fingerprint: await fingerprint(duplicatePayload), payload: duplicatePayload,
+});
+const duplicateDatabase = memoryDatabase();
+duplicateDatabase.records.get("candidate_working_models").set(duplicateInitial.working_model_id, structuredClone(duplicateInitial));
+duplicateDatabase.records.get("source_documents").set(duplicateInitial.source_document_id, { source_document_id: duplicateInitial.source_document_id });
+const duplicateSession = await Integration.resolveSession(duplicateDatabase, duplicateInitial.source_document_id, "2026-09-03T08:00:00Z");
+const duplicateTurn = await Integration.executeListTurn({
+  database: duplicateDatabase, session: duplicateSession, focus: { type: "ITEM", item_id: "synthetic-project-card" },
+  human_message: "把补充信息里现在是2025的那项改成RCA硕士作业。", runtime_snapshot: snapshot(), id_factory: idFactory, now,
+  call_runtime: async (request) => {
+    const operation = { operation: "SET_FACT_VALUE", fact_id: "synthetic-a", value: "RCA硕士作业" };
+    const action = {
+      contract_id: Conversation.ACTION_CONTRACT_ID, action: "PATCH_ITEM", message: "Untrusted generic success.",
+      observed_working_model: Conversation.observedWorkingModel(request.observation),
+      patches: [{ target_item_id: "synthetic-project-card", operations: [operation], reason: "Exact synthetic value resolution.", origin: "MODEL_PROPOSAL", evidence_refs: [] }], clarification: null,
+    };
+    return runtimeResult(request, action);
+  },
+});
+const duplicateFacts = duplicateTurn.working_model.payload.items[0].facts;
+assert.equal(duplicateFacts.find((fact) => fact.fact_id === "synthetic-a").value, "RCA硕士作业");
+assert.equal(duplicateFacts.find((fact) => fact.fact_id === "synthetic-b").value, "HTML + JavaScript");
+assert.equal(duplicateTurn.assistant_message.text, "已将这张卡片的「未分类信息」（原值：「2025」）改为「RCA硕士作业」。");
+assert(!/synthetic-(?:project-card|a|b|duplicate-working)/u.test(duplicateTurn.assistant_message.text));
+assert.equal((await Integration.resolveSession(duplicateDatabase, duplicateInitial.source_document_id)).conversation_id, duplicateSession.conversation_id);
+
+// Version skew is rejected before a Model turn can be sent; the current signature is exact.
+const currentSignature = Integration.runtimeSignature();
+assert.equal(Integration.runtimeSignaturesMatch(currentSignature, structuredClone(currentSignature)), true);
+assert.equal(Integration.runtimeSignaturesMatch(currentSignature, { ...currentSignature, runtime_result_contract_version: "ariadne-candidate-conversation-runtime-result-v1" }), false);
+const skewedRuntimeResult = runtimeResult({ turn: { execution_id: "turn", generation: "generation" }, conversation: session, runtime_snapshot: { snapshot_id: "snapshot" } }, {
+  contract_id: Conversation.ACTION_CONTRACT_ID, action: "EXPLAIN", message: "Synthetic.", observed_working_model: {}, patches: [], clarification: null,
+});
+skewedRuntimeResult.contract_id = "ariadne-candidate-conversation-runtime-result-v1";
+assert.throws(() => Integration.validateRuntimeResult(skewedRuntimeResult, { execution_id: "turn", generation: "generation" }, session, { snapshot_id: "snapshot" }),
+  (error) => error.code === "RUNTIME_RESULT_IDENTITY_INVALID");
+
+// Human Copy Boundary replaces provider copy containing internal identities before persistence/display.
+const leakyExplain = await Integration.executeListTurn({
+  database: duplicateDatabase, session: duplicateSession, focus: { type: "ITEM", item_id: "synthetic-project-card" },
+  human_message: "解释当前字段。", runtime_snapshot: snapshot(), id_factory: idFactory, now,
+  call_runtime: async (request) => noPatches(request, "EXPLAIN", `item synthetic-project-card fact synthetic-b working ${request.working_model.working_model_id}`),
+});
+assert.equal(leakyExplain.assistant_message.text, "我无法安全显示这段说明，请换一种问法。");
+assert(!leakyExplain.assistant_message.text.includes("synthetic-project-card"));
+const currentCardClarification = await Integration.executeListTurn({
+  database: duplicateDatabase, session: duplicateSession, focus: { type: "ITEM", item_id: "synthetic-project-card" },
+  human_message: "这个卡片里补充一条背景信息。", runtime_snapshot: snapshot(), id_factory: idFactory, now,
+  call_runtime: async (request) => noPatches(request, "ASK_CLARIFICATION", "", "请选择 synthetic-project-card / synthetic-a。"),
+});
+assert.equal(currentCardClarification.turn.state, "NEEDS_CLARIFICATION");
+assert.equal(currentCardClarification.assistant_message.text, "请使用卡片标题或字段名称说明要修改的内容。");
+assert.equal(currentCardClarification.session.conversation_id, duplicateSession.conversation_id);
+
+// Applied Verification V2 rejects a result where another descriptor changed, even though some operation succeeded.
+const correctOperation = { operation: "SET_FACT_VALUE", fact_id: "synthetic-a", value: "Expected" };
+const correctPatch = { target_item_id: "synthetic-project-card", operations: [correctOperation] };
+const correctReceipt = receiptFor({ working_model: duplicateInitial }, correctPatch, correctOperation);
+const wrongTargetResult = structuredClone(duplicateInitial);
+wrongTargetResult.payload.items[0].facts.find((fact) => fact.fact_id === "synthetic-b").value = "Expected";
+assert.throws(() => Integration.verifiedAppliedAction({ action: "PATCH_ITEM", patches: [correctPatch] }, [correctReceipt], duplicateInitial, wrongTargetResult),
+  (error) => error.code === "APPLICATION_RESULT_MISMATCH");
+
+// The runtime blocks an unverifiable application before it can persist an Assistant success message.
+assert.throws(() => Integration.verifiedAppliedAction({
+  action: "PATCH_ITEM", patches: [{ target_item_id: "synthetic-work-role-card", operations: [{ operation: "SET_ITEM_FIELD", field: "title", value: "Never Applied" }] }],
+}, [receiptFor({ working_model: workInitial }, { target_item_id: "synthetic-work-role-card" }, { operation: "SET_ITEM_FIELD", field: "title", value: "Never Applied" })], workInitial, workInitial), (error) => error.code === "APPLICATION_RESULT_MISMATCH");
+
+// UI wiring evidence: List and Detail use one integration function and select focus at submit time.
 const pages = fs.readFileSync(path.join(root, "public", "v1-pages.js"), "utf8");
+const detailRendererBody = pages.match(/function renderCandidateWorkspaceCardDetail\(itemId\) \{([\s\S]*?)\n  \}\n\n  async function openCandidateWorkspaceCardDetail/)?.[1] || "";
+assert.match(detailRendererBody, /candidate-card-detail-title[\s\S]*item\.title/);
+assert.match(detailRendererBody, /candidate-card-detail-facts[\s\S]*visibleFacts\.map\(\(fact\)[\s\S]*canonical_display_label[\s\S]*fact\.value/);
 const rootSubmitBody = pages.match(/async function submitCandidateWorkspaceConversation\(content\) \{([\s\S]*?)\n  \}\n\n  function returnToCandidateCardList/)?.[1] || "";
 assert(rootSubmitBody.includes("CandidateWorkspaceConversationRuntime.executeListTurn"));
 assert(!rootSubmitBody.includes("applyCandidateWorkspaceCorrection"));
-assert.match(pages, /if \(activeCandidateWorkspaceItemId\) applyCandidateWorkspaceCorrection\(content\)[\s\S]*else submitCandidateWorkspaceConversation\(content\)/);
+assert.doesNotMatch(pages, /applyCandidateWorkspaceCorrection|workspaceItemPatch/);
+assert.match(rootSubmitBody, /type: "CANDIDATE"/);
+assert.match(rootSubmitBody, /type: "ITEM", item_id: activeCandidateWorkspaceItemId/);
+assert.match(rootSubmitBody, /focus,/);
 assert.match(rootSubmitBody, /workspaceViewIsCurrent\(viewGeneration\)/);
-assert.match(rootSubmitBody, /candidateWorkingGroupsMarkup\(durableHead\.payload\.items/);
+assert.match(rootSubmitBody, /renderLatestCandidateWorkspaceSurface\(sourceId, durableHead, viewGeneration\)/);
+assert.match(pages, /openCandidateWorkspaceCardDetail\(card\.dataset\.workingItem\)/);
+assert.match(pages, /CandidateWorkspaceConversationRuntime\.latestWorkingModel\(database, sourceId\)/);
 assert.match(pages, /candidateConversationTurnActive/);
+assert.match(pages, /candidate-conversation-runtime-signature/);
+assert.match(pages, /RUNTIME_CONTRACT_VERSION_MISMATCH/);
+assert.match(pages, /模型这次没有返回可用内容，请重试。/);
 
 const html = fs.readFileSync(path.join(root, "public", "personal-import.html"), "utf8");
 assert.match(html, /candidate-conversation-contract-manifest\.js/);

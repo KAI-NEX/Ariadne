@@ -111,7 +111,7 @@ assert.equal(unverified.capabilities.ai_conversation, "unverified");
 const conversationDescriptor = {
   provider_id: "deepseek", model_id: "deepseek-v4-pro", protocol: "OPENAI_CHAT_COMPLETIONS",
   capabilities: ["TEXT", "STRUCTURED_JSON"], discovery_source: "qualification_2026-09-03",
-  runtime_capability_basis: "adapter_verified", adapter_version: "deepseek-candidate-conversation-v1",
+  runtime_capability_basis: "adapter_verified", adapter_version: "deepseek-candidate-conversation-v3",
   runtime_capabilities: {
     semantic_understanding: "supported", candidate_model_structuring: "unsupported",
     job_model_structuring: "unsupported", model_merge: "unsupported", ai_conversation: "supported", vision: "unsupported",
@@ -123,7 +123,7 @@ const conversationSnapshot = Runtime.createRuntimeSnapshot(
     modelDescriptor: conversationDescriptor, snapshotId: "runtime-snapshot-candidate-conversation",
     capturedAt: "2026-09-03T07:00:00Z", operation: "CANDIDATE_CONVERSATION_TURN",
     capabilityBasis: "adapter_verified", actionSchemaVersion: "ariadne-candidate-conversation-action-v1",
-    requestConfigVersion: "deepseek-candidate-conversation-request-v1",
+    requestConfigVersion: "deepseek-candidate-conversation-request-v3",
   },
 );
 assert.equal(conversationSnapshot.capabilities.ai_conversation, "supported");

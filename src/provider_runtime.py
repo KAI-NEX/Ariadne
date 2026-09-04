@@ -89,7 +89,7 @@ def deepseek_model_descriptors(model_ids: list[str]) -> list[ModelDescriptor]:
                     "ai_conversation": "supported",
                     "vision": "unsupported",
                 },
-                "deepseek-candidate-conversation-v1",
+                "deepseek-candidate-conversation-v3",
                 None,
             ))
         elif model_id == "deepseek-v4-flash-vision-exp":

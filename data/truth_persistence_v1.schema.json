@@ -395,6 +395,7 @@
         "state": { "enum": ["CREATED", "SENDING", "RECEIVED", "VALIDATING", "APPLIED", "NO_CHANGE", "NEEDS_CLARIFICATION", "FAILED", "CANCELLED", "STALE"] },
         "state_history": { "type": "array", "minItems": 1, "items": { "type": "object" } },
         "failure_code": { "$ref": "#/$defs/nullableString" },
+        "failure_diagnostics": { "type": ["object", "null"] },
         "result_action": { "$ref": "#/$defs/nullableString" },
         "created_at": { "$ref": "#/$defs/isoTimestamp" },
         "updated_at": { "$ref": "#/$defs/isoTimestamp" },

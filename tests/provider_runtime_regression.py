@@ -19,7 +19,7 @@ assert pro.protocol == OPENAI_CHAT_COMPLETIONS
 assert pro.runtime_capability_basis == "adapter_verified"
 assert pro.runtime_capabilities["ai_conversation"] == "supported"
 assert pro.runtime_capabilities["candidate_model_structuring"] == "unsupported"
-assert pro.adapter_version == "deepseek-candidate-conversation-v1" and pro.delivery_method is None
+assert pro.adapter_version == "deepseek-candidate-conversation-v3" and pro.delivery_method is None
 assert vision.protocol == OPENAI_CHAT_COMPLETIONS and vision.capabilities == (TEXT, VISION)
 assert vision.multimodal_readiness == MULTIMODAL_VERIFIED and vision.discovery_source == "qualification_2026-09-03" and is_multimodal(vision)
 assert vision.runtime_capability_basis == "adapter_verified"

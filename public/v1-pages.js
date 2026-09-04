@@ -11,6 +11,7 @@
   const LocalCandidateProposal = window.AriadneLocalCandidateProposal;
   const LocalCandidateReview = window.AriadneLocalCandidateReview;
   const CandidateModel = window.AriadneCandidateModelRuntime;
+  const CandidateConversation = window.AriadneCandidateConversation;
   const CandidateConversationPersistence = window.AriadneCandidateConversationPersistence;
   const CandidateWorkspaceConversationRuntime = window.AriadneCandidateWorkspaceConversationRuntime;
   const LocalJobLifecycle = window.AriadneLocalJobLifecycle;
@@ -82,9 +83,15 @@
   }
 
   function candidateTypeLabel(item) { return subtypeLabels[item?.item_subtype] || typeLabels[item?.item_type] || "其他经历"; }
-  function candidateFactLabel(value) { return factLabels[value] || factLabels[String(value || "").trim().toLowerCase()] || (/[\u3400-\u9fff]/.test(String(value || "")) ? value : "补充信息"); }
+  function candidateFactLabel(value) {
+    if (CandidateConversation) {
+      const semanticKey = CandidateConversation.semanticKeyForFactLabel(value);
+      return CandidateConversation.canonicalDisplayLabel(semanticKey, value);
+    }
+    return factLabels[value] || factLabels[String(value || "").trim().toLowerCase()] || (/[\u3400-\u9fff]/.test(String(value || "")) ? value : "未分类信息");
+  }
   function candidateWorkspaceFactLabel(value) {
-    return ["organization", "company"].includes(String(value || "").trim().toLowerCase()) ? "公司机构" : candidateFactLabel(value);
+    return candidateFactLabel(value);
   }
   function personalErrorCopy(error) {
     const code = String(error?.code || error?.message || error || "");
@@ -852,27 +859,6 @@
     } finally { database.close(); }
   }
 
-  function workspaceItemPatch(item, text) {
-    const content = String(text || "").trim();
-    const alias = content.match(/^(.+?)\s*就是\s*(.+?)(?:[，,。！!]?\s*(?:不需要重复(?:写)?|不要重复|请不要重复))?[。！!]?$/u);
-    const directEdit = content.match(/^(?:把|将)\s*(.+?)\s*(?:改为|改成)\s*(.+?)[。！!]?$/u);
-    const aliasLeft = alias?.[1]?.trim();
-    const aliasRight = alias?.[2]?.trim();
-    const replacement = alias ? (/[a-z]{2,}/i.test(aliasLeft) && !/[a-z]{2,}/i.test(aliasRight) ? `${aliasRight}（${aliasLeft.toUpperCase()}）` : `${aliasLeft}（${aliasRight}）`) : directEdit?.[2]?.trim();
-    const targets = alias ? [alias[1].trim(), alias[2].trim()] : directEdit ? [directEdit[1].trim()] : [];
-    if (!replacement || !targets.every(Boolean)) return null;
-    const shouldReplace = (value) => targets.some((target) => normalizedDisplayValue(value).includes(normalizedDisplayValue(target)));
-    const replaceValue = (value) => shouldReplace(value) ? replacement : value;
-    const factValues = (item.facts || []).map((fact) => replaceValue(fact.value));
-    const changed = shouldReplace(item.title) || shouldReplace(item.subtitle) || shouldReplace(item.time) || shouldReplace(item.summary) || factValues.some((value, index) => value !== item.facts[index].value);
-    if (!changed) return null;
-    return {
-      patch: { title: replaceValue(item.title), subtitle: replaceValue(item.subtitle), time: replaceValue(item.time), summary: replaceValue(item.summary), facts: factValues },
-      supportRelation: alias ? "USER_CONFIRMED" : "USER_EDITED",
-      acknowledgement: alias ? `已将${alias[1].trim()}与${alias[2].trim()}视为同一机构，并更新相关卡片。` : "已更新相关 Working Card。",
-    };
-  }
-
   function showCandidateWorkspaceLayer(sourceName, processing = false) {
     const workspace = byId("candidate-ai-workspace");
     if (!workspace) return;
@@ -904,16 +890,43 @@
     candidateWorkspaceEditDirty = false;
     byId("candidate-card-detail-kind").textContent = candidateTypeLabel(item);
     byId("candidate-card-detail-title").textContent = item.title;
-    byId("candidate-card-detail-meta").textContent = [item.subtitle, item.time].filter(Boolean).join(" · ");
-    byId("candidate-card-detail-summary").textContent = item.summary || "暂无摘要";
-    const seen = new Set([item.title, item.subtitle, item.time, item.summary].map(normalizedDisplayValue).filter(Boolean));
-    const visibleFacts = (item.facts || []).filter((fact) => {
-      const value = normalizedDisplayValue(fact.value);
-      if (!value || seen.has(value)) return false;
-      seen.add(value);
-      return true;
-    });
-    byId("candidate-card-detail-facts").innerHTML = visibleFacts.map((fact) => `<div><small>${escapeHtml(candidateWorkspaceFactLabel(fact.label))}</small><p>${escapeHtml(fact.value)}</p></div>`).join("") || "<p>暂无补充事实</p>";
+    byId("candidate-card-detail-meta").textContent = [item.subtitle ? `副标题：${item.subtitle}` : "", item.time ? `时间：${item.time}` : ""].filter(Boolean).join(" · ");
+    byId("candidate-card-detail-summary").textContent = `摘要：${item.summary || "暂无摘要"}`;
+    const visibleFacts = (item.facts || []).filter((fact) => normalizedDisplayValue(fact.value));
+    const descriptors = CandidateConversation ? CandidateConversation.candidateFieldDescriptors(item) : [];
+    byId("candidate-card-detail-facts").innerHTML = visibleFacts.map((fact) => {
+      const descriptor = descriptors.find((entry) => entry.storage_target.kind === "FACT" && entry.storage_target.fact_id === fact.fact_id);
+      const label = descriptor?.canonical_display_label || candidateWorkspaceFactLabel(fact.label);
+      return `<div><small>${escapeHtml(label)}</small><p>${escapeHtml(fact.value)}</p></div>`;
+    }).join("") || "<p>暂无现有信息</p>";
+  }
+
+  async function openCandidateWorkspaceCardDetail(itemId) {
+    const sourceId = activeCandidateWorkingModel?.source_document_id;
+    const viewGeneration = candidateWorkspaceViewGeneration;
+    if (!sourceId || !workspaceViewIsCurrent(viewGeneration)) return;
+    const database = await Truth.openDatabase();
+    let durableHead;
+    try { durableHead = await CandidateWorkspaceConversationRuntime.latestWorkingModel(database, sourceId); }
+    finally { database.close(); }
+    if (!workspaceViewIsCurrent(viewGeneration)) return;
+    activeCandidateWorkingModel = durableHead;
+    byId("candidate-working-groups").innerHTML = candidateWorkingGroupsMarkup(durableHead.payload.items || []);
+    if ((durableHead.payload.items || []).some((item) => item.item_id === itemId)) renderCandidateWorkspaceCardDetail(itemId);
+    else returnToCandidateCardList();
+  }
+
+  async function renderLatestCandidateWorkspaceSurface(sourceId, durableHead, viewGeneration) {
+    if (!workspaceViewIsCurrent(viewGeneration)) return;
+    activeCandidateWorkingModel = durableHead;
+    const detailItemId = activeCandidateWorkspaceItemId;
+    if (detailItemId === null) {
+      await renderCandidateWorkingWorkspace(sourceId, { workingModel: durableHead, viewGeneration });
+      return;
+    }
+    byId("candidate-working-groups").innerHTML = candidateWorkingGroupsMarkup(durableHead.payload.items || []);
+    if ((durableHead.payload.items || []).some((item) => item.item_id === detailItemId)) renderCandidateWorkspaceCardDetail(detailItemId);
+    else returnToCandidateCardList();
   }
 
   async function renderCandidateWorkingWorkspace(sourceId, options = {}) {
@@ -990,6 +1003,32 @@
   }
 
   async function callCandidateConversationRuntime(request) {
+    const signatureResponse = await fetch("/api/candidate-conversation-runtime-signature", { cache: "no-store" });
+    const signaturePayload = await signatureResponse.json().catch(() => null);
+    const frontendSignature = CandidateWorkspaceConversationRuntime.runtimeSignature();
+    const backendSignature = signaturePayload?.runtime_signature;
+    if (!signatureResponse.ok || !CandidateWorkspaceConversationRuntime.runtimeSignaturesMatch(frontendSignature, backendSignature)) {
+      const error = new Error("RUNTIME_CONTRACT_VERSION_MISMATCH");
+      error.code = "RUNTIME_CONTRACT_VERSION_MISMATCH";
+      error.failure_layer = "runtime";
+      error.network_call_made = false;
+      error.diagnostics = {
+        stage: "RUNTIME_SIGNATURE",
+        error_code: "RUNTIME_CONTRACT_VERSION_MISMATCH",
+        provider_called: false,
+        provider_response_received: false,
+        json_parse_passed: false,
+        semantic_schema_passed: false,
+        resolution_passed: false,
+        canonical_schema_passed: false,
+        semantic_guard_passed: false,
+        persistence_reached: false,
+        runtime_signature_compatible: false,
+        frontend_contract_version: frontendSignature.runtime_result_contract_version,
+        backend_contract_version: typeof backendSignature?.runtime_result_contract_version === "string" ? backendSignature.runtime_result_contract_version : "unavailable",
+      };
+      throw error;
+    }
     const response = await fetch("/api/candidate-conversation-turn", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1001,6 +1040,7 @@
       error.code = result.error || "CANDIDATE_CONVERSATION_FAILED";
       error.failure_layer = result.failure_layer || "runtime";
       error.network_call_made = result.network_call_made === true;
+      error.diagnostics = result.diagnostics;
       throw error;
     }
     return result;
@@ -1009,10 +1049,12 @@
   async function submitCandidateWorkspaceConversation(content) {
     const humanMessage = String(content || "").trim();
     if (!humanMessage || !activeCandidateWorkingModel || candidateConversationTurnActive) return;
-    if (activeCandidateWorkspaceItemId) throw new Error("candidate_conversation_list_focus_required");
     if (!CandidateWorkspaceConversationRuntime || !CandidateConversationPersistence) throw new Error("candidate_conversation_runtime_dependencies_unavailable");
     const sourceId = activeCandidateWorkingModel.source_document_id;
     const viewGeneration = candidateWorkspaceViewGeneration;
+    const focus = activeCandidateWorkspaceItemId === null
+      ? Object.freeze({ type: "CANDIDATE" })
+      : Object.freeze({ type: "ITEM", item_id: activeCandidateWorkspaceItemId });
     let terminalCopy = "";
     let database = null;
     candidateConversationTurnActive = true;
@@ -1028,6 +1070,7 @@
         database,
         session,
         human_message: humanMessage,
+        focus,
         runtime_snapshot: snapshot,
         call_runtime: callCandidateConversationRuntime,
         on_user_persisted: async () => {
@@ -1043,28 +1086,31 @@
       renderCandidateWorkspaceConversation();
       if (outcome.status === "STALE") {
         terminalCopy = "候选人信息已发生变化，请基于最新内容重试。";
-        activeCandidateWorkingModel = outcome.working_model;
-        byId("candidate-working-groups").innerHTML = candidateWorkingGroupsMarkup(outcome.working_model.payload.items || []);
+        await renderLatestCandidateWorkspaceSurface(sourceId, outcome.working_model, viewGeneration);
         return outcome;
       }
       const durableHead = await CandidateWorkspaceConversationRuntime.latestWorkingModel(database, sourceId);
-      activeCandidateWorkingModel = durableHead;
-      if (activeCandidateWorkspaceItemId === null) {
-        await renderCandidateWorkingWorkspace(sourceId, { workingModel: durableHead, viewGeneration });
-      } else {
-        byId("candidate-working-groups").innerHTML = candidateWorkingGroupsMarkup(durableHead.payload.items || []);
-      }
+      await renderLatestCandidateWorkspaceSurface(sourceId, durableHead, viewGeneration);
       return outcome;
     } catch (error) {
-      terminalCopy = String(error?.code || error?.message) === "STALE_WORKING_OBSERVATION"
+      const failureCode = String(error?.code || error?.message);
+      terminalCopy = failureCode === "STALE_WORKING_OBSERVATION"
         ? "候选人信息已发生变化，请基于最新内容重试。"
-        : "这次没有完成，请重试。";
+        : failureCode === "FOCUS_VIOLATION"
+          ? "这个请求超出了当前卡片范围；候选人信息未修改。"
+          : failureCode === "RUNTIME_CONTRACT_VERSION_MISMATCH"
+            ? "服务版本已更新，请刷新页面后重试。"
+            : failureCode === "EMPTY_RESPONSE"
+              ? "模型这次没有返回可用内容，请重试。"
+          : "这次没有完成，请重试。";
       if (database && activeCandidateConversationSession?.conversation_id) {
         try {
           const restored = await CandidateConversationPersistence.restoreConversation(database, activeCandidateConversationSession.conversation_id);
           if (workspaceViewIsCurrent(viewGeneration)) {
             candidateWorkspaceConversation = restored.messages;
             renderCandidateWorkspaceConversation();
+            const durableHead = await CandidateWorkspaceConversationRuntime.latestWorkingModel(database, sourceId);
+            await renderLatestCandidateWorkspaceSurface(sourceId, durableHead, viewGeneration);
           }
         } catch (_restoreError) { /* Preserve the safe failure copy. */ }
       }
@@ -1091,31 +1137,6 @@
     const dialog = byId("candidate-card-unsaved-dialog");
     if (!dialog.open) dialog.showModal();
     return undefined;
-  }
-
-  async function applyCandidateWorkspaceCorrection(content) {
-    const userMessage = String(content || "").trim();
-    if (!userMessage || !activeCandidateWorkingModel) return;
-    candidateWorkspaceConversation.push({ role: "USER", content: userMessage });
-    renderCandidateWorkspaceConversation();
-    const items = activeCandidateWorkingModel.payload.items || [];
-    const activeItem = items.find((item) => item.item_id === activeCandidateWorkspaceItemId);
-    const activeTarget = activeItem ? { item: activeItem, update: workspaceItemPatch(activeItem, userMessage) } : null;
-    const target = activeItem ? (activeTarget?.update ? activeTarget : null) : items.map((item) => ({ item, update: workspaceItemPatch(item, userMessage) })).find((entry) => entry.update);
-    if (!target) {
-      candidateWorkspaceConversation.push({ role: "ASSISTANT", content: activeItem ? "我会针对当前卡片修改；请用“把…改为…”或“…就是…”说明具体字段。" : "我还无法确定需要修改哪张卡片；请点开目标卡片，或用“把…改为…”说明具体字段。" });
-      renderCandidateWorkspaceConversation();
-      return;
-    }
-    const next = await CandidateModel.editedCandidateWorkingModel(activeCandidateWorkingModel, target.item.item_id, target.update.patch, new Date().toISOString(), target.update.supportRelation);
-    const database = await Truth.openDatabase();
-    try { await Truth.persistCandidateWorkingModel(database, next); }
-    finally { database.close(); }
-    activeCandidateWorkingModel = next;
-    candidateWorkspaceConversation.push({ role: "ASSISTANT", content: target.update.acknowledgement });
-    await renderCandidateWorkingWorkspace(next.source_document_id, { workingModel: next, viewGeneration: candidateWorkspaceViewGeneration });
-    if (activeCandidateWorkspaceItemId === target.item.item_id) renderCandidateWorkspaceCardDetail(target.item.item_id);
-    renderCandidateWorkspaceConversation();
   }
 
   function closeCandidateWorkspaceLayer(destination = "import") {
@@ -1216,12 +1237,14 @@
     const gate = CandidateModel.assertEligibleGate(refreshCandidateImportGate());
     void gate;
     const database = await Truth.openDatabase();
+    let restoredWorkingModel = null;
     try {
       const records = await readCandidateRecords(database);
       const sourceDocument = records.source_documents.find((source) => source.source_document_id === sourceId);
       if (!sourceDocument) throw new Error("raw_source_document_missing");
       const resolved = await RawSource.resolveRawSource(database, sourceId);
       if (selectionVersion !== candidateSelectionVersion) return;
+      restoredWorkingModel = latestCandidateWorkingModel(records, sourceId);
       selectedCandidateSources = [{
         file: resolved.file,
         mime_type: sourceDocument.mime_type,
@@ -1235,7 +1258,8 @@
     setCompletedSourceSheet(false);
     byId("personal-page-message").textContent = "";
     byId("personal-page-message").classList.remove("error");
-    candidateExecutionState = "READY";
+    activeCandidateWorkingModel = restoredWorkingModel ? Truth.validateCandidateWorkingModel(restoredWorkingModel) : null;
+    candidateExecutionState = activeCandidateWorkingModel ? "COMPLETE" : "READY";
     showCandidateSource(selectedCandidateSources[0]);
     setSavedCandidateSourceMenu(false);
     await renderAwaitingCandidateReviews({ reset: true, sourceIds: [] });
@@ -1903,7 +1927,7 @@
     });
     byId("candidate-working-groups").addEventListener("click", (event) => {
       const card = event.target.closest("[data-working-item]");
-      if (card) renderCandidateWorkspaceCardDetail(card.dataset.workingItem);
+      if (card) openCandidateWorkspaceCardDetail(card.dataset.workingItem).catch(showPersonalError);
     });
     byId("candidate-card-back").addEventListener("click", requestCandidateCardBack);
     byId("candidate-card-edit").addEventListener("click", enterCandidateWorkspaceEdit);
@@ -1927,8 +1951,7 @@
       const content = input.value.trim();
       if (!content || candidateConversationTurnActive) return;
       input.value = "";
-      if (activeCandidateWorkspaceItemId) applyCandidateWorkspaceCorrection(content).catch(showPersonalError);
-      else submitCandidateWorkspaceConversation(content);
+      submitCandidateWorkspaceConversation(content);
     });
     byId("candidate-workspace-save").addEventListener("click", () => saveCandidateWorkspaceToProfile().catch(showPersonalError));
     byId("candidate-workspace-continue-editing").addEventListener("click", () => byId("candidate-workspace-close-dialog").close());

@@ -136,6 +136,16 @@ const concurrentExecution = Conversation.transitionExecution(Conversation.create
 await assert.rejects(Persistence.persistUserTurn(database, { session, user_message: concurrentUser, turn: Persistence.turnRecord(concurrentExecution, { user_message_id: concurrentUser.message_id }) }), (error) => error.code === "CONVERSATION_TURN_ACTIVE");
 failedExecution = Conversation.transitionExecution(failedExecution, "FAILED", { at: timestamp(3, 4), failure_code: "PROVIDER_TRANSPORT_ERROR" });
 await Persistence.persistFailedTurn(database, Persistence.turnRecord(failedExecution, { user_message_id: failedUser.message_id }));
+// B1 diagnostic telemetry is additive: a persisted Slice A turn has no such
+// field and must still let an already-analysed source reopen without a write or
+// migration.  The stored legacy record stays legacy; only the read projection
+// is normalized.
+const legacyFailedTurn = structuredClone(database.records.get("conversation_turn_executions").get(failedExecution.execution_id));
+delete legacyFailedTurn.failure_diagnostics;
+database.records.get("conversation_turn_executions").set(failedExecution.execution_id, legacyFailedTurn);
+const legacyRestored = await Persistence.restoreConversation(database, session.conversation_id);
+assert.equal(legacyRestored.turns[0].failure_diagnostics, null);
+assert.equal(Object.hasOwn(database.records.get("conversation_turn_executions").get(failedExecution.execution_id), "failure_diagnostics"), false);
 const duplicateTurnUser = Persistence.createUserMessage({ message_id: "message-user-duplicate-turn", conversation_id: session.conversation_id, turn_id: failedExecution.execution_id, text: "Synthetic duplicate turn id.", created_at: timestamp(3, 5) });
 let duplicateTurnExecution = Conversation.createTurnExecution({ execution_id: failedExecution.execution_id, session: runtimeSession, observation: candidateObservation, runtime_snapshot_id: "runtime-snapshot-conversation", generation: "generation-duplicate-turn", created_at: timestamp(3, 5) });
 duplicateTurnExecution = Conversation.transitionExecution(duplicateTurnExecution, "SENDING", { at: timestamp(3, 6) });
@@ -187,9 +197,23 @@ assert.equal(database.records.get("conversation_turn_executions").get(staleExecu
 staleExecution = Conversation.transitionExecution(staleExecution, "FAILED", { at: timestamp(5, 5), failure_code: "STALE_WORKING_OBSERVATION" });
 await Persistence.persistFailedTurn(database, Persistence.turnRecord(staleExecution, { user_message_id: staleUser.message_id }));
 
+const diagnosticUser = Persistence.createUserMessage({ message_id: "message-user-diagnostic", conversation_id: session.conversation_id, turn_id: "turn-diagnostic", text: "Synthetic diagnostic instruction.", created_at: timestamp(6) });
+let diagnosticExecution = Conversation.createTurnExecution({ execution_id: "turn-diagnostic", session: runtimeSession, observation: candidateObservation, runtime_snapshot_id: "runtime-snapshot-conversation", generation: "generation-diagnostic", created_at: timestamp(6) });
+diagnosticExecution = Conversation.transitionExecution(diagnosticExecution, "SENDING", { at: timestamp(6, 1) });
+await Persistence.persistUserTurn(database, { session, user_message: diagnosticUser, turn: Persistence.turnRecord(diagnosticExecution, { user_message_id: diagnosticUser.message_id }) });
+diagnosticExecution = Conversation.transitionExecution(diagnosticExecution, "FAILED", {
+  at: timestamp(6, 2), failure_code: "EMPTY_RESPONSE", failure_diagnostics: {
+    stage: "PROVIDER_OUTPUT", error_code: "EMPTY_RESPONSE", provider_called: true, provider_response_received: true,
+    json_parse_passed: false, semantic_schema_passed: false, resolution_passed: false, canonical_schema_passed: false,
+    semantic_guard_passed: false, persistence_reached: false, provider_http_status: 200, exact_returned_model_match: true,
+    finish_reason: "stop", content_type: "string", content_length: 0, empty_response_classification: "EMPTY_RESPONSE_ZERO_COMPLETION",
+  },
+});
+await Persistence.persistFailedTurn(database, Persistence.turnRecord(diagnosticExecution, { user_message_id: diagnosticUser.message_id }));
+
 // Refresh restore uses only durable stores and preserves order/linkage.
 restored = await Persistence.restoreConversation(database, session.conversation_id);
-assert.deepEqual(restored.messages.map((message) => message.message_id), ["message-user-failed", "message-user-applied", "message-assistant-applied", "message-user-stale"]);
+assert.deepEqual(restored.messages.map((message) => message.message_id), ["message-user-failed", "message-user-applied", "message-assistant-applied", "message-user-stale", "message-user-diagnostic"]);
 assert.equal(restored.actions[0].originating_user_message_id, user.message_id);
 assert.equal(restored.actions[0].resulting_working_model_id, outcome.application.working_model.working_model_id);
 assert.equal(restored.turns.find((turn) => turn.execution_id === "turn-applied").action_id, actionRecord.action_id);

@@ -78,6 +78,12 @@
     if (typeof value === "string" && FORBIDDEN_VALUE.test(value)) throw new CandidateConversationPersistenceError("PRIVATE_MATERIAL_FORBIDDEN");
   }
 
+  function assertSafeDiagnosticValues(value) {
+    if (Array.isArray(value)) return value.forEach(assertSafeDiagnosticValues);
+    if (isPlainObject(value)) return Object.values(value).forEach(assertSafeDiagnosticValues);
+    if (typeof value === "string" && FORBIDDEN_VALUE.test(value)) throw new CandidateConversationPersistenceError("PRIVATE_MATERIAL_FORBIDDEN");
+  }
+
   function createSession({ candidate_context_id: candidateContextId, source_document_id: sourceDocumentId, created_at: createdAt = new Date() }) {
     const core = Conversation.createSession(candidateContextId, createdAt);
     return validateSession({
@@ -155,7 +161,15 @@
   }
 
   function validateTurn(value) {
-    const turn = exact(value, ["contract_id", "execution_id", "conversation_id", "operation", "generation", "observation", "runtime_snapshot_id", "state", "state_history", "failure_code", "result_action", "created_at", "updated_at", "cancelled_at", "user_message_id", "action_id", "usage"], "TURN_SHAPE_INVALID");
+    // B1 diagnostics are additive.  Historical turns remain durable records and
+    // must reopen without being rewritten just because this optional telemetry did
+    // not exist when they were created.
+    const legacyKeys = ["contract_id", "execution_id", "conversation_id", "operation", "generation", "observation", "runtime_snapshot_id", "state", "state_history", "failure_code", "result_action", "created_at", "updated_at", "cancelled_at", "user_message_id", "action_id", "usage"];
+    const currentKeys = [...legacyKeys.slice(0, 10), "failure_diagnostics", ...legacyKeys.slice(10)];
+    const candidate = isPlainObject(value) && JSON.stringify(Object.keys(value).sort()) === JSON.stringify(legacyKeys.slice().sort())
+      ? { ...value, failure_diagnostics: null }
+      : value;
+    const turn = exact(candidate, currentKeys, "TURN_SHAPE_INVALID");
     if (turn.contract_id !== TURN_CONTRACT || turn.operation !== Conversation.OPERATION || !Conversation.STATES.includes(turn.state)) throw new CandidateConversationPersistenceError("TURN_CONTRACT_INVALID");
     ["execution_id", "conversation_id", "generation", "runtime_snapshot_id", "user_message_id"].forEach((key) => requiredString(turn[key], "TURN_IDENTITY_INVALID", 256));
     if (!isPlainObject(turn.observation) || !isPlainObject(turn.usage)) throw new CandidateConversationPersistenceError("TURN_METADATA_INVALID");
@@ -172,6 +186,20 @@
     if (turn.cancelled_at !== null) iso(turn.cancelled_at, "TURN_TIMESTAMP_INVALID");
     if (turn.state === "FAILED") requiredString(turn.failure_code, "TURN_FAILURE_INVALID", 256);
     else if (turn.failure_code !== null) throw new CandidateConversationPersistenceError("TURN_FAILURE_INVALID");
+    if (turn.failure_diagnostics !== null && !isPlainObject(turn.failure_diagnostics)) throw new CandidateConversationPersistenceError("TURN_FAILURE_DIAGNOSTICS_INVALID");
+    if (turn.failure_diagnostics !== null) {
+      const allowed = new Set(["stage", "error_code", "provider_called", "provider_response_received", "json_parse_passed", "semantic_schema_passed", "resolution_passed", "canonical_schema_passed", "semantic_guard_passed", "persistence_reached", "runtime_signature_compatible", "frontend_contract_version", "backend_contract_version", "provider_http_status", "exact_returned_model_match", "finish_reason", "content_type", "content_length", "prompt_tokens", "completion_tokens", "total_tokens", "reasoning_content_present", "reasoning_content_length", "refusal_present", "tool_calls_present", "message_key_names", "empty_response_classification"]);
+      if (Object.keys(turn.failure_diagnostics).some((key) => !allowed.has(key))) throw new CandidateConversationPersistenceError("TURN_FAILURE_DIAGNOSTICS_INVALID");
+      if (turn.failure_diagnostics.message_key_names !== undefined
+        && (!Array.isArray(turn.failure_diagnostics.message_key_names)
+          || turn.failure_diagnostics.message_key_names.some((key) => typeof key !== "string" || !/^[a-z_]{1,128}$/u.test(key)))) {
+        throw new CandidateConversationPersistenceError("TURN_FAILURE_DIAGNOSTICS_INVALID");
+      }
+      // Diagnostic keys are already exact-allowlisted above.  Their values may
+      // include structural names such as `reasoning_content`, so only scan
+      // values for actual secret/raw-material signatures.
+      assertSafeDiagnosticValues(turn.failure_diagnostics);
+    }
     nullableString(turn.result_action, "TURN_RESULT_INVALID", 64);
     nullableString(turn.action_id, "TURN_ACTION_LINKAGE_INVALID", 256);
     if ((turn.action_id === null) !== (turn.result_action === null) || (turn.result_action !== null && !Conversation.ACTIONS.includes(turn.result_action))) {
@@ -180,7 +208,9 @@
     if (Conversation.TERMINAL_STATES.includes(turn.state) && ["APPLIED", "NO_CHANGE", "NEEDS_CLARIFICATION"].includes(turn.state) && !turn.action_id) {
       throw new CandidateConversationPersistenceError("TURN_ACTION_LINKAGE_INVALID");
     }
-    assertPrivateMaterialAbsent(turn);
+    const { failure_diagnostics: failureDiagnostics, ...turnWithoutDiagnostics } = turn;
+    void failureDiagnostics;
+    assertPrivateMaterialAbsent(turnWithoutDiagnostics);
     return Object.freeze(clone(turn));
   }
 

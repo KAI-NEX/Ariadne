@@ -45,7 +45,7 @@
       ai_conversation: "supported",
       vision: "unsupported",
     }),
-    adapter_version: "deepseek-candidate-conversation-v1",
+    adapter_version: "deepseek-candidate-conversation-v3",
     delivery_method: null,
   });
   const OPERATION_CAPABILITIES = Object.freeze({
