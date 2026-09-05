@@ -12,12 +12,16 @@ const Truth = require("../public/truth-persistence-domain.js");
 const Conversation = require("../public/candidate-conversation-domain.js");
 const Persistence = require("../public/candidate-conversation-persistence-domain.js");
 const Integration = require("../public/candidate-workspace-conversation-runtime.js");
+const CandidateModel = require("../public/candidate-model-runtime-domain.js");
+const Review = require("../public/local-candidate-review-domain.js");
+const JobCandidateContext = require("../public/job-candidate-context-domain.js");
 
 function memoryDatabase() {
   const specs = new Map(Truth.STORE_SPECS.map((spec) => [spec.name, spec]));
   const records = new Map([...specs].map(([name]) => [name, new Map()]));
   return {
     records,
+    objectStoreNames: { contains: (name) => records.has(name) },
     close() {},
     transaction(storeNames) {
       const names = Array.isArray(storeNames) ? storeNames : [storeNames];
@@ -551,6 +555,79 @@ assert.throws(() => Integration.verifiedAppliedAction({
 
 // UI wiring evidence: List and Detail use one integration function and select focus at submit time.
 const pages = fs.readFileSync(path.join(root, "public", "v1-pages.js"), "utf8");
+// Reproduce the actual Detail owner: a confirmed legacy item absent from an existing same-source Working head.
+const detailOwner = pages.match(/  async function candidateWorkingModelForDetail\([\s\S]*?\n  \}/)?.[0];
+assert(detailOwner);
+const resolveDetailWorking = new Function("LocalCandidateReview", "Truth", "CandidateModel", `${detailOwner}; return candidateWorkingModelForDetail;`)(Review, Truth, CandidateModel);
+const legacyItem = { ...structuredClone(initialPayload.items[0]), item_id: "synthetic-legacy-material", title: "Confirmed synthetic material", review_status: "CONFIRMED", content_origin: "USER_CONFIRMED" };
+delete legacyItem.item_subtype;
+const legacyRevision = Truth.validateContextRevision({
+  contract_id: "ariadne-context-revision-v1", context_type: "CANDIDATE", context_id: "candidate-context-synthetic-legacy",
+  revision_id: "synthetic-legacy-v1", version: 1, previous_revision_id: null, confirmed_from_proposal_id: initialWorking.proposal_ids[0],
+  review_decision_id: "synthetic-legacy-review", created_at: "2026-09-03T08:00:00Z",
+  provenance: { source_document_ids: [initialWorking.source_document_id], processing_run_id: initialWorking.processing_run_id, runtime_snapshot_id: initialWorking.runtime_snapshot_id },
+  payload: { items: [legacyItem] }, authority: Truth.AUTHORITY.revision,
+});
+const detailDb = memoryDatabase();
+detailDb.records.get("candidate_working_models").set(initialWorking.working_model_id, structuredClone(initialWorking));
+detailDb.records.get("candidate_context_revisions").set(legacyRevision.revision_id, structuredClone(legacyRevision));
+const materialWorking = await resolveDetailWorking(detailDb, initialWorking.source_document_id, legacyItem.item_id, legacyRevision);
+assert.equal(materialWorking.version, 2);
+assert.deepEqual(materialWorking.payload.items.slice(0, 2), initialWorking.payload.items);
+assert.equal(materialWorking.payload.items.at(-1).confidence, "unknown");
+assert.equal((await resolveDetailWorking(detailDb, initialWorking.source_document_id, legacyItem.item_id, legacyRevision)).working_model_id, materialWorking.working_model_id);
+assert.equal(detailDb.records.get("candidate_working_models").size, 2, "reopen must not persist a duplicate version");
+const detailSession = await Integration.resolveSession(detailDb, initialWorking.source_document_id, "2026-09-03T08:01:00Z");
+const detailDiscussion = await Integration.executeListTurn({
+  database: detailDb, session: detailSession, focus: { type: "ITEM", item_id: legacyItem.item_id }, human_message: "Explain this synthetic material.", runtime_snapshot: snapshot(), id_factory: idFactory, now,
+  call_runtime: async (request) => {
+    assert.equal(request.compiled_context.candidate.current_item.title, legacyItem.title);
+    return noPatches(request, "EXPLAIN", "Synthetic discussion only.");
+  },
+});
+assert.equal(detailDiscussion.status, "SUCCEEDED");
+assert.equal(detailDb.records.get("candidate_working_models").size, 2);
+assert.equal(detailDb.records.get("candidate_context_revisions").size, 1);
+const recoveryOwner = pages.match(/  async function restoreCandidateDetailConversation\([\s\S]*?\n  \}/)?.[0];
+assert(recoveryOwner);
+const restoreDetail = new Function("CandidateConversationPersistence", `${recoveryOwner}; return restoreCandidateDetailConversation;`)(Persistence);
+const interruptedDb = memoryDatabase();
+const interruptedTurn = { ...structuredClone(detailDiscussion.turn), state: "SENDING", action_id: null, result_action: null, state_history: detailDiscussion.turn.state_history.slice(0, 2) };
+interruptedTurn.updated_at = interruptedTurn.state_history.at(-1).at;
+interruptedDb.records.get("conversation_sessions").set(detailSession.conversation_id, detailSession);
+interruptedDb.records.get("conversation_messages").set(detailDiscussion.user_message.message_id, detailDiscussion.user_message);
+interruptedDb.records.get("conversation_turn_executions").set(interruptedTurn.execution_id, interruptedTurn);
+assert.equal((await restoreDetail(interruptedDb, detailSession.conversation_id, interruptedTurn.updated_at)).turns[0].state, "SENDING", "a fresh turn in another view must remain active");
+const expiredAt = new Date(Date.parse(interruptedTurn.updated_at) + 300001).toISOString();
+const recoveredDetail = await restoreDetail(interruptedDb, detailSession.conversation_id, expiredAt);
+assert.equal(recoveredDetail.turns[0].state, "FAILED");
+assert.equal(recoveredDetail.turns[0].failure_code, "INTERRUPTED_TURN_EXPIRED");
+assert.equal(recoveredDetail.messages.length, 1, "recovery must not fabricate Assistant output");
+assert.equal(recoveredDetail.actions.length, 0);
+assert.deepEqual(await restoreDetail(interruptedDb, detailSession.conversation_id, expiredAt), recoveredDetail);
+const legacyPatch = { title: "Saved synthetic material", subtitle: legacyItem.subtitle, time: legacyItem.time, summary: legacyItem.summary, ownership: "User-confirmed boundary", facts: legacyItem.facts.map((fact) => fact.value) };
+const acceptedWorking = await CandidateModel.editedCandidateWorkingModel(materialWorking, legacyItem.item_id, legacyPatch, "2026-09-03T10:00:00Z", "USER_CONFIRMED");
+const acceptedItem = { ...legacyItem, ...legacyPatch, facts: acceptedWorking.payload.items.at(-1).facts };
+const legacySaved = await Review.persistUserEdit(detailDb, legacyRevision, legacyItem.item_id, acceptedItem, { working_model: acceptedWorking });
+assert.equal(legacySaved.revision.version, 2);
+assert.equal((await resolveDetailWorking(detailDb, initialWorking.source_document_id, legacyItem.item_id, legacySaved.revision)).payload.items.at(-1).title, legacyPatch.title);
+assert.equal(detailDb.records.get("candidate_working_models").size, 3);
+const nextJobCandidateSnapshot = await JobCandidateContext.buildSnapshotFromDatabase(detailDb);
+assert(JSON.stringify(nextJobCandidateSnapshot.provider_view.confirmed).includes(legacyPatch.title));
+assert(JSON.stringify(nextJobCandidateSnapshot.provider_view.working).includes(legacyPatch.title));
+assert(!JSON.stringify(nextJobCandidateSnapshot.provider_view).includes(legacyItem.title), "new Job context must not see a stale legacy title");
+const savedCounts = [...detailDb.records].map(([name, rows]) => [name, rows.size]);
+await assert.rejects(Review.persistUserEdit(detailDb, legacyRevision, legacyItem.item_id, acceptedItem, { working_model: acceptedWorking }), /context_version_conflict|candidate_working_model_stale/);
+assert.deepEqual([...detailDb.records].map(([name, rows]) => [name, rows.size]), savedCounts, "conflicting Save must atomically preserve both Working and confirmed stores");
+await assert.rejects(Review.persistUserEdit(detailDb, legacySaved.revision, legacyItem.item_id, acceptedItem, { working_model: acceptedWorking }), /candidate_working_model_stale/);
+assert.deepEqual([...detailDb.records].map(([name, rows]) => [name, rows.size]), savedCounts);
+await Integration.executeListTurn({
+  database: detailDb, session: detailSession, focus: { type: "ITEM", item_id: legacyItem.item_id }, human_message: "What is the current synthetic title?", runtime_snapshot: snapshot(), id_factory: idFactory, now,
+  call_runtime: async (request) => {
+    assert.equal(request.compiled_context.candidate.current_item.title, legacyPatch.title);
+    return noPatches(request, "EXPLAIN", legacyPatch.title);
+  },
+});
 const detailRendererBody = pages.match(/function renderCandidateWorkspaceCardDetail\(itemId\) \{([\s\S]*?)\n  \}\n\n  async function openCandidateWorkspaceCardDetail/)?.[1] || "";
 assert.match(detailRendererBody, /candidate-card-detail-title[\s\S]*item\.title/);
 assert.match(detailRendererBody, /candidate-card-detail-facts[\s\S]*visibleFacts\.map\(\(fact\)[\s\S]*canonical_display_label[\s\S]*fact\.value/);

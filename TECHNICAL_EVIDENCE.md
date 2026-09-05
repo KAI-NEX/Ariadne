@@ -1,5 +1,56 @@
 # AI Job Radar｜Technical Evidence
 
+## 2026-09-05｜Bounded J1 Candidate Material conversation hotfix evidence
+
+This supersedes earlier Candidate Material browser PASS claims, which Human usage disproved. Browser evidence here is from the normal `http://127.0.0.1:8000/` session, 1280×720, through Personal Information → Candidate Material Card → embedded Candidate Material Detail, using real typing/clicking and DeepSeek. No direct runtime invocation, mock event, or Provider test endpoint is counted as browser acceptance.
+
+### First broken boundary and owner
+
+The first user-visible NO was `submit_enabled`. Input was present and shared binding/domain/Model-operation selection existed. The causal owner was `candidateWorkingModelForDetail()` in `public/v1-pages.js`: it required the confirmed item identity to exist in a stored Working model, and threw `candidate_detail_item_not_in_working_model`. The observed source had Working versions but none contained the active legacy confirmed item. Initialization caught that failure and disabled Send. Classification: `ACTIVE_MATERIAL_BINDING` at the embedded Detail boundary, not an absent input handler or a Job-only adapter.
+
+| Boundary | Broken baseline | Repaired real Work Experience discussion |
+| --- | --- | --- |
+| input_state_present | YES | YES |
+| submit_enabled | NO | YES |
+| submit_event_fired | NO | YES |
+| conversation_binding_present | YES | YES |
+| candidate_domain_selected | YES | YES |
+| active_candidate_material_resolved | NO | YES |
+| mode_model | YES | YES |
+| operation_resolved | YES | YES |
+| runtime_compatible | YES | YES |
+| context_compiled | Not reached | YES |
+| provider_called | NO | YES |
+| provider_returned | Not reached | YES |
+| response_valid | Not reached | YES |
+| result_projected | Not reached | YES |
+| assistant_rendered | NO new response | YES |
+
+Evidence combines DOM input/Send/submit state, visible Processing/Assistant, and the existing allowlisted server acceptance diagnostic after validation (`EXPLAIN`, no Working proposal, no confirmed mutation). No credentials, private material bodies, or Provider reasoning are copied into this record. Earlier automated fixtures began with already-bound Working items; new integration coverage executes the actual Detail resolver with a missing legacy item and tests repeat-open idempotence.
+
+### Repair and failure coverage
+
+- Only the active confirmed item is bootstrapped into the newest source Working head, with original item/source identity and confirmed provenance retained. Existing Working items and pending edits are preserved. No import rerun or confirmed write occurs on open/discussion.
+- Legacy Human Save/direct Edit advances Working and the existing confirmed context atomically, rejecting either stale Working or stale confirmed lineage. Workspace-v2 Save remains on its existing acceptance path. Parent Personal Information refreshes after closing the saved Detail.
+- ITEM Provider context excludes the other-material directory; current-item content and relevant bounded history remain. Regression verifies unrelated synthetic titles are absent from the outbound request.
+- One real Project request timed out at the Provider read boundary. Closing/reopening while it was pending also exposed a durable interrupted turn. Detail reopen now expires active records older than five minutes through existing guarded failure persistence, preserving the user message and writing no Assistant/action/Working/confirmed output. Fresh active turns are not expired. The Project retry returned a visible real Assistant answer.
+- One final mutation response failed parsing (`MALFORMED_RESPONSE`); the UI showed failure and preserved confirmed state. One unchanged-prompt retry produced a real `PATCH_ITEM`, visible before/after Working, Human Save, refreshed Candidate Material Card, reopened Detail, and a subsequent Assistant answer with the saved value.
+- Local direct Edit was tested while the model pane was hidden: zero Provider/POST calls across the observed 105-second Local window. Restoring Model and discussing the same material demonstrated the latest direct-edited title, not stale Working.
+
+### Automated evidence (not a substitute for browser evidence)
+
+17 Node suites passed: `candidate_model_runtime_regression`, `detail_behavioral_wiring_regression`, `candidate_workspace_conversation_integration_regression`, `candidate_conversation_domain_regression`, `candidate_conversation_persistence_regression`, `candidate_local_model_isolation_regression`, `candidate_context_regression`, `local_candidate_review_regression`, `candidate_context_removal_regression`, `personal_local_pipeline_stabilization_regression`, `final_candidate_job_parity_regression`, `runtime_capability_gating_regression`, `runtime_operation_routing_stabilization_regression`, `runtime_execution_contract_regression`, `runtime_selection_regression`, `shared_product_shell_regression`, and `ui_contract_addendum_regression` (all under `tests/`, `.mjs`). New integration checks cover missing-item bootstrap, repeat-open, EXPLAIN without mutation, atomic legacy Save/conflicts, expired-turn recovery, and the newest Candidate title in both conversation and newly built Job CandidateContext.
+
+8 Python suites passed: `candidate_conversation_runtime_regression`, `candidate_workspace_route_contract_regression`, `candidate_context_provider_regression`, `candidate_model_runtime_regression`, `runtime_capability_gating_regression`, `runtime_execution_contract_regression`, `provider_runtime_regression`, and `job_conversation_runtime_regression` (under `tests/`, `.py`, run with `PYTHONPATH=.`). This includes 15 unittest cases and six executable assertion suites. Also passed: syntax for the three changed public JS files and five changed JS test files; Python compilation of `app.py`, the changed Candidate runtime and its test; `git diff --check`.
+
+Final representative discussions, mutation/Save/reopen/current-state, and repeat Local isolation all passed. The initial Job smoke returned HTTP 422 / `JOB_EDIT_INVALID` after a real Provider call, with no new Assistant. Read-only execution of `resolveJobDetailReferent()` mapped the ordinary question with “不修改任何内容” to `job_edit_requested=true`; without that negative clause it mapped to false. Work paused at that mandatory gate. Its exact malformed Provider edit field remains unknown and no private response body was retained for diagnosis.
+
+The Human subsequently authorized fixing this bounded defect and one additional Job smoke. `public/job-conversation-domain.js` now masks explicitly negated edit verbs only for routing, retaining the original Human message and separate affirmative edits. The Job foundation suite adds 10 non-edit and 6 affirmative/mixed-intent examples, including avoiding false negation for “分别修改” and “特别修改”. Total final gates: 18 Node suites (the 17 above plus `job_intelligence_foundation_regression.mjs`), the same 8 Python suites, 10 JS syntax targets (the 8 above plus the changed Job domain and its test), and the same 3 Python compilation targets.
+
+The one authorized additional browser call used the identical failed question on the same existing Job Detail. Send enabled → visible Processing → DeepSeek → HTTP 200 → new visible Assistant answer passed. The allowlisted server diagnostic recorded `ASK_CLARIFICATION`, `working_proposal_created=no`, `confirmed_mutation_before_save=no`, and `assistant_copy_source=PROVIDER`. The visible answer summarized the core Job requirement; the normalized envelope is not described as EXPLAIN. Console warnings/errors were 0. There was no Job mutation, Save, prompt redesign, or further Provider retry. Candidate implementation was unchanged in this extension, and its completed browser evidence remains applicable. Overall hotfix gates are now satisfied.
+
+Browser screenshots were displayed during verification and were not added to the repository. The viewport began at 1280×720 and was later resized to 733×581; no comprehensive responsive-design claim is made. The pre-existing private untracked QA screenshot remains untouched and must not be staged.
+
 ## 82. Figma-aligned workspace, native dropzones, and one-time duplicate consolidation（2026-08-31）
 
 - Design evidence：Figma file `3XdQUI6Dd1BhGCZVhFOncF` nodes `9:2 / 13:2 / 14:2` 作为这次 code implementation authority。Workspace CSS 使用 1060 px max grid、32 px gap、297 px folder、`top:9.4%` front、`top:18.67% / height:61.77%` paper；982×782 浏览器实测 grid `x=42 / y=190 / w=898`，folders `433×297`，wordmark x=477、font 12/800，数量为 Candidate 3 / Job 1。

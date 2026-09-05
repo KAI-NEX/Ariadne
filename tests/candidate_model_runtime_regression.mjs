@@ -112,6 +112,25 @@ assert.equal(editedWorkingModel.payload.items[0].working_provenance.support_rela
 const confirmedWorkingModel = await CandidateModel.editedCandidateWorkingModel(workingModel, "work-1", { title: "Senior Product Designer", subtitle: "Synthetic Studio", time: "2024", summary: "User confirmed the role.", facts: ["Senior Product Designer"] }, "2026-09-03T09:05:30Z", "USER_CONFIRMED");
 assert.equal(confirmedWorkingModel.payload.items[0].content_origin, "USER_CONFIRMED");
 assert.equal(confirmedWorkingModel.payload.items[0].working_provenance.support_relation, "USER_CONFIRMED");
+const legacyConfirmedRevision = Truth.validateContextRevision({
+  contract_id: "ariadne-context-revision-v1", context_type: "CANDIDATE", context_id: "candidate-context-synthetic-legacy",
+  revision_id: "candidate-context-synthetic-legacy-v1", version: 1, previous_revision_id: null,
+  confirmed_from_proposal_id: proposals[0].proposal_id, review_decision_id: "review-synthetic-legacy",
+  created_at: "2026-09-03T09:05:45Z", provenance: { source_document_ids: [sourceId], processing_run_id: running.run_id, runtime_snapshot_id: snapshot.snapshot_id },
+  payload: { ...structuredClone(workingModel.payload), items: [{ ...structuredClone(workingModel.payload.items[0]), item_id: "legacy-work-1", title: "Confirmed Legacy Role", review_status: "CONFIRMED", content_origin: "USER_CONFIRMED" }] },
+  authority: Truth.AUTHORITY.revision,
+});
+const bootstrappedDetailWorking = await CandidateModel.synchronizedCandidateWorkingModel(null, legacyConfirmedRevision, "legacy-work-1", sourceId, "2026-09-03T09:05:50Z");
+assert.equal(bootstrappedDetailWorking.version, 1);
+assert.equal(bootstrappedDetailWorking.previous_working_model_id, null);
+assert.equal(bootstrappedDetailWorking.payload.items[0].title, "Confirmed Legacy Role");
+assert.equal(bootstrappedDetailWorking.payload.items[0].content_origin, "USER_CONFIRMED");
+const mergedDetailWorking = await CandidateModel.synchronizedCandidateWorkingModel(editedWorkingModel, legacyConfirmedRevision, "legacy-work-1", sourceId, "2026-09-03T09:05:55Z");
+assert.equal(mergedDetailWorking.version, editedWorkingModel.version + 1);
+assert.equal(mergedDetailWorking.previous_working_model_id, editedWorkingModel.working_model_id);
+assert.equal(mergedDetailWorking.payload.items.find((item) => item.item_id === "legacy-work-1").title, "Confirmed Legacy Role");
+assert.equal(mergedDetailWorking.payload.items.find((item) => item.item_id === "work-1").title, "Senior Product Designer");
+assert.deepEqual(await CandidateModel.synchronizedCandidateWorkingModel(mergedDetailWorking, legacyConfirmedRevision, "legacy-work-1", sourceId, "2026-09-03T09:06:00Z"), mergedDetailWorking);
 const workspaceOutcome = Truth.applyWorkspaceAcceptance({ working_model: editedWorkingModel, proposals, current_revision: null, expected_revision_version: 0, context_id: "candidate-workspace-context-synthetic", acceptance_id: "candidate-workspace-acceptance-synthetic", revision_id: "candidate-workspace-revision-synthetic", accepted_at: "2026-09-03T09:06:00Z" });
 assert.equal(workspaceOutcome.revision.workspace_acceptance_id, workspaceOutcome.workspace_acceptance.acceptance_id);
 assert(!("review_decision_id" in workspaceOutcome.revision));
@@ -285,6 +304,9 @@ assert.match(pages, /ProductShell\.showWorkspace\(workspace, \{ source_name: sou
 assert.match(productShell, /modelWorkspaceUi\.setProcessingState\(\{ processing: workspace\.processing, content: workspace\.content, save: workspace\.save, active: processing \}\)/);
 assert.match(pages, /data-entry-type="CLARIFYING_QUESTION"/);
 assert.match(pages, /CandidateModel\.editedCandidateWorkingModel/);
+assert.match(pages, /CandidateModel\.synchronizedCandidateWorkingModel/);
+assert.match(pages, /canonicalRevision\.contract_id === "ariadne-context-revision-v2"/);
+assert.match(pages, /LocalCandidateReview\.persistUserEdit\(database, canonicalRevision, itemId, confirmedItem, \{ working_model: confirmedWorkingModel \}\)/);
 assert.match(pages, /Truth\.persistCandidateWorkingModel/);
 assert.match(pages, /Truth\.applyWorkspaceAcceptance/);
 assert.match(pages, /Truth\.persistWorkspaceAcceptance/);

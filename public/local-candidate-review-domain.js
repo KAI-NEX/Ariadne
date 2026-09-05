@@ -109,11 +109,23 @@
     return Object.freeze({ review_decision: review, revision });
   }
 
-  function persistUserEdit(database, currentRevision, itemId, editedItem) {
+  function persistUserEdit(database, currentRevision, itemId, editedItem, { working_model = null } = {}) {
     const outcome = userEditOutcome(currentRevision, itemId, editedItem);
+    const workingModel = working_model ? Truth.validateCandidateWorkingModel(working_model) : null;
+    if (workingModel && (!currentRevision.provenance.source_document_ids.includes(workingModel.source_document_id)
+      || !(workingModel.payload.items || []).some((item) => item.item_id === itemId))) throw new Error("candidate_working_model_source_mismatch");
     return new Promise((resolve, reject) => {
-      const transaction = database.transaction(["context_review_decisions", "candidate_context_revisions"], "readwrite");
+      const stores = ["context_review_decisions", "candidate_context_revisions", ...(workingModel ? ["candidate_working_models"] : [])];
+      const transaction = database.transaction(stores, "readwrite");
       let contractError = null;
+      let revisionReady = false;
+      let workingReady = !workingModel;
+      const writeWhenReady = () => {
+        if (!revisionReady || !workingReady || contractError) return;
+        if (workingModel) transaction.objectStore("candidate_working_models").add(structuredClone(workingModel));
+        if (outcome.review_decision) transaction.objectStore("context_review_decisions").add(structuredClone(outcome.review_decision));
+        transaction.objectStore("candidate_context_revisions").add(structuredClone(outcome.revision));
+      };
       const request = transaction.objectStore("candidate_context_revisions").getAll();
       request.onsuccess = () => {
         const head = latestRevision(request.result || [], outcome.revision.context_id);
@@ -122,10 +134,24 @@
           transaction.abort();
           return;
         }
-        if (outcome.review_decision) transaction.objectStore("context_review_decisions").add(structuredClone(outcome.review_decision));
-        transaction.objectStore("candidate_context_revisions").add(structuredClone(outcome.revision));
+        revisionReady = true;
+        writeWhenReady();
       };
       request.onerror = () => { contractError = request.error || new Error("candidate_revision_read_failed"); transaction.abort(); };
+      if (workingModel) {
+        const workingRequest = transaction.objectStore("candidate_working_models").getAll();
+        workingRequest.onsuccess = () => {
+          const head = (workingRequest.result || []).filter((model) => model.source_document_id === workingModel.source_document_id).sort((a, b) => b.version - a.version)[0];
+          if (workingModel.version !== (head?.version || 0) + 1 || workingModel.previous_working_model_id !== (head?.working_model_id || null)) {
+            contractError = new Error("candidate_working_model_stale");
+            transaction.abort();
+            return;
+          }
+          workingReady = true;
+          writeWhenReady();
+        };
+        workingRequest.onerror = () => { contractError = workingRequest.error || new Error("candidate_working_model_read_failed"); transaction.abort(); };
+      }
       transaction.oncomplete = () => resolve(outcome);
       transaction.onerror = () => reject(contractError || transaction.error || new Error("candidate_user_edit_failed"));
       transaction.onabort = () => reject(contractError || transaction.error || new Error("candidate_user_edit_aborted"));

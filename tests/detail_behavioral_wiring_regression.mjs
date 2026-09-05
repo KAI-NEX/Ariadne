@@ -49,6 +49,8 @@ for (const dependency of ["model-import-lifecycle-domain", "candidate-context-do
 assert.match(pages, /canonicalRevision\.contract_id === "ariadne-context-revision-v2"/);
 assert.match(pages, /CandidateModel\.editedCandidateWorkingModel/);
 assert.match(pages, /persistCandidateWorkspaceAcceptance\(database, editedWorkingModel\)/);
+assert.match(pages, /CandidateModel\.synchronizedCandidateWorkingModel/);
+assert.match(pages, /LocalCandidateReview\.persistUserEdit\(database, canonicalRevision, itemId, confirmedItem, \{ working_model: confirmedWorkingModel \}\)/);
 assert.match(pages, /renderCandidate\(activeCandidate\);\s+byId\("candidate-patch-proposal"\)\.classList\.add\("hidden"\);\s+editShell\.complete\(\)/);
 
 console.log(JSON.stringify({

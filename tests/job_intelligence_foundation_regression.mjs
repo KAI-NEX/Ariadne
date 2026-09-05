@@ -215,6 +215,26 @@ assert.equal(compiled.turn_scope.ambiguity, "RESOLVED_BY_ACTIVE_JOB_SCOPE");
 assert.equal(compiled.turn_scope.job_edit_requested, false);
 assert.equal(Conversation.resolveJobDetailReferent("把这个职位地点改成深圳", candidateA).job_edit_requested, true);
 assert.equal(Conversation.resolveJobDetailReferent("摘要里删除任职要求", candidateA).job_edit_requested, true);
+for (const message of [
+  "请用一句话概括这份职位最核心的要求，不修改任何内容。",
+  "请不要修改职位摘要，只解释现有要求。",
+  "先讨论职位，不需要更新摘要。",
+  "无需编辑岗位标题。",
+  "别删除职位要求。",
+  "禁止调整公司名称。",
+  "不要把职位地点改成深圳。",
+  "不要对职位摘要进行修改。",
+  "职位摘要不需要做任何修改。",
+  "概括职位要求，保持内容不变。",
+]) assert.equal(Conversation.resolveJobDetailReferent(message, candidateA).job_edit_requested, false, message);
+for (const message of [
+  "不要修改公司，但把职位地点改成深圳。",
+  "把职位地点改成深圳，不要修改摘要。",
+  "不更新摘要，只修改公司名称。",
+  "标题改成不修改任何内容。",
+  "分别修改职位标题和摘要。",
+  "请特别修改职位摘要。",
+]) assert.equal(Conversation.resolveJobDetailReferent(message, candidateA).job_edit_requested, true, message);
 const serializedProviderContext = JSON.stringify(compiled);
 for (const privateValue of [sourceDocument.source_document_id, modelAccepted.revision.revision_id, candidateA.aggregate_fingerprint, "indexeddb://", "/Users/"]) assert(!serializedProviderContext.includes(privateValue));
 assert(serializedProviderContext.includes("confirmed-candidate-1"));

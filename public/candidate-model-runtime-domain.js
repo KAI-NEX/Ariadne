@@ -315,6 +315,7 @@
       subtitle: String(patch.subtitle || "").trim() || null,
       time: String(patch.time || "").trim() || null,
       summary: String(patch.summary || "").trim() || null,
+      ownership: patch.ownership === undefined ? original.ownership || null : String(patch.ownership || "").trim() || null,
       facts: (patch.facts || []).map((value, factIndex) => ({ fact_id: original.facts?.[factIndex]?.fact_id || `working-fact-${factIndex + 1}`, label: original.facts?.[factIndex]?.label || "用户补充", value: String(value).trim() })).filter((fact) => fact.value),
       content_origin: supportRelation,
       working_provenance: { support_relation: supportRelation, updated_at: createdAt, paths: [`/items/${index}`] },
@@ -329,6 +330,81 @@
       fingerprint,
       created_at: createdAt,
       payload,
+    });
+  }
+
+  function confirmedItemState(item) {
+    return {
+      item_id: item?.item_id,
+      item_type: item?.item_type,
+      item_subtype: item?.item_subtype,
+      title: item?.title,
+      subtitle: item?.subtitle || null,
+      time: item?.time || null,
+      summary: item?.summary || null,
+      facts: structuredClone(item?.facts || []),
+      ownership: item?.ownership || null,
+      grounding_refs: structuredClone(item?.grounding_refs || item?.source_refs || []),
+    };
+  }
+
+  function workingItemFromConfirmed(item, createdAt) {
+    const state = confirmedItemState(item);
+    const subtype = state.item_subtype || {
+      WORK_EXPERIENCE: "work_experience", PROJECT: "project", EDUCATION: "education", OTHER: "custom_section",
+    }[state.item_type] || "custom_section";
+    return {
+      ...structuredClone(item),
+      ...state,
+      item_subtype: subtype,
+      confidence: item.confidence || "unknown",
+      warnings: structuredClone(item.warnings || []),
+      uncertainties: structuredClone(item.uncertainties || []),
+      review_status: "CONFIRMED",
+      content_origin: "USER_CONFIRMED",
+      dedupe_state: item.dedupe_state || "unique",
+      working_provenance: { support_relation: "USER_CONFIRMED", updated_at: createdAt, paths: ["/items"] },
+    };
+  }
+
+  async function synchronizedCandidateWorkingModel(currentModel, confirmedRevision, itemId, sourceDocumentId, createdAt = now()) {
+    const revision = Truth.validateContextRevision(confirmedRevision);
+    const sourceId = String(sourceDocumentId || "").trim();
+    if (revision.context_type !== "CANDIDATE" || !sourceId || !revision.provenance.source_document_ids.includes(sourceId)) {
+      throw new Error("candidate_confirmed_working_source_mismatch");
+    }
+    const confirmedItem = (revision.payload.items || []).find((item) => item.item_id === itemId);
+    if (!confirmedItem) throw new Error("candidate_confirmed_working_item_missing");
+    const current = currentModel ? Truth.validateCandidateWorkingModel(currentModel) : null;
+    if (current && current.source_document_id !== sourceId) throw new Error("candidate_working_model_source_mismatch");
+    const items = structuredClone(current?.payload?.items || []);
+    const index = items.findIndex((item) => item.item_id === itemId);
+    if (index >= 0) return current;
+    const synchronizedItem = workingItemFromConfirmed(confirmedItem, createdAt);
+    items.push(synchronizedItem);
+    const payload = {
+      ...(current ? structuredClone(current.payload) : {}),
+      contract_id: "ariadne-candidate-working-payload-v1",
+      material_type: current?.payload?.material_type || revision.payload.candidate_material_type || revision.payload.material_type || "other",
+      items,
+    };
+    const fingerprint = `sha256:${await sha256(canonicalJson(payload))}`;
+    const version = (current?.version || 0) + 1;
+    const proposalIds = current?.proposal_ids || (revision.contract_id === "ariadne-context-revision-v1" ? [revision.confirmed_from_proposal_id] : null);
+    if (!proposalIds?.length) throw new Error("candidate_confirmed_working_lineage_missing");
+    return Truth.validateCandidateWorkingModel({
+      contract_id: "ariadne-candidate-working-model-v1",
+      working_model_id: `${sourceId}-working-v${version}-${fingerprint.slice(7, 19)}`,
+      source_document_id: sourceId,
+      processing_run_id: current?.processing_run_id || revision.provenance.processing_run_id,
+      runtime_snapshot_id: current?.runtime_snapshot_id || revision.provenance.runtime_snapshot_id,
+      proposal_ids: proposalIds,
+      version,
+      previous_working_model_id: current?.working_model_id || null,
+      fingerprint,
+      created_at: createdAt,
+      payload,
+      authority: Truth.AUTHORITY.working,
     });
   }
 
@@ -392,7 +468,7 @@
     proposalsFor,
     workingCardsFor,
     candidateWorkingModelFor,
-    editedCandidateWorkingModel,
+    editedCandidateWorkingModel, synchronizedCandidateWorkingModel,
     consentFor,
     requestFor,
     persistSuccessfulResult,

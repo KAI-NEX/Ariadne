@@ -25,7 +25,7 @@ assert.match(pages, /模型导入尚不可用/);
 assert.match(pages, /dataset\.candidateImportRuntime = local \? "local" : modelReady \? "model-ready" : "model-unavailable"/);
 
 for (const field of ["candidate-edit-title", "candidate-edit-subtitle", "candidate-edit-time", "candidate-edit-summary", "candidate-edit-facts"]) assert.match(detail, new RegExp(`id="${field}"`));
-assert.match(pages, /persistUserEdit\(database, canonicalRevision, itemId, editedItem\)/);
+assert.match(pages, /persistUserEdit\(database, canonicalRevision, itemId, editedItem, \{ working_model: editedWorkingModel \}\)/);
 assert.match(pages, /上一版本仍保留/);
 assert.match(pages, /未晋升为已确认候选信息/);
 

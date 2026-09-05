@@ -138,7 +138,10 @@
     const message = requiredText(humanMessage, "human_message_invalid", Manifest.limits.human_message);
     const candidatePresent = candidateSnapshot?.structural_counts?.candidate_snapshot_present === true;
     const jobCandidatePrompt = /(?:我还需要补充什么|我还缺什么|我适合吗|哪里不够|我要补什么能力|还需要补充什么能力)/iu.test(message);
-    const jobEditRequested = /(?:(?:修改|改成|改为|更新|编辑|调整|删除|移除|去掉|删掉).{0,24}(?:职位|岗位|JD|公司|地点|标题|摘要|任职要求)|(?:职位|岗位|JD|公司|地点|标题|摘要|任职要求).{0,24}(?:修改|改成|改为|更新|编辑|调整|删除|移除|去掉|删掉))/iu.test(message);
+    // Mask only explicitly negated edit verbs for routing; preserve the original
+    // Human message and any separate affirmative edit in the same request.
+    const editIntentMessage = message.replace(/(?:不(?:要|必|需(?:要)?|用|允许)?|无需|禁止|(?<![特分])别)\s*(?:(?:再|直接|立即|随意|擅自)\s*)?(?:(?:把|将|对)[^，。！？；,\n!?;]{0,24}?)?(?:(?:进行|做(?:任何)?)\s*)?(?:修改|改成|改为|更新|编辑|调整|删除|移除|去掉|删掉)/giu, "");
+    const jobEditRequested = /(?:(?:修改|改成|改为|更新|编辑|调整|删除|移除|去掉|删掉).{0,24}(?:职位|岗位|JD|公司|地点|标题|摘要|任职要求)|(?:职位|岗位|JD|公司|地点|标题|摘要|任职要求).{0,24}(?:修改|改成|改为|更新|编辑|调整|删除|移除|去掉|删掉))/iu.test(editIntentMessage);
     return Object.freeze({
       scope: candidatePresent ? "CURRENT_CANDIDATE_X_ACTIVE_JOB" : "ACTIVE_JOB",
       referent: jobCandidatePrompt && candidatePresent ? "CANDIDATE_GAPS_RELATIVE_TO_ACTIVE_JOB" : "ACTIVE_JOB_WITH_CURRENT_CANDIDATE",

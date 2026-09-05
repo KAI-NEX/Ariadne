@@ -1024,8 +1024,7 @@ def _provider_candidate_context(request: CandidateConversationRequest) -> dict[s
             "target_mode": focus["type"],
             "candidate_items": [],
             "current_item": _provider_item(item_by_id[active_id], active_ref),
-            "other_item_directory": [_provider_item(item_by_id[item_id], card_ref, directory=True)
-                                     for card_ref, item_id in reference_map.items() if item_id != active_id],
+            "other_item_directory": [],
         }
         provider_focus = {"type": focus["type"], "active_card_ref": active_ref}
     return {"focus": provider_focus, "candidate": candidate}

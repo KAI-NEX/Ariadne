@@ -1,5 +1,12 @@
 # JOB RADAR NEXT PHASE HANDOFF
 
+## CURRENT J1 HOTFIX AUTHORITY — 2026-09-05
+
+- Earlier Candidate Material PASS reports are superseded by Human usage and this hotfix's fresh evidence. Base is `13ff1fc764b7235ba624a82f3e9a6594d20ba6d3`; all required browser and automated gates have now passed for the authorized single hotfix commit.
+- Candidate Material Detail repair and real post-regression Work Experience/Project/Education discussion, Working mutation, Human Save, parent list refresh, reopen, latest-state discussion, Local direct Edit, and Local Provider=0 checks passed. Model is restored. See current `PROJECT_STATUS.md` and `TECHNICAL_EVIDENCE.md` for trace, failures and exact regression inventory.
+- The initial Job smoke blocked completion with `JOB_EDIT_INVALID`. After an explicit Human request to fix the diagnosed negation error, only the Job referent resolver was repaired and one additional same-question/same-Job smoke passed: Provider response visible, no Working or confirmed mutation. No wider Job changes are authorized. Final regression totals are 18 Node suites, 8 Python suites, 10 JS syntax checks, and 3 Python compilation targets; console and diff checks pass.
+- Preserve all originals and the existing untracked private QA screenshot; it must remain unstaged. Only exact required hotfix code/tests/evidence belong in the single hotfix commit. No J2, import redesign, UI polish, or new architecture work. Stop after commit/report; do not repeat completed Provider calls.
+
 ## CURRENT RUNTIME-ROUTING AUTHORITY — 2026-09-04
 
 - The earlier `READY FOR J1 HUMAN ACCEPTANCE — GLOBAL INTERACTION CONVERGED` statement was revoked by Human Acceptance and is historical only. Current implementation evidence supports the new runtime-routing stabilization gate; Human acceptance is still pending and no files are staged or committed.

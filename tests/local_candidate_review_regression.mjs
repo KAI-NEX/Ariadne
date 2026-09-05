@@ -152,7 +152,7 @@ assert.match(pages, /proposalReviewMarkup\(proposals\[0\]/);
 assert.match(pages, /第 \$\{position\} \/ \$\{total\} 条/);
 assert.match(pages, /ensureItemProposalQueue\(database, proposalRecords\)/);
 assert.match(pages, /if \(!remaining\.length\) completeEmbeddedImport/);
-assert.match(pages, /persistUserEdit\(database, canonicalRevision, itemId, editedItem\)/);
+assert.match(pages, /persistUserEdit\(database, canonicalRevision, itemId, editedItem, \{ working_model: editedWorkingModel \}\)/);
 const reviewMarkup = pages.slice(pages.indexOf("function proposalReviewMarkup"), pages.indexOf("async function renderAwaitingCandidateReviews"));
 assert.match(reviewMarkup, /data-review-action="confirm"/);
 assert.match(reviewMarkup, /data-review-action="reject"/);

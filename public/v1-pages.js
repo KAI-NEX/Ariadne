@@ -1016,13 +1016,14 @@
     return (records.candidate_working_models || []).filter((model) => model.source_document_id === sourceId).sort((left, right) => right.version - left.version)[0] || null;
   }
 
-  async function candidateWorkingModelForDetail(database, sourceId, itemId) {
+  async function candidateWorkingModelForDetail(database, sourceId, itemId, canonicalRevision) {
     const models = await LocalCandidateReview.getAll(database, "candidate_working_models");
-    const matching = models.map(Truth.validateCandidateWorkingModel)
-      .filter((model) => model.source_document_id === sourceId && (model.payload?.items || []).some((item) => item.item_id === itemId))
+    const head = models.map(Truth.validateCandidateWorkingModel)
+      .filter((model) => model.source_document_id === sourceId)
       .sort((left, right) => right.version - left.version || String(right.created_at || "").localeCompare(String(left.created_at || "")))[0] || null;
-    if (!matching) throw new Error("candidate_detail_item_not_in_working_model");
-    return matching;
+    const synchronized = await CandidateModel.synchronizedCandidateWorkingModel(head, canonicalRevision, itemId, sourceId);
+    if (synchronized.working_model_id !== head?.working_model_id) await Truth.persistCandidateWorkingModel(database, synchronized);
+    return synchronized;
   }
 
   function setCandidateWorkspaceProgress(steps, currentIndex = steps.length - 1) {
@@ -1330,6 +1331,24 @@
     });
   }
 
+  async function restoreCandidateDetailConversation(database, conversationId, at = new Date().toISOString()) {
+    let restored = await CandidateConversationPersistence.restoreConversation(database, conversationId);
+    const expired = restored.turns.filter((turn) => CandidateConversationPersistence.ACTIVE_STATES.includes(turn.state)
+      && Date.parse(at) - Date.parse(turn.updated_at) > 300000);
+    for (const turn of expired) {
+      try {
+        await CandidateConversationPersistence.persistFailedTurn(database, {
+          ...turn, state: "FAILED", updated_at: at, failure_code: "INTERRUPTED_TURN_EXPIRED",
+          state_history: [...turn.state_history, { state: "FAILED", at }],
+        });
+      } catch (error) {
+        if (error.code !== "TURN_NOT_ACTIVE") throw error;
+      }
+    }
+    if (expired.length) restored = await CandidateConversationPersistence.restoreConversation(database, conversationId);
+    return restored;
+  }
+
   function setCandidateDetailConversationExecutionState(copy = "", active = candidateDetailConversationTurnActive) {
     ConversationUI.setExecutionState({
       form: byId("candidate-conversation-form"),
@@ -1339,7 +1358,7 @@
     });
   }
 
-  async function submitCandidateDetailConversation({ sourceId, itemId, content }) {
+  async function submitCandidateDetailConversation({ sourceId, itemId, canonicalRevision, content }) {
     const humanMessage = String(content || "").trim();
     if (!humanMessage || !sourceId || !itemId || candidateDetailConversationTurnActive) return;
     if (!CandidateWorkspaceConversationRuntime || !CandidateConversationPersistence) throw new Error("candidate_conversation_runtime_dependencies_unavailable");
@@ -1350,7 +1369,7 @@
     await ConversationUI.waitForIndicatorPaint();
     try {
       database = await Truth.openDatabase();
-      const workingModel = await candidateWorkingModelForDetail(database, sourceId, itemId);
+      const workingModel = await candidateWorkingModelForDetail(database, sourceId, itemId, canonicalRevision);
       const session = await CandidateWorkspaceConversationRuntime.resolveSession(database, sourceId);
       activeCandidateConversationSession = session;
       activeCandidateWorkingModel = workingModel;
@@ -2454,20 +2473,21 @@
         return gate.authority.runtime.mode === "model" && gate.allowed && Boolean(candidateDetailSourceId && canonicalRevision);
       },
       resolveTarget: () => candidateDetailSourceId && canonicalRevision ? Object.freeze({ sourceId: candidateDetailSourceId, itemId }) : null,
-      submit: ({ content, target }) => submitCandidateDetailConversation({ sourceId: target.sourceId, itemId: target.itemId, content }),
+      submit: ({ content, target }) => submitCandidateDetailConversation({ sourceId: target.sourceId, itemId: target.itemId, canonicalRevision, content }),
     });
     if (conversationAllowed) {
       const form = byId("candidate-conversation-form");
       if (candidateDetailSourceId && canonicalRevision) {
         const database = await Truth.openDatabase();
         try {
-          activeCandidateWorkingModel = await candidateWorkingModelForDetail(database, candidateDetailSourceId, itemId);
+          activeCandidateWorkingModel = await candidateWorkingModelForDetail(database, candidateDetailSourceId, itemId, canonicalRevision);
           showCandidateDetailWorkingProposal(activeCandidate, activeCandidateWorkingModel.payload.items.find((item) => item.item_id === itemId));
           activeCandidateConversationSession = await CandidateWorkspaceConversationRuntime.resolveSession(database, candidateDetailSourceId);
-          const restored = await CandidateConversationPersistence.restoreConversation(database, activeCandidateConversationSession.conversation_id);
+          const restored = await restoreCandidateDetailConversation(database, activeCandidateConversationSession.conversation_id);
           renderCandidateDetailConversation(restored.messages);
           const hasActiveTurn = restored.turns.some((turn) => CandidateConversationPersistence.ACTIVE_STATES.includes(turn.state));
-          setCandidateDetailConversationExecutionState(hasActiveTurn ? "正在理解…" : "", hasActiveTurn);
+          const interrupted = restored.turns.at(-1)?.failure_code === "INTERRUPTED_TURN_EXPIRED";
+          setCandidateDetailConversationExecutionState(hasActiveTurn ? "正在理解…" : interrupted ? "上次对话已中断，请重新发送。" : "", hasActiveTurn);
         } catch (error) {
           byId("candidate-detail-message").textContent = "当前材料的对话上下文尚不可用；不会改用本地结果。";
           byId("candidate-detail-message").classList.add("error");
@@ -2485,7 +2505,35 @@
       try {
         const database = await Truth.openDatabase();
         try {
-          const outcome = await persistCandidateWorkspaceAcceptance(database, activeCandidateWorkingModel);
+          let outcome;
+          if (canonicalRevision.contract_id === "ariadne-context-revision-v2") {
+            outcome = await persistCandidateWorkspaceAcceptance(database, activeCandidateWorkingModel);
+          } else {
+            const workingItem = activeCandidateWorkingModel.payload.items.find((item) => item.item_id === itemId);
+            const originalItem = canonicalRevision.payload.items.find((item) => item.item_id === itemId);
+            if (!workingItem || !originalItem) throw new Error("candidate_item_not_found");
+            const confirmedWorkingModel = await CandidateModel.editedCandidateWorkingModel(activeCandidateWorkingModel, itemId, {
+              title: workingItem.title,
+              subtitle: workingItem.subtitle,
+              time: workingItem.time,
+              summary: workingItem.summary,
+              ownership: workingItem.ownership,
+              facts: (workingItem.facts || []).map((fact) => fact.value),
+            }, new Date().toISOString(), "USER_CONFIRMED");
+            const confirmedItem = {
+              ...originalItem,
+              title: workingItem.title,
+              subtitle: workingItem.subtitle || null,
+              time: workingItem.time || null,
+              summary: workingItem.summary || null,
+              ownership: workingItem.ownership || null,
+              facts: structuredClone(workingItem.facts || []),
+              content_origin: "USER_CONFIRMED",
+              review_status: "CONFIRMED",
+            };
+            outcome = await LocalCandidateReview.persistUserEdit(database, canonicalRevision, itemId, confirmedItem, { working_model: confirmedWorkingModel });
+            activeCandidateWorkingModel = confirmedWorkingModel;
+          }
           canonicalRevision = outcome.revision;
           const confirmedItem = canonicalRevision.payload.items.find((item) => item.item_id === itemId);
           activeCandidate = { ...confirmedItem, data_class: "CANONICAL_CONFIRMED", context_id: canonicalRevision.context_id, source_refs: confirmedItem.grounding_refs || [] };
@@ -2494,6 +2542,7 @@
         byId("candidate-patch-proposal").classList.add("hidden");
         byId("candidate-detail-message").textContent = `Working 修改已由你确认并保存为第 ${canonicalRevision.version} 个确认版本；上一版本仍保留。`;
         byId("candidate-detail-message").classList.remove("error");
+        if (window.parent !== window) window.parent.postMessage({ type: "job-radar-v1-detail-updated", library: "personal", sourceKey: `candidate:${itemId}` }, window.location.origin);
       } catch (error) {
         byId("candidate-detail-message").textContent = ["candidate_working_model_stale", "context_version_conflict"].includes(String(error?.code || error?.message))
           ? "内容已经变化，请刷新后重新查看再保存。"
@@ -2586,7 +2635,13 @@
               outcome = await persistCandidateWorkspaceAcceptance(database, editedWorkingModel);
               activeCandidateWorkingModel = editedWorkingModel;
             } else {
-              outcome = await LocalCandidateReview.persistUserEdit(database, canonicalRevision, itemId, editedItem);
+              const currentWorkingModel = await candidateWorkingModelForDetail(database, candidateDetailSourceId, itemId, canonicalRevision);
+              const editedWorkingModel = await CandidateModel.editedCandidateWorkingModel(currentWorkingModel, itemId, {
+                ...pendingDirectEdit,
+                facts: pendingDirectEdit.facts.map((fact) => fact.value),
+              }, new Date().toISOString(), "USER_CONFIRMED");
+              outcome = await LocalCandidateReview.persistUserEdit(database, canonicalRevision, itemId, editedItem, { working_model: editedWorkingModel });
+              activeCandidateWorkingModel = editedWorkingModel;
             }
             canonicalRevision = outcome.revision;
             const confirmedItem = canonicalRevision.payload.items.find((item) => item.item_id === itemId);
@@ -2602,6 +2657,7 @@
         byId("candidate-patch-proposal").classList.add("hidden");
         editShell.complete();
         pendingDirectEdit = null;
+        if (window.parent !== window) window.parent.postMessage({ type: "job-radar-v1-detail-updated", library: "personal", sourceKey: `candidate:${itemId}` }, window.location.origin);
       } finally {
         button.disabled = false;
       }

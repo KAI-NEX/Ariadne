@@ -305,6 +305,12 @@ expect_error("CONTEXT_LIMIT_EXCEEDED", lambda: validate_candidate_conversation_r
 
 # Subject identity is stable when turn focus changes.
 item_request = request_for(focus={"type": "ITEM", "item_id": "item-edu-001"})
+item_provider_payload = build_candidate_conversation_payload(validate_candidate_conversation_request(item_request))
+item_provider_context = json.loads(item_provider_payload["messages"][1]["content"])["candidate"]
+assert item_provider_context["candidate_items"] == []
+assert item_provider_context["other_item_directory"] == []
+assert item_provider_context["current_item"]["title"] == WORKING_MODEL["payload"]["items"][0]["title"]
+assert WORKING_MODEL["payload"]["items"][1]["title"] not in json.dumps(item_provider_payload, ensure_ascii=False)
 draft_request = request_for(focus={"type": "ITEM_DRAFT", "item_id": "item-edu-001", "draft_fingerprint": "sha256:" + "b" * 64})
 draft_item = {**WORKING_MODEL["payload"]["items"][0], "title": "Unsaved synthetic draft"}
 draft_fingerprint = "sha256:" + hashlib.sha256(json.dumps(draft_item, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")).hexdigest()
