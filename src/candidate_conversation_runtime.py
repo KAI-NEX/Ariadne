@@ -23,7 +23,7 @@ from src.truth_persistence import TruthPersistenceError, validate_candidate_work
 
 
 PROVIDER_ID = "deepseek"
-MODEL_ID = "deepseek-v4-pro"
+MODEL_ID = "deepseek-v4-flash-vision-exp"
 PROTOCOL = OPENAI_CHAT_COMPLETIONS
 CAPABILITY_BASIS = "adapter_verified"
 CREDENTIAL_REF = "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision"
@@ -280,8 +280,9 @@ def _validate_snapshot(value: Any) -> dict[str, Any]:
         or snapshot.capability_basis != CAPABILITY_BASIS
         or snapshot.action_schema_version != ACTION_SCHEMA_VERSION
         or snapshot.request_config_version != REQUEST_CONFIG_VERSION
-        or snapshot.delivery_method is not None
+        or snapshot.delivery_method != "compiled_context_text"
         or snapshot.credential_ref != CREDENTIAL_REF
+        or capabilities.get("vision") != "supported"
         or capabilities.get("ai_conversation") != "supported"
         or capabilities.get("semantic_understanding") != "supported"
     ):
@@ -1200,7 +1201,7 @@ def execute_candidate_conversation_request(
     action, _resolution_verifications, usage = _normalize_candidate_conversation_response_with_verifications(provider_response, request, http_status)
     print(
         "candidate_conversation_acceptance submit_event=fired domain=candidate "
-        f"operation={OPERATION} provider_called=true provider=deepseek model=deepseek-v4-pro "
+        f"operation={OPERATION} provider_called=true provider=deepseek model=deepseek-v4-flash-vision-exp "
         f"result_type={action['action']} working_proposal_created={'yes' if action['patches'] else 'no'} "
         "confirmed_mutation_before_save=no",
         flush=True,

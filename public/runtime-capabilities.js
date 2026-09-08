@@ -216,6 +216,17 @@
     return capability;
   }
 
+  function isEligibleModelDescriptor(descriptor) {
+    return Boolean(descriptor
+      && descriptor.capabilities?.includes("TEXT") && descriptor.capabilities?.includes("VISION")
+      && descriptor.multimodal_readiness === "VERIFIED"
+      && descriptor.supports_complete_document_review === true
+      && ["original_pdf", "rendered_pdf_pages"].includes(descriptor.document_delivery)
+      && descriptor.runtime_capability_basis === "adapter_verified"
+      && descriptor.runtime_capabilities?.vision === "supported"
+      && descriptor.runtime_capabilities?.semantic_understanding === "supported");
+  }
+
   function credentialReference(value) {
     const credentialRef = optionalString(value, "runtime_credential_ref_invalid", 512);
     if (credentialRef !== null && CONTROL_CHARACTER_PATTERN.test(credentialRef)) {
@@ -341,6 +352,7 @@
     ExecutionContractError,
     normalizeCurrentRuntime,
     resolveRuntimeCapability,
+    isEligibleModelDescriptor,
     createRuntimeSnapshot,
     validateRuntimeSnapshot,
     serializeRuntimeSnapshot,

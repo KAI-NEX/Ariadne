@@ -18,7 +18,7 @@
   if (!Runtime || !RuntimeGate || !Truth || !JobContext || !Manifest) throw new Error("job_conversation_dependencies_required");
 
   const PROVIDER = "deepseek";
-  const MODEL = "deepseek-v4-pro";
+  const MODEL = "deepseek-v4-flash-vision-exp";
   const PROTOCOL = "OPENAI_CHAT_COMPLETIONS";
   const OPERATION = "JOB_CONVERSATION_TURN";
   const CREDENTIAL_REF = "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision";

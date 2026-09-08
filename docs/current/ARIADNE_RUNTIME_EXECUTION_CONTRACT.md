@@ -9,6 +9,16 @@
 
 ## 1. Status and Authority
 
+### 2026-09-08 用户确认：全操作多模态接入门槛
+
+本条依据当前用户明确要求，修订后续所有 Provider/model 接入规则，并取代 2026-09-04 历史实施记录中的“Pro 专用于对话”例外；下文 2026-09-01 baseline 状态保留为历史。
+
+- 所有可执行 Model Runtime，包括 Candidate/Job 文字对话，必须具备 verified 图片输入、语义理解和完整视觉 PDF 处理路径。原生 PDF 或完整逐页渲染后发送图片均符合要求；纯文本模型、仅 OCR/文本抽取路径、未验证模型均不符合。
+- 复用现有 `capabilities`、`multimodal_readiness`、`runtime_capability_basis`、`supports_complete_document_review` 和 `document_delivery`。Python `is_runtime_eligible` 与浏览器 `isEligibleModelDescriptor` 执行同一规则，领域操作仍独立解析。`document_delivery` 表示模型的 PDF 能力路线，snapshot `delivery_method` 记录本次实际传输；例如对话为 `compiled_context_text`，不会因为输入是文字而接受纯文本模型。
+- 模型列表只证明账户可见性，`connection_verified` 只证明相应连接测试，均不能跳过模型级能力/领域 adapter 验证。未知 Gemini/其他模型默认不可执行；新增模型须核实官方输入能力，并验证真实图片、PDF 及对应领域契约。Gemini 文档发现仅接受已核对的具体 ID，不能仅凭 `generateContent` 方法推断多模态能力。
+- 当前 DeepSeek 导入及 Candidate/Job 对话统一到 `deepseek-v4-flash-vision-exp`；对话 adapter 分别为 v8/v10。旧 Pro 选择和旧操作分配不能继续发起请求；界面提示重新选择，不自动改为其他模型或 Local。历史资料、来源和执行 provenance 原样保留。
+- 2026-09-08 官方依据：[DeepSeek Vision](https://api-docs.deepseek.com/guides/vision/)、[Gemini 3.7 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.7-flash)、[Gemini 3.1 Flash-Lite](https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite)。文档能力不替代真实领域执行验收；本阶段未启用新的 Gemini/Qwen 领域 adapter。
+
 ### Human Review 状态
 
 - Architecture Human Review：`PASS`

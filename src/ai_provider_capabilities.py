@@ -8,11 +8,15 @@ understanding adapter without an explicit provider capability.
 from __future__ import annotations
 
 from typing import Any
+from src.provider_runtime import deepseek_model_descriptors, v1_runtime_selector_descriptors
 
 
 GEMINI_MODELS_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models"
 GEMINI_INTERACTIONS_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/interactions"
 DEEPSEEK_MODELS_ENDPOINT = "https://api.deepseek.com/models"
+# Exact official image + PDF input contracts, checked 2026-09-08. Listing methods
+# alone are not evidence; these entries do not enable an Ariadne domain adapter.
+GEMINI_DOCUMENT_MODELS = ("gemini-3.7-flash", "gemini-3.1-flash-lite")
 
 
 def provider_catalog(credentials: dict[str, bool], gemini_model: str | None = None) -> list[dict[str, Any]]:
@@ -53,13 +57,13 @@ def select_gemini_document_model(model_listing: dict[str, Any]) -> str | None:
             continue
         name = str(item.get("name") or "").removeprefix("models/").strip()
         methods = item.get("supportedGenerationMethods") or []
-        if name and ("generateContent" in methods or "interactions" in methods):
+        if name in GEMINI_DOCUMENT_MODELS and ("generateContent" in methods or "interactions" in methods):
             candidates.append(name)
-    # Prefer a returned Flash/Gemini document-capable candidate, never invent one.
-    candidates.sort(key=lambda item: ("flash" not in item.lower(), item.lower()))
+    candidates.sort(key=GEMINI_DOCUMENT_MODELS.index)
     return candidates[0] if candidates else None
 
 
 def select_deepseek_document_model(model_ids: list[str]) -> str | None:
     """Use only the account-returned experimental vision model for rendered-page review."""
-    return next((model for model in model_ids if "vision" in model.lower()), None)
+    eligible = v1_runtime_selector_descriptors(deepseek_model_descriptors(model_ids))
+    return eligible[0].model_id if eligible else None

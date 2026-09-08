@@ -49,6 +49,8 @@ class ModelDescriptor:
     runtime_capabilities: dict[str, str] | None = None
     adapter_version: str | None = None
     delivery_method: str | None = None
+    supports_complete_document_review: bool = False
+    document_delivery: str | None = None
 
     def to_public_dict(self) -> dict[str, Any]:
         result = asdict(self)
@@ -86,7 +88,7 @@ def deepseek_model_descriptors(model_ids: list[str]) -> list[ModelDescriptor]:
                     "candidate_model_structuring": "unsupported",
                     "job_model_structuring": "unsupported",
                     "model_merge": "unsupported",
-                    "ai_conversation": "supported",
+                    "ai_conversation": "unsupported",
                     "vision": "unsupported",
                 },
                 None,
@@ -110,6 +112,8 @@ def deepseek_model_descriptors(model_ids: list[str]) -> list[ModelDescriptor]:
                 },
                 "deepseek-candidate-multimodal-v2",
                 "source_or_rendered_images",
+                True,
+                "rendered_pdf_pages",
             ))
         else:
             descriptors.append(ModelDescriptor("deepseek", model_id, f"DeepSeek · {model_id}", ACCOUNT_EXPERIMENTAL, (), "account_discovered"))
@@ -122,23 +126,25 @@ def is_multimodal(descriptor: ModelDescriptor) -> bool:
 
 
 def v1_selector_descriptors(descriptors: list[ModelDescriptor]) -> list[ModelDescriptor]:
-    """Expose only model-level multimodal candidates, never provider-wide capability."""
-    return [item for item in descriptors if is_multimodal(item) and item.multimodal_readiness in {MULTIMODAL_UNVERIFIED, MULTIMODAL_VERIFIED}]
+    """Use the same admission rule for every executable model selector."""
+    return v1_runtime_selector_descriptors(descriptors)
 
 
 def v1_runtime_selector_descriptors(descriptors: list[ModelDescriptor]) -> list[ModelDescriptor]:
-    """Expose verified product runtimes without assigning a domain adapter."""
-    return [
-        item for item in descriptors
-        if (
-            is_multimodal(item)
-            and item.multimodal_readiness in {MULTIMODAL_UNVERIFIED, MULTIMODAL_VERIFIED}
-        ) or (
-            item.runtime_capability_basis == "adapter_verified"
-            and item.runtime_capabilities is not None
-            and item.runtime_capabilities.get("ai_conversation") == "supported"
-        )
-    ]
+    """All operations, including conversation, require image and visual PDF input."""
+    return [item for item in descriptors if is_runtime_eligible(item)]
+
+
+def is_runtime_eligible(descriptor: ModelDescriptor) -> bool:
+    return (
+        is_multimodal(descriptor)
+        and descriptor.multimodal_readiness == MULTIMODAL_VERIFIED
+        and descriptor.supports_complete_document_review is True
+        and descriptor.document_delivery in {"original_pdf", "rendered_pdf_pages"}
+        and descriptor.runtime_capability_basis == "adapter_verified"
+        and (descriptor.runtime_capabilities or {}).get("vision") == "supported"
+        and (descriptor.runtime_capabilities or {}).get("semantic_understanding") == "supported"
+    )
 
 
 def descriptor_for(model_id: str, descriptors: list[ModelDescriptor]) -> ModelDescriptor:

@@ -21,7 +21,7 @@ MANIFEST_PATH = Path(__file__).resolve().parents[1] / "data" / "job_intelligence
 MANIFEST = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 RUNTIME = MANIFEST["runtime_contracts"]
 PROVIDER_ID = "deepseek"
-MODEL_ID = "deepseek-v4-pro"
+MODEL_ID = "deepseek-v4-flash-vision-exp"
 PROTOCOL = OPENAI_CHAT_COMPLETIONS
 OPERATION = "JOB_CONVERSATION_TURN"
 CREDENTIAL_REF = "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision"
@@ -168,6 +168,10 @@ def validate_job_conversation_request(payload: Any) -> JobConversationRequest:
         or snapshot.prompt_version != RUNTIME["prompt_version"] or snapshot.schema_version != SEMANTIC_OUTPUT_CONTRACT
         or snapshot.operation != OPERATION or snapshot.action_schema_version != SEMANTIC_OUTPUT_CONTRACT
         or snapshot.request_config_version != RUNTIME["request_config_version"]
+        or snapshot.delivery_method != "compiled_context_text"
+        or snapshot.capabilities.vision != "supported"
+        or snapshot.capabilities.semantic_understanding != "supported"
+        or snapshot.capability_basis != "adapter_verified"
         or snapshot.capabilities.ai_conversation != "supported"
     ):
         raise JobConversationRuntimeError("RUNTIME_SNAPSHOT_INVALID", "runtime")
@@ -475,7 +479,7 @@ def execute_job_conversation_request(
     output, usage = normalize_job_conversation_response(response, request, status)
     print(
         "job_conversation_acceptance submit_event=fired domain=job "
-        f"operation={OPERATION} provider_called=true provider=deepseek model=deepseek-v4-pro "
+        f"operation={OPERATION} provider_called=true provider=deepseek model=deepseek-v4-flash-vision-exp "
         f"result_type={output['action']} working_proposal_created={'yes' if output['job_edit'] else 'no'} "
         "confirmed_mutation_before_save=no assistant_copy_source=PROVIDER",
         flush=True,

@@ -29,6 +29,8 @@
     }),
     adapter_version: "deepseek-candidate-multimodal-v2",
     delivery_method: "source_or_rendered_images",
+    supports_complete_document_review: true,
+    document_delivery: "rendered_pdf_pages",
   });
   const CANDIDATE_PDF_MODEL_ADAPTER = CANDIDATE_MULTIMODAL_IMPORT_ADAPTER;
   const DEEPSEEK_VISION_MODEL_DESCRIPTOR = Object.freeze({
@@ -53,18 +55,24 @@
       candidate_model_structuring: "unsupported",
       job_model_structuring: "unsupported",
       model_merge: "unsupported",
-      ai_conversation: "supported",
+      ai_conversation: "unsupported",
       vision: "unsupported",
     }),
     delivery_method: null,
   });
   const CANDIDATE_CONVERSATION_MODEL_ADAPTER = Object.freeze({
-    ...DEEPSEEK_PRO_MODEL_DESCRIPTOR,
-    adapter_version: "deepseek-candidate-conversation-v7",
+    ...DEEPSEEK_VISION_MODEL_DESCRIPTOR,
+    runtime_capabilities: Object.freeze({
+      ...DEEPSEEK_VISION_MODEL_DESCRIPTOR.runtime_capabilities,
+      ai_conversation: "supported",
+    }),
+    discovery_source: "qualification_2026-09-08",
+    adapter_version: "deepseek-candidate-conversation-v8",
+    delivery_method: "compiled_context_text",
   });
   const JOB_CONVERSATION_MODEL_ADAPTER = Object.freeze({
-    ...DEEPSEEK_PRO_MODEL_DESCRIPTOR,
-    adapter_version: "deepseek-job-conversation-v9",
+    ...CANDIDATE_CONVERSATION_MODEL_ADAPTER,
+    adapter_version: "deepseek-job-conversation-v10",
   });
   const JOB_MULTIMODAL_IMPORT_ADAPTER = Object.freeze({
     ...CANDIDATE_MULTIMODAL_IMPORT_ADAPTER,
@@ -119,13 +127,13 @@
     const normalized = Contract.normalizeCurrentRuntime(runtime);
     if (normalized.mode !== "model") return null;
     if (normalized.provider === CANDIDATE_PDF_MODEL_ADAPTER.provider_id && normalized.model === CANDIDATE_PDF_MODEL_ADAPTER.model_id) {
+      if (operation === "job_conversation") return JOB_CONVERSATION_MODEL_ADAPTER;
+      if (["candidate_conversation", "ai_conversation", null].includes(operation)) return CANDIDATE_CONVERSATION_MODEL_ADAPTER;
       if (["job_image_import", "job_text_import", "job_model_import"].includes(operation)) return JOB_MULTIMODAL_IMPORT_ADAPTER;
       if (["candidate_image_import", "candidate_import"].includes(operation)) return CANDIDATE_MULTIMODAL_IMPORT_ADAPTER;
       return DEEPSEEK_VISION_MODEL_DESCRIPTOR;
     }
     if (normalized.provider === DEEPSEEK_PRO_MODEL_DESCRIPTOR.provider_id && normalized.model === DEEPSEEK_PRO_MODEL_DESCRIPTOR.model_id) {
-      if (operation === "job_conversation") return JOB_CONVERSATION_MODEL_ADAPTER;
-      if (operation === "candidate_conversation" || operation === "ai_conversation" || operation === null) return CANDIDATE_CONVERSATION_MODEL_ADAPTER;
       return DEEPSEEK_PRO_MODEL_DESCRIPTOR;
     }
     return Object.freeze({
@@ -137,6 +145,12 @@
 
   function currentAuthority(storage = globalThis.localStorage) {
     return authorityFrom(readStoredRuntime(storage));
+  }
+
+  function isModelRuntimeEligible(runtime) {
+    try {
+      return Contract.isEligibleModelDescriptor(modelDescriptorForRuntime(runtime));
+    } catch (_error) { return false; }
   }
 
   function readOperationRuntimes(storage = globalThis.localStorage) {
@@ -180,6 +194,7 @@
     if (!Object.hasOwn(OPERATION_CAPABILITIES, operation)) throw new RuntimeGateError("runtime_operation_unknown");
     const selected = Contract.normalizeCurrentRuntime(readStoredRuntime(storage));
     if (selected.mode === "local") return selected;
+    if (!isModelRuntimeEligible(selected)) return selected;
     const assigned = readOperationRuntimes(storage)[operation];
     if (assigned && operationCompatible(operation, assigned)) return assigned;
     return selected;
@@ -196,7 +211,7 @@
     const capability = requirement[resolvedAuthority.runtime.mode];
     const state = resolvedAuthority.capabilities[capability];
     return Object.freeze({
-      allowed: state === "supported",
+      allowed: state === "supported" && (resolvedAuthority.runtime.mode === "local" || isModelRuntimeEligible(resolvedAuthority.runtime)),
       operation,
       capability,
       state,
@@ -217,7 +232,7 @@
       && runtime.provider === String(provider || "").trim().toLowerCase()
       && (!model || runtime.model === String(model).trim());
     return Object.freeze({
-      allowed: identityMatches && state === "supported",
+      allowed: identityMatches && state === "supported" && isModelRuntimeEligible(runtime),
       capability,
       state,
       identity_matches: identityMatches,
@@ -250,6 +265,7 @@
     authorityFrom,
     modelDescriptorForRuntime,
     currentAuthority,
+    isModelRuntimeEligible,
     readOperationRuntimes,
     compatibleModelOperations,
     recordOperationRuntimeSelection,

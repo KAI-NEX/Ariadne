@@ -42,6 +42,7 @@
   }
 
   function buildConnectionRequest(model, imageDataUrl) {
+    if (!KNOWN_MULTIMODAL_MODELS.includes(model)) throw new Error("model_image_pdf_capability_unverified");
     const match = /^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=]+)$/i.exec(String(imageDataUrl || ""));
     if (!match) throw new Error("invalid_synthetic_multimodal_image");
     return {

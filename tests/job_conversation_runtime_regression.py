@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from dataclasses import replace
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -23,13 +24,13 @@ from src.provider_runtime import deepseek_model_descriptors  # noqa: E402
 
 SNAPSHOT = create_runtime_snapshot(
     {"mode": "model", "provider": PROVIDER_ID, "model": MODEL_ID},
-    model_descriptor=deepseek_model_descriptors([MODEL_ID])[0],
+    model_descriptor=replace(deepseek_model_descriptors([MODEL_ID])[0], delivery_method="compiled_context_text", runtime_capabilities={**deepseek_model_descriptors([MODEL_ID])[0].runtime_capabilities, "candidate_model_structuring": "unsupported", "ai_conversation": "supported"}),
     snapshot_id="runtime-snapshot-job-runtime-test", captured_at="2026-09-04T04:00:00Z",
     credential_ref=CREDENTIAL_REF, adapter_version=RUNTIME["adapter_version"],
     prompt_version=RUNTIME["prompt_version"], schema_version=SEMANTIC_OUTPUT_CONTRACT,
     operation=OPERATION, capability_basis="adapter_verified",
     action_schema_version=SEMANTIC_OUTPUT_CONTRACT,
-    request_config_version=RUNTIME["request_config_version"], delivery_method=None,
+    request_config_version=RUNTIME["request_config_version"], delivery_method="compiled_context_text",
 ).to_dict()
 
 

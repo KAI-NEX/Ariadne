@@ -136,7 +136,8 @@ verified_conversation = create_runtime_snapshot(
     action_schema_version="ariadne-candidate-conversation-action-v1",
     request_config_version="deepseek-candidate-conversation-request-v8",
 )
-assert verified_conversation.capabilities.ai_conversation == "supported"
+# Current discovery revokes the historical text-only conversation capability.
+assert verified_conversation.capabilities.ai_conversation == "unsupported"
 assert verified_conversation.capabilities.candidate_model_structuring == "unsupported"
 assert verified_conversation.operation == "CANDIDATE_CONVERSATION_TURN"
 assert verified_conversation.action_schema_version == "ariadne-candidate-conversation-action-v1"

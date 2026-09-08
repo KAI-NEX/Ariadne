@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import hashlib
 from pathlib import Path
+from dataclasses import replace
 import sys
 
 
@@ -83,7 +84,7 @@ WORKING_MODEL = {
 FINGERPRINT = "sha256:" + hashlib.sha256(json.dumps(WORKING_MODEL["payload"], ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")).hexdigest()
 WORKING_MODEL["fingerprint"] = FINGERPRINT
 
-DESCRIPTOR = deepseek_model_descriptors([MODEL_ID])[0]
+DESCRIPTOR = replace(deepseek_model_descriptors([MODEL_ID])[0], delivery_method="compiled_context_text", runtime_capabilities={**deepseek_model_descriptors([MODEL_ID])[0].runtime_capabilities, "candidate_model_structuring": "unsupported", "ai_conversation": "supported"})
 SNAPSHOT = create_runtime_snapshot(
     {"mode": "model", "provider": "deepseek", "model": MODEL_ID},
     model_descriptor=DESCRIPTOR,
@@ -97,7 +98,7 @@ SNAPSHOT = create_runtime_snapshot(
     capability_basis=CAPABILITY_BASIS,
     action_schema_version=ACTION_SCHEMA_VERSION,
     request_config_version=REQUEST_CONFIG_VERSION,
-    delivery_method=None,
+    delivery_method="compiled_context_text",
 )
 
 
@@ -264,7 +265,7 @@ assert SNAPSHOT.model == MODEL_ID and SNAPSHOT.protocol == "OPENAI_CHAT_COMPLETI
 assert SNAPSHOT.operation == OPERATION and SNAPSHOT.capability_basis == CAPABILITY_BASIS
 assert SNAPSHOT.action_schema_version == ACTION_SCHEMA_VERSION
 assert SNAPSHOT.request_config_version == REQUEST_CONFIG_VERSION
-assert SNAPSHOT.delivery_method is None and SNAPSHOT.credential_ref == CREDENTIAL_REF
+assert SNAPSHOT.delivery_method == "compiled_context_text" and SNAPSHOT.credential_ref == CREDENTIAL_REF
 assert CONTRACT_MANIFEST["semantic_action_version"] == SEMANTIC_ACTION_SCHEMA_VERSION
 
 base_request = request_for()

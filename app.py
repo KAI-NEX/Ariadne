@@ -84,7 +84,7 @@ OCR_UPLOAD_PATH = PROJECT_ROOT / "data" / "local_ocr_uploads"
 RAW_CAPTURE_PATH = PROJECT_ROOT / "data" / "raw"
 DEEPSEEK_ENDPOINT = "https://api.deepseek.com/chat/completions"
 DEEPSEEK_VISION_MODEL = "deepseek-v4-flash-vision-exp"
-DEEPSEEK_CONVERSATION_MODEL = "deepseek-v4-pro"
+DEEPSEEK_CONVERSATION_MODEL = DEEPSEEK_VISION_MODEL
 QWEN_CHAT_COMPLETIONS_ENDPOINT = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
 QWEN_V1_MULTIMODAL_MODEL = "qwen3.8-max"
 MULTIMODAL_SMOKE_IMAGE_PATH = PUBLIC_PATH / "job-radar-multimodal-smoke.jpg"
@@ -442,6 +442,10 @@ def synthetic_multimodal_smoke_image_data_url() -> str:
 
 def deepseek_runtime_connection_check(model: str, synthetic_image_data_url: str | None = None) -> dict:
     """Perform the capability-matched runtime check when explicitly authorized."""
+    # Reject text-only/unknown identities before reading credentials or contacting a Provider.
+    if not v1_runtime_selector_descriptors(deepseek_model_descriptors([model])):
+        return {"ok": False, "status": HTTPStatus.UNPROCESSABLE_ENTITY, "error": "runtime_requires_image_and_pdf", "failure_layer": "capability", "network_call_made": False}
+    synthetic_image_data_url = synthetic_image_data_url or synthetic_multimodal_smoke_image_data_url()
     options = deepseek_runtime_models()
     if not options["ok"]:
         return options
@@ -1032,7 +1036,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
 
     def runtime_options(self) -> None:
         """List current runtime choices without sending career material or an inference."""
-        descriptors = deepseek_model_descriptors([DEEPSEEK_VISION_MODEL, DEEPSEEK_CONVERSATION_MODEL])
+        descriptors = deepseek_model_descriptors([DEEPSEEK_VISION_MODEL])
         self.send_json(HTTPStatus.OK, {
             "provider": "deepseek", "models": [item.to_public_dict() for item in v1_runtime_selector_descriptors(descriptors)], "network_call_made": False,
             "career_data_sent": False,
@@ -1205,7 +1209,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             print(
                 "candidate_conversation_failure "
                 f"provider_called={str(error.network_call_made).lower()} provider=deepseek "
-                f"model=deepseek-v4-pro stage={error.failure_layer} "
+                f"model=deepseek-v4-flash-vision-exp stage={error.failure_layer} "
                 f"error_code={error.code} field_category={safe_diagnostics.get('field_category', 'unknown')} "
                 f"action_type={safe_diagnostics.get('action_type', 'unknown')} assistant_copy_source=NONE",
                 flush=True,
@@ -1282,7 +1286,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             print(
                 "job_conversation_failure "
                 f"provider_called={str(error.network_call_made).lower()} provider=deepseek "
-                f"model=deepseek-v4-pro stage={error.failure_layer} "
+                f"model=deepseek-v4-flash-vision-exp stage={error.failure_layer} "
                 f"error_code={error.code} assistant_copy_source=NONE",
                 flush=True,
             )

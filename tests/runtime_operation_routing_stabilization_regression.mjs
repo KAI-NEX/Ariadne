@@ -28,7 +28,7 @@ for (const operation of ["candidate_image_import", "job_image_import"]) {
   assert.equal(gate.authority.capabilities.vision, "unsupported");
 }
 
-const routed = storage(pro);
+const routed = storage(vision);
 Gate.recordOperationRuntimeSelection(pro, routed);
 Gate.recordOperationRuntimeSelection(vision, routed);
 for (const operation of ["candidate_image_import", "job_image_import"]) {
@@ -40,13 +40,13 @@ for (const operation of ["candidate_image_import", "job_image_import"]) {
 for (const operation of ["candidate_conversation", "job_conversation"]) {
   const gate = Gate.operationGate(operation, Gate.operationAuthority(operation, routed));
   assert.equal(gate.allowed, true);
-  assert.equal(gate.authority.runtime.model, "deepseek-v4-pro");
+  assert.equal(gate.authority.runtime.model, "deepseek-v4-flash-vision-exp");
 }
 const preserved = storage(vision);
 Gate.recordOperationRuntimeSelection(vision, preserved);
 Gate.recordOperationRuntimeSelection(pro, preserved, { only_unassigned: true });
 assert.equal(Gate.runtimeForOperation("candidate_image_import", preserved).model, "deepseek-v4-flash-vision-exp");
-assert.equal(Gate.runtimeForOperation("job_conversation", preserved).model, "deepseek-v4-pro");
+assert.equal(Gate.runtimeForOperation("job_conversation", preserved).model, "deepseek-v4-flash-vision-exp");
 
 const local = storage({ mode: "local", provider: null, model: null });
 for (const operation of ["candidate_import", "job_import"]) {
@@ -92,7 +92,7 @@ assert.match(styles, /\.v1-workspace-open \.v1-workspace-shell \{ width: min\(12
 console.log(JSON.stringify({
   incompatible_image_model_fails_closed: "pass",
   image_import_uses_multimodal_runtime: "pass",
-  conversation_keeps_text_runtime: "pass",
+  conversation_uses_multimodal_runtime: "pass",
   local_authority_unchanged: "pass",
   model_flows_exclude_local_semantics: "pass",
   minibar_right_vertical_center: "pass",

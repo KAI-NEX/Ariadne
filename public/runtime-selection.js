@@ -41,7 +41,8 @@ function persistSelectedRuntime() {
 
 function selectableModels() {
   const addedIds = new Set(state.addedModels.map((model) => `${model.provider_id}:${model.model_id}`));
-  return [...state.addedModels, ...state.models.filter((model) => !addedIds.has(`${model.provider_id}:${model.model_id}`))];
+  return [...state.addedModels, ...state.models.filter((model) => !addedIds.has(`${model.provider_id}:${model.model_id}`))]
+    .filter((model) => window.JobRadarRuntimeGate?.isModelRuntimeEligible({ mode: "model", provider: model.provider_id, model: model.model_id }));
 }
 
 function setMessage(message = "", failed = false) {
@@ -88,12 +89,12 @@ function openMenu() {
 }
 
 function failureCopy(layer) {
-  return { AUTH: "连接失败：请检查 Gemini API Key。", CORS: "连接失败：浏览器无法直接访问 Gemini。", PROVIDER: "连接失败：Gemini 暂时不可用。", MODEL: "连接失败：当前账号没有可用的图文模型。", REQUEST: "连接失败：Gemini 未接受图文验证请求。", RESPONSE_EXTRACTION: "连接失败：无法读取 Gemini 返回内容。", EMPTY_RESPONSE: "连接失败：Gemini 返回了空内容。", SMOKE_MISMATCH: "连接失败：模型未正确读取测试图片。", credential: "连接失败：请检查 DeepSeek 凭据。", transport: "连接失败：无法访问 DeepSeek。", provider: "连接失败：DeepSeek 暂时不可用。", model: "连接失败：该模型当前不可用。", capability: "该模型尚未完成图文验证。", protocol: "该模型的连接协议尚未确认。", unexpected_response: "连接失败：服务返回异常。" }[layer] || "连接失败：请重试。";
+  return { AUTH: "连接失败：请检查 Gemini API Key。", CORS: "连接失败：浏览器无法直接访问 Gemini。", PROVIDER: "连接失败：Gemini 暂时不可用。", MODEL: "连接失败：当前账号没有可用的图文模型。", REQUEST: "连接失败：Gemini 未接受图文验证请求。", RESPONSE_EXTRACTION: "连接失败：无法读取 Gemini 返回内容。", EMPTY_RESPONSE: "连接失败：Gemini 返回了空内容。", SMOKE_MISMATCH: "连接失败：模型未正确读取测试图片。", credential: "连接失败：请检查 DeepSeek 凭据。", transport: "连接失败：无法访问 DeepSeek。", provider: "连接失败：DeepSeek 暂时不可用。", model: "连接失败：该模型当前不可用。", capability: "该模型不符合图片和 PDF 接入要求。", protocol: "该模型的连接协议尚未确认。", unexpected_response: "连接失败：服务返回异常。" }[layer] || "连接失败：请重试。";
 }
 
 function isVerifiedRuntimeModel(model) {
   return model?.provider_id === "deepseek" && model.runtime_capability_basis === "adapter_verified"
-    && (model.multimodal_readiness === "VERIFIED" || model.runtime_capabilities?.ai_conversation === "supported");
+    && window.AriadneRuntimeExecution.isEligibleModelDescriptor(model);
 }
 
 function selectVerifiedRuntimeModel(model) {
@@ -103,7 +104,11 @@ function selectVerifiedRuntimeModel(model) {
 }
 
 function applyReadyModel(model, shouldPersist = true) {
-  if (!model) return false;
+  if (!model || !window.JobRadarRuntimeGate?.isModelRuntimeEligible({ mode: "model", provider: model.provider_id, model: model.model_id })) {
+    state.phase = "FAILED";
+    setMessage("当前模型不符合图片和 PDF 接入要求，或尚未完成 Ariadne 适配验证。请重新选择模型。", true);
+    return false;
+  }
   state.mode = "ai";
   state.provider = model.provider_id;
   state.model = model.model_id;
@@ -130,6 +135,10 @@ async function checkModel(model) {
     const response = await fetch("/api/runtime-check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model }) });
     const result = await response.json();
     if (!response.ok) throw Object.assign(new Error(result.error || "runtime_check_failed"), { result });
+    if (!result.diagnostics?.multimodal_connection_ready
+      || !window.JobRadarRuntimeGate?.isModelRuntimeEligible({ mode: "model", provider: result.provider, model: result.model })) {
+      throw Object.assign(new Error("runtime_requires_image_and_pdf"), { result: { failure_layer: "capability" } });
+    }
     state.phase = "READY"; state.diagnostics = result.diagnostics || null;
     sessionStorage.setItem("job-radar-runtime-check", JSON.stringify({ ...state.diagnostics, provider: result.provider, model: result.model }));
     persistSelectedRuntime();
@@ -151,7 +160,7 @@ function renderModels() {
     button.className = "runtime-menu-item runtime-existing-model";
     button.type = "button"; button.setAttribute("role", "option"); button.setAttribute("aria-selected", "false"); button.dataset.model = model.model_id; button.dataset.provider = model.provider_id; button.style.setProperty("--runtime-menu-index", String(index));
     title.textContent = labelFor(model);
-    detail.textContent = model.runtime_capabilities?.ai_conversation === "supported" ? "职位 / 候选人对话" : model.multimodal_readiness === "VERIFIED" ? "图片 / PDF 导入" : "实验图文模型";
+    detail.textContent = "图片 / PDF 导入 · 职位 / 候选人对话";
     button.append(title, detail); container.append(button);
   });
   document.querySelectorAll(".runtime-existing-model").forEach((button) => button.addEventListener("click", () => {
@@ -162,27 +171,15 @@ function renderModels() {
   }));
 }
 
-function seedConfiguredConversationRuntime() {
-  const model = selectableModels().find((item) => item.provider_id === "deepseek"
-    && item.model_id === "deepseek-v4-pro" && item.runtime_capabilities?.ai_conversation === "supported");
-  if (!model) return;
-  window.JobRadarRuntimeGate?.recordOperationRuntimeSelection(
-    { mode: "model", provider: model.provider_id, model: model.model_id },
-    localStorage,
-    { only_unassigned: true },
-  );
-}
-
 async function loadModels() {
   try {
     const response = await fetch("/api/runtime-options");
     const result = await response.json();
     if (!response.ok) throw Object.assign(new Error(result.error || "runtime_options_failed"), { result });
     state.models = result.models || [];
-    seedConfiguredConversationRuntime();
     if (!(["READY", "OFFICIAL_READY", "LOCAL_READY"].includes(state.phase) && (state.model || state.mode === "local"))) {
       const restoredModel = selectableModels().find((model) => model.provider_id === state.provider && model.model_id === state.model);
-      if (restoredModel) applyReadyModel(restoredModel, false);
+      if (state.mode === "ai") applyReadyModel(restoredModel, false);
     }
     renderModels(); render();
   } catch (_error) {
@@ -204,7 +201,7 @@ function restoreAddedModels() {
   }
   if (!Array.isArray(models)) models = [];
   state.addedModels = models.filter((model) => model && typeof model.provider_id === "string" && typeof model.model_id === "string" && model.connection_verified === true);
-  if (state.addedModels.length) writeLocalJson(ADDED_MODELS_STORAGE_KEY, state.addedModels);
+  // Keep original stored entries, including now-ineligible models, for history.
 }
 
 function restoreSelectedRuntime() {
@@ -254,7 +251,8 @@ document.addEventListener("keydown", (event) => { if (event.key === "Escape") cl
 function restoreGeminiReadyState() {
   try {
     const diagnostics = JSON.parse(sessionStorage.getItem("job-radar-runtime-check") || "null");
-    if (!state.model && diagnostics?.provider === "gemini" && diagnostics?.multimodal_connection_ready && diagnostics?.normalized_text) {
+    if (!state.model && diagnostics?.provider === "gemini" && diagnostics?.multimodal_connection_ready && diagnostics?.normalized_text
+      && window.JobRadarRuntimeGate?.isModelRuntimeEligible({ mode: "model", provider: diagnostics.provider, model: diagnostics.model })) {
       state.mode = "ai"; state.provider = "gemini"; state.model = diagnostics.model; state.phase = "READY"; state.diagnostics = diagnostics;
       persistSelectedRuntime(); render();
     }

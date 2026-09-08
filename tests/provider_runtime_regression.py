@@ -18,7 +18,7 @@ flash, pro, vision, unknown = descriptors
 assert flash.protocol == OPENAI_RESPONSES and flash.runtime_default
 assert pro.protocol == OPENAI_CHAT_COMPLETIONS
 assert pro.runtime_capability_basis == "adapter_verified"
-assert pro.runtime_capabilities["ai_conversation"] == "supported"
+assert pro.runtime_capabilities["ai_conversation"] == "unsupported"
 assert pro.runtime_capabilities["candidate_model_structuring"] == "unsupported"
 assert pro.adapter_version is None and pro.delivery_method is None  # adapter identity is resolved by product operation
 assert vision.protocol == OPENAI_CHAT_COMPLETIONS and vision.capabilities == (TEXT, VISION)
@@ -34,9 +34,9 @@ assert not is_multimodal(unknown)
 assert descriptor_for("deepseek-v4-pro", descriptors) == pro
 assert resolve_credential_reference("keychain://synthetic", "keychain://synthetic", lambda: "synthetic-secret") == "synthetic-secret"
 assert v1_selector_descriptors(descriptors) == [vision]  # only the model-level official vision model is visible
-assert v1_runtime_selector_descriptors(descriptors) == [pro, vision]
+assert v1_runtime_selector_descriptors(descriptors) == [vision]
 verified = ModelDescriptor("fixture", "verified-vision", "Fixture vision", OPENAI_CHAT_COMPLETIONS, (TEXT, VISION), "fixture", False, MULTIMODAL_VERIFIED)
-assert v1_selector_descriptors([flash, verified]) == [verified]
+assert v1_selector_descriptors([flash, verified]) == []  # image support without PDF/adapter evidence is insufficient
 
 responses_request = connection_request(flash)
 assert responses_request.endpoint.endswith("/responses")

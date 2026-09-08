@@ -36,17 +36,17 @@ assert.equal(Gate.operationGate("candidate_image_import", modelAuthority).allowe
 for (const operation of ["job_import", "ai_conversation", "model_merge"]) assert.equal(Gate.operationGate(operation, modelAuthority).allowed, false);
 assert.equal(Gate.requireOperation("candidate_image_import", modelAuthority).capability, "candidate_model_structuring");
 
-const conversationAuthority = Gate.authorityFrom({ mode: "model", provider: "deepseek", model: "deepseek-v4-pro" });
+const conversationAuthority = Gate.authorityFrom(visionRuntime);
 assert.equal(Gate.operationGate("ai_conversation", conversationAuthority).allowed, true);
 assert.equal(Gate.operationGate("candidate_import", conversationAuthority).allowed, false);
-assert.equal(conversationAuthority.capabilities.vision, "unsupported");
+assert.equal(conversationAuthority.capabilities.vision, "supported");
 assert.equal(Gate.modelDescriptorForRuntime(conversationAuthority.runtime), Gate.CANDIDATE_CONVERSATION_MODEL_ADAPTER);
 assert.equal(Gate.modelDescriptorForRuntime(conversationAuthority.runtime, "candidate_conversation"), Gate.CANDIDATE_CONVERSATION_MODEL_ADAPTER);
 assert.equal(Gate.modelDescriptorForRuntime(conversationAuthority.runtime, "job_conversation"), Gate.JOB_CONVERSATION_MODEL_ADAPTER);
-assert.equal(Gate.modelDescriptorForRuntime(conversationAuthority.runtime, "job_model_import"), Gate.DEEPSEEK_PRO_MODEL_DESCRIPTOR);
+assert.equal(Gate.modelDescriptorForRuntime(conversationAuthority.runtime, "job_model_import"), Gate.JOB_MULTIMODAL_IMPORT_ADAPTER);
 const jobModelImportAuthority = Gate.authorityFrom(conversationAuthority.runtime, "job_model_import");
-assert.equal(Gate.operationGate("job_model_import", jobModelImportAuthority).allowed, false);
-assert.equal(jobModelImportAuthority.capabilities.job_model_structuring, "unsupported");
+assert.equal(Gate.operationGate("job_model_import", jobModelImportAuthority).allowed, true);
+assert.equal(jobModelImportAuthority.capabilities.job_model_structuring, "supported");
 assert.equal(conversationAuthority.capabilities.job_model_structuring, "unsupported");
 const jobImageAuthority = Gate.authorityFrom(visionRuntime, "job_image_import");
 assert.equal(Gate.operationGate("job_image_import", jobImageAuthority).allowed, true);
@@ -56,10 +56,10 @@ assert.equal(Gate.authorityFrom(conversationAuthority.runtime, "candidate_conver
 assert.equal(Gate.authorityFrom(conversationAuthority.runtime, "job_conversation").capabilities.ai_conversation, "supported");
 assert.equal(Gate.operationGate("candidate_conversation").operation, "candidate_conversation");
 
-const routedStorage = memoryStorage({ mode: "ai", provider: "deepseek", model: "deepseek-v4-pro" });
+const routedStorage = memoryStorage(visionRuntime);
 Gate.recordOperationRuntimeSelection({ mode: "model", provider: "deepseek", model: "deepseek-v4-pro" }, routedStorage);
 Gate.recordOperationRuntimeSelection({ mode: "model", provider: "deepseek", model: "deepseek-v4-flash-vision-exp" }, routedStorage);
-assert.equal(Gate.runtimeForOperation("job_conversation", routedStorage).model, "deepseek-v4-pro");
+assert.equal(Gate.runtimeForOperation("job_conversation", routedStorage).model, "deepseek-v4-flash-vision-exp");
 assert.equal(Gate.runtimeForOperation("candidate_image_import", routedStorage).model, "deepseek-v4-flash-vision-exp");
 assert.equal(Gate.runtimeForOperation("job_image_import", routedStorage).model, "deepseek-v4-flash-vision-exp");
 const incompatibleStorage = memoryStorage({ mode: "ai", provider: "deepseek", model: "deepseek-v4-pro" });

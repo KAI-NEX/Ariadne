@@ -41,19 +41,19 @@ try:
     available = app.deepseek_runtime_models()
     assert available["ok"] and available["models"] == ["deepseek-v4-flash", "deepseek-v4-flash-vision-exp"]
     assert available["descriptors"][0].protocol == "OPENAI_RESPONSES"
-    result = app.deepseek_runtime_connection_check("deepseek-v4-flash")
-    assert result["ok"] and result["diagnostics"]["purpose"] == "CONNECTION_TEST"
-    assert result["diagnostics"]["career_data_sent"] is False
-    assert result["diagnostics"]["protocol"] == "OPENAI_RESPONSES"
-    assert result["diagnostics"]["usage"]["total_tokens"] == 4
+    before = len(calls)
+    for model in ["deepseek-v4-flash", "deepseek-v4-pro", "invented-vision"]:
+        result = app.deepseek_runtime_connection_check(model)
+        assert not result["ok"] and result["error"] == "runtime_requires_image_and_pdf"
+        assert result["network_call_made"] is False and len(calls) == before
     experimental = app.deepseek_runtime_connection_check("deepseek-v4-flash-vision-exp", "data:image/jpeg;base64,ZmFrZQ==")
     assert experimental["ok"] and experimental["diagnostics"]["purpose"] == "MULTIMODAL_CONNECTION_TEST"
     assert experimental["diagnostics"]["multimodal_connection_ready"] is True
     assert experimental["diagnostics"]["structured_output_verified"] is False
     text_only_vision = app.deepseek_runtime_connection_check("deepseek-v4-flash-vision-exp")
-    assert not text_only_vision["ok"] and text_only_vision["error"] == "selected_model_requires_multimodal_smoke"
+    assert text_only_vision["ok"] and text_only_vision["diagnostics"]["multimodal_connection_ready"]
     unavailable = app.deepseek_runtime_connection_check("invented-model")
-    assert not unavailable["ok"] and unavailable["failure_layer"] == "model"
+    assert not unavailable["ok"] and unavailable["failure_layer"] == "capability"
 finally:
     app.read_deepseek_key, app.urlopen = original_key, original_urlopen
 
@@ -65,5 +65,5 @@ finally:
     app.read_deepseek_key = original_key
 
 assert calls.count((app.DEEPSEEK_MODELS_ENDPOINT, 30)) >= 3
-assert ("https://api.deepseek.com/responses", 60) in calls
+assert ("https://api.deepseek.com/responses", 60) not in calls
 print("runtime_connection_contract=pass")

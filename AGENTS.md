@@ -23,6 +23,7 @@ Ariadne 先理解用户提供的个人资料，再理解用户选择的职位描
 
 ## 运行与产品边界
 
+- Model 接入只允许至少支持图片与视觉 PDF 理解的多模态模型，对话也不例外。复用现有 capability authority，核实具体模型及协议，验证图片与原生 PDF/完整逐页转图路径；Provider 名称、模型名、模型列表或纯文字连通成功都不构成能力认证。此要求同样适用于后续 Gemini 与其他 Provider；能力未证实或领域 adapter 未完成时禁止进入可执行选择器。
 - 当前 Runtime 决定 Local/Model 模式，具体操作按 model capability 解析。Local 的 Provider 调用为零；Model 不可用或失败须明确失败，不静默切换 Local 或生成假回复。
 - Model 导入先保存 durable SourceDocument/有序 source bundle；本地读取、OCR、hash 校验属于技术准备，不替代 Model 语义理解。
 - 复用 Candidate/Job 已有共用输入、处理状态、详情、编辑与对话组件；领域 schema、action、context 和保存权限仍分别维护。

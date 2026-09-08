@@ -22,7 +22,7 @@
   }
 
   const PROVIDER = "deepseek";
-  const MODEL = "deepseek-v4-pro";
+  const MODEL = "deepseek-v4-flash-vision-exp";
   const PROTOCOL = "OPENAI_CHAT_COMPLETIONS";
   const RUNTIME_CONTRACTS = Conversation.CONTRACT_MANIFEST.runtime_contracts;
   const ADAPTER_VERSION = RUNTIME_CONTRACTS.adapter_version;

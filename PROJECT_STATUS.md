@@ -1,5 +1,16 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-08 — 全操作多模态模型接入修复（COMPLETE）
+
+- 用户明确要求所有可调用模型至少能理解图片和 PDF，后续 Gemini/其他 Provider 同样适用。规则已写入 AGENTS、PROJECT_CONTEXT 和 Runtime Contract 顶部增量条目；取代历史 Pro 对话例外，原历史记录保留。
+- 根因：Runtime selector 通过 `ai_conversation=supported` 单独放行纯文本 `deepseek-v4-pro`，首页又自动给对话分配 Pro；旧的 `connection_verified` 记录也可恢复为 READY。现已在共用能力门槛、选择器、旧配置恢复、操作路由及后端执行/连接边界阻断这些路径。
+- DeepSeek 可执行模型仅保留 `deepseek-v4-flash-vision-exp`；Candidate/Job 对话迁至同一模型（adapter v8/v10），保留领域 schema、Working、人工保存、版本及来源边界。旧 Pro 不自动替换：刷新后提示重新选择；用户选定 Vision 后才更新相应操作分配。历史来源和已有对话记录不迁移、不删除。
+- PDF 能力要求原生 PDF 或完整逐页转图；纯文本/OCR 路径和未知模型名称不构成多模态认证。Gemini 文档发现增加确切模型白名单，直接连接请求拒绝未知 ID；未完成 Ariadne 领域适配的 Gemini/Qwen 连接不再成为可执行 Runtime。本阶段未新增这些 Provider 的领域能力。
+- 验证：40 Node + 21 Python = **61/61** 自动回归通过（含新跨 Provider 门槛、旧配置保留、伪造能力标记、文本/未知模型在凭据读取前拒绝）；22 个受影响 JS/Python/JSON 文件语法检查及 diff 检查通过。真实 DeepSeek 合成测试通过：图片读取、两页 PDF 逐页转图按序读取、Candidate/Job 各一次讨论及一次修改提案，共 6 次推理；没有私人材料或确认数据写入。
+- 浏览器：egolite 在独立 `:8001` 验证旧 Pro 阻止继续、仅 Vision 可选、显式选择后导入/对话分配收敛、历史记录保留、Local 可选及进入 Workspace。egolite 截图技术超时后，使用已安装 Chrome 的 Playwright 完成 1280×800 截图核对；无新增 JS 异常，既有 Google Fonts CSP 阻止记录与本修改无关，未扩大修改范围。
+- 已核实原进程 cwd 后重启正式 `:8000` 服务；8 项 HTTP 检查通过，包括新模型列表、对话签名及 Pro 请求 422/Provider=0。证据原地保存在忽略目录 `.cache/multimodal-api-20260908/`，不提交凭据、运行数据或 QA 产物。
+- 验收边界：真实合成 Provider 测试与浏览器选择流程分开记录；未以此宣称复杂私人 PDF 识别质量或完整个人资料端到端重新验收。完成后按当前项目规则创建本地 Git commit，不 push。
+
 ## 2026-09-08 — 迁移与项目规范阶段 Git 收口
 
 - 用户明确要求提交当前项目，并将“每次大阶段完成且验收通过后主动创建一次本地 Git commit”作为后续工作规则；已写入 AGENTS.md，取代旧的不自动提交约定。此授权不包含 push、发布或额外清理。

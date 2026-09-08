@@ -12,6 +12,9 @@ assert catalog["deepseek"]["supports_complete_document_review"] and catalog["dee
 assert catalog["gemini"]["supports_complete_document_review"] and catalog["gemini"]["credential_status"] == "not_configured"
 assert not catalog["groq"]["supports_complete_document_review"]
 assert select_deepseek_document_model(["deepseek-v4-flash", "deepseek-v4-flash-vision-exp"]) == "deepseek-v4-flash-vision-exp"
-assert select_gemini_document_model({"models": [{"name": "models/account-model", "supportedGenerationMethods": ["generateContent"]}]}) == "account-model"
+assert select_gemini_document_model({"models": [{"name": "models/account-model", "supportedGenerationMethods": ["generateContent"]}]}) is None
 assert select_gemini_document_model({"models": []}) is None
 print("provider_capability_contract=pass")
+
+assert select_deepseek_document_model(["invented-vision", "deepseek-v4-pro"]) is None
+assert select_gemini_document_model({"models": [{"name": "models/gemini-3.7-flash", "supportedGenerationMethods": ["generateContent"]}]}) == "gemini-3.7-flash"

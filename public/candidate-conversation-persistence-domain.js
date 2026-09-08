@@ -391,7 +391,7 @@
     const expectedTerminal = action.application_result.status === "NEEDS_CLARIFICATION" ? "NEEDS_CLARIFICATION"
       : action.application_result.status === "NO_CHANGE" ? "NO_CHANGE" : "APPLIED";
     const expectedAssistantText = action.normalized_action.action === "ASK_CLARIFICATION" ? action.normalized_action.clarification : action.normalized_action.message;
-    if (turn.state !== expectedTerminal || assistant.provider !== "deepseek" || assistant.model !== "deepseek-v4-pro" || assistant.text !== expectedAssistantText) {
+    if (turn.state !== expectedTerminal || assistant.provider !== "deepseek" || assistant.model !== "deepseek-v4-flash-vision-exp" || assistant.text !== expectedAssistantText) {
       return Promise.reject(new CandidateConversationPersistenceError("SUCCESSFUL_TURN_LINKAGE_INVALID"));
     }
     if ((action.application_result.mutation === "NEW_WORKING_STATE") !== Boolean(resulting)
