@@ -1,5 +1,15 @@
 # Job Radar Documentation Map
 
+## 当前阅读入口
+
+先读 [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md)、[AGENTS.md](../AGENTS.md) 和 [PROJECT_STATUS.md](../PROJECT_STATUS.md) 最新条目。架构文件用于追溯稳定约束与设计取舍；带日期的实现状态、阶段计划、模型推荐和一次性授权按当时范围理解。后续修订须有明确决策依据，不能仅凭代码或测试结果覆盖契约。
+
+日常入口还包括 [README.md](../README.md)、[TECHNICAL_EVIDENCE.md](../TECHNICAL_EVIDENCE.md) 与 [NEXT_PHASE_HANDOFF.md](../NEXT_PHASE_HANDOFF.md)。历史清单提及的根目录 `文件说明.md` 不在当前仓库；本页和 PROJECT_CONTEXT 承担现行导航职责。
+
+## 2026-08-25 文档清单快照（历史）
+
+下文 `Implementation = NOT STARTED`、唯一 Step 1 等描述是原始时点记录，不代表当前产品状态；原文保留供追溯。
+
 当前最高 authority：`architecture/PRODUCT_ARCHITECTURE_V2_FINAL_CONSOLIDATION.md`。状态为 `PRODUCT ARCHITECTURE V2 = FROZEN / CONFIRMED`、`Architecture Gate = COMPLETE`、`Implementation = NOT STARTED`；唯一 next milestone 是 `STEP 1 — ONE REAL RESUME / CANDIDATE IMPORT + HUMAN CALIBRATION`。旧文档只保留为历史决策或既有实现证据。
 
 日常入口仍在项目根目录：`README.md`、`PROJECT_STATUS.md`、`NEXT_PHASE_HANDOFF.md`、`TECHNICAL_EVIDENCE.md` 与 `文件说明.md`。

@@ -1,5 +1,21 @@
 # AI Job Radar
 
+## Ariadne 项目入口
+
+Ariadne 先理解用户提供的个人资料，再理解用户选择的职位描述；通过有来源的关联分析、澄清与建议，帮助用户一步步接近自己想要的职位。
+
+开始任务先读 [项目上下文](PROJECT_CONTEXT.md)、[工作规范](AGENTS.md) 和 [当前状态](PROJECT_STATUS.md) 的最新条目。产品方向、已实现能力和历史阶段分别记录；下文旧阶段的 next milestone、模型信息及一次性执行指令不构成当前任务授权。
+
+## 2026-09-08 — 正式开发位置
+
+本仓库 `/Users/kai/Documents/GitKaiNex/Ariadne` 已由用户确认为 Ariadne 的正式开发、测试、运行与 Git 位置。当前切换记录见 [RELOCATION_HANDOFF.md](/Users/kai/Documents/GitKaiNex/Ariadne/RELOCATION_HANDOFF.md)，产品当前状态见 [PROJECT_STATUS.md](/Users/kai/Documents/GitKaiNex/Ariadne/PROJECT_STATUS.md)。旧 Learning OS 目录仅保留学习/历史/私有记录，见 [归档入口](/Users/kai/Documents/Codex/AI-Learning-OS/03_projects/job-radar/RELOCATION_POINTER.md)。
+
+本次为迁移收口，未开启 J2 或新功能。下方较早日期的功能说明保留为历史实现信息；当前阶段以 PROJECT_STATUS 最新条目为准。
+
+## 2026-08-25 — 架构冻结与实现准备快照（历史）
+
+以下内容保留当时的状态与范围，不能覆盖顶部项目入口或最新 PROJECT_STATUS。
+
 > 2026-08-25：`PRODUCT ARCHITECTURE V2 = FROZEN / CONFIRMED`；`Architecture Gate = COMPLETE`；`Step 1 = IN PROGRESS / Phase A–B contract preparation complete`。当前最高 authority：`docs/architecture/PRODUCT_ARCHITECTURE_V2_FINAL_CONSOLIDATION.md`。
 
 当前唯一 next milestone：`STEP 1 — ONE REAL RESUME / CANDIDATE IMPORT + HUMAN CALIBRATION`。本文件后续 P4.1、Career Intelligence V0、CareerEntity、旧 Provider 与 UI 内容是 existing implementation inventory，不是当前主线或 next action；不要继续 Architecture Research，也不要开始 Portfolio、Job、Match、generation、Capability Card、Career Mentor、旧 CareerEntity migration、OCR benchmark、MCP/RAG/Agent/Skill/CLI。
@@ -94,7 +110,7 @@ Gemini credential 尚未配置，因此尚未发送真实职业资料。DeepSeek
 ## 运行
 
 ```bash
-cd /Users/kai/Documents/Codex/AI-Learning-OS/03_projects/job-radar
+cd /Users/kai/Documents/GitKaiNex/Ariadne
 python3 app.py
 ```
 

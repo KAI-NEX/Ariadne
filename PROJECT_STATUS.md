@@ -1,5 +1,36 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-08 — 迁移与项目规范阶段 Git 收口
+
+- 用户明确要求提交当前项目，并将“每次大阶段完成且验收通过后主动创建一次本地 Git commit”作为后续工作规则；已写入 AGENTS.md，取代旧的不自动提交约定。此授权不包含 push、发布或额外清理。
+- 本次提交范围为已完成的迁移/切换记录、README 与文档入口、项目专用 AGENTS/PROJECT_CONTEXT、gate #16 精确断言修复，以及迁移时已排除的 4 张 tracked 私有 QA 图片。原始图片继续保留在旧归档位置，未执行新的文件删除。
+- 运行验收沿用本阶段已完成的 59/59 regressions、70/70 HTTP 及浏览器/数据完整性证据；后续改动仅为项目文档与提交规则，不改变运行代码。提交前检查文档链接、diff 格式与暂存文件范围。
+
+## 2026-09-08 — 项目专用工作规范与上下文整理
+
+- 用户重新明确主线：先理解个人资料，再理解用户选择的职位描述，通过有依据的关联、澄清与建议帮助用户逐步接近目标职位。
+- 新增 AGENTS.md 与 PROJECT_CONTEXT.md，择要整理项目规则、领域边界和现有设计决策；只引用本仓库已有契约与证据，不整份复制旧系统规范或个人学习记录。
+- README、docs/README 与 NEXT_PHASE_HANDOFF 增加当前入口及历史状态/授权说明，保留原正文和既有迁移收口记录。产品愿景与已实现范围分开；未启动新功能、未更换应用 Provider/model。
+- 本次仅改项目文档；40/40 本地链接有效，四份既有文档原正文按原顺序保留，核对范围内 128 个旧目录文件无变化，既有改动保留，diff 检查通过且暂存区为空。未重跑产品回归或真实 Provider 请求，既有运行验收仍引用下方记录。
+
+## 2026-09-08 — Human 正式切换与 Phase B
+
+当前状态：**CUTOVER COMPLETE / PHASE B COMPLETE / ARIADNE ACTIVE**。用户已明确确认 `/Users/kai/Documents/GitKaiNex/Ariadne` 为正式开发目录，并授权按首次迁移快照 §15 清理旧实现。此前 READY FOR CUTOVER / Human confirmation pending 为前序历史状态。
+
+本轮清理已完成：按 74 个显式路径组移除 1,044 files；旧根 124 个原文件保留（123 个逐字节不变，README 仅加归档提示并保留原正文），另新增 RELOCATION_POINTER.md。清理后从新根直接执行 app.py，PID 85159；39 Node + 20 Python = 59/59 regressions、70/70 HTTP（63 静态字节对照）再次通过。255 个现行实现/测试/数据文件及 57 个原始浏览器 Blob 哈希不变，SQLite 完整性正常；main 37 commits/HEAD 不变，暂存区为空。无真实 Provider 请求，本轮未重复浏览器 UI 验收。
+
+删除前核对：旧 1,168 files 无漂移；93 个 data/ 非缓存文件一致；原 Git 历史/对象完整，新仓库 main HEAD 不变，现有未提交内容保留。执行记录和每文件清单见 [Phase B 执行记录](/Users/kai/Documents/Codex/AI-Learning-OS/06_reports/ARIADNE_CUTOVER_PHASE_B_2026-09-08.md)。
+
+旧根保留学习/历史/私有档案，入口见 [归档入口](/Users/kai/Documents/Codex/AI-Learning-OS/03_projects/job-radar/RELOCATION_POINTER.md)。本次不自动 commit，不修改产品代码，不发送模型请求，不启动 J2。Phase B 后旧根直接运行/回退方式失效，恢复需从新仓库及已保全的最新数据进行。
+
+## 2026-09-08 — Ariadne 新目录迁移验收（READY FOR CUTOVER）
+
+- 新 root：`/Users/kai/Documents/GitKaiNex/Ariadne`，`main @ a2b3512`。gate #16 的既有失败为 global-convergence 测试未同步 2026-09-05 hotfix 的 `canonicalRevision` 参数；依据确认版本 → 同源 Working 补齐/保留 pending edits/幂等性及 Human Save 契约，仅修正一条精确测试断言并加注释，运行代码不变。
+- 复验全部通过：39 Node + 20 Python regressions、84 JS syntax、50 Python compilation、70 HTTP checks、Git diff/fsck。新位置现有 PID 77200 的 cwd/entrypoint 已核实，runtime audit 无旧 Learning OS 实现读取。
+- 原 Codex profile + `http://127.0.0.1:8000` 的浏览器 smoke 通过：36 Candidate / 17 Job；两域 Detail Edit 首字段 focus、Cancel 不变、刷新重开不变；13 PDF 来源恢复、既有 Candidate Working 重开；console error/warning=0。本轮未执行真实 Provider turn、Human Save 或新导入，不据此新增语义质量或完整 E2E 声明。
+- 旧目录 1,168 files hash/mode 无漂移、57 原始 Blob 同哈希、SQLite 完整性 ok。原未提交 README/QA exclusions/relocation docs 保留，无 staging/commit、Phase B 或旧 Learning OS 修改。技术迁移验收 READY FOR CUTOVER，正式开发切换仍由 Human 确认。
+- 详情及临时证据路径见 `RELOCATION_HANDOFF.md` 顶部接手续验节；下方历史产品验收记录原样保留。
+
 ## 2026-09-05 — J1 Candidate Material conversation hotfix（browser and regression gates PASS）
 
 - This entry supersedes earlier Candidate Material conversation PASS claims. Human usage disproved those claims; the hotfix is based on `13ff1fc764b7235ba624a82f3e9a6594d20ba6d3` and must not be committed until final real-browser gates pass.

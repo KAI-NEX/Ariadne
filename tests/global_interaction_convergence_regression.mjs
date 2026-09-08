@@ -88,7 +88,8 @@ for (const html of [candidateImport, jobImport, candidateDetail, jobDetail]) {
 }
 assert.match(candidateDetail, /candidate-workspace-conversation-runtime\.js\?v=candidate-conversation-route-contract-v2/);
 assert.match(pages, /async function submitCandidateDetailConversation/);
-assert.match(pages, /submit: \(\{ content, target \}\) => submitCandidateDetailConversation\(\{ sourceId: target\.sourceId, itemId: target\.itemId, content \}\)/);
+// Detail submission must carry the current confirmed revision for legacy Working synchronization.
+assert.match(pages, /submit: \(\{ content, target \}\) => submitCandidateDetailConversation\(\{ sourceId: target\.sourceId, itemId: target\.itemId, canonicalRevision, content \}\)/);
 assert.match(pages, /form: byId\("candidate-conversation-form"\),[\s\S]*status: byId\("candidate-conversation-status"\)/);
 assert.match(pages, /boundedBundlePreparations/);
 assert.match(pages, /source_bundle: sourceBundle/);

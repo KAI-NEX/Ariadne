@@ -1,5 +1,9 @@
 # JOB RADAR NEXT PHASE HANDOFF
 
+## 当前任务入口与历史授权边界 — 2026-09-08
+
+新任务从 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)、[AGENTS.md](AGENTS.md) 和 [PROJECT_STATUS.md](PROJECT_STATUS.md) 最新适用条目开始。本文保留历次阶段交接与故障处理记录；下文 `CURRENT`、`唯一 next milestone` 或 `Stop after commit` 均须按所在日期和原任务理解，不能作为今天的阶段选择、提交、真实模型调用或清理授权。稳定行为约束仍须结合后续明确决策与对应测试核对。
+
 ## CURRENT J1 HOTFIX AUTHORITY — 2026-09-05
 
 - Earlier Candidate Material PASS reports are superseded by Human usage and this hotfix's fresh evidence. Base is `13ff1fc764b7235ba624a82f3e9a6594d20ba6d3`; all required browser and automated gates have now passed for the authorized single hotfix commit.
