@@ -577,10 +577,11 @@
           <header><button class="v1-detail-overlay-close" type="button" aria-label="关闭详情"></button><p></p><span class="v1-detail-overlay-header-actions"><button class="v1-detail-overlay-edit" type="button" aria-label="编辑当前内容">编辑</button><button class="v1-detail-overlay-workspace-close hidden" type="button" aria-label="关闭导入">×</button></span></header>
           <iframe title="本地资料详情"></iframe>
           <div class="v1-about-copy hidden">
-            <h1>Ariadne <span>衡</span></h1>
+            <h1><span class="v1-about-name">Ariadne</span><span class="v1-about-name-zh">衡</span></h1>
             <p class="v1-about-intro">先理解你，再理解机会。</p>
             <p>Ariadne · 衡是一个帮助你探索职业方向的工具。它理解你的经历与作品，也理解你选择的职位，帮你看清两者的关系。</p>
             <p>在个人资料中点击「了解我」，围绕过去的项目与经历逐步了解你；在职位描述中点击「了解职位概况」，汇总所有 JD 的职责、要求与差异。想讨论自己与某个职位的关系，可以进入该职位详情。</p>
+            <p>你的文件内容、资料、对话记录和 API 密钥保存在这台电脑或当前浏览器本地，不会上传至 Ariadne 的云端服务器，请放心使用。使用 AI 功能时，必要材料仍会按你的操作与传输确认发送给所选模型服务商；API 密钥仅用于对应服务的连接与调用。</p>
           </div>
         </div>
       </section>
@@ -596,6 +597,32 @@
     const workspaceCloseButton = overlay.querySelector(".v1-detail-overlay-workspace-close");
     const frame = overlay.querySelector("iframe");
     const aboutCopy = overlay.querySelector(".v1-about-copy");
+    function alignAboutBrand() {
+      if (!aboutWorkspace) return;
+      const english = aboutCopy.querySelector(".v1-about-name");
+      const chinese = aboutCopy.querySelector(".v1-about-name-zh");
+      const context = document.createElement("canvas").getContext("2d");
+      if (!context) return;
+      const measure = (element) => {
+        context.font = getComputedStyle(element).font;
+        return context.measureText(element.textContent);
+      };
+      const latin = measure(english);
+      const reference = measure(chinese);
+      const latinHeight = latin.actualBoundingBoxAscent + latin.actualBoundingBoxDescent;
+      const chineseHeight = reference.actualBoundingBoxAscent + reference.actualBoundingBoxDescent;
+      if (!(latinHeight > 0 && chineseHeight > 0)) return;
+      // Match the painted glyph bounds without stretching either writing system.
+      const size = parseFloat(getComputedStyle(chinese).fontSize) * latinHeight / chineseHeight;
+      chinese.style.fontSize = `${size}px`;
+      const adjusted = measure(chinese);
+      chinese.style.transform = `translateY(${latin.actualBoundingBoxDescent - adjusted.actualBoundingBoxDescent}px)`;
+    }
+    if (aboutWorkspace) {
+      document.fonts?.ready.then(alignAboutBrand);
+      document.fonts?.addEventListener("loadingdone", alignAboutBrand);
+      window.addEventListener("resize", alignAboutBrand);
+    }
     const pageShell = document.querySelector(".v1-page-shell");
     const wasPageInert = pageShell?.inert || false;
     if (aboutWorkspace) {
@@ -622,7 +649,7 @@
     function prepareAboutReturn() {
       const heading = aboutCopy.querySelector("h1");
       const showingCopy = Number(getComputedStyle(content).opacity) >= 0.5;
-      const origin = showingCopy ? heading : preview.firstElementChild;
+      const origin = showingCopy ? heading.querySelector(".v1-about-name") : preview.firstElementChild;
       const start = origin.getBoundingClientRect();
       const end = sourceCard.getBoundingClientRect();
       const startStyle = getComputedStyle(origin);
@@ -717,6 +744,7 @@
         aboutCopy.scrollTop = 0;
       }
       overlay.classList.remove("hidden", "is-content-ready", "is-closing");
+      if (aboutWorkspace) alignAboutBrand();
       overlay.setAttribute("aria-hidden", "false");
       document.body.classList.add("v1-detail-overlay-open");
       Object.assign(surface.style, rectFrame(destinationRect, "28px"));
