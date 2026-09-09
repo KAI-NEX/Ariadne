@@ -78,6 +78,7 @@
     ...CANDIDATE_CONVERSATION_MODEL_ADAPTER,
     adapter_version: "deepseek-personal-understanding-v1",
   });
+  const JOB_OVERVIEW_MODEL_ADAPTER = Object.freeze({ ...CANDIDATE_CONVERSATION_MODEL_ADAPTER, adapter_version: "deepseek-job-overview-v1" });
   const JOB_MULTIMODAL_IMPORT_ADAPTER = Object.freeze({
     ...CANDIDATE_MULTIMODAL_IMPORT_ADAPTER,
     runtime_capabilities: Object.freeze({
@@ -99,6 +100,7 @@
     ai_conversation: Object.freeze({ local: "ai_conversation", model: "ai_conversation" }),
     candidate_conversation: Object.freeze({ local: "ai_conversation", model: "ai_conversation" }),
     job_conversation: Object.freeze({ local: "ai_conversation", model: "ai_conversation" }),
+    job_overview: Object.freeze({ local: "ai_conversation", model: "ai_conversation" }),
     personal_understanding: Object.freeze({ local: "ai_conversation", model: "ai_conversation" }),
     model_merge: Object.freeze({ local: "model_merge", model: "model_merge" }),
     legacy_candidate_semantic: Object.freeze({ local: "candidate_model_structuring", model: "candidate_model_structuring" }),
@@ -133,6 +135,7 @@
     if (normalized.mode !== "model") return null;
     if (normalized.provider === CANDIDATE_PDF_MODEL_ADAPTER.provider_id && normalized.model === CANDIDATE_PDF_MODEL_ADAPTER.model_id) {
       if (operation === "job_conversation") return JOB_CONVERSATION_MODEL_ADAPTER;
+      if (operation === "job_overview") return JOB_OVERVIEW_MODEL_ADAPTER;
       if (operation === "personal_understanding") return PERSONAL_UNDERSTANDING_MODEL_ADAPTER;
       if (["candidate_conversation", "ai_conversation", null].includes(operation)) return CANDIDATE_CONVERSATION_MODEL_ADAPTER;
       if (["job_image_import", "job_text_import", "job_model_import"].includes(operation)) return JOB_MULTIMODAL_IMPORT_ADAPTER;
@@ -265,7 +268,7 @@
     DEEPSEEK_PRO_MODEL_DESCRIPTOR,
     CANDIDATE_CONVERSATION_MODEL_ADAPTER,
     JOB_CONVERSATION_MODEL_ADAPTER,
-    PERSONAL_UNDERSTANDING_MODEL_ADAPTER,
+    PERSONAL_UNDERSTANDING_MODEL_ADAPTER, JOB_OVERVIEW_MODEL_ADAPTER,
     JOB_MULTIMODAL_IMPORT_ADAPTER,
     RuntimeGateError,
     readStoredRuntime,

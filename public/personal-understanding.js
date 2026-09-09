@@ -43,7 +43,7 @@
     byId("understanding-state").textContent = overview
       ? `已综合当前 ${overview.covered_records} 条资料与补充 · 模型推断，可继续校准`
       : records.length ? `已有 ${records.length} 条资料与补充 · 当前理解待更新；发送问题时也会更新` : "尚无个人资料。可以添加文件，也可以从对话中补充。";
-    byId("understanding-summary").textContent = overview?.summary || "先聊一段经历、一个选择，或你希望接近的方向。你的补充会逐步完善这里的理解。";
+    byId("understanding-summary").textContent = overview?.summary || "从你做过的项目开始，聊聊当时负责什么、怎么做、为什么这样做。你的补充会帮助我逐步了解你。";
     byId("understanding-insights").innerHTML = (overview?.insights || []).map((entry) => `<article class="personal-insight"><p>${esc(entry.text)}</p><div class="personal-evidence">${entry.evidence.map(sourceMarkup).join("")}</div></article>`).join("");
     byId("understanding-unknowns").innerHTML = overview?.uncertainties?.length ? `<div class="personal-unknowns"><h3>还需要澄清</h3><ul>${overview.uncertainties.map((entry) => `<li>${esc(entry)}</li>`).join("")}</ul></div>` : "";
     const activeIds = new Set(records.filter((entry) => entry.identity.startsWith("memory:")).map((entry) => entry.lineage.memory_id));

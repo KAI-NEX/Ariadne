@@ -4,7 +4,7 @@
   "result_contract": "ariadne-personal-understanding-result-v1",
   "operation": "PERSONAL_UNDERSTANDING_TURN",
   "adapter_version": "deepseek-personal-understanding-v1",
-  "prompt_version": "ariadne-personal-understanding-prompt-v2",
+  "prompt_version": "ariadne-personal-understanding-prompt-v3",
   "request_config_version": "deepseek-personal-understanding-request-v2",
   "phases": ["DISTILL", "SYNTHESIZE", "DISCUSS"],
   "memory_kinds": ["FACT", "PREFERENCE", "GOAL", "CORRECTION"],

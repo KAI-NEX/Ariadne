@@ -401,7 +401,7 @@
 
   function installMiniSidebar() {
     if (isEmbeddedDetail) return;
-    const activeSection = page === "candidate-detail" || page === "personal-import" || page === "personal-understanding" ? "personal" : page === "job-detail" || page === "job-import" ? "jd" : page;
+    const activeSection = page === "candidate-detail" || page === "personal-import" || page === "personal-understanding" ? "personal" : page === "job-detail" || page === "job-import" || page === "job-overview" ? "jd" : page;
     const items = [
       { id: "runtime", label: "运行方式", href: "/index.html", width: 84, base: 8 },
       { id: "workspace", label: "工作空间", href: "/workspace.html", width: 106, base: 8 },
@@ -575,7 +575,7 @@
             <h1>Ariadne <span>衡</span></h1>
             <p class="v1-about-intro">先理解你，再理解机会。</p>
             <p>Ariadne · 衡是一个帮助你探索职业方向的工具。它理解你的经历与作品，也理解你选择的职位，帮你看清两者的关系。</p>
-            <p>你可以整理个人资料、了解职位要求。整体 AI 对话正在搭建：后续可在个人资料中点击「了解我」，在职位要求中点击「了解职位概况」，从整体出发，与 AI 讨论你的经历和职位要求。</p>
+            <p>在个人资料中点击「了解我」，围绕过去的项目与经历逐步了解你；在职位描述中点击「了解职位概况」，汇总所有 JD 的职责、要求与差异。想讨论自己与某个职位的关系，可以进入该职位详情。</p>
           </div>
         </div>
       </section>

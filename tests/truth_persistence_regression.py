@@ -52,7 +52,7 @@ from src.truth_persistence import (  # noqa: E402
 
 assert CONTRACT_ID == SCHEMA["x-contract-id"]
 assert DB_NAME == SCHEMA["x-indexeddb-name"]
-assert DB_VERSION == SCHEMA["x-indexeddb-version"] == 16
+assert DB_VERSION == SCHEMA["x-indexeddb-version"] == 17
 assert STORE_SPECS == tuple((item["name"], item["keyPath"], item["lifecycle"]) for item in SCHEMA["x-stores"])
 assert NEW_STORE_SPECS == tuple(item for item in STORE_SPECS if item[2] == "new")
 assert SOURCE_TYPES == tuple(SCHEMA["$defs"]["sourceDocument"]["properties"]["source_type"]["enum"])

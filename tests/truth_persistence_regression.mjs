@@ -532,7 +532,7 @@ assert.equal(memoryDb.records.get("candidate_context_revisions").size, 3); // Pr
 const openers = ["v1-demo-domain.js", "career-evidence.js", "local-first.js", "career-profile.js", "local-jobs.js"];
 for (const filename of openers) {
   const sourceText = fs.readFileSync(path.join(root, "public", filename), "utf8");
-  assert.match(sourceText, /const DB_VERSION = 16;/, `${filename} must open IndexedDB v16`);
+  assert.match(sourceText, /const DB_VERSION = 17;/, `${filename} must open IndexedDB v16`);
   for (const spec of Truth.NEW_STORE_SPECS) {
     assert(sourceText.includes(`"${spec.name}"`), `${filename} must add ${spec.name}`);
     assert(sourceText.includes(`"${spec.keyPath}"`), `${filename} must use ${spec.keyPath}`);

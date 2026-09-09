@@ -1,6 +1,6 @@
 /* Browser-only Ariadne storage: no app.py route and no network request. */
 const DB_NAME = "job-radar-local-first-v1";
-const DB_VERSION = 16;
+const DB_VERSION = 17;
 const JOBS = "jobs";
 const CANDIDATES = "candidates";
 const RuntimeGate = window.JobRadarRuntimeGate;
@@ -59,6 +59,9 @@ function openDatabase() {
       if (!db.objectStoreNames.contains("personal_understanding_fragments")) db.createObjectStore("personal_understanding_fragments", { keyPath: "fragment_id" });
       if (!db.objectStoreNames.contains("personal_understanding_snapshots")) db.createObjectStore("personal_understanding_snapshots", { keyPath: "understanding_id" });
       if (!db.objectStoreNames.contains("personal_conversation_turns")) db.createObjectStore("personal_conversation_turns", { keyPath: "turn_id" });
+      if (!db.objectStoreNames.contains("job_overview_fragments")) db.createObjectStore("job_overview_fragments", { keyPath: "fragment_id" });
+      if (!db.objectStoreNames.contains("job_overview_snapshots")) db.createObjectStore("job_overview_snapshots", { keyPath: "overview_id" });
+      if (!db.objectStoreNames.contains("job_overview_turns")) db.createObjectStore("job_overview_turns", { keyPath: "turn_id" });
       if (!db.objectStoreNames.contains("demo_candidate_items")) db.createObjectStore("demo_candidate_items", { keyPath: "item_id" });
       if (!db.objectStoreNames.contains("demo_job_contexts")) db.createObjectStore("demo_job_contexts", { keyPath: "job_context_id" });
       if (!db.objectStoreNames.contains("demo_conversations")) db.createObjectStore("demo_conversations", { keyPath: "conversation_id" });

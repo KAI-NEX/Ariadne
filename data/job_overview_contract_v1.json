@@ -1,0 +1,21 @@
+{
+  "contract_id": "ariadne-job-overview-v1",
+  "request_contract": "ariadne-job-overview-request-v1",
+  "result_contract": "ariadne-job-overview-result-v1",
+  "operation": "JOB_OVERVIEW_TURN",
+  "adapter_version": "deepseek-job-overview-v1",
+  "prompt_version": "ariadne-job-overview-prompt-v2",
+  "request_config_version": "deepseek-job-overview-request-v1",
+  "phases": [
+    "DISTILL",
+    "SYNTHESIZE",
+    "DISCUSS"
+  ],
+  "scope": "CURRENT_JOB_COLLECTION_ONLY",
+  "limits": {
+    "context_bytes": 48000,
+    "fragment_bytes": 6000,
+    "evidence_bytes": 18000,
+    "human_message": 6000
+  }
+}
