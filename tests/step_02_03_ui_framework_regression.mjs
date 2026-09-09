@@ -241,6 +241,9 @@ assert.doesNotMatch(styles, /\.v1-object-folder\.dark:hover \.v1-folder-paper[^}
 assert.doesNotMatch(styles, /\.v1-object-folder\.dark:focus-visible \.v1-folder-paper[^}]*background:/s);
 assert.match(styles, /\.v1-add-guide-icon \{[^}]*border: 0/s);
 assert.match(styles, /\.v1-add-guide-icon::before \{[^}]*height: 24px[^}]*width: 24px/s);
+assert.match(styles, /\.v1-add-guide-card \{[^}]*padding: 24px/s);
+assert.match(styles, /\.v1-add-guide-icon \{[^}]*justify-content: flex-start/s);
+assert.match(styles, /\.v1-add-guide-icon::before \{[^}]*transform: translateX\(calc\(-1 \* 4px\)\)/s);
 assert.match(styles, /\.v1-conversation-form button \{[^}]*background: #20232a[^}]*font-size: 0[^}]*height: 42px[^}]*width: 42px/s);
 assert.match(styles, /\.v1-conversation-form button::before \{[^}]*height: 20px[^}]*mask: url\("\/vi\/icons\/send\.svg"\)[^}]*20px 20px[^}]*width: 20px/s);
 assert.match(styles, /\.v1-body button:focus-visible[^}]*outline: 3px solid rgba\(82, 111, 218, 0\.25\)[^}]*outline-offset: 3px/s);

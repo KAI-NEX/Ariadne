@@ -455,14 +455,15 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-candidate-card { background: var(--vi-surface); border: 1px solid var(--line); border-radius: 20px; color: var(--ink); flex-direction: column; min-height: 330px; padding: 24px; text-decoration: none; transition: background-color 320ms var(--vi-ease-reveal), border-color 220ms ease, box-shadow 260ms ease, color 260ms ease, transform 260ms var(--vi-ease-reveal); }
 .v1-candidate-card:hover { border-color: #9ca7c3; transform: translateY(-3px); }
 .v1-candidate-card.job { max-width: none; min-height: 380px; }
-.v1-add-guide-card { background: var(--vi-action); border: 1px solid var(--vi-action); border-radius: 22px; color: var(--vi-surface); cursor: pointer; flex-direction: column; min-height: 285px; padding: 25px; text-align: left; text-decoration: none; transition: background-color 360ms var(--vi-ease-reveal), border-color 260ms ease, box-shadow 300ms ease, color 280ms ease, transform 280ms var(--vi-ease-reveal); }
+.v1-add-guide-card { background: var(--vi-action); border: 1px solid var(--vi-action); border-radius: 22px; color: var(--vi-surface); cursor: pointer; flex-direction: column; min-height: 285px; padding: var(--vi-space-24); text-align: left; text-decoration: none; transition: background-color 360ms var(--vi-ease-reveal), border-color 260ms ease, box-shadow 300ms ease, color 280ms ease, transform 280ms var(--vi-ease-reveal); }
 .v1-add-guide-card.job { min-height: 330px; }
 .v1-add-guide-card:hover, .v1-add-guide-card:focus-visible { box-shadow: 0 20px 48px rgba(31,34,42,.14); transform: translateY(-3px); }
 .v1-add-guide-card:hover, .v1-add-guide-card:focus-visible, .v1-add-guide-card.v1-transition-light { background: var(--vi-surface); border-color: var(--line); color: var(--ink); }
 .v1-add-guide-card:hover small, .v1-add-guide-card:focus-visible small, .v1-add-guide-card.v1-transition-light small { color: #6f7786; }
 .v1-add-guide-card:hover p, .v1-add-guide-card:focus-visible p, .v1-add-guide-card.v1-transition-light p { color: var(--vi-text-secondary); }
-.v1-add-guide-icon { align-items: center; border: 0; border-radius: 0; color: currentColor; display: inline-flex; font-size: 0; height: 36px; justify-content: center; line-height: 1; width: 36px; }
-.v1-add-guide-icon::before { background: currentColor; content: ""; height: 24px; mask: url("/vi/icons/plus.svg") center / 24px 24px no-repeat; width: 24px; -webkit-mask: url("/vi/icons/plus.svg") center / 24px 24px no-repeat; }
+.v1-add-guide-icon { align-items: center; border: 0; border-radius: 0; color: currentColor; display: inline-flex; font-size: 0; height: 36px; justify-content: flex-start; line-height: 1; width: 36px; }
+/* Align the plus ink, compensating for the shared SVG's internal left inset. */
+.v1-add-guide-icon::before { background: currentColor; content: ""; height: 24px; mask: url("/vi/icons/plus.svg") center / 24px 24px no-repeat; transform: translateX(calc(-1 * var(--vi-space-4))); width: 24px; -webkit-mask: url("/vi/icons/plus.svg") center / 24px 24px no-repeat; }
 .v1-add-guide-card > span:nth-child(2) { display: grid; gap: 7px; margin-top: auto; padding-top: 52px; }
 .v1-add-guide-card b { font-size: 25px; font-weight: 560; letter-spacing: -.04em; }
 .v1-add-guide-card p { color: #b4bac5; font-size: 12px; line-height: 1.55; margin: 18px 0 0; }
