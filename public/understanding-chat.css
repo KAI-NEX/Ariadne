@@ -21,6 +21,7 @@
 .personal-understanding-shell .v1-detail-breadcrumb,
 .personal-understanding-shell .personal-add-link,
 .personal-dialogue > .personal-meta,
+.personal-dialogue .v1-composer-dock > .personal-meta,
 .personal-dialogue > .personal-heading-row > .personal-meta,
 .personal-dialogue .v1-conversation-empty,
 .personal-dialogue > .job-overview-scope-link {
@@ -36,8 +37,10 @@
   background: transparent;
   border: 0;
   padding: 0;
-  min-height: min(640px, calc(100dvh - 192px));
+  height: calc(100dvh - 128px);
+  min-height: 0;
 }
+.personal-understanding-shell { padding-bottom: 16px; }
 .personal-understanding-shell .personal-dialogue > .personal-heading-row {
   display: block;
 }
@@ -49,8 +52,8 @@
 }
 .personal-understanding-shell .personal-dialogue .v1-conversation-thread {
   flex: 1;
-  min-height: 180px;
-  max-height: 52dvh;
+  min-height: 0;
+  max-height: none;
   padding: 0;
 }
 .personal-dialogue .personal-prompts { margin: var(--vi-space-24) 0; }
@@ -68,7 +71,7 @@
     margin-top: var(--vi-space-16);
   }
   .personal-understanding-shell .personal-dialogue.v1-conversation-pane {
-    min-height: calc(100dvh - 192px);
+    height: calc(100dvh - 112px);
   }
   .personal-dialogue .personal-prompts { gap: var(--vi-space-8); }
 }
