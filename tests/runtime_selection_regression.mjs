@@ -1,3 +1,4 @@
+import { resolveVICSS } from "./helpers/vi-css.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -9,7 +10,7 @@ const html = read("index.html");
 const geminiConnect = read("gemini-connect.html");
 const geminiGuide = read("gemini-api-key-guide.html");
 const script = read("runtime-selection.js");
-const css = read("styles.css");
+const css = resolveVICSS(read("styles.css"));
 
 assert.match(html, /ONE|runtime-selector/);
 assert.match(html, /添加新的模型/);
@@ -85,7 +86,7 @@ assert.match(css, /\.runtime-back-icon svg \{[^}]*stroke-linecap: round[^}]*stro
 assert.match(css, /\.runtime-spinner svg \{ display: none; \}/);
 assert.match(css, /\.runtime-selector \{[^}]*padding: 0 16px 0 20px/s);
 assert.match(css, /\.runtime-menu \{[^}]*padding: 8px/s);
-assert.match(css, /\.runtime-existing-model\[aria-selected="true"\]::after, #runtime-local\[aria-selected="true"\]::after \{[^}]*background: currentColor[^}]*color: #1f2129[^}]*content: ""[^}]*height: 20px[^}]*stroke-width='2\.6'[^}]*stroke-linecap='round'[^}]*stroke-linejoin='round'[^}]*20px 20px[^}]*right: 8px[^}]*width: 20px/s);
+assert.match(css, /\.runtime-existing-model\[aria-selected="true"\]::after, #runtime-local\[aria-selected="true"\]::after \{[^}]*background: currentColor[^}]*color: #1f2129[^}]*content: ""[^}]*height: 20px[^}]*url\("\/vi\/icons\/check\.svg"\)[^}]*20px 20px[^}]*right: 8px[^}]*width: 20px/s);
 assert.doesNotMatch(css, /\.runtime-existing-model\[aria-selected="true"\]::after, #runtime-local\[aria-selected="true"\]::after \{[^}]*#2961db[^}]*content: "✓"/s);
 assert.match(script, /button\.setAttribute\("aria-selected", String\(state\.mode === "ai"/);
 assert.match(script, /byId\("runtime-local"\)\.setAttribute\("aria-selected", String\(state\.mode === "local"\)\)/);
@@ -114,3 +115,5 @@ assert.match(script, /addModelSheet\.open\(originRect, returnRect\)/);
 assert.match(script, /\}, \(\) => openMenu\(\)\)/);
 assert.doesNotMatch(html, /runtime-menu-label|id="runtime-menu" class="runtime-menu hidden"/);
 console.log("runtime_selection_ui_contract=pass");
+
+assert.match(read("vi/icons/check.svg"), /stroke-width="2\.6" stroke-linecap="round" stroke-linejoin="round"[\s\S]*M6\.5 12\.5 10\.3 16\.3 17\.7 8\.4/);

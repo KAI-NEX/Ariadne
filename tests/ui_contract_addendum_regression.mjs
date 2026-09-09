@@ -1,3 +1,4 @@
+import { resolveVICSS } from "./helpers/vi-css.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -10,7 +11,7 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "u
 const ProcessingIndicator = require("../public/processing-indicator-domain.js");
 const ProductShell = require("../public/product-shell-domain.js");
 const ConversationUI = require("../public/conversation-ui-domain.js");
-const styles = read("public/styles.css");
+const styles = resolveVICSS(read("public/styles.css"));
 const pages = read("public/v1-pages.js");
 const candidateImport = read("public/personal-import.html");
 const jobImport = read("public/jd-import.html");

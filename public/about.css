@@ -1,4 +1,4 @@
-.about-page { --about-muted: #626978; --about-accent: #a34e2e; }
+.about-page { --about-muted: var(--vi-brand-muted); --about-accent: var(--vi-brand-accent); }
 .about-page a { color: inherit; text-underline-offset: 5px; }
 .about-page p { margin: 0; }
 .about-page h1, .about-page h2, .about-page h3 { margin: 0; color: var(--ink); }
@@ -60,14 +60,14 @@
 .about-local li::marker { color: #b9bec8; }
 .about-local li strong { font-weight: 500; font-size: 14px; }
 .about-local li p { color: #c9cdd5; font-size: 13px; line-height: 1.9; margin-top: 7px; }
-.about-local pre { background: #30343d; border: 1px solid #454b56; border-radius: 10px; padding: 13px 16px; margin: 12px 0 0; overflow-x: auto; color: #fff; }
+.about-local pre { background: #30343d; border: 1px solid #454b56; border-radius: 10px; padding: 13px 16px; margin: 12px 0 0; overflow-x: auto; color: var(--vi-surface); }
 .about-local code { font-family: ui-monospace, monospace; font-size: 13px; }
 .about-faq { display: grid; grid-template-columns: 1fr 1.6fr; gap: 80px; padding-top: 0; border: 0; }
 .about-faq details { border-bottom: 1px solid var(--line); }
 .about-faq summary { cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 20px; font-size: 15px; list-style: none; padding: 22px 0; }
 .about-faq summary::-webkit-details-marker { display: none; }
-.about-faq summary::after { content: "+"; font-size: 23px; font-weight: 300; }
-.about-faq details[open] summary::after { content: "−"; }
+.about-faq summary::after { content: ""; flex: 0 0 var(--vi-icon-small); width: var(--vi-icon-small); height: var(--vi-icon-small); background: currentColor; mask: url("/vi/icons/plus.svg") center / contain no-repeat; -webkit-mask: url("/vi/icons/plus.svg") center / contain no-repeat; }
+.about-faq details[open] summary::after { mask-image: url("/vi/icons/minus.svg"); -webkit-mask-image: url("/vi/icons/minus.svg"); }
 .about-faq details p { color: var(--about-muted); font-size: 14px; line-height: 1.95; padding: 0 24px 24px 0; }
 .about-closing { border-top: 1px solid var(--line); padding: 55px 0; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .about-closing p { font-size: clamp(23px, 3vw, 34px); font-weight: 500; letter-spacing: -.04em; }
@@ -102,3 +102,5 @@
   .about-actions { gap: 20px; }
   .about-desktop-break { display: none; }
 }
+
+.about-page .vi-icon { width: var(--vi-icon-inline); height: var(--vi-icon-inline); }

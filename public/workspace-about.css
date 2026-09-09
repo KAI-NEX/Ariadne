@@ -1,7 +1,7 @@
 .v1-detail-overlay.is-about .v1-about-copy { overflow-y: auto; padding: 28px 42px 36px; }
 .v1-about-copy h1 { font-size: 44px; font-weight: 550; letter-spacing: -.06em; line-height: 1.25; margin: 0 0 12px; }
 .v1-about-copy h1 span { color: #7a7f89; font-size: .86em; font-weight: inherit; letter-spacing: 0; margin-left: 14px; }
-.v1-about-copy p { color: #626978; font-size: 14px; line-height: 1.85; margin: 16px 0 0; }
+.v1-about-copy p { color: var(--vi-brand-muted); font-size: 14px; line-height: 1.85; margin: 16px 0 0; }
 .v1-about-copy .v1-about-intro { color: var(--ink); font-size: 20px; margin-top: 0; }
 .v1-detail-overlay.is-about .v1-detail-overlay-preview { container-type: inline-size; display: grid; place-items: center; }
 .v1-detail-overlay.is-about .v1-detail-overlay-preview .v1-wordmark { font-size: clamp(12px, 8cqw, 44px); font-weight: 550; grid-column: 1; letter-spacing: -.06em; }

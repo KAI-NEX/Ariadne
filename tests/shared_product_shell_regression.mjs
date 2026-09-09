@@ -1,3 +1,4 @@
+import { resolveVICSS } from "./helpers/vi-css.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -9,7 +10,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "utf8");
 const ProductShell = require("../public/product-shell-domain.js");
 const pages = read("public/v1-pages.js");
-const styles = read("public/styles.css");
+const styles = resolveVICSS(read("public/styles.css"));
 const candidateImport = read("public/personal-import.html");
 const jobImport = read("public/jd-import.html");
 const candidateDetail = read("public/candidate-detail.html");

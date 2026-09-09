@@ -1,3 +1,4 @@
+import { resolveVICSS } from "./helpers/vi-css.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -40,7 +41,7 @@ assert.doesNotMatch(source, /--add-model-origin-scale-x|--add-model-origin-scale
 assert.match(source, /typeof onReturn === "function"/);
 assert.doesNotMatch(source, /AWAITING_APPROVAL|indexedDB/);
 
-const html = read("index.html"); const runtime = read("runtime-selection.js"); const css = read("styles.css");
+const html = read("index.html"); const runtime = read("runtime-selection.js"); const css = resolveVICSS(read("styles.css"));
 assert.match(html, /id="add-model-sheet"/); assert.match(html, /id="add-model-close"/); assert.doesNotMatch(html, /id="add-model-complete"/);
 assert.doesNotMatch(html, /id="add-model-close"[^>]*>×</);
 assert.doesNotMatch(html, /id="add-model-drag-handle"/); assert.match(html, /id="add-model-provider"/);

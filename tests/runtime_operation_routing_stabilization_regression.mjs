@@ -1,3 +1,4 @@
+import { resolveVICSS } from "./helpers/vi-css.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -79,7 +80,7 @@ assert.match(server, /snapshot\.capabilities\.candidate_model_structuring/);
 assert.match(server, /snapshot\.capabilities\.job_model_structuring/);
 assert.match(read("public/jd-import.html"), /按顺序排列的原始图片发送给 DeepSeek/);
 
-const styles = read("public/styles.css");
+const styles = resolveVICSS(read("public/styles.css"));
 const minibarRule = styles.match(/\.v1-mini-sidebar \{[^}]+\}/)?.[0] || "";
 assert.match(minibarRule, /right: 18px/);
 assert.match(minibarRule, /top: 50%/);

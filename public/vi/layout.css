@@ -1,0 +1,33 @@
+/* Reusable International Typographic Style grid. Existing specialized shells retain their contracts. */
+.vi-container { width: 100%; max-width: var(--vi-grid-max); margin-inline: auto; padding-inline: var(--vi-grid-margin); }
+.vi-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--vi-grid-gutter); align-items: start; }
+.vi-grid > * { min-width: 0; }
+.vi-span-3 { grid-column: span 3; }
+.vi-span-4 { grid-column: span 4; }
+.vi-span-6 { grid-column: span 6; }
+.vi-span-8 { grid-column: span 8; }
+.vi-span-9 { grid-column: span 9; }
+.vi-span-12 { grid-column: 1 / -1; }
+.vi-prose { max-width: 68ch; font-family: var(--vi-font-ui); font-size: var(--vi-text-body); line-height: var(--vi-leading-reading); text-align: start; overflow-wrap: anywhere; }
+.vi-prose :is(p, ul, ol) { margin-block: 0 var(--vi-space-16); }
+.vi-numeric { font-variant-numeric: tabular-nums; }
+/* Resume/document preview only: A4 proportions, a common left edge and a 3:9 section grid. */
+.vi-resume-sheet { width: 100%; max-width: 210mm; background: var(--vi-surface); color: var(--vi-ink); padding: 16mm; font-family: var(--vi-font-ui); text-align: start; }
+.vi-resume-row { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4mm; padding-block: 16pt; border-top: 1px solid var(--vi-line); }
+.vi-resume-label { grid-column: span 3; font-size: 10.5pt; line-height: 16pt; margin: 0; }
+.vi-resume-content { grid-column: span 9; min-width: 0; font-size: 10.5pt; line-height: 16pt; overflow-wrap: anywhere; }
+.vi-resume-content p { margin: 0 0 8pt; }
+.vi-resume-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4pt 12pt; margin-bottom: 8pt; }
+@media (min-width: 701px) and (max-width: 1100px) {
+  .vi-grid { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  .vi-span-3, .vi-span-4 { grid-column: span 4; }
+  .vi-span-6, .vi-span-8, .vi-span-9 { grid-column: span 8; }
+}
+@media (max-width: 700px) {
+  .vi-container { padding-inline: var(--vi-grid-margin-mobile); }
+  .vi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--vi-space-16); }
+  .vi-grid > * { grid-column: 1 / -1; }
+  .vi-resume-sheet { padding: var(--vi-space-24); }
+  .vi-resume-row { grid-template-columns: minmax(0, 1fr); gap: var(--vi-space-8); }
+  .vi-resume-label, .vi-resume-content { grid-column: 1; }
+}

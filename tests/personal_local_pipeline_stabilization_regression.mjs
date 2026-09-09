@@ -1,3 +1,4 @@
+import { resolveVICSS } from "./helpers/vi-css.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -5,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pages = fs.readFileSync(path.join(root, "public", "v1-pages.js"), "utf8");
-const styles = fs.readFileSync(path.join(root, "public", "styles.css"), "utf8");
+const styles = resolveVICSS(fs.readFileSync(path.join(root, "public", "styles.css"), "utf8"));
 const detail = fs.readFileSync(path.join(root, "public", "candidate-detail.html"), "utf8");
 
 const reviewSurface = pages.slice(pages.indexOf("function proposalItemEditor"), pages.indexOf("async function renderAwaitingCandidateReviews"));

@@ -1,3 +1,4 @@
+import { resolveVICSS } from "./helpers/vi-css.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -142,7 +143,7 @@ assert.equal(Review.sourceImportState(sourceId, { ...completedRecords, context_p
 assert.equal(Review.sourceImportState("missing-source", completedRecords), "NEW");
 const pages = fs.readFileSync(path.join(root, "public", "v1-pages.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "public", "personal-import.html"), "utf8");
-const styles = fs.readFileSync(path.join(root, "public", "styles.css"), "utf8");
+const styles = resolveVICSS(fs.readFileSync(path.join(root, "public", "styles.css"), "utf8"));
 assert.match(html, /candidate-review-surface/);
 assert.match(pages, /persistDecision\(database, proposal, decision, acceptedPayload\)/);
 assert.match(pages, /activeConfirmedRevisions/);

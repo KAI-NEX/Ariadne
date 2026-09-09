@@ -6,6 +6,10 @@
 
 日常入口还包括 [README.md](../README.md)、[TECHNICAL_EVIDENCE.md](../TECHNICAL_EVIDENCE.md) 与 [NEXT_PHASE_HANDOFF.md](../NEXT_PHASE_HANDOFF.md)。历史清单提及的根目录 `文件说明.md` 不在当前仓库；本页和 PROJECT_CONTEXT 承担现行导航职责。
 
+## 当前视觉体系
+
+[Ariadne VI 系统](current/ARIADNE_VI_SYSTEM.md) · [可浏览总览](../public/vi-system.html) · [基础定义](../public/vi/manifest.json)。界面、图标、中英文字体、网格与简历对齐、色彩、组件、动效及维护检查从这里开始。
+
 ## 2026-08-25 文档清单快照（历史）
 
 下文 `Implementation = NOT STARTED`、唯一 Step 1 等描述是原始时点记录，不代表当前产品状态；原文保留供追溯。

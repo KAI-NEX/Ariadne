@@ -1,3 +1,4 @@
+import { resolveVICSS } from "./helpers/vi-css.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -17,7 +18,7 @@ const jd = read("jd.html");
 const jobImport = read("jd-import.html");
 const jobDetail = read("job-detail.html");
 const pages = read("v1-pages.js");
-const styles = read("styles.css");
+const styles = resolveVICSS(read("styles.css"));
 
 for (const html of [workspace, personal, personalImport, candidateDetail, jd, jobImport, jobDetail]) {
   assert.match(html, /v1-motion-33/);
@@ -241,10 +242,10 @@ assert.doesNotMatch(styles, /\.v1-object-folder\.dark:focus-visible \.v1-folder-
 assert.match(styles, /\.v1-add-guide-icon \{[^}]*border: 0/s);
 assert.match(styles, /\.v1-add-guide-icon::before \{[^}]*height: 24px[^}]*width: 24px/s);
 assert.match(styles, /\.v1-conversation-form button \{[^}]*background: #20232a[^}]*font-size: 0[^}]*height: 42px[^}]*width: 42px/s);
-assert.match(styles, /\.v1-conversation-form button::before \{[^}]*height: 20px[^}]*mask: url\([^}]*stroke-width='1\.8'[^}]*stroke-linecap='round'[^}]*stroke-linejoin='round'[^}]*20px 20px[^}]*width: 20px/s);
+assert.match(styles, /\.v1-conversation-form button::before \{[^}]*height: 20px[^}]*mask: url\("\/vi\/icons\/send\.svg"\)[^}]*20px 20px[^}]*width: 20px/s);
 assert.match(styles, /\.v1-body button:focus-visible[^}]*outline: 3px solid rgba\(82, 111, 218, 0\.25\)[^}]*outline-offset: 3px/s);
 assert.match(styles, /\.v1-back \{[^}]*border: 0/s);
-assert.match(styles, /\.v1-back::before \{[^}]*M15 5\.5 8\.5 12 15 18\.5[^}]*stroke-width='2\.4'[^}]*stroke-linecap='round'[^}]*width: 20px/s);
+assert.match(styles, /\.v1-back::before \{[^}]*url\("\/vi\/icons\/chevron-left\.svg"\)[^}]*width: 20px/s);
 assert.match(styles, /\.v1-back::after \{ content: none; \}/);
 assert.match(styles, /\.v1-detail-overlay-close::before \{[^}]*height: 24px[^}]*width: 24px/s);
 assert.match(styles, /\.sheet-icon-button::before \{[^}]*height: 24px[^}]*width: 24px/s);
@@ -414,7 +415,8 @@ assert.match(styles, /corner-shape: squircle/);
 assert.match(workspace, />Ariadne</);
 assert.doesNotMatch(workspace, /所有本轮示例均为/);
 assert.match(styles, /@import url\("https:\/\/fonts\.googleapis\.com\/css2\?family=IBM\+Plex\+Serif/);
-assert.match(styles, /font-family: "Recursive", "Inter", "IBM Plex Serif"/);
+assert.match(styles, /font-family: "Recursive", "Inter", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", ui-sans-serif, sans-serif/);
+assert.doesNotMatch(styles, /font-family:[^;]*IBM Plex Serif/);
 assert.doesNotMatch(styles, /\.v1-back::before \{[^}]*width: 17px/s);
 assert.doesNotMatch(pages, /打开材料|打开职位上下文|PDF · 图片 · 粘贴文本|简历 · 作品集 · 项目/);
 assert.match(pages, /点击进入导入页面，建立待审核的职业对象。/);
@@ -429,3 +431,6 @@ assert.match(pages, /"personal-import": initPersonalImport/);
 assert.match(pages, /"job-import": initJobImport/);
 
 console.log(JSON.stringify({ step_02_03_ui_framework: "expanded_checks_pass", mini_sidebar_fisheye_contract: "compact_idle_expanded_proximity_active_emphasis_and_fade_navigation_pass", workspace_folders: "figma_vector_back_and_layered_hover_open_with_three_papers_pass", workspace_navigation: "folder_and_workspace_back_smooth_page_fade_pass", stored_card_detail: "current_runtime_capability_gated_with_local_direct_edit", import_guides: "personal_and_job_import_share_the_same_reversible_overlay_and_complete_in_place", page_motion: "folder_fade_overlay_morph_and_mini_fade_pass", real_provider_calls: "none", fixture_truth_separation: "pass" }, null, 2));
+
+assert.match(read("vi/icons/send.svg"), /stroke-width="1\.8" stroke-linecap="round" stroke-linejoin="round"[\s\S]*M12 18V6M7\.5 10\.5 12 6l4\.5 4\.5/);
+assert.match(read("vi/icons/chevron-left.svg"), /stroke-width="2\.4" stroke-linecap="round" stroke-linejoin="round"[\s\S]*M15 5\.5 8\.5 12 15 18\.5/);

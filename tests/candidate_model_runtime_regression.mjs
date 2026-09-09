@@ -1,3 +1,4 @@
+import { resolveVICSS } from "./helpers/vi-css.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -260,7 +261,7 @@ assert.match(pages, /confirm-candidate-model-failure"\)\.addEventListener\("clic
 assert.match(pages, /saved-candidate-source-selector/);
 assert.match(pages, /function setSavedCandidateSourceMenu\(open\)/);
 assert.match(pages, /list\.inert = !open/);
-const styles = fs.readFileSync(path.join(root, "public", "styles.css"), "utf8");
+const styles = resolveVICSS(fs.readFileSync(path.join(root, "public", "styles.css"), "utf8"));
 assert.match(styles, /\.v1-dialog-dismiss \{[\s\S]*background: transparent;[\s\S]*border: 0;/);
 assert.match(styles, /\.v1-dialog-dismiss:hover \{[\s\S]*rgba\(82,111,218,\.08\)/);
 assert.match(styles, /\.v1-dialog-dismiss:focus-visible \{[\s\S]*outline: 2px solid #526fda/);

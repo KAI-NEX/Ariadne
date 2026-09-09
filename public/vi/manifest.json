@@ -1,0 +1,591 @@
+{
+  "version": "1.0.0",
+  "updated": "2026-09-09",
+  "brand": {
+    "en": "Ariadne",
+    "zh": "衡"
+  },
+  "tokens": [
+    {
+      "name": "--vi-canvas",
+      "value": "#f7f7f9",
+      "group": "color",
+      "label": "应用纸面"
+    },
+    {
+      "name": "--vi-surface",
+      "value": "#fff",
+      "group": "color",
+      "label": "白色表面 / 深底文字"
+    },
+    {
+      "name": "--vi-ink",
+      "value": "#1f222a",
+      "group": "color",
+      "label": "主要文字"
+    },
+    {
+      "name": "--vi-muted",
+      "value": "#737b8c",
+      "group": "color",
+      "label": "次要说明（现状保留）"
+    },
+    {
+      "name": "--vi-text-secondary",
+      "value": "#596171",
+      "group": "color",
+      "label": "可读次要文字"
+    },
+    {
+      "name": "--vi-line",
+      "value": "#dce1e9",
+      "group": "color",
+      "label": "轻分隔线"
+    },
+    {
+      "name": "--vi-action",
+      "value": "#20232a",
+      "group": "color",
+      "label": "主操作 / AI 气泡"
+    },
+    {
+      "name": "--vi-action-hover",
+      "value": "#343842",
+      "group": "color",
+      "label": "主操作悬停 / 深文件夹背板"
+    },
+    {
+      "name": "--vi-focus",
+      "value": "#526fda",
+      "group": "color",
+      "label": "焦点 / 交互蓝"
+    },
+    {
+      "name": "--vi-processing",
+      "value": "#8ea6ff",
+      "group": "color",
+      "label": "深色背景上的等待蓝"
+    },
+    {
+      "name": "--vi-conversation",
+      "value": "#f3f5f9",
+      "group": "color",
+      "label": "对话区域"
+    },
+    {
+      "name": "--vi-dialog",
+      "value": "#fafafd",
+      "group": "color",
+      "label": "浮窗表面"
+    },
+    {
+      "name": "--vi-danger",
+      "value": "#bd2f2a",
+      "group": "color",
+      "label": "移除动作"
+    },
+    {
+      "name": "--vi-error",
+      "value": "#b1414a",
+      "group": "color",
+      "label": "失败提示"
+    },
+    {
+      "name": "--vi-warning",
+      "value": "#9a6226",
+      "group": "color",
+      "label": "待注意"
+    },
+    {
+      "name": "--vi-folder-back",
+      "value": "#e8ebf0",
+      "group": "color",
+      "label": "浅文件夹背板"
+    },
+    {
+      "name": "--vi-folder-front",
+      "value": "#fafbfc",
+      "group": "color",
+      "label": "浅文件夹正面"
+    },
+    {
+      "name": "--vi-folder-transition",
+      "value": "#eceff4",
+      "group": "color",
+      "label": "文件夹展开过渡"
+    },
+    {
+      "name": "--vi-folder-paper-back",
+      "value": "#f0f2f6",
+      "group": "color",
+      "label": "后层纸张"
+    },
+    {
+      "name": "--vi-folder-paper-mid",
+      "value": "#f5f6f8",
+      "group": "color",
+      "label": "中层纸张"
+    },
+    {
+      "name": "--vi-runtime-canvas",
+      "value": "#f9f9fa",
+      "group": "color",
+      "label": "运行入口纸面"
+    },
+    {
+      "name": "--vi-runtime-ink",
+      "value": "#1f2129",
+      "group": "color",
+      "label": "运行入口文字"
+    },
+    {
+      "name": "--vi-runtime-action",
+      "value": "#1c1f26",
+      "group": "color",
+      "label": "运行入口主按钮"
+    },
+    {
+      "name": "--vi-brand-accent",
+      "value": "#a34e2e",
+      "group": "color",
+      "label": "介绍页陶土色"
+    },
+    {
+      "name": "--vi-brand-thread",
+      "value": "#b65b38",
+      "group": "color",
+      "label": "介绍页引路线"
+    },
+    {
+      "name": "--vi-brand-muted",
+      "value": "#626978",
+      "group": "color",
+      "label": "品牌叙述次要文字"
+    },
+    {
+      "name": "--vi-font-ui",
+      "value": "\"Recursive\", \"Inter\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", ui-sans-serif, sans-serif",
+      "group": "type",
+      "label": "英文优先 Recursive；中文使用系统黑体；全程无衬线回退"
+    },
+    {
+      "name": "--vi-font-wordmark",
+      "value": "\"Recursive\", \"Inter\", ui-sans-serif, sans-serif",
+      "group": "type",
+      "label": "现有英文字标字体"
+    },
+    {
+      "name": "--vi-font-mono",
+      "value": "ui-monospace, SFMono-Regular, Consolas, monospace",
+      "group": "type",
+      "label": "代码 / token 标识"
+    },
+    {
+      "name": "--vi-text-caption",
+      "value": "12px",
+      "group": "type",
+      "label": "辅助说明"
+    },
+    {
+      "name": "--vi-text-body",
+      "value": "14px",
+      "group": "type",
+      "label": "常规正文"
+    },
+    {
+      "name": "--vi-text-reading",
+      "value": "15px",
+      "group": "type",
+      "label": "长文阅读"
+    },
+    {
+      "name": "--vi-text-title",
+      "value": "30px",
+      "group": "type",
+      "label": "页级标题基准"
+    },
+    {
+      "name": "--vi-leading-body",
+      "value": "1.65",
+      "group": "type",
+      "label": "正文行高"
+    },
+    {
+      "name": "--vi-leading-reading",
+      "value": "1.85",
+      "group": "type",
+      "label": "中文长文行高"
+    },
+    {
+      "name": "--vi-space-4",
+      "value": "4px",
+      "group": "space",
+      "label": "间距 4"
+    },
+    {
+      "name": "--vi-space-8",
+      "value": "8px",
+      "group": "space",
+      "label": "间距 8"
+    },
+    {
+      "name": "--vi-space-12",
+      "value": "12px",
+      "group": "space",
+      "label": "间距 12"
+    },
+    {
+      "name": "--vi-space-16",
+      "value": "16px",
+      "group": "space",
+      "label": "间距 16"
+    },
+    {
+      "name": "--vi-space-20",
+      "value": "20px",
+      "group": "space",
+      "label": "间距 20"
+    },
+    {
+      "name": "--vi-space-24",
+      "value": "24px",
+      "group": "space",
+      "label": "间距 24"
+    },
+    {
+      "name": "--vi-space-32",
+      "value": "32px",
+      "group": "space",
+      "label": "间距 32"
+    },
+    {
+      "name": "--vi-space-40",
+      "value": "40px",
+      "group": "space",
+      "label": "间距 40"
+    },
+    {
+      "name": "--vi-space-48",
+      "value": "48px",
+      "group": "space",
+      "label": "间距 48"
+    },
+    {
+      "name": "--vi-space-64",
+      "value": "64px",
+      "group": "space",
+      "label": "间距 64"
+    },
+    {
+      "name": "--vi-radius-small",
+      "value": "12px",
+      "group": "geometry",
+      "label": "小型输入与控件"
+    },
+    {
+      "name": "--vi-radius-field",
+      "value": "16px",
+      "group": "geometry",
+      "label": "对话输入框"
+    },
+    {
+      "name": "--vi-radius-surface",
+      "value": "20px",
+      "group": "geometry",
+      "label": "共用 squircle 表面"
+    },
+    {
+      "name": "--vi-radius-dialog",
+      "value": "24px",
+      "group": "geometry",
+      "label": "独立大容器"
+    },
+    {
+      "name": "--vi-radius-pill",
+      "value": "999px",
+      "group": "geometry",
+      "label": "标签 / 等待胶囊"
+    },
+    {
+      "name": "--vi-radius-circle",
+      "value": "50%",
+      "group": "geometry",
+      "label": "圆形图标按钮"
+    },
+    {
+      "name": "--vi-composer-field",
+      "value": "46px",
+      "group": "geometry",
+      "label": "对话输入外框"
+    },
+    {
+      "name": "--vi-composer-input",
+      "value": "44px",
+      "group": "geometry",
+      "label": "对话文本域"
+    },
+    {
+      "name": "--vi-composer-send",
+      "value": "42px",
+      "group": "geometry",
+      "label": "发送按钮"
+    },
+    {
+      "name": "--vi-icon-control",
+      "value": "36px",
+      "group": "geometry",
+      "label": "既有返回 / 关闭热区"
+    },
+    {
+      "name": "--vi-target-comfort",
+      "value": "44px",
+      "group": "geometry",
+      "label": "新建独立图标控件热区"
+    },
+    {
+      "name": "--vi-icon-inline",
+      "value": "14px",
+      "group": "geometry",
+      "label": "行内图标"
+    },
+    {
+      "name": "--vi-icon-small",
+      "value": "20px",
+      "group": "geometry",
+      "label": "返回 / 发送图标"
+    },
+    {
+      "name": "--vi-icon-default",
+      "value": "24px",
+      "group": "geometry",
+      "label": "添加 / 关闭图标"
+    },
+    {
+      "name": "--vi-ease-standard",
+      "value": "cubic-bezier(.22,.78,.24,1)",
+      "group": "motion",
+      "label": "常规缓动"
+    },
+    {
+      "name": "--vi-ease-reveal",
+      "value": "cubic-bezier(.16,1,.3,1)",
+      "group": "motion",
+      "label": "展开缓动"
+    },
+    {
+      "name": "--vi-motion-feedback",
+      "value": "180ms",
+      "group": "motion",
+      "label": "轻反馈"
+    },
+    {
+      "name": "--vi-motion-control",
+      "value": "190ms",
+      "group": "motion",
+      "label": "按压与控件过渡"
+    },
+    {
+      "name": "--vi-motion-loop",
+      "value": ".82s",
+      "group": "motion",
+      "label": "等待循环"
+    },
+    {
+      "name": "--vi-motion-open",
+      "value": "540ms",
+      "group": "motion",
+      "label": "详情展开（JS 现状契约）"
+    },
+    {
+      "name": "--vi-motion-close",
+      "value": "480ms",
+      "group": "motion",
+      "label": "详情缩回（JS 现状契约）"
+    },
+    {
+      "name": "--vi-shadow-card",
+      "value": "0 10px 24px rgba(31,34,42,.06)",
+      "group": "effect",
+      "label": "文件夹静态阴影"
+    },
+    {
+      "name": "--vi-shadow-dialog",
+      "value": "0 34px 90px rgba(31,34,42,.2), 0 5px 18px rgba(31,34,42,.08)",
+      "group": "effect",
+      "label": "详情浮窗阴影"
+    },
+    {
+      "name": "--vi-focus-ring",
+      "value": "0 0 0 3px rgba(82,111,218,.16)",
+      "group": "effect",
+      "label": "输入框焦点光晕"
+    },
+    {
+      "name": "--vi-font-latin",
+      "value": "\"Recursive\", \"Inter\", ui-sans-serif, sans-serif",
+      "group": "type",
+      "label": "英文 / 数字"
+    },
+    {
+      "name": "--vi-font-cjk",
+      "value": "\"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "group": "type",
+      "label": "中文黑体"
+    },
+    {
+      "name": "--vi-grid-max",
+      "value": "1440px",
+      "group": "grid",
+      "label": "应用最大外框"
+    },
+    {
+      "name": "--vi-grid-margin",
+      "value": "42px",
+      "group": "grid",
+      "label": "现有桌面页边距"
+    },
+    {
+      "name": "--vi-grid-margin-mobile",
+      "value": "18px",
+      "group": "grid",
+      "label": "现有窄屏页边距"
+    },
+    {
+      "name": "--vi-grid-gutter",
+      "value": "24px",
+      "group": "grid",
+      "label": "新建布局列间距"
+    },
+    {
+      "name": "--vi-grid-baseline",
+      "value": "4px",
+      "group": "grid",
+      "label": "基线与间距基础单位"
+    },
+    {
+      "name": "--vi-grid-columns",
+      "value": "12",
+      "group": "grid",
+      "label": "桌面列数"
+    },
+    {
+      "name": "--vi-grid-columns-mobile",
+      "value": "4",
+      "group": "grid",
+      "label": "窄屏列数"
+    },
+    {
+      "name": "--vi-font-object",
+      "value": "\"Inter\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", ui-sans-serif, sans-serif",
+      "group": "type",
+      "label": "既有文件夹标题：Inter / 系统中文黑体"
+    }
+  ],
+  "icons": [
+    {
+      "name": "chevron-left",
+      "body": "<path d=\"M15 5.5 8.5 12 15 18.5\"/>",
+      "stroke": 2.4,
+      "label": "返回",
+      "usage": "返回上一级 / 回到原卡片；不用长杆左箭头"
+    },
+    {
+      "name": "chevron-right",
+      "body": "<path d=\"M9 5.5 15.5 12 9 18.5\"/>",
+      "stroke": 2.4,
+      "label": "前往",
+      "usage": "继续、进入下一层"
+    },
+    {
+      "name": "chevron-down",
+      "body": "<path d=\"M5.5 9 12 15.5 18.5 9\"/>",
+      "stroke": 2.4,
+      "label": "展开",
+      "usage": "选择器；展开时旋转 180°"
+    },
+    {
+      "name": "close",
+      "body": "<path d=\"M6.5 6.5l11 11M17.5 6.5l-11 11\"/>",
+      "stroke": 1.8,
+      "label": "关闭",
+      "usage": "关闭浮窗 / 取消临时界面；不代表删除数据"
+    },
+    {
+      "name": "plus",
+      "body": "<path d=\"M12 5v14M5 12h14\"/>",
+      "stroke": 1.8,
+      "label": "添加",
+      "usage": "新增资料、职位、展开 FAQ"
+    },
+    {
+      "name": "minus",
+      "body": "<path d=\"M5 12h14\"/>",
+      "stroke": 1.8,
+      "label": "收起",
+      "usage": "收起 FAQ；不代表删除"
+    },
+    {
+      "name": "send",
+      "body": "<path d=\"M12 18V6M7.5 10.5 12 6l4.5 4.5\"/>",
+      "stroke": 1.8,
+      "label": "发送",
+      "usage": "仅用于提交对话；忙碌时由加载圈替换"
+    },
+    {
+      "name": "check",
+      "body": "<path d=\"M6.5 12.5 10.3 16.3 17.7 8.4\"/>",
+      "stroke": 2.6,
+      "label": "已选择",
+      "usage": "选择器选中；不暗示事实经过外部核验"
+    },
+    {
+      "name": "arrow-up-right",
+      "body": "<path d=\"M6 18 18 6M6 6h12v12\"/>",
+      "stroke": 1.8,
+      "label": "跳转",
+      "usage": "介绍页行动链接；外部链接仍需文字说明"
+    },
+    {
+      "name": "arrow-down",
+      "body": "<path d=\"M12 5v14m-6-6 6 6 6-6\"/>",
+      "stroke": 1.8,
+      "label": "向下",
+      "usage": "同页跳转下方内容"
+    },
+    {
+      "name": "arrow-up",
+      "body": "<path d=\"M12 19V5m-6 6 6-6 6 6\"/>",
+      "stroke": 1.8,
+      "label": "回到顶部",
+      "usage": "同页回到顶部；不要替代发送图标"
+    },
+    {
+      "name": "check-circle",
+      "body": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"m8.5 12 2.3 2.3 4.8-5\"/>",
+      "stroke": 2,
+      "label": "操作完成",
+      "usage": "连接完成等技术状态；必须配状态文字"
+    },
+    {
+      "name": "loader",
+      "body": "<path d=\"M12 3a9 9 0 1 0 9 9\"/>",
+      "stroke": 2,
+      "label": "等待",
+      "usage": "过程图形；减少动效时保留文字和忙碌状态"
+    },
+    {
+      "name": "sliders",
+      "body": "<path d=\"M4 7h5m4 0h7M4 17h9m4 0h3M9 4v6m4 4v6\"/>",
+      "stroke": 1.8,
+      "label": "调节",
+      "usage": "ASCII 波纹调节；现有入口保持"
+    },
+    {
+      "name": "menu",
+      "body": "<path d=\"M5 8h14M5 16h14\"/>",
+      "stroke": 1.8,
+      "label": "导航菜单",
+      "usage": "窄屏导航；现有两条线 CSS 为对应实现"
+    }
+  ]
+}

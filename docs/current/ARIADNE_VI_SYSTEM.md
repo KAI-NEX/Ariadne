@@ -1,0 +1,173 @@
+# Ariadne · 衡 — VI 视觉系统 1.0
+
+更新：2026-09-09。范围：整个 `public/` 的静态视觉实现，包括 Runtime、Workspace、Candidate/Job、介绍入口、旧版页面以及本次观察到的并行个人理解页面。本系统约束视觉呈现，不改变资料、模型、来源、人工保存和版本权限。
+
+## 使用入口与唯一来源
+
+- **可浏览规范**：[VI 总览](../../public/vi-system.html)；启动项目后打开 [本机 VI 总览](http://127.0.0.1:8000/vi-system.html)。含颜色复制、图标检索、网格叠层、真实组件/等待演示、中文与英文样本、简历对齐示例。普通页面不用增加开发规范菜单。
+- **唯一 token / 普通图标定义**：[manifest.json](../../public/vi/manifest.json)。按 `color/type/space/geometry/motion/effect/grid` 分类，值、语义名称与说明一起维护。
+- **生成资源**：[tokens.css](../../public/vi/tokens.css)、[icons.css](../../public/vi/icons.css)、[SVG 图标目录](../../public/vi/icons/)。只通过 [build_vi.py](../../scripts/build_vi.py) 更新。修改生成文件会被检查阻止。
+- **排版工具**：[layout.css](../../public/vi/layout.css)：列网格、通用容器、正文和简历排版样本。
+- **产品组件**：[styles.css](../../public/styles.css)、[ProductShell](../../public/product-shell-domain.js)、[ConversationUI](../../public/conversation-ui-domain.js)、[ProcessingIndicator](../../public/processing-indicator-domain.js)。四个 Candidate/Job composer 继续共用已有结构。
+- **全量现状索引**：[source-inventory.json](vi/source-inventory.json)，逐文件列出色彩、字号、行高、尺寸、间距、网格、边框、圆角、阴影、变换、动画和层级声明；包含历史样式，不是推荐值清单。
+- **历史例外台账**：[legacy-baseline.json](vi/legacy-baseline.json)。旧声明以文件＋选择器＋属性＋值＋次数登记；只允许不增加，不能复制到新位置。并行个人理解样式仅列入观察清单，不由本阶段重构或提交。
+
+## 1. 品牌基础
+
+英文固定 **Ariadne**，中文固定 **衡**。不使用音译作为产品中文名。语义：从有来源的资料出发，帮助衡量、判断和取舍。不得用“匹配百分比”、色阶或图标暗示不存在的能力认证。
+
+视觉方向：冷浅灰纸面、深色文字/主按钮、白色资料表面；少量蓝色表达交互与处理中；陶土色只属于介绍页叙事图形。主工作区保持克制，不把品牌插图色扩散成全站按钮色。
+
+字标现有两种比例：工具栏 `12px / 800 / .16em`；介绍展示采用较大字号与紧字距（介绍浮窗 `44px / 550 / -.06em`）。这两者是应用尺度差异，不混用。中文「衡」用系统黑体与英文并列，不拉伸、不挤压、不机械套用英文字距。新增正式外部品牌资产建议四周保留至少半个大写 A 字高的空白；现有工具栏按已验收几何保留。
+
+## 2. 色彩角色
+
+| 语义变量（统一 `--vi-` 前缀） | 值 | 职责 |
+|---|---|---|
+| canvas / surface | #F7F7F9 / #FFFFFF | 页面底色 / 内容与输入表面 |
+| ink / text-secondary | #1F222A / #596171 | 主文 / 新增可读次要文字 |
+| muted | #737B8C | 现有弱说明，不能默认用于所有小字 |
+| line | #DCE1E9 | 装饰性分隔线；不作为唯一控件边界提示 |
+| action / action-hover | #20232A / #343842 | 主操作、AI 气泡与其层级 |
+| focus / processing | #526FDA / #8EA6FF | 焦点、深背景上的等待光标 |
+| conversation / dialog | #F3F5F9 / #FAFAFD | 对话区域 / 浮窗纸面 |
+| error / danger / warning | #B1414A / #BD2F2A / #9A6226 | 错误说明 / 移除行为 / 待注意 |
+| brand-accent / brand-thread | #A34E2E / #B65B38 | 品牌叙述 / 引路插图 |
+
+完整文件夹、Runtime、字体、阴影、间距变量以 manifest 为准。`--ink/--paper/--muted/--line/--blue` 保留为兼容别名，引用对应 VI 变量，不再各自定义值。本次抽取保持原数值，未把旧绿色页面强制换肤。
+
+颜色必须伴随文案或形状：选中有勾，错误有原因，等待有进度文字，保存有实际结果。文本可读性根据前景和实际背景组合判断；正文以至少 4.5:1 为验收目标，大字与必要非文本控件以至少 3:1 为目标。现有弱灰与细分隔线不据此宣称整站已通过无障碍认证；新辅助文案优先 `text-secondary`，不要直接沿用弱灰。
+
+## 3. 中英文字体与排版
+
+### 声明与实际渲染
+
+| 内容 | 首选 | 降级顺序 / 说明 |
+|---|---|---|
+| 英文 / 数字 | Recursive | Inter → 系统无衬线；见 `--vi-font-latin` |
+| macOS 简体中文 | PingFang SC / 苹方 | Microsoft YaHei → Noto Sans CJK SC → 系统黑体；见 `--vi-font-cjk` |
+| 中英混排 UI | `--vi-font-ui` | Recursive、Inter 优先承担英文，中文由后续 CJK 黑体承担 |
+| 代码 / token / 尺寸标识 | `--vi-font-mono` | 系统等宽；不用于中文正文 |
+| 文件夹标题 | Inter / 系统中文黑体 | `--vi-font-object`；保留现有 Inter 优先顺序 |
+| 英文字标 | `--vi-font-wordmark` | Recursive → Inter → 系统无衬线 |
+
+2026-09-09 **egolite 真实字体证据**（CDP `CSS.getPlatformFontsForNode`，Workspace）：
+
+- `.v1-wordmark`：custom font `Recursive Sans Linear Light`，PostScript `RecursiveSansLnr-ExtraBold`。
+- `.v1-object-copy b` 中文：`.PingFang SC`，PostScript `PingFang-SC-Medium`。
+- `.v1-object-copy small`：中文 `PingFangSC-Regular`，英文/分隔符由 `RecursiveSansLnr-Regular` 承担。
+
+`font-family` 的 CSS 声明只能证明请求顺序；`document.fonts.check()` 不能独立证明某段中文实际用了哪款字体。Windows / Linux 的实际字体未在本阶段验收。Google Fonts 是现有在线来源；当前未打包离线 webfont。断网或 CSP 阻止时必须按明确无衬线链降级，不保证字宽完全相同。
+
+旧 `IBM Plex Serif` 从 UI / 字标回退链移除，避免加载失败时切换成衬线；旧 Google Fonts 请求暂保留原样，不代表它仍是首选。增加本地字体前要检查授权、可变字重范围、中文覆盖和离线场景，不随意替换品牌首选字体。
+
+### 字号与阅读节奏
+
+| 角色 | 尺寸与字重 | 规则 |
+|---|---|---|
+| 页级标题 | 30–44 px / 500–550 | 清晰层级；不把展示大字用进工具栏 |
+| 子标题 | 18–24 px / 500–550 | 标题与下一段共享左边界 |
+| 界面正文 | 14 px / 400 / 1.65 | 左对齐，自然换行 |
+| 中文长文 | 15 px / 400 / 1.85 | 正文列控制约 30–40 个汉字；按实际字体校准 |
+| 对话气泡（既有契约） | 13 px / 400 / 1.6 | 保留 Candidate/Job 一致尺寸 |
+| 辅助与日期 | 12 px / 400 / 1.65 | 用可读次要文字色；日期 `tabular-nums` |
+| 旧小标签 | 10–11 px | 历史密度例外；不新增同尺寸长正文 |
+
+中文正文 `letter-spacing: normal`，不逐字强制拉开。英文标题可以光学收紧；不能把英文字标 `.16em` 全局继承到中文。正文左对齐、右侧自然参差，不两端拉伸，不靠空格/连续 `<br>` 做布局。强调使用有意义的短语与中等字重，避免整段全粗体。
+
+## 4. 国际主义网格与简历对齐
+
+新建通用页面使用 `vi-container + vi-grid`，而不是手动偏移：
+
+| 视口 | 列数 | 容器边距 / 列距 | 组合 |
+|---|---|---|---|
+| >1100 px | 12 | 最大外框 1440 px（含内边距），边距 42 px / 列距 24 px | 3+9、4+8、6+6 |
+| 701–1100 px | 8 | 42 px / 24 px | 4+4 或通栏 |
+| ≤700 px | 4 | 18 px / 16 px | 内容通栏、元信息随标题折行 |
+
+以 **4 px** 为基础节奏；常规间距优先 8、16、24、32、48、64 px。基线是组织文字的参考，不把所有字体高度强行截断：1 px 边框、36 px 返回热区、46/44/42 px composer 是已有交互契约；42 px 桌面边距是兼容现状的边缘例外。
+
+对齐规则：
+
+1. 标题、正文、分隔线和输入框沿共同的列边缘；一段内容不同时出现多个随意左缩进。
+2. 同排标题与日期使用 `align-items: baseline`；标签/图标和控件用光学中心，不能把图形基线套成文字基线。
+3. 日期使用等宽数字且右对齐同一边界，长日期允许整体换行；不使用空格堆砌。
+4. 列表悬挂缩进，项目符号后文字共用正文轴；多行条目第二行对齐文字，不对齐项目符号。
+5. 栏目之间靠间距和细线组织，不用每段一个装饰卡片。保留空白让层次可读。
+6. 现有文件夹双列、详情分栏、浮窗动画的源位置和 iframe 布局是专用模块，不因引入 12 列而重排。新规范不是宣称旧页面已逐一完成网格迁移。
+
+**简历 / 文档排版基线**：A4 210 × 297 mm，四周 16 mm 安全边距，12 列、4 mm 列距；章节标签占 3 列、正文占 9 列。中文正文 10.5 pt、16 pt 行高，正文段后 8 pt，段落组前后 16/24 pt；使用 4 pt 基础节奏。姓名可 24 pt / 28 pt，元信息 9 pt / 16 pt。超过一页时避免孤立章节标题、标题与首段分离、项目中间无说明地断页；PDF 导出需另做字体嵌入与逐页检查。
+
+VI 页面提供 `vi-resume-sheet/row/label/content/heading` 的**合成排版样本**，没有写入或虚构个人经历，也未实现新的简历生成/导出功能。
+
+## 5. 图标系统
+
+15 个普通图标共用 24×24 SVG 母版、圆端点、圆转角、currentColor。图标视觉尺寸与点击热区分开：行内 14 px，返回/发送 20 px，添加/关闭 24 px；新独立控件建议 44 px 热区；既有 36 px 返回/关闭保留。
+
+| 资源名 | 用途 | 线宽 / 禁止混用 |
+|---|---|---|
+| chevron-left / right / down | 返回 / 继续 / 展开选择器 | 2.4；返回不是长杆箭头 |
+| close | 关闭界面、退出临时态 | 1.8；不删除数据 |
+| plus / minus | 添加 / FAQ 收起 | 1.8；不能表示保存或删除 |
+| send | 提交对话 | 1.8；短杆向上，与回到顶部区分 |
+| check | 选择器已选择 | 2.6；不证明资料真实性 |
+| arrow-up-right / down / up | 介绍链接 / 页内下移 / 页顶 | 1.8；跨站链接仍需文案说明 |
+| check-circle / loader | 技术操作完成 / 等待 | 2；必须配状态文案 |
+| sliders | 运行页 ASCII 调节 | 1.8 |
+| menu | 两线导航 | 1.8；现有 CSS 两线图形保留 |
+
+这些线宽差异是既有光学校正，不是“误差”。静态 HTML 推荐 `<span class="vi-icon" data-icon="close" aria-hidden="true"></span>`；按钮提供具体中文 `aria-label`。CSS 伪元素直接引用 `/vi/icons/close.svg`。不要将 `×`、`↗`、emoji 或其他字体字符当作新的 UI 图标；普通正文的乘号、方向说明不在此禁令内。
+
+已接入：返回、关闭、添加、发送、选择勾的重复 CSS mask；介绍页全部方向字符与 FAQ 加减号。Runtime HTML/JS 内既有折线、连接状态和 sliders SVG 暂保留为库存例外，与 manifest 的几何核对；后续不再新增副本。
+
+**专用图形资产（不机械替换）**：
+
+| 图形 | 所有者 | 不变量 |
+|---|---|---|
+| 文件夹背板 | `public/assets/figma-folder-back.svg` + `styles.css` | Figma 原有外形；前板、纸张层次与变换由同一组件管理 |
+| 动态垃圾桶 | `public/index.html` + `styles.css` 的 `add-model-bin-*` | 69 坐标系、分离盖与桶身；现有悬停动作和 API Key 清除语义 |
+| ASCII 波纹 | `public/ascii-waves.js` | 运行入口背景；不冒充模型处理结果 |
+| 介绍页引路线 | `public/about.html` | 420 坐标系，迷宫路径保留；颜色引用品牌 thread token |
+| 细导航轨 | `styles.css` + `v1-pages.js` | 激活/悬停尺度和桌面位置沿既有契约 |
+| 加载圈 | `ProcessingIndicator` + `styles.css` | 过程/终止语义，减少动效时仍有文字 |
+| `job-radar-multimodal-smoke.*` | `public/` 测试素材 | 验证素材，不是品牌 logo；原地保留 |
+
+## 6. 表面、组件与状态
+
+层级从纸面 → 白色卡片/输入 → 浮窗。核心连续圆角 20 px / squircle；输入框 16 px、独立小控件 12 px、胶囊 999 px、圆按钮 50%。已有 24 px 等大容器半径按层叠后的实际样式核验。浏览器不支持 `corner-shape` 时保留普通圆角，不能因此造成布局失败。
+
+共享组件的职责：
+
+- **主/次/轻操作**：复用 `v1-primary-button / secondary / tertiary / consent-action`，禁止每个页面复制按钮尺寸。
+- **来源入口**：Candidate/Job 共用 source input、dropzone、预览与错误说明；不可用视觉提示替代材料传输确认。
+- **消息线程**：Human 白底靠右、Assistant 深底靠左；最大宽度 88%；提示、输入与发送由共享组件管理。
+- **composer**：外框 46 / textarea 44 / send 42 px；中心对齐，聚焦在外框内显示反馈，加载保持尺寸。
+- **详情/编辑/确认**：使用 ProductShell，标签同时说明 Working/保存/失败；颜色不跨越数据权限。
+- **浮窗**：可访问标题、初始焦点、键盘约束、Esc/返回后焦点恢复，原对象展开/缩回位置保持。
+
+状态至少覆盖初始、hover、focus-visible、pressed、disabled、loading、success、failure。`disabled` 不仅是变灰，`loading` 不仅是动画：需要禁止重复提交与 `aria-busy`，成功仅在真实成功后显示，失败说明原因和可执行下一步。
+
+## 7. 动效与层级
+
+常规缓动 `cubic-bezier(.22,.78,.24,1)`；展开缓动 `cubic-bezier(.16,1,.3,1)`。控件反馈 180–190 ms；加载 820 ms；详情展开/缩回 540/480 ms。JS 的 540/480 目前是既有代码契约，不声称已自动读取 CSS token；变更时须同时更新 JS 验证与 manifest。
+
+返回/关闭只轻缩放，不横向漂移；层级动画由触发位置建立连续性。系统减少动态效果时关闭连续循环与入场位移，保留操作与状态信息；CSS 与 Web Animations 两条路径都需验证。
+
+层级现状按 source inventory 追踪：普通内容 → 导航/菜单 → 过渡覆盖层 → 详情浮窗（1200）→ 删除确认层（1300）。这些组件在不同 stacking context 内，不能简单把 z-index 最大数当全局最高层；不要为解决一个遮挡随意新增更大数字。
+
+## 8. 维护流程与验收
+
+1. 新 UI 先读本规范，在 manifest 选择语义变量与图标，复用组件。旧文件中某个硬编码存在不代表允许继续复制。
+2. 需要新基础值时修改 manifest，说明用途并生成：`python3 scripts/build_vi.py`。生成器只更新自己的资源，不清理任何原文件。
+3. 运行 `python3 scripts/check_vi.py`：检查生成文件一致性、未知 VI token、丢失图标、新增硬编码颜色/独立字体栈/内嵌 SVG/符号图标。静态 baseline 不自动扩充；新增例外必须写明原因后人工审阅。
+4. 运行 `python3 tests/vi_system_regression.py` 和相关 Node UI 回归。旧 Node 断言通过小型 token 解析器继续校验原尺寸、数值、mask 路径与 SVG 几何，不删除原行为约束。
+5. 浏览器至少检查本次受影响的桌面和窄屏路径、中文换行/实际字体、无横向溢出、图标/点击区域、焦点、等待/失败和减少动效。新增 Provider 请求不属于视觉验收必需。
+6. 可更新静态索引：`python3 scripts/check_vi.py --inventory docs/current/vi/source-inventory.json`。索引只读取仓库静态源码，不收集私人资料或浏览器运行数据。出现行为/视觉失败先修复，再更新状态并本地提交本阶段文件。
+
+检查的能力边界：当前覆盖静态 CSS、HTML 样式、内嵌 SVG、部分明确图标字符及 VI 资源引用。不能自动识别任意 JS 动态着色、网格美感、真实字体回退、语义误导、组件所有交互、跨系统渲染或所有可访问性缺陷。字号、行高和网格仍需代码审阅与真实浏览器证据；本系统不承诺后续绝无视觉错误。
+
+## 9. 本阶段接入与待迁移范围
+
+已完成核心 CSS 色彩与几何 token 化、普通图标资源抽取、品牌页字符图标替换、字体回退修正、可复用国际主义排版网格、全 public 静态清单、可浏览规范与维护检查。
+
+保留并登记：早期绿色 legacy 页面、Runtime 若干局部中性色与内嵌 SVG、专用资产，以及另一项独立个人理解工作维护的局部样式。不把其库存值自动提升为新推荐色，不移动、不删除、不代为修改另一任务。下一次真正修改这些页面时，应逐项向语义 token/共享组件迁移，而不是大范围无依据换肤。
