@@ -761,7 +761,7 @@ def connect() -> sqlite3.Connection:
 
 
 def initialize_database() -> None:
-    """Create the table and seed the real JD exactly once."""
+    """Create an empty database; an existing private seed remains optional."""
     with connect() as connection:
         connection.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
         columns = {row["name"] for row in connection.execute("PRAGMA table_info(jobs)")}
@@ -798,6 +798,8 @@ def initialize_database() -> None:
         }.items():
             if column not in analysis_columns:
                 connection.execute(f"ALTER TABLE job_analyses ADD COLUMN {column} {definition}")
+        if not DATA_PATH.is_file():
+            return  # A clean open-source checkout contains no private job corpus.
         job = json.loads(DATA_PATH.read_text(encoding="utf-8"))
         job["responsibilities_json"] = json.dumps(job.pop("responsibilities"), ensure_ascii=False)
         job["requirements_json"] = json.dumps(job.pop("requirements"), ensure_ascii=False)
@@ -846,6 +848,38 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(PUBLIC_PATH), **kwargs)
 
+    def local_request_allowed(self) -> bool:
+        """The local service never grants a website ambient access to credentials."""
+        if getattr(self, "connector_authorized", False):
+            return True  # The connector already checked its exact origin and token.
+        host = self.headers.get("Host", "")
+        origin = self.headers.get("Origin")
+        denied = host not in {f"127.0.0.1:{self.server.server_port}", f"localhost:{self.server.server_port}"}
+        denied = denied or (origin is not None and origin != f"http://{host}")
+        if urlparse(self.path).path.startswith("/api/"):
+            denied = denied or self.headers.get("Sec-Fetch-Site") == "cross-site"
+        if denied:
+            self.send_json(HTTPStatus.FORBIDDEN, {"error": "LOCAL_ORIGIN_REQUIRED", "network_call_made": False})
+            return False
+        return True
+
+    def send_head(self):
+        # SimpleHTTPRequestHandler follows symlinks and lists directories by
+        # default. Neither is appropriate for a service alongside local secrets.
+        resolved = Path(self.translate_path(self.path)).resolve()
+        if not resolved.is_relative_to(PUBLIC_PATH.resolve()):
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return None
+        return super().send_head()
+
+    def list_directory(self, path):
+        self.send_error(HTTPStatus.NOT_FOUND)
+        return None
+
+    def do_HEAD(self) -> None:  # noqa: N802
+        if self.local_request_allowed():
+            super().do_HEAD()
+
     def end_headers(self) -> None:
         """Keep local HTML/JS in step with the localhost API during development."""
         if urlparse(self.path).path.endswith((".html", ".js")) or urlparse(self.path).path == "/":
@@ -853,6 +887,8 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def do_GET(self) -> None:  # noqa: N802 - required by the standard library
+        if not self.local_request_allowed():
+            return
         parsed = urlparse(self.path)
         if parsed.path == "/candidate-conversation-contract-manifest.js":
             self.candidate_conversation_contract_manifest()
@@ -975,12 +1011,8 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802 - required by the standard library
         parsed = urlparse(self.path)
-        if codex_enabled() and not getattr(self, "connector_authorized", False):
-            host = self.headers.get("Host", "")
-            origin = self.headers.get("Origin")
-            if host not in {f"127.0.0.1:{self.server.server_port}", f"localhost:{self.server.server_port}"} or (origin and origin != f"http://{host}"):
-                self.send_json(HTTPStatus.FORBIDDEN, {"error": "LOCAL_ORIGIN_REQUIRED", "network_call_made": False})
-                return
+        if not self.local_request_allowed():
+            return
         if parsed.path in LEGACY_PROVIDER_ACTION_PATHS:
             self.legacy_provider_action_unavailable()
             return

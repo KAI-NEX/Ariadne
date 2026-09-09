@@ -96,3 +96,12 @@ htmlcov/
 
 # Optional local-only private career regression fixtures
 /tests/private_fixtures/
+
+# Codex authentication and browser profiles are never source artifacts
+.codex/
+auth.json
+.auth/
+*.har
+*.trace.zip
+browser-profile/
+playwright/.auth/

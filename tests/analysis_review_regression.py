@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import sys
+import tempfile
+from unittest.mock import patch
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,6 +13,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+import app
 from app import connect, initialize_database
 from src.validate_model_output import validate
 
@@ -30,7 +33,7 @@ def analysis_snapshot(connection) -> dict:
     return dict(row) if row else {"analysis_record": "absent"}
 
 
-def main() -> int:
+def run_review_regression() -> int:
     """Create pending, reject it as a test reviewer, then roll everything back."""
     initialize_database()
     contract = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
@@ -56,8 +59,8 @@ def main() -> int:
                 """
                 INSERT INTO job_analyses (
                     analysis_id, job_id, analysis_contract_id, input_raw_capture_sha256,
-                    output_json, review_status
-                ) VALUES (?, ?, ?, ?, ?, 'needs_review')
+                    output_json, review_status, instruction_version, provider_name, model_name, input_json
+                ) VALUES (?, ?, ?, ?, ?, 'needs_review', 'synthetic-v1', 'mock', 'mock', '{}')
                 """,
                 ("AN-REG-001", "JD-001", contract["contract_id"], raw_hash,
                  json.dumps(output, ensure_ascii=False)),
@@ -81,6 +84,7 @@ def main() -> int:
         finally:
             connection.rollback()
 
+    assert unchanged and pending["review_status"] == "needs_review" and rejected["review_status"] == "rejected"
     print(json.dumps({
         "regression_passed": unchanged and pending["review_status"] == "needs_review"
         and rejected["review_status"] == "rejected",
@@ -93,6 +97,20 @@ def main() -> int:
         "transaction_rolled_back": True,
     }, ensure_ascii=False, indent=2))
     return 0
+
+
+def main() -> int:
+    # A public checkout must never need or mutate a maintainer's private corpus.
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        with patch.object(app, "DATABASE_PATH", root / "synthetic.db"), patch.object(app, "DATA_PATH", root / "absent-private-seed.json"):
+            initialize_database()
+            with connect() as connection:
+                assert connection.execute("SELECT COUNT(*) FROM jobs").fetchone()[0] == 0
+                connection.execute("""INSERT INTO jobs
+                    (job_id, company, title, location, seniority, source_path, captured_date, raw_capture_sha256)
+                    VALUES ('JD-001', 'Synthetic Company', 'Synthetic Role', 'Unknown', 'Unknown', 'synthetic', '2026-01-01', ?)""", ("a" * 64,))
+            return run_review_regression()
 
 
 if __name__ == "__main__":

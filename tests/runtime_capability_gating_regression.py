@@ -4,6 +4,7 @@ from http import HTTPStatus
 from pathlib import Path
 import inspect
 import sys
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -25,6 +26,8 @@ assert app.LEGACY_PROVIDER_ACTION_PATHS == expected_legacy_paths
 def bare_handler(path: str = "/"):
     handler = object.__new__(app.JobRadarHandler)
     handler.path = path
+    handler.headers = {"Host": "127.0.0.1:8000", "Origin": "http://127.0.0.1:8000"}
+    handler.server = SimpleNamespace(server_port=8000)
     calls = []
     handler.send_json = lambda status, payload: calls.append((status, payload))
     return handler, calls

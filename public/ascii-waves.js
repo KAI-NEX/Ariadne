@@ -6,7 +6,8 @@
   const context = canvas.getContext("2d", { alpha: true });
   if (!context) return;
 
-  // Ariadne V1 approved preset. Customer UI must not mutate these values.
+  // User-confirmed 2026-09-09 baseline, verified against the current browser.
+  // Future adjustments and Restore Preset start from these values.
   const LOCKED_BACKGROUND_SETTINGS = Object.freeze({
     opacity: .77,
     fontSize: 6.8,

@@ -174,3 +174,7 @@ VI 页面提供 `vi-resume-sheet/row/label/content/heading` 的**合成排版样
 已完成核心 CSS 色彩与几何 token 化、普通图标资源抽取、品牌页字符图标替换、字体回退修正、可复用国际主义排版网格、全 public 静态清单、可浏览规范与维护检查。
 
 保留并登记：早期绿色 legacy 页面、Runtime 若干局部中性色与内嵌 SVG、专用资产，以及另一项独立个人理解工作维护的局部样式。不把其库存值自动提升为新推荐色，不移动、不删除、不代为修改另一任务。下一次真正修改这些页面时，应逐项向语义 token/共享组件迁移，而不是大范围无依据换肤。
+
+## 2026-09-09 模型选择页背景预设确认
+
+用户确认当前浏览器效果就是发布预设。核对当前保存值与 `public/ascii-waves.js` 的 `LOCKED_BACKGROUND_SETTINGS` 一致：opacity 0.77、fontSize 6.8、density 1.1、speed 2.8、direction 65、twist 2、tension 0.4；maxCells 70000、maxPixelRatio 2。后续调整从这组参数开始，「恢复预设」也返回此基准；本次不改变背景效果。

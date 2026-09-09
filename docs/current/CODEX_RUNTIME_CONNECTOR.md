@@ -42,7 +42,7 @@ python3 scripts/run_codex_connector.py
 - 配对通道只允许 Codex 模型执行，不允许借用本机其他 Provider 的凭据。断连、过期或撤销明确失败；不自动切到 Local、DeepSeek 或云端后端继续模型请求。
 - 配对后的模型确认框继续显示实际 Provider/model。原始材料先 durable 保存；语义结果仍进入 Working/Proposal，确认版本由人工保存生成。
 
-Web 服务器继续提供现有 Ariadne HTML/JS 和契约 manifest 路由；本阶段没有创建纯静态导出器、云端中继、账号同步或公网 Codex daemon。HTTPS 网站访问 loopback 的权限仍受浏览器版本、企业策略及用户授权影响，不能通过服务端 CORS 绕过。首次公开部署后需在真实 HTTPS origin 再验收此权限路径。
+后续托管 Web 需要独立提供 Ariadne HTML/JS 和公开契约 manifest；本机 app.py 仅允许 loopback Host/Origin，不能直接反向代理为公网服务。本阶段没有创建纯静态导出器、云端中继、账号同步或公网 Codex daemon。HTTPS 网站访问 loopback 的权限仍受浏览器版本、企业策略及用户授权影响，不能通过服务端 CORS 绕过。首次公开部署后需在真实 HTTPS origin 再验收此权限路径。
 
 ## 领域与传输契约
 

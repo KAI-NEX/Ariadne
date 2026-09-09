@@ -1,3 +1,58 @@
+# Ariadne · 衡
+
+**v0.1.0 · MIT 开源预览版**
+
+先理解你的个人资料，再理解目标职位。Ariadne 保留原始来源，帮助解释经历与岗位的关系；模型结果先形成可审阅内容，由你决定是否保存。
+
+- **个人资料与职位**：图片/PDF/文本导入、来源恢复、Working 审阅、确认版本及范围明确的对话。
+- **两个运行模式**：Local 使用确定性本地处理；Model 使用通过图片和视觉 PDF 验证的模型。失败不会静默切换。
+- **本机 Codex**：支持本机 Ariadne 直连，以及 Web 网页通过配对连接器使用本机 Codex。模型推理仍在 OpenAI，使用你自己的账号额度。
+- **数据与凭据**：每位用户自行配置。仓库不包含维护者的 API Key、Codex 登录、简历、数据库或浏览器工作区。
+
+## 本机启动
+
+需要 Python 3.11+；运行回归还需 Node.js 20+。目前完整文件处理在 macOS 验证，部分本地 PDF/OCR 路径依赖 Swift、PDFKit 和 Vision；PDF 逐页转图需 Poppler 的 `pdftoppm`。其他平台尚未完成完整材料路径验收。
+
+```sh
+git clone https://github.com/KAI-NEX/Ariadne.git
+cd Ariadne
+python3 app.py
+```
+
+打开 [本机 Ariadne](http://127.0.0.1:8000/)。干净克隆会初始化空数据库，无需维护者的私有种子文件。在运行方式页选择 Local 或配置自己的合格模型。
+
+使用本机 Codex 前，安装并登录 Codex CLI，确保 `codex login status` 成功，再启动：
+
+```sh
+ARIADNE_CODEX_ENABLED=1 python3 app.py
+```
+
+当前验证的 Codex 组合为 `codex-cli 0.153.4` / `gpt-5.6-sol`。详细设置、Web 配对和断开方式见 [Codex 运行指南](docs/current/CODEX_RUNTIME_CONNECTOR.md)。本机服务只监听 loopback；不要通过隧道或反向代理把自己的凭据服务公开。
+
+## 开发与检查
+
+```sh
+python3 scripts/run_regressions.py
+python3 scripts/check_vi.py
+python3 scripts/check_public_release.py
+```
+
+| 目录 | 内容 |
+| --- | --- |
+| `public/` | 原生 HTML/CSS/JavaScript UI 与视觉资源 |
+| `src/` | 领域契约、资料处理及 Provider adapters |
+| `data/` | 公开 schema/契约和合成范例；运行数据库与原件被忽略 |
+| `tests/` | 合成回归；真实私有 fixture 不发布 |
+| `scripts/` | 验证、运行和开发工具 |
+| `docs/` | 当前规范与保留的设计记录 |
+
+[贡献指南](CONTRIBUTING.md) · [安全边界](SECURITY.md) · [发布记录](CHANGELOG.md) · [MIT License](LICENSE)
+
+这是早期预览版。模型回答需要审阅，测试不保证所有真实材料都能正确理解。公开 GitHub 项目不等于公网 Web 应用已经部署；网站可以直接链接到此仓库，公开 HTTPS 的本机网络授权路径仍需部署后验收。历史开发记录按维护者决定保留，其中旧本机路径是历史定位信息，不是启动依赖或凭据。
+
+<details>
+<summary>历史开发说明（原记录保留，当前入口以上文为准）</summary>
+
 # AI Job Radar
 
 ## Ariadne 项目入口
@@ -244,3 +299,5 @@ python3 src/validate_model_output.py <contract.json> <model_output.json>
 ```
 
 例如 `invalid_model_output.json` 故意包含 user-owned `application_status`、擅自 `approved` 和无证据 claim，validator 会拒绝并返回 `do_not_persist`。`compliant_model_output.json` 的 `contract_valid: true` 仅表示结构/边界检查通过，仍只返回 `await_human_review`，不会自动写入。`misleading_but_valid_model_output.json` 也能通过 contract 检查，却误把“一年以上工作经验”总结为“三年经验”，用于说明 human review 仍不可省略。
+
+</details>

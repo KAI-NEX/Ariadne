@@ -1,5 +1,13 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-09 — v0.1.0 MIT 开源发布候选（VALIDATED）
+
+- 用户选择 MIT，并明确公开现有 KAI-NEX/Ariadne 仓库、保留已核验历史。整理 README 当前入口、许可、安全/贡献指南、CHANGELOG、公开文件门禁和固定版本 GitHub CI；历史开发记录及原件原地保留，不将本机凭据、运行数据或私人材料加入发布。
+- 全历史 Gitleaks 与补充 blob/commit metadata 检查未发现有效凭据；两条告警是历史 Figma file key，按完整指纹精确排除。所有模式的本机 HTTP 增加 Host/Origin/跨站请求隔离，并禁止目录列表和越界 symlink；配对连接器的 GET 明确经过授权，HEAD 拒绝。
+- 修复干净克隆依赖未发布私有 JD seed 的启动问题；legacy review 回归改用临时合成数据库。78/78 回归、VI 与 diff 检查通过。完整检查范围和限制见 [发布安全检查](docs/current/PUBLIC_RELEASE_SECURITY_AUDIT.md)；GitHub 公开/Release 结果以随后实际发布记录为准。
+- 用户确认模型选择背景的当前保存参数就是预设。读取目标浏览器的指定背景设置键并核对代码，九项值完全一致；本次仅记录基准，不改变效果，后续调整/恢复沿用该组值。见 [VI 预设记录](docs/current/ARIADNE_VI_SYSTEM.md)。
+- 证据及审计工具保留 `.cache/open-source-20260909/`，不提交凭据、扫描临时原件或日志；其他并行未完成的安装器/启动器工作不混入本候选。
+
 ## 2026-09-09 — 介绍字标顶底对齐与本地存储说明（COMPLETE）
 
 - 第二页 Ariadne 介绍弹窗改以英文和中文的实际字形边界对齐：共用基线，按当前字体测得的高度调整「衡」字号与垂直位置，不拉伸字形。字体完成加载、回退或视口变化后重算；返回动画从英文文字本身起步。工作空间资源版本与 VI 规则同步更新。

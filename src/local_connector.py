@@ -106,7 +106,11 @@ def connector_handler(base_handler):
 
         def do_GET(self):
             if self.boundary():
+                self.connector_authorized = True
                 super().do_GET()
+
+        def do_HEAD(self):
+            self.boundary()  # HEAD is outside the connector allowlist.
 
         def runtime_options(self):
             # Paired web clients may select Codex only. The local application's
