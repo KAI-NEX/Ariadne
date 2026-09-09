@@ -1,5 +1,10 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-09 — 职位概况页面术语中文化（COMPLETE）
+
+- 「了解职位概况」的界面文案统一将 JD 写为「职位描述」，覆盖按钮、快捷问题、传输确认、范围/空态说明与失败提示；路由标识、原始资料和已有对话不改写。
+- egolite 确认页面可见文案没有 JD、首个快捷按钮正确填入中文问题，390 px 窄屏无横向溢出；已有职位概况回归、JS 语法、VI 及 diff 检查通过，未发送模型请求。仅提交本项页面文案与记录，其他工作区改动保留。
+
 ## 2026-09-09 — v0.1.0 MIT 公开发布（PUBLISHED）
 
 - 现有 [KAI-NEX/Ariadne](https://github.com/KAI-NEX/Ariadne) 已公开，MIT 许可已由 GitHub 识别，匿名访问验证通过；保留已核验 Git 历史。[v0.1.0 开源预览版](https://github.com/KAI-NEX/Ariadne/releases/tag/v0.1.0) 对应 `005b387`，本地 annotated tag 与远端同步。

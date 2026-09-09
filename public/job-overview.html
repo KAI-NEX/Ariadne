@@ -14,25 +14,25 @@
   <header class="v1-topbar">
     <a class="v1-back" href="/jd.html" aria-label="返回职位描述"></a>
     <p class="v1-detail-breadcrumb">职位描述 / 职位概况</p>
-    <a class="personal-add-link" href="/jd-import.html"><span class="vi-icon" data-icon="plus" aria-hidden="true"></span> 添加 JD</a>
+    <a class="personal-add-link" href="/jd-import.html"><span class="vi-icon" data-icon="plus" aria-hidden="true"></span> 添加职位描述</a>
   </header>
   <div class="vi-grid job-overview-layout">
     <section class="vi-span-6 personal-knowledge" aria-labelledby="job-overview-heading">
       <div class="personal-heading-row"><div><p class="v1-section-label">先理解职位本身</p><h1 id="job-overview-heading">了解职位概况</h1></div><button id="refresh-job-overview" class="v1-secondary-button" type="button">更新概况</button></div>
-      <p class="personal-meta">汇总你添加的 JD，梳理职责、要求、共同点与差异。这里专注职位；你的项目与经历在个人理解中讨论。</p>
+      <p class="personal-meta">汇总你添加的职位描述，梳理职责、要求、共同点与差异。这里专注职位；你的项目与经历在个人理解中讨论。</p>
       <p id="job-overview-state" class="personal-meta" aria-live="polite">正在读取职位…</p>
       <a class="job-overview-jump" href="#job-overview-dialogue-heading">开始跨职位对话 <span class="vi-icon" data-icon="arrow-down" aria-hidden="true"></span></a>
       <p id="job-overview-summary" class="personal-overview"></p>
       <div id="job-overview-insights"></div>
       <div id="job-overview-unknowns"></div>
-      <details class="personal-history"><summary>查看本次范围内的全部 JD</summary><div id="job-overview-directory"></div></details>
+      <details class="personal-history"><summary>查看本次范围内的全部职位描述</summary><div id="job-overview-directory"></div></details>
     </section>
     <section class="vi-span-6 personal-dialogue v1-conversation-pane" aria-labelledby="job-overview-dialogue-heading">
       <div class="personal-heading-row"><h2 id="job-overview-dialogue-heading">了解职位概况</h2><span id="job-overview-runtime" class="personal-meta"></span></div>
-      <p class="personal-meta">可以对比多个 JD、讨论岗位类型与要求差异。概况和讨论不会改写原 JD，也不会读取或修改个人资料。</p>
+      <p class="personal-meta">可以对比多个职位描述、讨论岗位类型与要求差异。概况和讨论不会改写原职位描述，也不会读取或修改个人资料。</p>
       <div class="personal-prompts" aria-label="开始讨论">
-        <button type="button" data-job-overview-prompt="请总结我添加的全部 JD，分别说明它们是什么类型的岗位。">总结全部 JD</button>
-        <button type="button" data-job-overview-prompt="这些 JD 有哪些共同要求和重要差异？请注明各自的来源。">共性与差异</button>
+        <button type="button" data-job-overview-prompt="请总结我添加的全部职位描述，分别说明它们是什么类型的岗位。">总结全部职位描述</button>
+        <button type="button" data-job-overview-prompt="这些职位描述有哪些共同要求和重要差异？请注明各自的来源。">共性与差异</button>
         <button type="button" data-job-overview-prompt="哪些职位要求或团队背景还不明确，需要向招聘方进一步确认？">需要确认什么</button>
       </div>
       <button id="job-overview-older" class="personal-text-button hidden" type="button">查看更早对话</button>
