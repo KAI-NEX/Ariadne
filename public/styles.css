@@ -710,9 +710,9 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-structured-pane { background: var(--vi-surface); padding: clamp(30px, 4vw, 64px); }
 .v1-detail-meta-row { align-items: center; display: flex; gap: 16px; justify-content: space-between; }
 .v1-detail-chips { align-items: center; display: flex; gap: 8px; }
-.v1-detail-edit-button { background: var(--vi-action); border: 1px solid var(--vi-action); border-radius: 12px; color: var(--vi-surface); font-size: 12px; font-weight: 650; min-height: 36px; padding: 8px 15px; transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, opacity 180ms ease, transform 180ms var(--vi-ease-standard); }
-.v1-detail-edit-button:hover, .v1-detail-edit-button:focus-visible { background: var(--vi-action-hover); border-color: var(--vi-action-hover); box-shadow: 0 5px 14px rgba(32,35,42,.18); outline: 0; }
-.v1-detail-edit-button:active { box-shadow: none; transform: translateY(1px) scale(.98); }
+.v1-detail-edit-button { background: transparent; border: 0; border-radius: 0; box-shadow: none; color: var(--vi-ink); font-size: 12px; font-weight: 650; min-height: 36px; padding: 8px 15px; transition: opacity 180ms ease; }
+.v1-detail-edit-button:hover, .v1-detail-edit-button:focus-visible { background: transparent; border: 0; box-shadow: none; text-decoration: underline; text-underline-offset: 4px; }
+.v1-detail-edit-button:active { box-shadow: none; transform: none; }
 .v1-detail-actions { display: inline-flex; gap: 8px; }
 .v1-detail-remove-button { background: transparent; border-color: transparent; color: var(--vi-danger); transition: opacity 180ms ease; }
 .v1-detail-remove-button:hover, .v1-detail-remove-button:focus-visible { background: transparent; border-color: transparent; box-shadow: none; }
@@ -828,9 +828,9 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-detail-overlay-close::before { background: currentColor; content: ""; height: 24px; mask: url("/vi/icons/close.svg") center / 24px 24px no-repeat; width: 24px; -webkit-mask: url("/vi/icons/close.svg") center / 24px 24px no-repeat; }
 .v1-detail-overlay-close:hover, .v1-sheet-close:hover { scale: 1.04; transform: none; }
 .v1-detail-overlay-close:active, .v1-sheet-close:active { scale: .985; transform: none; }
-.v1-detail-overlay-edit { background: transparent; border: 0; color: var(--vi-surface); font-size: 10px; font-weight: 600; height: 36px; isolation: isolate; justify-self: end; min-width: 56px; padding: 0 11px; position: relative; white-space: nowrap; }
-.v1-detail-overlay-edit::before { background: var(--vi-action); border: 1px solid var(--vi-action); border-radius: var(--vi-radius-surface); corner-shape: squircle; content: ""; inset: 2px 3px; position: absolute; transition: background-color 180ms ease, border-color 180ms ease; z-index: -1; }
-.v1-detail-overlay-edit:hover::before, .v1-detail-overlay-edit:focus-visible::before { background: var(--vi-action-hover); border-color: var(--vi-action-hover); }
+.v1-detail-overlay-edit { background: transparent; border: 0; border-radius: 0; box-shadow: none; color: var(--vi-ink); font-size: 10px; font-weight: 600; height: 36px; isolation: isolate; justify-self: end; min-width: 56px; padding: 0 11px; position: relative; white-space: nowrap; }
+.v1-detail-overlay-edit::before { content: none; }
+.v1-detail-overlay-edit:hover, .v1-detail-overlay-edit:focus-visible { background: transparent; border: 0; box-shadow: none; text-decoration: underline; text-underline-offset: 4px; }
 .v1-embedded-detail .v1-detail-actions { display: none; }
 .v1-delete-popover { inset: 0; opacity: 0; pointer-events: none; position: fixed; transition: opacity 180ms ease; z-index: 1300; }
 .v1-delete-popover.is-open { opacity: 1; pointer-events: auto; }

@@ -25,7 +25,7 @@ for (const detail of [candidateDetail, jobDetail]) {
   assert.doesNotMatch(detail, /id="(?:candidate|job)-delete-first"|id="(?:candidate|job)-delete-scope"|要从个人资料中移除内容吗？|要从职位描述中移除内容吗？/);
   assert.match(detail, /class="v1-edit-text-action v1-detail-remove-button"/);
 }
-assert.match(styles, /\.v1-detail-edit-button \{ background: #20232a;[^}]*color: #fff/);
+assert.match(styles, /\.v1-detail-edit-button \{ background: transparent; border: 0;[^}]*color: #1f222a/);
 assert.match(styles, /\.v1-detail-remove-button \{ background: transparent;[^}]*border-color: transparent[^}]*color: #bd2f2a/);
 assert.doesNotMatch(styles, /\.v1-detail-remove-button \{[^}]*border-radius|\.v1-detail-remove-button \{[^}]*font-size|\.v1-detail-remove-button \{[^}]*min-height|\.v1-detail-remove-button \{[^}]*padding/);
 assert.match(styles, /\.v1-button-row\.v1-edit-actions \{[^}]*justify-content: space-between/);
@@ -41,7 +41,7 @@ assert.match(styles, /\.v1-delete-popover-option\.destructive \{[^}]*color: #bd2
 assert.match(styles, /\.v1-delete-popover-option\.cancel \{[^}]*color: #737b8c/);
 assert.match(styles, /\.v1-detail-overlay-content > header \{[^}]*grid-template-columns: minmax\(0, 1fr\) auto minmax\(0, 1fr\)/);
 assert.match(styles, /\.v1-detail-overlay-edit \{[^}]*background: transparent[^}]*font-size: 10px[^}]*height: 36px[^}]*min-width: 56px[^}]*white-space: nowrap/);
-assert.match(styles, /\.v1-detail-overlay-edit::before \{[^}]*background: #20232a[^}]*border-radius: 20px[^}]*corner-shape: squircle[^}]*inset: 2px 3px/);
+assert.match(styles, /\.v1-detail-overlay-edit::before \{ content: none; \}/);
 assert.match(styles, /\.v1-embedded-detail \.v1-structured-pane \{[^}]*padding:[^}]*max\(28px, env\(safe-area-inset-bottom\)\)/);
 assert.match(styles, /\.v1-edit-form textarea \{[^}]*resize: none/);
 assert.match(styles, /\.v1-detail-state-panel\.is-active/);
