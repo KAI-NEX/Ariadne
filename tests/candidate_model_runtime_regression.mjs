@@ -310,7 +310,7 @@ assert.match(html, /id="candidate-card-unsaved-discard"[^>]*>否</);
 assert.match(html, /id="candidate-understanding-events"/);
 assert.match(html, /id="candidate-clarification-list"/);
 assert.match(html, /id="candidate-workspace-composer"/);
-assert.match(html, /placeholder="告诉 Ariadne 哪里需要调整"/);
+assert.match(html, /placeholder="直接说想了解什么，或哪里需要修改"/);
 assert.doesNotMatch(html, /SYSTEM|grounding|source-scoped|非权威 Working Cards/);
 assert.match(modelWorkspaceUi, /data-entry-type="EXECUTION_EVENT"/);
 assert.match(pages, /ModelWorkspaceUI\.renderProgress\(byId\("candidate-understanding-events"\)/);

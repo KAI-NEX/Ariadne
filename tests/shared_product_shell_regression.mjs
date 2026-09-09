@@ -16,6 +16,10 @@ const jobImport = read("public/jd-import.html");
 const candidateDetail = read("public/candidate-detail.html");
 const jobDetail = read("public/job-detail.html");
 
+assert.match(candidateImport, /placeholder="直接说想了解什么，或哪里需要修改"/);
+assert.match(candidateDetail, /placeholder="询问这份材料，或直接说明要修改什么"/);
+assert.match(pages, /修改先保留在草稿，核对后由你保存/);
+
 assert.equal(ProductShell.CONTRACT.import.root, "v1-import-shell");
 assert.equal(ProductShell.CONTRACT.workspace.layer, "v1-workspace-layer");
 assert.equal(ProductShell.CONTRACT.workspace.content_pane, "v1-workspace-content-pane");

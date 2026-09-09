@@ -1,5 +1,11 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-09 — 对话使用引导与 GitHub 同步准备（COMPLETE）
+
+- 优化 Candidate 导入工作区、详情对话的输入提示和空态说明，明确可直接提问或要求修改、结合上文说明范围、草稿核对后人工保存；复用既有组件，不新增关键词判断或改变模型/写入权限。
+- README 补充自然语言操作示例及真实能力边界，CHANGELOG 区分 main 分支更新与既有 v0.1.0 Release；用户本次授权推送 GitHub，不包含公网部署、私人资料或独立 App 打包的未提交工作。
+- 80 项离线 suite 执行后 79 项通过，唯一失败为旧 placeholder 文案断言；同步断言后该 suite 与共享界面 suite 重跑通过。VI、公开文件检查、Git 全历史 Gitleaks 及 diff 检查通过。egolite 核对实际服务的新提示与工作空间导航；本轮未调用真实模型，不将文案优化称为新增语义能力验收。
+
 ## 2026-09-09 — 通用对话语义与执行链补齐（COMPLETE）
 
 - 从架构分离人类意图理解、领域能力目录、类型化修改和真实执行回执。Candidate/Job/个人理解/职位概况共用意图原则，但各自保留上下文与写入权限；不更换 Provider/model。架构、使用方式及限制见 [对话语义与执行](docs/current/CONVERSATION_SEMANTIC_EXECUTION.md)。

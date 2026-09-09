@@ -1196,7 +1196,7 @@
   function renderCandidateWorkspaceConversation() {
     const target = byId("candidate-workspace-conversation");
     if (!target) return;
-    ConversationUI.renderMessages(target, candidateWorkspaceConversation, { empty_text: "你可以告诉 Ariadne 哪些内容需要调整。", text_for: (message) => ConversationUI.humanSafeText(message.text ?? message.content) });
+    ConversationUI.renderMessages(target, candidateWorkspaceConversation, { empty_text: "可以讨论资料，也可以直接要求修改。支持结合上文说明范围与例外；修改先保留在草稿，核对后由你保存。", text_for: (message) => ConversationUI.humanSafeText(message.text ?? message.content) });
     window.AriadnePersonalMemoryBridge?.attachActions(target, candidateWorkspaceConversation, { type: "CANDIDATE", conversation_id: activeCandidateConversationSession?.conversation_id || null });
   }
 
