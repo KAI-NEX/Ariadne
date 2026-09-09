@@ -13,7 +13,7 @@ from typing import Any
 
 
 CONTRACT_ID = "job-radar-candidate-context-v2-step1"
-PROMPT_VERSION = "candidate_workspace_v1_auto_material"
+PROMPT_VERSION = "candidate_workspace_v2_item_types"
 ITEM_TYPES = {"WORK_EXPERIENCE", "PROJECT", "EDUCATION", "OTHER"}
 SUPPORT_RELATIONS = {"EXPLICIT_SOURCE", "AI_DERIVED"}
 REVIEW_STATUS = "NEEDS_REVIEW"
@@ -49,6 +49,8 @@ Output rules:
 - Do not repeat filename, provider, model, or source metadata. source_document_id appears only inside source_refs.
 - Return only source-supported items. Never invent an item to avoid an empty result.
 - Infer material_type as exactly one of resume, portfolio, project, or other.
+- For item_type use exactly one of __ITEM_TYPES__ (case-sensitive). These are card types, not material_type values.
+- Use PROJECT for a coherent project, EDUCATION for education, WORK_EXPERIENCE for employment, and OTHER only for other supported material. Do not invent alternative type names or copy the example's employment type onto every item.
 - Resume extracts supported work, project, and education items; portfolio emphasizes distinct cases; project keeps coherent projects; other stays conservative and preserves ambiguity.
 
 Use exactly this shape:
@@ -69,7 +71,7 @@ Use exactly this shape:
   ]
 }}
 
-Replace SOURCE_DOCUMENT_ID with the supplied ID. Use EXPLICIT_SOURCE for direct evidence and AI_DERIVED only for a concise marked interpretation. Every item needs at least one short source_ref. For affects use only fact, ownership, outcome, or matching use; use status OPEN for unresolved questions. Use an empty uncertainties array when none exist. If nothing is supported, still return the inferred material_type with an empty items array."""
+Replace SOURCE_DOCUMENT_ID with the supplied ID. Use EXPLICIT_SOURCE for direct evidence and AI_DERIVED only for a concise marked interpretation. Every item needs at least one short source_ref. For affects use only fact, ownership, outcome, or matching use; use status OPEN for unresolved questions. Use an empty uncertainties array when none exist. If nothing is supported, still return the inferred material_type with an empty items array.""".replace("__ITEM_TYPES__", json.dumps(sorted(ITEM_TYPES)))
 
 
 def build_deepseek_candidate_proposal_payload(

@@ -1,5 +1,13 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-09 — 项目材料卡片类型契约与 Chrome 导入验收（COMPLETE）
+
+- 用户指定项目 PDF 的两次真实 Codex 返回均被 `invalid_item_type` 拒绝，未保存失败提案。检查发现提示只示范 WORK_EXPERIENCE，没有列出验证器完整类型；现由同一 ITEM_TYPES 权威生成枚举，明确 PROJECT/EDUCATION/WORK_EXPERIENCE/OTHER 的用途，仍拒绝未知类型，不自动改写模型输出或放宽来源与事实校验。
+- 前后端 prompt 同步升级至 `candidate_workspace_v2_item_types`，旧请求在传输前被拒绝；补充四类合法输出、非法类型拒绝、提示枚举/前端版本一致性及旧快照零 Provider 调用回归。7 项相关 Python/Node suite、VI 和 diff 检查通过。
+- 经用户明确授权发送与保存，在用户实际 Chrome 的 `127.0.0.1:8000` 工作区完成两份项目 PDF 的真实 Codex 分析、逐卡核对、编辑与保存；刷新后两张新增项目卡片可见，原有三张演示卡片未修改。保存内容区分个人贡献和 AI 实现分工，不据项目技术栈推定独立开发能力。
+- 原文、整理稿、两份嵌入中文字体的 PDF 与逐页渲染保留在本机忽略目录 `.cache/personal-project-sync-20260909/`；未纳入公开仓库。Chrome 浏览器连接超时后改用原生窗口操作，没有启用 Apple Events JavaScript 或改变浏览器权限；未迁移整个浏览器资料库。Markdown 模型导入尚未接通，本次完整转 PDF 后使用原有视觉路径，不扩展文件能力。
+
+
 ## 2026-09-09 — 职位概况页面术语中文化（COMPLETE）
 
 - 「了解职位概况」的界面文案统一将 JD 写为「职位描述」，覆盖按钮、快捷问题、传输确认、范围/空态说明与失败提示；路由标识、原始资料和已有对话不改写。

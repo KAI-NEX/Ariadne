@@ -225,6 +225,7 @@ class CandidateModelRuntimeRegression(unittest.TestCase):
         for mutate, code in [
             (lambda payload: payload.__setitem__("consent", None), "candidate_model_consent_required"),
             (lambda payload: payload["source_document"].__setitem__("content_hash", "sha256:" + "0" * 64), "raw_source_integrity_mismatch"),
+            (lambda payload: payload["runtime_snapshot"].__setitem__("prompt_version", "candidate_workspace_v1_auto_material"), "candidate_model_runtime_not_eligible"),
         ]:
             payload = request()
             mutate(payload)

@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import unittest
 
 from src.candidate_context import (
     CandidateProposalError,
+    ITEM_TYPES,
+    PROMPT_VERSION,
     build_deepseek_candidate_proposal_payload,
     candidate_proposal_instruction,
     extract_deepseek_candidate_proposal,
@@ -26,6 +29,27 @@ VALID_ITEM = {
 
 
 class CandidateContextProviderRegression(unittest.TestCase):
+    def test_prompt_card_types_match_validation_authority(self) -> None:
+        prompt = candidate_proposal_instruction()
+        self.assertIn(json.dumps(sorted(ITEM_TYPES)), prompt)
+        self.assertIn("Use PROJECT for a coherent project", prompt)
+        frontend = (Path(__file__).resolve().parents[1] / "public/candidate-model-runtime-domain.js").read_text()
+        self.assertIn(f'const PROMPT_VERSION = "{PROMPT_VERSION}"', frontend)
+
+    def test_all_valid_card_types_remain_review_only(self) -> None:
+        for item_type in ITEM_TYPES:
+            with self.subTest(item_type=item_type):
+                item = {**VALID_ITEM, "item_type": item_type}
+                proposal = extract_deepseek_candidate_proposal(self.response(json.dumps({"material_type": "project", "items": [item]})), SOURCE_ID, "run-1", "model")
+                self.assertEqual(proposal["items"][0]["item_type"], item_type)
+                self.assertEqual(proposal["review_status"], "NEEDS_REVIEW")
+
+    def test_invalid_project_type_is_not_silently_rewritten(self) -> None:
+        for item_type in ("project", "PROJECT_EXPERIENCE", "PROFILE", "SKILL"):
+            with self.subTest(item_type=item_type), self.assertRaisesRegex(CandidateProposalError, "invalid_item_type"):
+                item = {**VALID_ITEM, "item_type": item_type}
+                extract_deepseek_candidate_proposal(self.response(json.dumps({"material_type": "project", "items": [item]})), SOURCE_ID, "run-1", "model")
+
     def response(self, content: str) -> dict:
         return {"id": "response-1", "usage": {"prompt_tokens": 123, "completion_tokens": 45}, "choices": [{"message": {"content": content}}]}
 
