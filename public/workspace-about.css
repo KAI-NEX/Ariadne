@@ -3,7 +3,6 @@
 .v1-about-copy h1 span { font-size: 1em; font-weight: inherit; letter-spacing: 0; margin-left: 14px; }
 .v1-about-copy p { color: #626978; font-size: 14px; line-height: 1.85; margin: 16px 0 0; }
 .v1-about-copy .v1-about-intro { color: var(--ink); font-size: 20px; margin-top: 0; }
-.v1-about-copy .v1-about-principle { border-top: 1px solid var(--line); font-size: 13px; margin-top: 24px; padding-top: 18px; }
 .v1-detail-overlay.is-about .v1-detail-overlay-preview { container-type: inline-size; display: grid; place-items: center; }
 .v1-detail-overlay.is-about .v1-detail-overlay-preview .v1-wordmark { font-size: clamp(12px, 8cqw, 44px); font-weight: 550; grid-column: 1; letter-spacing: -.06em; }
 .v1-detail-overlay.is-about .v1-detail-overlay-content > header .v1-back { justify-self: start; }
