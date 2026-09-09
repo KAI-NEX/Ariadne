@@ -1,5 +1,13 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-09 — Ariadne · 衡 产品介绍页（COMPLETE）
+
+- 文件夹选择页（Workspace）顶部 Ariadne 字标链接至 `about.html`。新增独立介绍页及作用域 CSS，延续既有字体、浅灰背景与深色按钮；包含中文品牌名「衡」、英文名典故、产品用途、三项现有能力、资料与保存边界、可展开 FAQ、本地启动说明和返回应用入口。
+- 用户澄清“可登录”指能正常打开并进入应用，本次不新增账号系统。中文名是「衡」，不是音译；页面以“衡量、分寸、判断与取舍”表述本次用户提供的文化方向，不冒称已找回历史讨论原话。稳定命名已补入 PROJECT_CONTEXT。
+- 下载区域标注“后续开放”，没有安装包、假下载按钮或发布承诺。提供已有源码项目在 Codex/终端打开、`python3 app.py` 启动、通过 localhost 使用的步骤，并说明当前 macOS 文档处理条件。
+- 验证：既有 `step_02_03_ui_framework_regression.mjs` 通过。egolite 验证 Workspace 字标跳转与正文；截图接口技术超时后，使用已安装 Chrome/Playwright 完成 1280×900、390×900 截图审阅，修复共用旧 `main` 样式造成的窄内容区。复验标题、FAQ 展开/收起、页内锚点、5 个本地目标 HTTP 200、返回文件夹页面通过；无横向溢出、无 pageerror。证据保存在忽略目录 `.cache/about-page-20260909/`。
+- 仅提交介绍页、字标链接及本条记录/命名约定；其他任务正在进行的个人理解、领域、存储和共享界面改动保留，不纳入本阶段提交。未进行真实 Provider 请求或发布部署。
+
 ## 2026-09-09 — 个人理解架构审计与快照移除一致性修复（本阶段 COMPLETE）
 
 - 完成 [个人理解与 Candidate × Job 审计](docs/current/ARIADNE_PERSONAL_UNDERSTANDING_AUDIT.md)：JD 每轮实际接入跨资料最新个人快照；Candidate 详情仍限定当前卡片，来源工作区限定当前来源；尚无跨来源长期个人模型及 JD 新信息经提案保存回 Candidate 的闭环。不能宣称项目已实现“越聊越了解整个人”。
