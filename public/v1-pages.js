@@ -1334,8 +1334,21 @@
     byId("candidate-workspace-save-status").textContent = wasDisabled ? "这版候选人信息已保存。" : "";
   }
 
+  function requireCandidateWorkspaceTitle() {
+    const titleInput = byId("candidate-working-edit-title");
+    if (titleInput.value.trim()) {
+      titleInput.removeAttribute("aria-invalid");
+      return true;
+    }
+    titleInput.setAttribute("aria-invalid", "true");
+    const dialog = byId("candidate-card-title-required-dialog");
+    if (!dialog.open) dialog.showModal();
+    return false;
+  }
+
   async function persistCandidateWorkspaceEdit() {
     if (byId("candidate-card-edit-form").classList.contains("hidden")) return activeCandidateWorkingModel;
+    if (!requireCandidateWorkspaceTitle()) return null;
     const next = await CandidateModel.editedCandidateWorkingModel(activeCandidateWorkingModel, activeCandidateWorkspaceItemId, {
       title: byId("candidate-working-edit-title").value,
       category: byId("candidate-working-edit-category").value,
@@ -1590,6 +1603,7 @@
     const editOpen = !byId("candidate-card-edit-form").classList.contains("hidden");
     if (!editOpen) return returnToCandidateCardList();
     if (!candidateWorkspaceEditDirty) return cancelCandidateWorkspaceEdit();
+    if (!requireCandidateWorkspaceTitle()) return undefined;
     const dialog = byId("candidate-card-unsaved-dialog");
     if (!dialog.open) dialog.showModal();
     return undefined;
@@ -1610,6 +1624,7 @@
   function requestCandidateWorkspaceExit(destination) {
     const editOpen = !byId("candidate-card-edit-form").classList.contains("hidden");
     if (!editOpen || !candidateWorkspaceEditDirty) return closeCandidateWorkspaceLayer(destination);
+    if (!requireCandidateWorkspaceTitle()) return undefined;
     candidateWorkspaceExitIntent = destination;
     const dialog = byId("candidate-workspace-close-dialog");
     if (!dialog.open) dialog.showModal();
@@ -2389,7 +2404,10 @@
     });
     byId("candidate-card-back").addEventListener("click", requestCandidateCardBack);
     byId("candidate-card-edit").addEventListener("click", enterCandidateWorkspaceEdit);
-    byId("candidate-card-edit-form").addEventListener("input", () => { candidateWorkspaceEditDirty = true; });
+    byId("candidate-card-edit-form").addEventListener("input", (event) => {
+      candidateWorkspaceEditDirty = true;
+      if (event.target === byId("candidate-working-edit-title") && event.target.value.trim()) event.target.removeAttribute("aria-invalid");
+    });
     byId("candidate-working-cancel-edit").addEventListener("click", cancelCandidateWorkspaceEdit);
     byId("candidate-card-edit-form").addEventListener("submit", (event) => {
       event.preventDefault();
@@ -2397,11 +2415,16 @@
     });
     byId("candidate-card-unsaved-dialog").addEventListener("cancel", (event) => { event.preventDefault(); byId("candidate-card-unsaved-dialog").close(); });
     byId("candidate-card-unsaved-save").addEventListener("click", () => {
-      persistCandidateWorkspaceEdit().then(() => byId("candidate-card-unsaved-dialog").close()).catch(showPersonalError);
+      persistCandidateWorkspaceEdit().then((saved) => { if (saved) byId("candidate-card-unsaved-dialog").close(); }).catch(showPersonalError);
     });
     byId("candidate-card-unsaved-discard").addEventListener("click", () => {
       byId("candidate-card-unsaved-dialog").close();
       cancelCandidateWorkspaceEdit();
+    });
+    byId("candidate-card-title-required-dialog").addEventListener("cancel", (event) => event.preventDefault());
+    byId("candidate-card-title-required-confirm").addEventListener("click", () => {
+      byId("candidate-card-title-required-dialog").close();
+      byId("candidate-working-edit-title").focus();
     });
     byId("candidate-workspace-composer").addEventListener("submit", (event) => {
       event.preventDefault();
@@ -2418,7 +2441,8 @@
       closeCandidateWorkspaceLayer(candidateWorkspaceExitIntent || "import");
     });
     byId("candidate-workspace-save-draft-close").addEventListener("click", () => {
-      persistCandidateWorkspaceEdit().then(() => {
+      persistCandidateWorkspaceEdit().then((saved) => {
+        if (!saved) return;
         byId("candidate-workspace-close-dialog").close();
         closeCandidateWorkspaceLayer(candidateWorkspaceExitIntent || "import");
       }).catch(showPersonalError);
