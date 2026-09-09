@@ -3,9 +3,10 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Ariadne · 个人理解</title>
+    <title>Ariadne · 了解我</title>
     <link rel="stylesheet" href="/styles.css?v=personal-understanding-v1&amp;vi=1">
     <link rel="stylesheet" href="/personal-understanding.css">
+    <link rel="stylesheet" href="/understanding-chat.css?v=1">
   </head>
   <body class="v1-body" data-v1-page="personal-understanding">
     <main class="v1-page-shell personal-understanding-shell">
@@ -30,7 +31,7 @@
           <details class="personal-history"><summary>查看补充的历史版本</summary><div id="memory-history"></div></details>
         </section>
         <section class="personal-dialogue v1-conversation-pane" aria-labelledby="personal-dialogue-heading">
-          <div class="personal-heading-row"><h2 id="personal-dialogue-heading">聊聊你的经历与方向</h2><span id="personal-runtime" class="personal-meta"></span></div>
+          <div class="personal-heading-row"><h2 id="personal-dialogue-heading">了解我</h2><span id="personal-runtime" class="personal-meta"></span></div>
           <p class="personal-meta">可以跨资料讨论，也可以随时补充。需要记住的信息会先放到下方，由你确认保存。</p>
           <div id="personal-origin" class="personal-origin hidden"></div>
           <div class="personal-prompts" aria-label="开始讨论">
@@ -44,7 +45,7 @@
           <div id="personal-processing" class="v1-conversation-status hidden" aria-live="polite"></div>
           <form id="personal-conversation-form" class="v1-conversation-form">
             <label class="sr-only" for="personal-message">讨论经历或补充个人信息</label>
-            <div class="v1-composer-field"><textarea id="personal-message" maxlength="6000" placeholder="告诉我一个新的经历，或者纠正我对你的理解…"></textarea></div>
+            <div class="v1-composer-field"><textarea id="personal-message" maxlength="6000" placeholder="聊聊你的经历…"></textarea></div>
             <button type="submit" aria-label="发送"></button>
           </form>
           <label class="personal-consent"><input id="personal-model-consent" type="checkbox"><span id="personal-consent-copy">允许将本次问题及相关个人资料发送给当前模型；更新理解可能分批处理资料并产生 API 费用。</span></label>

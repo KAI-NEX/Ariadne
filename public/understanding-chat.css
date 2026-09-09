@@ -1,0 +1,74 @@
+/* Library title entries share the Workspace wordmark; chat titles keep UI type. */
+.v1-library-topbar:has(.understanding-title-entry) {
+  grid-template-columns: minmax(36px, 1fr) auto minmax(36px, 1fr);
+}
+.understanding-title-entry {
+  grid-column: 2;
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-align: center;
+}
+.understanding-title-entry:hover { color: var(--vi-text-secondary); }
+.understanding-title-entry:focus-visible {
+  outline: 2px solid var(--vi-focus);
+  outline-offset: 4px;
+}
+
+/* Keep the existing domain render targets available without duplicating cards. */
+.personal-understanding-shell .personal-knowledge,
+.personal-understanding-shell .v1-detail-breadcrumb,
+.personal-understanding-shell .personal-add-link,
+.personal-dialogue > .personal-meta,
+.personal-dialogue > .personal-heading-row > .personal-meta,
+.personal-dialogue .v1-conversation-empty,
+.personal-dialogue > .job-overview-scope-link {
+  display: none;
+}
+
+.personal-understanding-shell :is(.personal-understanding-layout, .job-overview-layout) {
+  display: block;
+  max-width: 800px;
+  margin: var(--vi-space-24) auto 0;
+}
+.personal-understanding-shell .personal-dialogue.v1-conversation-pane {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  min-height: min(640px, calc(100dvh - 192px));
+}
+.personal-understanding-shell .personal-dialogue > .personal-heading-row {
+  display: block;
+}
+.personal-dialogue .personal-heading-row h2 {
+  font-family: var(--vi-font-ui);
+  font-size: 18px;
+  letter-spacing: normal;
+  margin: 0;
+}
+.personal-understanding-shell .personal-dialogue .v1-conversation-thread {
+  flex: 1;
+  min-height: 180px;
+  max-height: 52dvh;
+  padding: 0;
+}
+.personal-dialogue .personal-prompts { margin: var(--vi-space-24) 0; }
+.personal-dialogue .personal-consent {
+  color: var(--vi-text-secondary);
+  font-size: var(--vi-text-caption);
+  font-weight: 400;
+}
+.personal-dialogue .personal-consent input { flex: none; width: auto; }
+.personal-dialogue .v1-inline-message:empty { display: none; }
+
+@media (max-width: 760px) {
+  .v1-library-topbar:has(.understanding-title-entry) { gap: var(--vi-space-8); }
+  .personal-understanding-shell :is(.personal-understanding-layout, .job-overview-layout) {
+    margin-top: var(--vi-space-16);
+  }
+  .personal-understanding-shell .personal-dialogue.v1-conversation-pane {
+    min-height: calc(100dvh - 192px);
+  }
+  .personal-dialogue .personal-prompts { gap: var(--vi-space-8); }
+}
