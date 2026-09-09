@@ -993,6 +993,10 @@
     window.requestAnimationFrame(playPendingCardReturn);
   }
 
+  function cardSubtitleText(...values) {
+    return values.map((value) => String(value ?? "").trim()).filter(Boolean).join(" ");
+  }
+
   function candidateCardMarkup(item) {
     const facts = (item.facts || []).slice(0, 4).map((fact) => `<li>${escapeHtml(fact.value)}</li>`).join("");
     const canonical = item.data_class === "CANONICAL_CONFIRMED";
@@ -1000,7 +1004,7 @@
     const stateBadge = canonical ? "" : '<span class="v1-review-chip">待审核 · 演示</span>';
     return `<a class="v1-candidate-card" data-transition-key="candidate:${escapeHtml(item.item_id)}" href="${href}">
       <div class="v1-card-top"><span class="v1-type-chip">${escapeHtml(candidateTypeLabel(item))}</span>${stateBadge}</div>
-      <h3>${escapeHtml(item.title)}</h3><p class="v1-card-subtitle">${escapeHtml(item.subtitle)} · ${escapeHtml(item.time)}</p>
+      <h3>${escapeHtml(item.title)}</h3><p class="v1-card-subtitle">${escapeHtml(cardSubtitleText(item.subtitle, item.time))}</p>
       <p class="v1-card-summary">${escapeHtml(item.summary || "")}</p><ul>${facts}</ul>
     </a>`;
   }
@@ -2775,7 +2779,7 @@
   function jobCardMarkup(job) {
     const canonical = job.data_class === "CANONICAL_CONFIRMED";
     const stateBadge = canonical ? "" : '<span class="v1-review-chip">演示数据</span>';
-    return `<a class="v1-candidate-card job" data-transition-key="job:${escapeHtml(job.job_context_id)}" href="/job-detail.html?job=${encodeURIComponent(job.job_context_id)}"><div class="v1-card-top"><span class="v1-type-chip">职位描述</span>${stateBadge}</div><h3>${escapeHtml(job.title)}</h3><p class="v1-card-subtitle">${escapeHtml(job.company)} · ${escapeHtml(job.location)}</p><p class="v1-card-summary">${escapeHtml(job.summary)}</p><ul>${(job.requirements || []).slice(0, 3).map((item) => `<li>${escapeHtml(item.label)}</li>`).join("")}</ul></a>`;
+    return `<a class="v1-candidate-card job" data-transition-key="job:${escapeHtml(job.job_context_id)}" href="/job-detail.html?job=${encodeURIComponent(job.job_context_id)}"><div class="v1-card-top"><span class="v1-type-chip">职位描述</span>${stateBadge}</div><h3>${escapeHtml(job.title)}</h3><p class="v1-card-subtitle">${escapeHtml(cardSubtitleText(job.company, job.location))}</p><p class="v1-card-summary">${escapeHtml(job.summary)}</p><ul>${(job.requirements || []).slice(0, 3).map((item) => `<li>${escapeHtml(item.label)}</li>`).join("")}</ul></a>`;
   }
 
   function jobGuideCardMarkup() {
