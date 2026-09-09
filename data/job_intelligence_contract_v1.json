@@ -25,7 +25,7 @@
     "request_contract_version": "ariadne-job-conversation-runtime-request-v3",
     "result_contract_version": "ariadne-job-conversation-runtime-result-v2",
     "adapter_version": "deepseek-job-conversation-v11",
-    "prompt_version": "ariadne-job-intelligence-prompt-v9",
+    "prompt_version": "ariadne-job-intelligence-prompt-v10",
     "request_config_version": "deepseek-job-conversation-request-v10"
   },
   "gap_types": [

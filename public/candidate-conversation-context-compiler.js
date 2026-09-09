@@ -95,6 +95,7 @@
       item_id: String(item.item_id).trim(),
       item_type: boundedText(item.item_type, 128),
       item_subtype: boundedText(item.item_subtype, 128),
+      category: boundedText(item.category, 120),
       title: boundedText(item.title, 500),
       subtitle: boundedText(item.subtitle, 500),
       time: boundedText(item.time, 256),
@@ -168,6 +169,11 @@
       turn_id: turnId,
       user: { message_id: pair.user.message_id, text: pair.user.text, created_at: pair.user.created_at },
       assistant: { message_id: pair.assistant.message_id, text: pair.assistant.text, created_at: pair.assistant.created_at },
+      action_result: actionsByTurn.get(turnId)?.normalized_action ? {
+        status: actionsByTurn.get(turnId).application_result.status,
+        action: actionsByTurn.get(turnId).normalized_action.action,
+        target_item_ids: (actionsByTurn.get(turnId).normalized_action.patches || []).map((patch) => patch.target_item_id),
+      } : null,
     })).sort((left, right) => left.user.created_at.localeCompare(right.user.created_at) || left.turn_id.localeCompare(right.turn_id));
     const recent = complete.slice(-HISTORY_TURN_LIMIT);
     const latestAction = relevantActions.sort((left, right) => String(left.created_at).localeCompare(String(right.created_at))).at(-1);

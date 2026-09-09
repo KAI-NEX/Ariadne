@@ -4,7 +4,7 @@
   "result_contract": "ariadne-job-overview-result-v1",
   "operation": "JOB_OVERVIEW_TURN",
   "adapter_version": "deepseek-job-overview-v1",
-  "prompt_version": "ariadne-job-overview-prompt-v2",
+  "prompt_version": "ariadne-job-overview-prompt-v3",
   "request_config_version": "deepseek-job-overview-request-v1",
   "phases": [
     "DISTILL",

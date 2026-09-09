@@ -38,7 +38,7 @@ provider_fixture = {"mode": "valid"}
 def fake_deepseek_transport(_credential: str, provider_payload: dict, *, response_limit: int) -> tuple[int, dict]:
     """Accept the production provider payload without contacting any provider."""
     provider_calls.append({"model": provider_payload.get("model"), "message_count": len(provider_payload.get("messages") or [])})
-    assert "ariadne-semantic-candidate-action-v4" in provider_payload["messages"][0]["content"]
+    assert "ariadne-semantic-candidate-action-v5" in provider_payload["messages"][0]["content"]
     assert "final USER message is the current turn intent" in provider_payload["messages"][0]["content"]
     compiled_context = json.loads(provider_payload["messages"][1]["content"])["context"]
     assert compiled_context["candidate"]["candidate_items"][0]["title"] == "Royal College of Art RCA"

@@ -173,7 +173,7 @@
     return runtime.model ? `${provider} · ${runtime.model}` : provider;
   }
 
-  function candidateTypeLabel(item) { return subtypeLabels[item?.item_subtype] || typeLabels[item?.item_type] || "其他经历"; }
+  function candidateTypeLabel(item) { return item?.category || subtypeLabels[item?.item_subtype] || typeLabels[item?.item_type] || "其他经历"; }
   function candidateFactLabel(value) {
     if (CandidateConversation) {
       const semanticKey = CandidateConversation.semanticKeyForFactLabel(value);
@@ -1065,7 +1065,16 @@
   }
 
   async function renderPersonalLibrary() {
-    const legacy = await localizedCandidateRecords(await Demo.getAll(Demo.DEMO_STORES.candidates));
+    // A new Truth-only workspace need not have legacy demo stores. Their
+    // absence must not prevent the authoritative library from rendering.
+    const legacyDatabase = await Demo.openDatabase();
+    let legacyRecords = [];
+    try {
+      if (legacyDatabase.objectStoreNames.contains(Demo.DEMO_STORES.candidates)) {
+        legacyRecords = await LocalCandidateReview.getAll(legacyDatabase, Demo.DEMO_STORES.candidates);
+      }
+    } finally { legacyDatabase.close(); }
+    const legacy = await localizedCandidateRecords(legacyRecords);
     let canonical = [];
     if (Truth && LocalCandidateReview) {
       const database = await Truth.openDatabase();
@@ -1302,6 +1311,7 @@
     const item = activeCandidateWorkingModel?.payload?.items?.find((entry) => entry.item_id === activeCandidateWorkspaceItemId);
     if (!item) return;
     byId("candidate-working-edit-title").value = item.title || "";
+    byId("candidate-working-edit-category").value = item.category || "";
     byId("candidate-working-edit-subtitle").value = item.subtitle || "";
     byId("candidate-working-edit-time").value = item.time || "";
     byId("candidate-working-edit-summary").value = item.summary || "";
@@ -1328,6 +1338,7 @@
     if (byId("candidate-card-edit-form").classList.contains("hidden")) return activeCandidateWorkingModel;
     const next = await CandidateModel.editedCandidateWorkingModel(activeCandidateWorkingModel, activeCandidateWorkspaceItemId, {
       title: byId("candidate-working-edit-title").value,
+      category: byId("candidate-working-edit-category").value,
       subtitle: byId("candidate-working-edit-subtitle").value,
       time: byId("candidate-working-edit-time").value,
       summary: byId("candidate-working-edit-summary").value,
@@ -2520,7 +2531,7 @@
       const next = String(after ?? "").trim();
       if (previous !== next) changes.push({ label, before: previous || "未填写", after: next || "未填写" });
     };
-    [["标题", "title"], ["组织 / 副标题", "subtitle"], ["日期", "time"], ["摘要", "summary"], ["责任边界", "ownership"]]
+    [["标题", "title"], ["分类标签", "category"], ["组织 / 副标题", "subtitle"], ["日期", "time"], ["摘要", "summary"], ["责任边界", "ownership"]]
       .forEach(([label, field]) => add(label, confirmedItem[field], workingItem[field]));
     const confirmedFacts = new Map((confirmedItem.facts || []).map((fact) => [fact.fact_id, fact]));
     const workingFacts = new Map((workingItem.facts || []).map((fact) => [fact.fact_id, fact]));
@@ -2659,6 +2670,7 @@
             if (!workingItem || !originalItem) throw new Error("candidate_item_not_found");
             const confirmedWorkingModel = await CandidateModel.editedCandidateWorkingModel(activeCandidateWorkingModel, itemId, {
               title: workingItem.title,
+              category: workingItem.category,
               subtitle: workingItem.subtitle,
               time: workingItem.time,
               summary: workingItem.summary,
@@ -2669,6 +2681,7 @@
               ...originalItem,
               title: workingItem.title,
               subtitle: workingItem.subtitle || null,
+              category: workingItem.category || null,
               time: workingItem.time || null,
               summary: workingItem.summary || null,
               ownership: workingItem.ownership || null,
@@ -2704,6 +2717,7 @@
       trigger: byId("open-direct-edit"), form: byId("candidate-edit-form"), preview: byId("direct-edit-preview"), window,
       populate: () => {
         byId("candidate-edit-title").value = activeCandidate.title || "";
+        byId("candidate-edit-category").value = activeCandidate.category || "";
         byId("candidate-edit-subtitle").value = activeCandidate.subtitle || "";
         byId("candidate-edit-time").value = activeCandidate.time || "";
         byId("candidate-edit-summary").value = activeCandidate.summary || "";
@@ -2753,10 +2767,10 @@
     }));
     byId("preview-direct-edit").addEventListener("click", () => {
       const values = byId("candidate-edit-facts").value.split("\n").map((value) => value.trim()).filter(Boolean);
-      pendingDirectEdit = { title: byId("candidate-edit-title").value.trim(), subtitle: byId("candidate-edit-subtitle").value.trim() || null, time: byId("candidate-edit-time").value.trim() || null, summary: byId("candidate-edit-summary").value.trim() || null, facts: values.map((value, index) => ({ fact_id: activeCandidate.facts[index]?.fact_id || `direct-fact-${index + 1}`, label: activeCandidate.facts[index]?.label || "用户补充", value })) };
+      pendingDirectEdit = { title: byId("candidate-edit-title").value.trim(), category: byId("candidate-edit-category").value.trim() || null, subtitle: byId("candidate-edit-subtitle").value.trim() || null, time: byId("candidate-edit-time").value.trim() || null, summary: byId("candidate-edit-summary").value.trim() || null, facts: values.map((value, index) => ({ fact_id: activeCandidate.facts[index]?.fact_id || `direct-fact-${index + 1}`, label: activeCandidate.facts[index]?.label || "用户补充", value })) };
       if (!pendingDirectEdit.title) return;
-      byId("direct-before").textContent = `${activeCandidate.title} · ${activeCandidate.facts.length} 条事实`;
-      byId("direct-after").textContent = `${pendingDirectEdit.title} · ${pendingDirectEdit.facts.length} 条事实`;
+      byId("direct-before").textContent = `${activeCandidate.title} · 分类标签：${activeCandidate.category || "未设置"} · ${activeCandidate.facts.length} 条事实`;
+      byId("direct-after").textContent = `${pendingDirectEdit.title} · 分类标签：${pendingDirectEdit.category || "未设置"} · ${pendingDirectEdit.facts.length} 条事实`;
       editShell.showPreview();
     });
     byId("confirm-direct-edit").addEventListener("click", async () => {

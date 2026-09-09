@@ -36,7 +36,7 @@ for (const symbol of editSymbols) assert.equal(typeof ProductShell.CONTRACT.edit
 assert.equal(typeof ProductShell.bindDetailEditShell, "function");
 for (const html of [candidateDetail, jobDetail]) {
   assert.match(html, /data-ariadne-edit-shell="detail"/);
-  assert.equal((html.match(/data-ariadne-edit-field/g) || []).length, 5);
+  assert.equal((html.match(/data-ariadne-edit-field/g) || []).length, html === candidateDetail ? 6 : 5);
   for (const marker of ["data-ariadne-edit-actions", "data-edit-cancel", "data-edit-preview", "data-edit-destructive", "data-edit-preview-actions", "data-edit-apply", "data-edit-back"]) {
     assert.match(html, new RegExp(marker));
   }

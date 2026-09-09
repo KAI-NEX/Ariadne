@@ -278,6 +278,7 @@
       exactKeys(operation, OPERATION_KEYS.SET_ITEM_FIELD, "ACTION_OPERATION_SHAPE_INVALID");
       if (!ITEM_FIELDS.includes(operation.field)) throw new CandidateConversationError("INVALID_OPERATION_TARGET");
       requiredString(operation.value, "ACTION_OPERATION_SHAPE_INVALID");
+      if (operation.field === "category") requiredString(operation.value, "ACTION_OPERATION_SHAPE_INVALID", 120);
     } else if (operation.operation === "CLEAR_ITEM_FIELD") {
       exactKeys(operation, OPERATION_KEYS.CLEAR_ITEM_FIELD, "ACTION_OPERATION_SHAPE_INVALID");
       if (!CLEARABLE_ITEM_FIELDS.includes(operation.field)) throw new CandidateConversationError("INVALID_OPERATION_TARGET");
@@ -317,8 +318,24 @@
     });
   }
 
-  function validateAction(rawAction, { observation, working_model: workingModel, human_message: humanMessage, draft = null }) {
-    exactKeys(rawAction, TOP_LEVEL_KEYS, "ACTION_TOP_LEVEL_SHAPE_INVALID");
+  function validatedMultiIntent(evidence, humanMessage, compiledContext) {
+    if (evidence === undefined) return hasExplicitMultiIntent(humanMessage);
+    exactKeys(evidence, ["current_quote", "history_ref", "history_quote"], "IMPLICIT_MULTI_VIOLATION");
+    const quote = requiredString(evidence.current_quote, "IMPLICIT_MULTI_VIOLATION", LIMITS.human_message);
+    if (!String(humanMessage).includes(quote)) throw new CandidateConversationError("IMPLICIT_MULTI_VIOLATION");
+    if (evidence.history_ref === null && evidence.history_quote === null) return true;
+    const history = compiledContext?.bounded_history || [];
+    const turn = history.find((entry, index) => evidence.history_ref === `history-${index + 1}`);
+    if (!turn || typeof evidence.history_quote !== "string" || !evidence.history_quote.trim() || !turn.user.text.includes(evidence.history_quote)) {
+      throw new CandidateConversationError("IMPLICIT_MULTI_VIOLATION");
+    }
+    return true;
+  }
+
+  function validateAction(rawAction, { observation, working_model: workingModel, human_message: humanMessage, draft = null, compiled_context: compiledContext = null }) {
+    if (!isPlainObject(rawAction)) throw new CandidateConversationError("ACTION_TOP_LEVEL_SHAPE_INVALID");
+    exactKeys(rawAction, [...TOP_LEVEL_KEYS, ...("intent_evidence" in rawAction ? ["intent_evidence"] : [])], "ACTION_TOP_LEVEL_SHAPE_INVALID");
+    const multiAuthorized = validatedMultiIntent(rawAction.intent_evidence, humanMessage, compiledContext);
     if (rawAction.contract_id !== ACTION_CONTRACT_ID) throw new CandidateConversationError("ACTION_TOP_LEVEL_SHAPE_INVALID");
     if (UNSUPPORTED_ACTIONS.includes(rawAction.action) || !ACTIONS.includes(rawAction.action)) throw new CandidateConversationError("UNSUPPORTED_ACTION");
     if (typeof rawAction.message !== "string" || rawAction.message.trim().length > LIMITS.message) throw new CandidateConversationError("ACTION_MESSAGE_SHAPE_INVALID");
@@ -342,7 +359,7 @@
     if (noPatchAction && patches.length) throw new CandidateConversationError("ACTION_CARDINALITY_INVALID");
     if (rawAction.action === "PATCH_ITEM" && (targets.size !== 1 || !patches.length)) throw new CandidateConversationError("ACTION_CARDINALITY_INVALID");
     if (rawAction.action === "PATCH_MULTIPLE_ITEMS" && (targets.size < 2 || patches.length < 2)) throw new CandidateConversationError("ACTION_CARDINALITY_INVALID");
-    if (rawAction.action === "PATCH_MULTIPLE_ITEMS" && !hasExplicitMultiIntent(humanMessage)) throw new CandidateConversationError("IMPLICIT_MULTI_VIOLATION");
+    if (rawAction.action === "PATCH_MULTIPLE_ITEMS" && !multiAuthorized) throw new CandidateConversationError("IMPLICIT_MULTI_VIOLATION");
     if (rawAction.action === "ASK_CLARIFICATION" && !rawAction.clarification) throw new CandidateConversationError("ACTION_CLARIFICATION_SHAPE_INVALID");
     if (rawAction.action !== "ASK_CLARIFICATION" && rawAction.clarification !== null) throw new CandidateConversationError("ACTION_CLARIFICATION_SHAPE_INVALID");
     if (rawAction.action !== "ASK_CLARIFICATION" && !rawAction.message.trim()) throw new CandidateConversationError("ACTION_MESSAGE_SHAPE_INVALID");
@@ -350,7 +367,7 @@
     const focus = observation.focus;
     if (focus.type === "ITEM_DRAFT" && [...targets].some((target) => target !== focus.item_id)) throw new CandidateConversationError("FOCUS_VIOLATION");
     if (focus.type === "ITEM" && [...targets].some((target) => target !== focus.item_id)) {
-      if (rawAction.action !== "PATCH_MULTIPLE_ITEMS" || !hasExplicitMultiIntent(humanMessage) || !targets.has(focus.item_id)) {
+      if (rawAction.action !== "PATCH_MULTIPLE_ITEMS" || !multiAuthorized || !targets.has(focus.item_id)) {
         throw new CandidateConversationError("FOCUS_VIOLATION");
       }
     }
@@ -382,10 +399,10 @@
     return next;
   }
 
-  async function applyAction({ action, observation, session, current_working_model: currentWorkingModel, human_message: humanMessage, draft = null, created_at: createdAt = new Date() }) {
+  async function applyAction({ action, observation, session, current_working_model: currentWorkingModel, human_message: humanMessage, draft = null, compiled_context: compiledContext = null, created_at: createdAt = new Date() }) {
     await assertDraftIntegrity(observation, draft);
     const current = assertCurrentObservation(observation, session, currentWorkingModel, draft);
-    const validated = validateAction(action, { observation, working_model: current, human_message: humanMessage, draft });
+    const validated = validateAction(action, { observation, working_model: current, human_message: humanMessage, draft, compiled_context: compiledContext });
     if (!["PATCH_ITEM", "PATCH_MULTIPLE_ITEMS"].includes(validated.action)) {
       return Object.freeze({ action: validated, working_model: current, draft, mutation: "NONE", authority: Truth.AUTHORITY.working });
     }
@@ -484,7 +501,7 @@
     return transitionExecution(execution, "CANCELLED", { at });
   }
 
-  async function applyExecutionResult({ execution, generation, action, session, current_working_model: currentWorkingModel, human_message: humanMessage, draft = null, at = new Date() }) {
+  async function applyExecutionResult({ execution, generation, action, session, current_working_model: currentWorkingModel, human_message: humanMessage, draft = null, compiled_context: compiledContext = null, at = new Date() }) {
     if (execution.state === "CANCELLED" || execution.generation !== generation) throw new CandidateConversationError("CANCELLED_TURN");
     if (execution.state !== "VALIDATING") throw new CandidateConversationError("TURN_STATE_INVALID");
     try { await assertDraftIntegrity(execution.observation, draft); assertCurrentObservation(execution.observation, session, currentWorkingModel, draft); }
@@ -492,7 +509,7 @@
       if (error.code !== "STALE_WORKING_OBSERVATION") throw error;
       return Object.freeze({ execution: transitionExecution(execution, "STALE", { at }), application: null });
     }
-    const application = await applyAction({ action, observation: execution.observation, session, current_working_model: currentWorkingModel, human_message: humanMessage, draft, created_at: at });
+    const application = await applyAction({ action, observation: execution.observation, session, current_working_model: currentWorkingModel, human_message: humanMessage, draft, compiled_context: compiledContext, created_at: at });
     const terminal = action.action === "ASK_CLARIFICATION" ? "NEEDS_CLARIFICATION" : action.action === "NO_CHANGE" || action.action === "EXPLAIN" ? "NO_CHANGE" : "APPLIED";
     return Object.freeze({ execution: transitionExecution(execution, terminal, { at, result_action: action.action }), application });
   }

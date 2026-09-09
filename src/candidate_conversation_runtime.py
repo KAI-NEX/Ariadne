@@ -18,6 +18,7 @@ from typing import Any, Callable, Mapping
 from urllib.parse import quote
 
 from src.runtime_binding import valid_binding, resolve_runtime_credential
+from src.conversation_semantics import HUMAN_CONVERSATION_PRINCIPLES
 
 from src.execution_contract import ExecutionContractError, validate_runtime_snapshot
 from src.provider_runtime import OPENAI_CHAT_COMPLETIONS, ProviderRuntimeError
@@ -430,6 +431,8 @@ def _validate_operation(value: Any, item: Mapping[str, Any]) -> dict[str, Any]:
         if operation.get("field") not in ITEM_FIELDS:
             raise CandidateConversationRuntimeError("INVALID_OPERATION_TARGET", "contract_validation")
         _string(operation.get("value"), "ACTION_OPERATION_SHAPE_INVALID", LIMITS["message"])
+        if operation.get("field") == "category":
+            _string(operation.get("value"), "ACTION_OPERATION_SHAPE_INVALID", 120)
     elif operation_type == "CLEAR_ITEM_FIELD":
         _exact(operation, OPERATION_KEYS[operation_type], "ACTION_OPERATION_SHAPE_INVALID")
         if operation.get("field") not in CLEARABLE_ITEM_FIELDS:
@@ -477,7 +480,11 @@ def _validate_patch(value: Any, item_by_id: dict[str, Mapping[str, Any]]) -> dic
 
 
 def validate_candidate_action(raw_action: Any, request: CandidateConversationRequest) -> dict[str, Any]:
-    action = _exact(raw_action, TOP_LEVEL_KEYS, "ACTION_TOP_LEVEL_SHAPE_INVALID")
+    keys = TOP_LEVEL_KEYS | ({"intent_evidence"} if isinstance(raw_action, Mapping) and "intent_evidence" in raw_action else set())
+    action = _exact(raw_action, keys, "ACTION_TOP_LEVEL_SHAPE_INVALID")
+    if "intent_evidence" in action and action["intent_evidence"] is None:
+        raise CandidateConversationRuntimeError("IMPLICIT_MULTI_VIOLATION", "intent")
+    multi_authorized = _validated_multi_intent(action.get("intent_evidence"), request)
     if action.get("contract_id") != ACTION_SCHEMA_VERSION:
         raise CandidateConversationRuntimeError("ACTION_TOP_LEVEL_SHAPE_INVALID", "contract_validation", True)
     action_type = action.get("action")
@@ -506,7 +513,7 @@ def validate_candidate_action(raw_action: Any, request: CandidateConversationReq
         raise CandidateConversationRuntimeError("ACTION_CARDINALITY_INVALID", "contract_validation", True)
     if action_type == "PATCH_MULTIPLE_ITEMS" and (len(targets) < 2 or len(patches) < 2):
         raise CandidateConversationRuntimeError("ACTION_CARDINALITY_INVALID", "contract_validation", True)
-    if action_type == "PATCH_MULTIPLE_ITEMS" and not _has_explicit_multi_intent(request.human_message):
+    if action_type == "PATCH_MULTIPLE_ITEMS" and not multi_authorized:
         raise CandidateConversationRuntimeError("IMPLICIT_MULTI_VIOLATION", "intent", True)
     if action_type == "ASK_CLARIFICATION" and clarification is None:
         raise CandidateConversationRuntimeError("ACTION_CLARIFICATION_SHAPE_INVALID", "contract_validation", True)
@@ -519,11 +526,31 @@ def validate_candidate_action(raw_action: Any, request: CandidateConversationReq
     if focus["type"] == "ITEM_DRAFT" and any(target != focus["item_id"] for target in targets):
         raise CandidateConversationRuntimeError("FOCUS_VIOLATION", "focus", True)
     if focus["type"] == "ITEM" and any(target != focus["item_id"] for target in targets):
-        if action_type != "PATCH_MULTIPLE_ITEMS" or not _has_explicit_multi_intent(request.human_message) or focus["item_id"] not in targets:
+        if action_type != "PATCH_MULTIPLE_ITEMS" or not multi_authorized or focus["item_id"] not in targets:
             raise CandidateConversationRuntimeError("FOCUS_VIOLATION", "focus", True)
     normalized = dict(action)
     normalized["patches"] = patches
     return normalized
+
+
+def _validated_multi_intent(evidence: Any, request: CandidateConversationRequest) -> bool:
+    # Semantics belong to the model; code verifies cited user instructions are
+    # actually in this turn's bounded, source-scoped context. Legacy actions
+    # without citations retain their original explicit-current-turn gate.
+    if evidence is None:
+        return _has_explicit_multi_intent(request.human_message)
+    evidence = _exact(evidence, {"current_quote", "history_ref", "history_quote"}, "IMPLICIT_MULTI_VIOLATION")
+    quote = _string(evidence["current_quote"], "IMPLICIT_MULTI_VIOLATION", LIMITS["human_message"])
+    if quote not in request.human_message:
+        raise CandidateConversationRuntimeError("IMPLICIT_MULTI_VIOLATION", "intent")
+    ref, prior_quote = evidence["history_ref"], evidence["history_quote"]
+    if ref is None and prior_quote is None:
+        return True
+    history = (request.compiled_context or {}).get("bounded_history", [])
+    matches = [turn for index, turn in enumerate(history, 1) if ref == f"history-{index}"]
+    if len(matches) != 1 or not isinstance(prior_quote, str) or not prior_quote.strip() or prior_quote not in matches[0]["user"]["text"]:
+        raise CandidateConversationRuntimeError("IMPLICIT_MULTI_VIOLATION", "intent")
+    return True
 
 
 def _semantic_object(
@@ -608,7 +635,9 @@ def validate_semantic_candidate_action(raw_action: Any) -> dict[str, Any]:
                 normalized_change["value"] = _string(change.get("value"), "SEMANTIC_SCHEMA_INVALID", 64)
             if "selector" in change:
                 normalized_change["selector"] = _string(change.get("selector"), "SEMANTIC_SCHEMA_INVALID", 1000)
-            if intent == "SET_STATUS" and "selector" not in normalized_change:
+            if "field_ref" in change:
+                normalized_change["field_ref"] = _string(change["field_ref"], "INVALID_OPERATION_TARGET", LIMITS["identifier"])
+            if intent == "SET_STATUS" and "selector" not in normalized_change and "field_ref" not in normalized_change:
                 raise _failure("SEMANTIC_SCHEMA_INVALID", "contract_validation", "SEMANTIC_SCHEMA", "semantic_action.change.selector", action_type)
             changes.append(normalized_change)
         semantic_patch["changes"] = changes
@@ -626,6 +655,7 @@ def validate_semantic_candidate_action(raw_action: Any) -> dict[str, Any]:
         "message": message.strip(),
         "patches": patches,
         "clarification": clarification.strip() if isinstance(clarification, str) else None,
+        **({"intent_evidence": action["intent_evidence"]} if "intent_evidence" in action else {}),
     }
 
 
@@ -727,6 +757,17 @@ def _descriptor_candidates_for_mapping(item: Mapping[str, Any], mapping: Mapping
 def _resolve_semantic_change(
     change: Mapping[str, Any], item: Mapping[str, Any], action_type: str
 ) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    if "field_ref" in change:
+        descriptors = candidate_field_descriptors(item)
+        matches = [entry for index, entry in enumerate(descriptors, 1) if change["field_ref"] == f"field-{index}"]
+        if len(matches) != 1:
+            raise _failure("INVALID_OPERATION_TARGET", "contract_validation", "RESOLUTION", "semantic_action.change.field_ref", action_type)
+        descriptor = matches[0]
+        operation = _operation_for_descriptor(descriptor, change, action_type)
+        # field_ref already identifies the model-selected current descriptor.
+        # A natural-language selector (e.g. 就读时间 vs 日期) is not an
+        # expected-before assertion; the immutable observation guards staleness.
+        return operation, _resolution_verification(descriptor, operation, change)
     mappings = _matching_concept_mappings(item, str(change["concept"]))
     if not mappings:
         # A recognized semantic concept can be absent from this Card shape.  That is
@@ -748,7 +789,7 @@ def _resolve_semantic_change(
         candidates = _descriptor_candidates_for_mapping(item, mapping)
 
     selector = _normalized_field_value(change.get("selector"))
-    if selector:
+    if selector and (len(candidates) != 1 or destination["kind"] not in {"ITEM_FIELD", "FIELD_BY_SEMANTIC_KEY"}):
         candidates = [descriptor for descriptor in candidates if selector in {
             _normalized_field_value(descriptor.get("current_value")),
             _normalized_field_value(descriptor.get("canonical_display_label")),
@@ -777,7 +818,7 @@ def _field_clarification(item: Mapping[str, Any], selector: Any = None) -> str:
             _normalized_field_value(descriptor.get("legacy_label")),
         }]
         if not matches:
-            return f"没有找到当前值为「{expected}」的现有字段，请确认字段名称或当前值。"
+            return f"尚未修改「{item.get('title') or '这张卡片'}」。我还不能把「{expected}」对应到当前内容；你希望调整哪一段文字？如果是新增信息，也可以打开卡片的“编辑”补充。"
         fact_descriptors = matches
     visible = [descriptor for descriptor in fact_descriptors if _normalized_field_value(descriptor.get("current_value"))]
     labels = [str(descriptor["canonical_display_label"]) for descriptor in visible]
@@ -820,11 +861,6 @@ def resolve_semantic_candidate_action_with_verifications(raw_action: Any, reques
     if request.draft is not None:
         item_by_id[request.draft["item_id"]] = request.draft["item"]
     focus = request.observation["focus"]
-    if action_type == "ASK_CLARIFICATION":
-        if focus["type"] in {"ITEM", "ITEM_DRAFT"}:
-            item = item_by_id[focus["item_id"]]
-            return _canonical_clarification(request, _field_clarification(item)), []
-        return _canonical_clarification(request, "请用卡片标题、机构或时间说明要修改哪张卡片。"), []
     if semantic["message"]:
         semantic["message"] = _human_copy(semantic["message"])
     if semantic["clarification"]:
@@ -832,7 +868,15 @@ def resolve_semantic_candidate_action_with_verifications(raw_action: Any, reques
     user_copy = semantic["clarification"] if action_type == "ASK_CLARIFICATION" else semantic["message"]
     if _AUTHORITY_ESCALATION.search(user_copy or ""):
         raise _failure("AUTHORITY_COPY_INVALID", "authority", "AUTHORITY", "semantic_action.user_copy", action_type)
-    if action_type == "PATCH_MULTIPLE_ITEMS" and not _has_explicit_multi_intent(request.human_message):
+    if action_type == "ASK_CLARIFICATION":
+        # Preserve useful model questions, but never expose storage identities.
+        internal_ids = [str(entry.get(key)) for entry in item_by_id.values() for key in ("item_id",) if entry.get(key)]
+        internal_ids += [str(field[key]) for entry in item_by_id.values() for collection, key in (("facts", "fact_id"), ("uncertainties", "uncertainty_id")) for field in entry.get(collection, []) if field.get(key)]
+        if any(identity in semantic["clarification"] for identity in internal_ids):
+            item = item_by_id.get(focus.get("item_id"))
+            return _canonical_clarification(request, _field_clarification(item) if item else "请用卡片的标题说明要调整的范围。"), []
+        return _canonical_clarification(request, semantic["clarification"]), []
+    if action_type == "PATCH_MULTIPLE_ITEMS" and not _validated_multi_intent(semantic.get("intent_evidence"), request):
         raise _failure("IMPLICIT_MULTI_VIOLATION", "intent", "SEMANTIC_GUARD", "semantic_action.cardinality", action_type)
 
     card_references = _card_reference_map(request)
@@ -862,8 +906,8 @@ def resolve_semantic_candidate_action_with_verifications(raw_action: Any, reques
             raise _failure("INVALID_TARGET", "contract_validation", "SEMANTIC_GUARD", "semantic_action.patch.target", action_type)
         operations: list[dict[str, Any]] = []
         for change in semantic_patch["changes"]:
-            if change["concept"] not in SEMANTIC_CONCEPTS:
-                return _canonical_clarification(request, _field_clarification(item, change.get("selector"))), []
+            if change["concept"] not in SEMANTIC_CONCEPTS and "field_ref" not in change:
+                return _canonical_clarification(request, f"尚未修改「{item.get('title') or '这张卡片'}」。当前支持修改标题、分类标签、组织、副标题、日期、摘要、负责内容及已有事实；你希望调整其中哪一项？"), []
             resolved = _resolve_semantic_change(change, item, action_type)
             if resolved is None:
                 return _canonical_clarification(request, _field_clarification(item, change.get("selector"))), []
@@ -896,6 +940,7 @@ def resolve_semantic_candidate_action_with_verifications(raw_action: Any, reques
         "observed_working_model": {key: request.observation[key] for key in OBSERVED_KEYS},
         "patches": canonical_patches,
         "clarification": semantic["clarification"] if action_type == "ASK_CLARIFICATION" else None,
+        **({"intent_evidence": semantic["intent_evidence"]} if "intent_evidence" in semantic else {}),
     }
     return validate_candidate_action(canonical, request), resolution_verifications
 
@@ -920,14 +965,19 @@ def semantic_prompt_schema_fragment() -> str:
 def candidate_conversation_prompt() -> str:
     """Semantic model-facing contract; storage bindings remain local."""
     return f"""You are Ariadne's Candidate conversation semantic action planner.
+{HUMAN_CONVERSATION_PRINCIPLES}
 Return exactly one JSON object and no Markdown or reasoning.
 Follow this versioned semantic schema exactly: {semantic_prompt_schema_fragment()}
 When focus is ITEM or ITEM_DRAFT, natural references such as this card, here, this project, or this experience mean the active focused item. For an ordinary PATCH_ITEM, prefer omitting card_ref because the system always binds it to the active focused item. If you include a turn-local card_ref anyway, it must identify that same active item; the system verifies it and rejects focus escape.
 For Candidate focus, choose a Card only with the turn-local card_ref shown in the current input. A Candidate PATCH_ITEM must include that card_ref unless there is exactly one Card. Never output or infer a persistent item ID. If the Human target is not unique, return ASK_CLARIFICATION.
 PATCH_MULTIPLE_ITEMS requires one turn-local card_ref per patch and is allowed only for explicit multi-Card Human intent. In ITEM focus it must include the active Card as one target; the lower canonical focus guard remains authoritative.
 Express changes only as semantic intent + concept + desired value. Do not output storage fields, fact IDs, contract IDs, Working observation echoes, origin, authority, provenance, or evidence_refs.
+Each current card supplies editable_fields with turn-local field_ref, a human label, current value and allowed_intents. Prefer selecting the appropriate field_ref from that card and concept referenced_field: infer human concepts (responsibility, contribution, education, time, classification, wording) from the actual field labels and content, not literal keyword matching. A field_ref is scoped to its card and this current observation; never reuse it from history. For a precise field_ref omit selector unless needed to disambiguate. Use a complete desired value, preserve unrelated facts, and never inflate contribution or turn missing evidence into missing ability.
 When the Human identifies an existing field by its visible label, value, or uncertainty question, put that Human-visible phrase in selector. The selector is only a semantic disambiguator; the system reads and verifies the actual current state. Never output fact IDs, uncertainty IDs, expected-before values, or proof objects.
-Use PATCH_MULTIPLE_ITEMS only when the literal human message explicitly requests all/every/both/multiple items. Otherwise ambiguity must return ASK_CLARIFICATION.
+Understand the complete conversation, not a keyword list. A mutation request may name several items, exclude one from a group, or authorize a previously discussed change with “就这样改 / 直接帮我修改好”. Resolve the scope and desired values from relevant user turns and the CURRENT cards. Never treat a question about feasibility/status, a refusal, or a suggestion by the assistant alone as authorization. Latest corrections/exclusions override earlier scope. If scope is genuinely unclear, ask only for the missing choice, naming the plausible cards.
+For PATCH_MULTIPLE_ITEMS provide intent_evidence with current_quote (an exact quote from the latest user message authorizing this edit), history_ref and history_quote (both null for a self-contained request; otherwise cite history-N and an exact earlier USER quote establishing the intended scope/change). Do not cite assistant text or source material as user authorization. Do not invent a prior instruction. The model interprets intent; code checks quotation linkage, current targets, focus, versions and persistence. Evidence does not mean external fact verification.
+The category concept is an editable classification label, e.g. 建筑项目, 软件项目. It is separate from immutable item_type/item_subtype (项目经历/工作经历/教育经历). Use SET category to add or replace it, CLEAR category to remove it, even if no category exists yet. Do not search for a field whose current value is 项目标签, do not rewrite the title/summary to simulate a label, and do not ask the user for internal field names. Each card has one classification label; ask a precise question if the user needs multiple independent labels.
+For unsupported operations explain the actual capability limit and that nothing changed; do not ask the user to rephrase an already clear instruction. For supported, unambiguous edits, execute a reviewable Working patch without asking “是否需要帮忙操作”. Clarifications must address the actual ambiguity, not generic card-location instructions.
 The final USER message is the current turn intent and overrides history. History only supplies context; it never proves that the current request was already applied.
 For every mutation request, return PATCH_ITEM or PATCH_MULTIPLE_ITEMS even when the desired value may already be present. The system alone determines NO_CHANGE from current state after semantic resolution.
 For an ITEM request of the form “把 X 改成 Y” or an equivalent explicit replacement, if one visible field or fact contains X, select that existing value, use intent SET, and return the complete desired value with X replaced by Y. REPLACE is not a valid intent. Another field already containing Y does not create ambiguity. Do not ask whether to add Y and do not ask for confirmation: the reviewable Working state plus Human Save is the confirmation boundary.
@@ -951,6 +1001,11 @@ def candidate_conversation_tool() -> dict[str, Any]:
                 "additionalProperties": False,
                 "required": ["action"],
                 "properties": {
+                    "intent_evidence": {
+                        "type": "object", "additionalProperties": False,
+                        "required": ["current_quote", "history_ref", "history_quote"],
+                        "properties": {"current_quote": {"type": "string"}, "history_ref": nullable_string, "history_quote": nullable_string},
+                    },
                     "action": {"type": "string", "enum": list(CONTRACT_MANIFEST["semantic_actions"])},
                     "message": {"type": "string", "description": "Human answer for EXPLAIN only; omit for mutations."},
                     "patches": {"type": "array", "items": {
@@ -968,6 +1023,7 @@ def candidate_conversation_tool() -> dict[str, Any]:
                                     "concept": {"type": "string", "enum": list(CONTRACT_MANIFEST["semantic_contract"]["concepts"])},
                                     "value": {"type": "string"},
                                     "selector": {"type": "string"},
+                                    "field_ref": {"type": "string"},
                                 },
                             }},
                         },
@@ -982,6 +1038,7 @@ def candidate_conversation_tool() -> dict[str, Any]:
 def _provider_item(item: Mapping[str, Any], card_ref: str, *, directory: bool = False) -> dict[str, Any]:
     result = {
         "card_ref": card_ref,
+        "category": item.get("category"),
         "item_type": item.get("item_type"),
         "item_subtype": item.get("item_subtype"),
         "title": item.get("title"),
@@ -992,6 +1049,13 @@ def _provider_item(item: Mapping[str, Any], card_ref: str, *, directory: bool = 
     if directory:
         return result
     result.update({
+        "editable_fields": [
+            {"field_ref": f"field-{index}", "label": entry["canonical_display_label"],
+             "current_value": entry["current_value"],
+             "allowed_intents": (["SET_STATUS"] if entry["storage_target"]["kind"] == "UNCERTAINTY"
+                                 else ["SET", "CLEAR"] if entry["storage_target"].get("field") in CLEARABLE_ITEM_FIELDS else ["SET"])}
+            for index, entry in enumerate(candidate_field_descriptors(item), 1)
+        ],
         "ownership": item.get("ownership"),
         "facts": [{"label": fact.get("label"), "value": fact.get("value")}
                   for fact in item.get("facts") or [] if isinstance(fact, Mapping)],
@@ -1026,7 +1090,13 @@ def _provider_candidate_context(request: CandidateConversationRequest) -> dict[s
             "other_item_directory": [],
         }
         provider_focus = {"type": focus["type"], "active_card_ref": active_ref}
-    return {"focus": provider_focus, "candidate": candidate}
+    return {"focus": provider_focus, "candidate": candidate, "capabilities": {
+        "editable_scope": "current source Working cards only; ITEM_DRAFT cannot escape its focused card",
+        "mutation_result": "reviewable Working, never automatically saved to confirmed personal information",
+        "can_edit": "the supplied editable_fields; multiple current cards with user-authorized scope and exclusions",
+        "cannot_edit": "create/delete/merge cards, add fact rows, source documents, identities, system item types, or another source/domain",
+        "history_policy": "history is context, not proof of application; read current values and latest user intent",
+    }}
 
 
 def _model_input(request: CandidateConversationRequest) -> dict[str, Any]:
@@ -1054,9 +1124,15 @@ def build_candidate_conversation_payload(request: CandidateConversationRequest) 
             {"role": "system", "content": candidate_conversation_prompt()},
             {"role": "user", "content": json.dumps({"message_type": "COMPILED_CANDIDATE_CONTEXT", "context": context_only}, ensure_ascii=False, separators=(",", ":"))},
         ]
-        for turn in request.compiled_context["bounded_history"]:
-            messages.append({"role": "user", "content": str(turn["user"]["text"])})
-            messages.append({"role": "assistant", "content": str(turn["assistant"]["text"])})
+        for index, turn in enumerate(request.compiled_context["bounded_history"], 1):
+            messages.append({"role": "user", "content": json.dumps({"history_ref": f"history-{index}", "text": str(turn["user"]["text"])}, ensure_ascii=False)})
+            outcome = turn.get("action_result")
+            if outcome:
+                titles = {item["item_id"]: item.get("title") for item in request.working_model["payload"].get("items", [])}
+                result = {"status": outcome["status"], "action": outcome["action"], "card_titles": [titles.get(identity, "不在当前卡片范围") for identity in outcome["target_item_ids"]]}
+                messages.append({"role": "assistant", "content": json.dumps({"text": str(turn["assistant"]["text"]), "actual_operation_result": result}, ensure_ascii=False)})
+            else:
+                messages.append({"role": "assistant", "content": str(turn["assistant"]["text"])})
         messages.append({"role": "user", "content": request.human_message})
     return {
         "model": request.runtime_snapshot["model"],
@@ -1065,7 +1141,7 @@ def build_candidate_conversation_payload(request: CandidateConversationRequest) 
         "tool_choice": {"type": "function", "function": {"name": "deliver_candidate_action"}},
         "thinking": {"type": "disabled"},
         "temperature": 0,
-        "max_tokens": 1400,
+        "max_tokens": min(8000, max(1400, 600 + len(request.working_model["payload"].get("items", [])) * 240)),
     }
 
 

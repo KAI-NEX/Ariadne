@@ -443,6 +443,10 @@
 
   function validateCandidateWorkingModel(model) {
     const value = prepare(model, FIELDS.working, "candidate_working_model");
+    for (const item of Array.isArray(value.payload?.items) ? value.payload.items : []) {
+      if (!item || typeof item !== "object") continue;
+      if (item.category != null && (typeof item.category !== "string" || !item.category.trim() || item.category.length > 120)) throw new TruthPersistenceError("candidate_category_invalid");
+    }
     if (value.contract_id !== "ariadne-candidate-working-model-v1") throw new TruthPersistenceError("candidate_working_model_contract_invalid");
     if (value.authority !== AUTHORITY.working) throw new TruthPersistenceError("candidate_working_model_authority_invalid");
     if (!Number.isInteger(value.version) || value.version < 1) throw new TruthPersistenceError("candidate_working_model_version_invalid");

@@ -58,7 +58,7 @@ for (const html of [candidateDetail, jobDetail]) {
   assert.match(html, /class="v1-composer-field"><textarea/);
   assert.match(html, /<button type="submit" aria-label="发送"><\/button>/);
   assert.match(html, /class="v1-edit-form v1-detail-state-panel hidden" data-ariadne-edit-shell="detail"/);
-  assert.equal((html.match(/class="v1-edit-field" data-ariadne-edit-field/g) || []).length, 5);
+  assert.equal((html.match(/class="v1-edit-field" data-ariadne-edit-field/g) || []).length, html === candidateDetail ? 6 : 5);
   assert.match(html, /class="v1-button-row v1-edit-actions" data-ariadne-edit-actions/);
   assert.match(html, /data-edit-cancel/);
   assert.match(html, /data-edit-preview/);

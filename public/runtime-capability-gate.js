@@ -67,7 +67,7 @@
       ai_conversation: "supported",
     }),
     discovery_source: "qualification_2026-09-08",
-    adapter_version: "deepseek-candidate-conversation-v8",
+    adapter_version: "deepseek-candidate-conversation-v9",
     delivery_method: "compiled_context_text",
   });
   const JOB_CONVERSATION_MODEL_ADAPTER = Object.freeze({

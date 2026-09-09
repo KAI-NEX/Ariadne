@@ -444,6 +444,13 @@ def validate_review_decision(review: Any) -> dict[str, Any]:
 
 def validate_candidate_working_model(model: Any) -> dict[str, Any]:
     value = _prepare(model, FIELDS["working"], "candidate_working_model")
+    payload = _plain_mapping(value["payload"], "candidate_working_model_payload_invalid")
+    for item in payload.get("items", []) if isinstance(payload.get("items"), list) else []:
+        if not isinstance(item, Mapping):
+            continue
+        category = item.get("category")
+        if category is not None and (not isinstance(category, str) or not category.strip() or len(category) > 120):
+            raise TruthPersistenceError("candidate_category_invalid")
     if value["contract_id"] != "ariadne-candidate-working-model-v1":
         raise TruthPersistenceError("candidate_working_model_contract_invalid")
     if value["authority"] != AUTHORITY["working"]:

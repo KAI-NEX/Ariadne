@@ -54,6 +54,7 @@
     return {
       item_type: item.item_type || item.entity_type || item.evidence_type || "OTHER",
       item_subtype: item.item_subtype || item.entity_type || null,
+      category: item.category || null,
       title: item.title || item.data?.position || item.data?.name || item.data?.institution || item.claim || "未命名候选信息",
       subtitle: item.subtitle || item.data?.name || item.data?.organization || item.data?.studyType || null,
       time: item.time || item.data?.rawDate || item.data?.timeframe || null,
@@ -277,7 +278,7 @@
 
   function semanticFieldDelta(before, current) {
     if (!before || !current) return [];
-    const fields = ["item_type", "item_subtype", "title", "subtitle", "time", "summary", "ownership", "facts", "uncertainties"];
+    const fields = ["item_type", "item_subtype", "category", "title", "subtitle", "time", "summary", "ownership", "facts", "uncertainties"];
     return fields.filter((field) => JSON.stringify(canonical(before[field] ?? null)) !== JSON.stringify(canonical(current[field] ?? null)))
       .map((field) => ({ field, before: clone(before[field] ?? null), current: clone(current[field] ?? null) }));
   }

@@ -452,19 +452,20 @@ const workTurn = async (human_message, operation, providerMessage) => Integratio
 const roleTurn = await workTurn("我的角色是 Synthetic Designer。", { operation: "SET_FACT_VALUE", fact_id: "synthetic-role-fact", value: "Synthetic Designer" }, "已更新经历标题。");
 assert.equal(roleTurn.working_model.payload.items[0].title, "Synthetic Experience Title");
 assert.equal(roleTurn.working_model.payload.items[0].facts.find((fact) => fact.fact_id === "synthetic-role-fact").value, "Synthetic Designer");
-assert.equal(roleTurn.assistant_message.text, "已将这张卡片的「角色」（原值：「Synthetic Collaborator」）改为「Synthetic Designer」。");
+assert.equal(roleTurn.assistant_message.text, "已更新 1 张卡片的草稿，其他卡片保持不变。\n「Synthetic Experience Title」：「角色」从「Synthetic Collaborator」改为「Synthetic Designer」。\n尚未保存到个人资料，请核对后点击“保存到个人资料”。");
 assert.equal(roleTurn.action.normalized_action.message, roleTurn.assistant_message.text);
 
 const titleTurn = await workTurn("这段经历的标题改成 Synthetic Revised Experience。", { operation: "SET_ITEM_FIELD", field: "title", value: "Synthetic Revised Experience" }, "已更新角色。");
 assert.equal(titleTurn.working_model.payload.items[0].title, "Synthetic Revised Experience");
 assert.equal(titleTurn.working_model.payload.items[0].facts.find((fact) => fact.fact_id === "synthetic-role-fact").value, "Synthetic Designer");
-assert.equal(titleTurn.assistant_message.text, "已将这张卡片的「标题」（原值：「Synthetic Experience Title」）改为「Synthetic Revised Experience」。");
+assert.match(titleTurn.assistant_message.text, /「Synthetic Experience Title」：「标题」从「Synthetic Experience Title」改为「Synthetic Revised Experience」/u);
+assert.match(titleTurn.assistant_message.text, /尚未保存到个人资料/u);
 
 const arrangementTurn = await workTurn("这里的工作性质改成 Synthetic Internship。", { operation: "SET_FACT_VALUE", fact_id: "synthetic-arrangement-fact", value: "Synthetic Internship" }, "已更新角色。");
 assert.equal(arrangementTurn.working_model.payload.items[0].title, "Synthetic Revised Experience");
 assert.equal(arrangementTurn.working_model.payload.items[0].facts.find((fact) => fact.fact_id === "synthetic-role-fact").value, "Synthetic Designer");
 assert.equal(arrangementTurn.working_model.payload.items[0].facts.find((fact) => fact.fact_id === "synthetic-arrangement-fact").value, "Synthetic Internship");
-assert.equal(arrangementTurn.assistant_message.text, "已将这张卡片的「工作性质」（原值：「Synthetic Part-time」）改为「Synthetic Internship」。");
+assert.match(arrangementTurn.assistant_message.text, /「Synthetic Revised Experience」：「工作性质」从「Synthetic Part-time」改为「Synthetic Internship」/u);
 const restoredWorkConversation = await Persistence.restoreConversation(workDatabase, workSession.conversation_id);
 assert.equal(restoredWorkConversation.messages.at(-1).text, arrangementTurn.assistant_message.text);
 assert.equal(restoredWorkConversation.actions.at(-1).normalized_action.message, arrangementTurn.assistant_message.text);
@@ -507,7 +508,8 @@ const duplicateTurn = await Integration.executeListTurn({
 const duplicateFacts = duplicateTurn.working_model.payload.items[0].facts;
 assert.equal(duplicateFacts.find((fact) => fact.fact_id === "synthetic-a").value, "RCA硕士作业");
 assert.equal(duplicateFacts.find((fact) => fact.fact_id === "synthetic-b").value, "HTML + JavaScript");
-assert.equal(duplicateTurn.assistant_message.text, "已将这张卡片的「未分类信息」（原值：「2025」）改为「RCA硕士作业」。");
+assert.match(duplicateTurn.assistant_message.text, /「未分类信息」从「2025」改为「RCA硕士作业」/u);
+assert.match(duplicateTurn.assistant_message.text, /尚未保存到个人资料/u);
 assert(!/synthetic-(?:project-card|a|b|duplicate-working)/u.test(duplicateTurn.assistant_message.text));
 assert.equal((await Integration.resolveSession(duplicateDatabase, duplicateInitial.source_document_id)).conversation_id, duplicateSession.conversation_id);
 
@@ -655,4 +657,53 @@ assert.match(html, /candidate-conversation-persistence-domain\.js/);
 assert.match(html, /candidate-conversation-context-compiler\.js/);
 assert.match(html, /candidate-workspace-conversation-runtime\.js/);
 
+// Continuation citations survive every validation/application/persistence layer.
+const semanticDb = memoryDatabase();
+semanticDb.records.get("candidate_working_models").set(initialWorking.working_model_id, structuredClone(initialWorking));
+semanticDb.records.get("source_documents").set(initialWorking.source_document_id, { source_document_id: initialWorking.source_document_id });
+const semanticSession = await Integration.resolveSession(semanticDb, initialWorking.source_document_id, "2026-09-03T08:01:00Z");
+const earlierIntent = "这两段教育经历可以标成学习经历吗？";
+await Integration.executeListTurn({ database: semanticDb, session: semanticSession, human_message: earlierIntent, runtime_snapshot: snapshot(), id_factory: idFactory, now,
+  call_runtime: async (request) => noPatches(request, "EXPLAIN", "可以设置分类标签，目前尚未修改。") });
+const continuedCategory = await Integration.executeListTurn({ database: semanticDb, session: semanticSession, human_message: "就这样改", runtime_snapshot: snapshot(), id_factory: idFactory, now,
+  call_runtime: async (request) => runtimeResult(request, {
+    contract_id: Conversation.ACTION_CONTRACT_ID, action: "PATCH_MULTIPLE_ITEMS", message: "Not a trusted success receipt",
+    observed_working_model: Conversation.observedWorkingModel(request.observation), clarification: null,
+    intent_evidence: { current_quote: "就这样改", history_ref: "history-1", history_quote: earlierIntent },
+    patches: request.working_model.payload.items.map((item) => ({ target_item_id: item.item_id, operations: [{ operation: "SET_ITEM_FIELD", field: "category", value: "学习经历" }], reason: "Synthetic continuation", origin: "MODEL_PROPOSAL", evidence_refs: [] })),
+  }) });
+assert.equal(continuedCategory.turn.state, "APPLIED");
+assert(continuedCategory.working_model.payload.items.every((item) => item.category === "学习经历" && item.item_type === "EDUCATION"));
+assert.equal(semanticDb.records.get("candidate_context_revisions").size, 0);
+assert.equal((await Integration.latestWorkingModel(semanticDb, initialWorking.source_document_id)).version, initialWorking.version + 1);
+assert.match(continuedCategory.assistant_message.text, /已更新 2 张卡片的草稿/u);
+await Integration.executeListTurn({ database: semanticDb, session: semanticSession, human_message: "改好了吗？", runtime_snapshot: snapshot(), id_factory: idFactory, now,
+  call_runtime: async (request) => {
+    assert.equal(request.compiled_context.bounded_history.at(-1).action_result.status, "APPLIED");
+    assert.equal(request.compiled_context.candidate.candidate_items[0].category, "学习经历");
+    return noPatches(request, "EXPLAIN", "草稿已更新，尚未保存到个人资料。");
+  } });
+const categoryObservation = Conversation.createObservation({ candidate_context_id: semanticSession.subject_id, working_model: continuedCategory.working_model, focus: { type: "CANDIDATE" } });
+assert.throws(() => Conversation.validateAction({ ...continuedCategory.action.normalized_action, observed_working_model: Conversation.observedWorkingModel(categoryObservation) }, {
+  observation: categoryObservation, working_model: continuedCategory.working_model, human_message: "就这样改", compiled_context: { bounded_history: [] },
+}), /IMPLICIT_MULTI_VIOLATION/);
+// Missing optional legacy stores must not hide confirmed Candidate revisions.
+const libraryOwner = pages.match(/  async function renderPersonalLibrary\([\s\S]*?\n  \}/)?.[0];
+assert(libraryOwner);
+for (const hasLegacy of [false, true]) {
+  const grid = { innerHTML: "" };
+  const optionalDb = { objectStoreNames: { contains: () => hasLegacy }, close() {} };
+  const readLibrary = new Function("Demo", "localizedCandidateRecords", "Truth", "LocalCandidateReview", "byId", "personalGuideCardMarkup", "candidateCardMarkup", "window", "playPendingCardReturn", `${libraryOwner}; return renderPersonalLibrary;`)(
+    { openDatabase: async () => optionalDb, DEMO_STORES: { candidates: "optional_legacy" } }, async x => x,
+    { openDatabase: async () => optionalDb }, {
+      getAll: async (_db, store) => {
+        if (store === "optional_legacy") { assert(hasLegacy); return [{ title: "legacy retained" }]; }
+        return store === "candidate_context_revisions" ? [{context_id:"synthetic",revision_id:"synthetic-v1",payload:{items:[{title:"confirmed retained"}]}}] : [];
+      }, activeConfirmedRevisions: x => x,
+    }, () => grid, () => "guide", item => item.title, { requestAnimationFrame() {} }, () => {});
+  await readLibrary();
+  assert.match(grid.innerHTML, /confirmed retained/);
+  assert.equal(grid.innerHTML.includes("legacy retained"), hasLegacy);
+}
+assert.match(fs.readFileSync(path.join(root,"public/personal-information.html"),"utf8"),/product-shell-domain.js/);
 console.log("candidate_workspace_conversation_integration=pass");

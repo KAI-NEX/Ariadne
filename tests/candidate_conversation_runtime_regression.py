@@ -551,10 +551,10 @@ assert "Synthetic note" not in friendly_ask["clarification"]
 
 unique_clarification_request = work_request_for("请补充这一项。")
 unique_clarification = resolve_semantic_candidate_action(
-    {"action": "ASK_CLARIFICATION", "patches": [], "clarification": "Untrusted model wording."},
+    {"action": "ASK_CLARIFICATION", "patches": [], "clarification": "你想补充负责内容，还是修正当前角色？"},
     validate_candidate_conversation_request(unique_clarification_request),
 )
-assert unique_clarification["clarification"] == "你想添加到「角色」还是「工作性质」？"
+assert unique_clarification["clarification"] == "你想补充负责内容，还是修正当前角色？"
 assert "当前值" not in unique_clarification["clarification"]
 
 # A missing role destination is safe ambiguity; it may never fall back to the Card title.

@@ -312,6 +312,7 @@
     items[index] = {
       ...original,
       title,
+      category: patch.category === undefined ? original.category || null : String(patch.category || "").trim() || null,
       subtitle: String(patch.subtitle || "").trim() || null,
       time: String(patch.time || "").trim() || null,
       summary: String(patch.summary || "").trim() || null,
@@ -338,6 +339,7 @@
       item_id: item?.item_id,
       item_type: item?.item_type,
       item_subtype: item?.item_subtype,
+      category: item?.category || null,
       title: item?.title,
       subtitle: item?.subtitle || null,
       time: item?.time || null,

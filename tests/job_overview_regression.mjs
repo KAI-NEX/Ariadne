@@ -80,5 +80,5 @@ const invalid=Domain.requestFor("SYNTHESIZE",{scope:Domain.Contract.scope,eviden
 const bad=await stub(invalid);bad.output.insights[0].evidence_refs=["unknown"];assert.throws(()=>Domain.validateResult(bad,invalid),/GROUNDING_INVALID/);
 assert(readFileSync(new URL('../public/personal-understanding.html',import.meta.url),'utf8').includes('围绕过去的项目、你的职责与做事方式'));
 assert(readFileSync(new URL('../public/jd.html',import.meta.url),'utf8').includes('了解职位概况'));
-assert.equal(Personal.Contract.prompt_version,"ariadne-personal-understanding-prompt-v3");
+assert.equal(Personal.Contract.prompt_version,"ariadne-personal-understanding-prompt-v4");
 console.log(JSON.stringify({job_only_scope:"pass",versions_and_review:"pass",incremental_cache:"pass",read_only_and_failure:"pass",bounded_context:"pass",provider_calls:0}));

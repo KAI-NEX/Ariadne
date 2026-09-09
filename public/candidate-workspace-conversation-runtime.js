@@ -238,14 +238,18 @@
     }));
   }
 
-  function successCopyForReceipts(receipts) {
-    return receipts.map((receipt) => {
+  function successCopyForReceipts(receipts, currentItems) {
+    const short = (value, maximum = 180) => String(value ?? "").length > maximum ? `${String(value).slice(0, maximum)}…` : String(value ?? "");
+    const details = receipts.slice(0, 12).map((receipt) => {
       const label = receipt.canonical_display_label;
-      const before = receipt.expected_before_value;
-      const after = receipt.desired_after_value;
-      if (after === null) return `已清空这张卡片的「${label}」（原值：「${before ?? ""}」）。`;
-      return `已将这张卡片的「${label}」（原值：「${before ?? ""}」）改为「${after}」。`;
-    }).join(" ");
+      const before = receipt.expected_before_value == null ? null : short(receipt.expected_before_value);
+      const after = receipt.desired_after_value == null ? null : short(receipt.desired_after_value);
+      const title = short(currentItems.get(receipt.active_item_identity)?.title || "未命名卡片", 100);
+      if (after === null) return `「${title}」：已清空「${label}」（原值：「${before ?? ""}」）。`;
+      return `「${title}」：「${label}」${before == null || before === "" ? "已设为" : `从「${before}」改为`}「${after}」。`;
+    }).join("\n");
+    const count = new Set(receipts.map((receipt) => receipt.active_item_identity)).size;
+    return `已更新 ${count} 张卡片的草稿，其他卡片保持不变。\n${details}${receipts.length > 12 ? "\n其余改动请在左侧卡片中核对。" : ""}\n尚未保存到个人资料，请核对后点击“保存到个人资料”。`;
   }
 
   function verifiedAppliedAction(action, receipts, currentWorkingModel, resultingWorkingModel) {
@@ -266,7 +270,7 @@
         throw new CandidateWorkspaceConversationError("APPLICATION_RESULT_MISMATCH");
       }
     });
-    return Object.freeze({ ...action, message: successCopyForReceipts(receipts) });
+    return Object.freeze({ ...action, message: successCopyForReceipts(receipts, currentItems) });
   }
 
   const INTERNAL_IDENTITY_KEYS = Object.freeze([
@@ -388,7 +392,7 @@
       try {
         Conversation.assertCurrentObservation(observation, runtimeSession(session), currentWorkingModel);
         const canonicalAction = Conversation.validateAction(result.action, {
-          observation, working_model: currentWorkingModel, human_message: humanMessage,
+          observation, working_model: currentWorkingModel, human_message: humanMessage, compiled_context: compiledContext,
         });
         resolutionVerifications = resolutionVerificationsForAction(canonicalAction, currentWorkingModel);
       } catch (error) {
@@ -398,6 +402,7 @@
         execution,
         generation,
         action: result.action,
+        compiled_context: compiledContext,
         session: runtimeSession(session),
         current_working_model: currentWorkingModel,
         human_message: humanMessage,
@@ -426,6 +431,7 @@
         originating_user_message_id: userMessage.message_id,
         observation,
         normalized_action: appliedAction,
+        compiled_context: compiledContext,
         application: outcome.application,
         working_model: currentWorkingModel,
         human_message: humanMessage,

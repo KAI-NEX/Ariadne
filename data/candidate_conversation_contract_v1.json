@@ -1,12 +1,12 @@
 {
-  "manifest_version": "ariadne-candidate-conversation-contract-manifest-v7",
-  "semantic_action_version": "ariadne-semantic-candidate-action-v4",
+  "manifest_version": "ariadne-candidate-conversation-contract-manifest-v8",
+  "semantic_action_version": "ariadne-semantic-candidate-action-v5",
   "runtime_contracts": {
     "request_contract_version": "ariadne-candidate-conversation-runtime-request-v3",
     "result_contract_version": "ariadne-candidate-conversation-runtime-result-v3",
-    "adapter_version": "deepseek-candidate-conversation-v8",
-    "prompt_version": "candidate-conversation-semantic-prompt-v7",
-    "request_config_version": "deepseek-candidate-conversation-request-v8"
+    "adapter_version": "deepseek-candidate-conversation-v9",
+    "prompt_version": "candidate-conversation-semantic-prompt-v8",
+    "request_config_version": "deepseek-candidate-conversation-request-v9"
   },
   "canonical_action_version": "ariadne-candidate-conversation-action-v1",
   "actions": [
@@ -35,6 +35,7 @@
     "SET_UNCERTAINTY_STATUS"
   ],
   "canonical_item_fields": [
+    "category",
     "title",
     "subtitle",
     "time",
@@ -42,12 +43,14 @@
     "ownership"
   ],
   "canonical_clearable_item_fields": [
+    "category",
     "subtitle",
     "time",
     "ownership"
   ],
   "field_identity_contract": {
     "canonical_display_labels": {
+      "CATEGORY": "分类标签",
       "TITLE": "标题",
       "SUBTITLE": "副标题",
       "TIME": "时间",
@@ -71,7 +74,8 @@
       "subtitle": "SUBTITLE",
       "time": "TIME",
       "summary": "SUMMARY",
-      "ownership": "OWNERSHIP"
+      "ownership": "OWNERSHIP",
+      "category": "CATEGORY"
     },
     "fact_label_semantic_keys": {
       "role": "ROLE",
@@ -205,6 +209,7 @@
       "action"
     ],
     "top_level_optional": [
+      "intent_evidence",
       "message",
       "patches",
       "clarification"
@@ -220,6 +225,7 @@
       "concept"
     ],
     "change_optional": [
+      "field_ref",
       "value",
       "selector"
     ],
@@ -229,6 +235,7 @@
       "SET_STATUS"
     ],
     "concepts": [
+      "category",
       "institution_name",
       "organization_name",
       "experience_title",
@@ -246,6 +253,9 @@
       "uncertainty_status"
     ],
     "concept_aliases": {
+      "project_tag": "category",
+      "project_category": "category",
+      "classification": "category",
       "institution": "institution_name",
       "school": "institution_name",
       "school_name": "institution_name",
@@ -305,6 +315,12 @@
     }
   },
   "concept_mappings": [
+    {
+      "concept": "category",
+      "item_types": ["*"],
+      "destination": { "kind": "ITEM_FIELD", "field": "category" },
+      "allowed_intents": ["SET", "CLEAR"]
+    },
     {
       "concept": "institution_name",
       "item_types": [

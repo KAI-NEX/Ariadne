@@ -227,8 +227,8 @@
     return JSON.stringify(value);
   }
 
-  async function createActionRecord({ action_id: actionId, conversation_id: conversationId, turn_id: turnId, originating_user_message_id: userMessageId, observation, normalized_action: normalizedAction, application, working_model: workingModel, human_message: humanMessage, draft = null, created_at: createdAt = new Date() }) {
-    const validatedAction = Conversation.validateAction(normalizedAction, { observation, working_model: workingModel, human_message: humanMessage, draft });
+  async function createActionRecord({ action_id: actionId, conversation_id: conversationId, turn_id: turnId, originating_user_message_id: userMessageId, observation, normalized_action: normalizedAction, application, working_model: workingModel, human_message: humanMessage, draft = null, compiled_context: compiledContext = null, created_at: createdAt = new Date() }) {
+    const validatedAction = Conversation.validateAction(normalizedAction, { observation, working_model: workingModel, human_message: humanMessage, draft, compiled_context: compiledContext });
     const mutation = application?.mutation || "NONE";
     const status = mutation === "NEW_WORKING_STATE" ? "APPLIED" : mutation === "ITEM_DRAFT_ONLY" ? "DRAFT_APPLIED"
       : validatedAction.action === "ASK_CLARIFICATION" ? "NEEDS_CLARIFICATION" : "NO_CHANGE";

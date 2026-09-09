@@ -135,6 +135,15 @@ assert.deepEqual(await CandidateModel.synchronizedCandidateWorkingModel(mergedDe
 const workspaceOutcome = Truth.applyWorkspaceAcceptance({ working_model: editedWorkingModel, proposals, current_revision: null, expected_revision_version: 0, context_id: "candidate-workspace-context-synthetic", acceptance_id: "candidate-workspace-acceptance-synthetic", revision_id: "candidate-workspace-revision-synthetic", accepted_at: "2026-09-03T09:06:00Z" });
 assert.equal(workspaceOutcome.revision.workspace_acceptance_id, workspaceOutcome.workspace_acceptance.acceptance_id);
 assert(!("review_decision_id" in workspaceOutcome.revision));
+const classifiedWorking = await CandidateModel.editedCandidateWorkingModel(workingModel, "work-1", { title: "Product Designer", category: "设计经历", facts: ["Product Designer"] });
+const classifiedSaved = Truth.applyWorkspaceAcceptance({ working_model: classifiedWorking, proposals, current_revision: null, expected_revision_version: 0, context_id: "synthetic-classified-context", acceptance_id: "synthetic-classified-acceptance", revision_id: "synthetic-classified-revision", accepted_at: "2026-09-03T09:06:00Z" });
+assert.equal(classifiedSaved.revision.payload.items[0].category, "设计经历");
+const restoredClassified = await CandidateModel.synchronizedCandidateWorkingModel(classifiedWorking, classifiedSaved.revision, "work-1", sourceId);
+assert.equal(restoredClassified.payload.items[0].category, "设计经历");
+assert.equal(restoredClassified.payload.items[0].item_type, "WORK_EXPERIENCE");
+const clearedCategory = await CandidateModel.editedCandidateWorkingModel(classifiedWorking, "work-1", { title: "Product Designer", category: "", facts: ["Product Designer"] });
+assert.equal(clearedCategory.payload.items[0].category, null);
+assert.equal(classifiedSaved.revision.payload.items[0].category, "设计经历");
 
 const stored = { processing_runs: new Map([[running.run_id, running]]), context_proposals: new Map() };
 const database = {

@@ -216,7 +216,9 @@ def semantic_output_schema() -> str:
 
 
 def job_conversation_prompt() -> str:
+    from src.conversation_semantics import HUMAN_CONVERSATION_PRINCIPLES
     return f"""You are Ariadne's Job Intelligence semantic reasoning adapter.
+{HUMAN_CONVERSATION_PRINCIPLES}
 Return exactly one JSON object, no Markdown and no chain-of-thought.
 Use this schema: {semantic_output_schema()}
 Use only the supplied Job, Candidate and source excerpts. Never invent Candidate experience, projects, skills or source evidence.
