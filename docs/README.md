@@ -4,7 +4,7 @@
 
 先读 [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md)、[AGENTS.md](../AGENTS.md) 和 [PROJECT_STATUS.md](../PROJECT_STATUS.md) 最新条目。架构文件用于追溯稳定约束与设计取舍；带日期的实现状态、阶段计划、模型推荐和一次性授权按当时范围理解。后续修订须有明确决策依据，不能仅凭代码或测试结果覆盖契约。
 
-日常入口还包括 [README.md](../README.md)、[TECHNICAL_EVIDENCE.md](../TECHNICAL_EVIDENCE.md) 与 [NEXT_PHASE_HANDOFF.md](../NEXT_PHASE_HANDOFF.md)。历史清单提及的根目录 `文件说明.md` 不在当前仓库；本页和 PROJECT_CONTEXT 承担现行导航职责。
+日常入口还包括 [README.md](../README.md)、[中文 README](../README.zh-CN.md)、[项目经历](../PROJECT_HISTORY.md)、[TECHNICAL_EVIDENCE.md](../TECHNICAL_EVIDENCE.md) 与 [NEXT_PHASE_HANDOFF.md](../NEXT_PHASE_HANDOFF.md)。历史清单提及的根目录 `文件说明.md` 不在当前仓库；本页和 PROJECT_CONTEXT 承担现行导航职责。
 
 ## 当前视觉体系
 
