@@ -1,0 +1,11 @@
+.v1-clarification { background: var(--vi-surface); border: 1px solid var(--vi-line); border-radius: 12px; overflow-wrap: anywhere; }
+.v1-clarification summary { cursor: pointer; padding: 16px; color: var(--vi-ink); font-size: 14px; line-height: 1.65; }
+.v1-clarification summary:focus-visible { outline: 2px solid var(--vi-focus); outline-offset: -4px; border-radius: 12px; }
+.v1-clarification-question { font-weight: 500; }
+.v1-clarification-context, .v1-clarification-hint { display: block; color: var(--vi-text-secondary); font-size: 12px; line-height: 1.65; margin-top: 8px; }
+.v1-clarification-hint { text-decoration: underline; }
+.v1-clarification[open] .v1-clarification-hint { display: none; }
+.v1-clarification .v1-edit-form { padding: 16px; margin: 0; gap: 12px; }
+.v1-clarification .v1-edit-form label { color: var(--vi-text-secondary); font-size: 12px; }
+.v1-clarification .v1-edit-form textarea { font-family: var(--vi-font-ui); font-size: 14px; line-height: 1.65; resize: vertical; }
+.v1-clarification .v1-primary-button { justify-self: start; }

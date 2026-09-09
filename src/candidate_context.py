@@ -13,8 +13,9 @@ from typing import Any
 
 
 CONTRACT_ID = "job-radar-candidate-context-v2-step1"
-PROMPT_VERSION = "candidate_workspace_v2_item_types"
+PROMPT_VERSION = "candidate_workspace_v3_atomic_awards"
 ITEM_TYPES = {"WORK_EXPERIENCE", "PROJECT", "EDUCATION", "OTHER"}
+ITEM_SUBTYPES = {"WORK_EXPERIENCE": {"work_experience"}, "PROJECT": {"project"}, "EDUCATION": {"education"}, "OTHER": {"award", "skill_group", "language", "custom_section"}}
 SUPPORT_RELATIONS = {"EXPLICIT_SOURCE", "AI_DERIVED"}
 REVIEW_STATUS = "NEEDS_REVIEW"
 MATERIAL_TYPES = {"resume", "portfolio", "project", "other"}
@@ -52,6 +53,9 @@ Output rules:
 - For item_type use exactly one of __ITEM_TYPES__ (case-sensitive). These are card types, not material_type values.
 - Use PROJECT for a coherent project, EDUCATION for education, WORK_EXPERIENCE for employment, and OTHER only for other supported material. Do not invent alternative type names or copy the example's employment type onto every item.
 - Resume extracts supported work, project, and education items; portfolio emphasizes distinct cases; project keeps coherent projects; other stays conservative and preserves ambiguity.
+- For each award/competition result use OTHER with item_subtype "award". One independently supported award/result per card, not one card for an Awards/Honours section. Title is the specific competition or award name, never a repeated category such as 获奖情况/获奖经历. Subtitle carries the supported module and result (e.g. H模块 · 优秀奖); distinguish shortlisted/入围 from winning. Summary and facts only add supported details, not generic praise or repeated lists of other awards.
+- Split distinct competitions mentioned together only when the source establishes their separate names and results. Deduplicate repeated mentions of the same award/result. Do not invent missing years, issuers, project associations or individual contribution. Preserve genuine ambiguity as uncertainties and attach each award's own source_refs. If only an unnamed aggregate award claim is supported, preserve it conservatively as OTHER/custom_section with an explicit unresolved question; do not fabricate named awards.
+- Optional item_subtype, when supplied, must match item_type: WORK_EXPERIENCE/work_experience, PROJECT/project, EDUCATION/education, OTHER/award|skill_group|language|custom_section. Classification is your semantic judgment from the material, not a keyword in a fact label.
 
 Use exactly this shape:
 {{
@@ -143,6 +147,8 @@ def validate_candidate_proposal(raw: Any, source_document_id: str) -> tuple[dict
             item_ids.add(item_id)
         if item.get("item_type") not in ITEM_TYPES:
             errors.append("invalid_item_type")
+        if "item_subtype" in item and (not isinstance(item["item_subtype"], str) or item["item_subtype"] not in ITEM_SUBTYPES.get(item.get("item_type"), set())):
+            errors.append("invalid_item_subtype")
         _required_string(item.get("title"), "item_title", errors)
         _required_string(item.get("summary"), "item_summary", errors)
         if item.get("review_status") != REVIEW_STATUS:

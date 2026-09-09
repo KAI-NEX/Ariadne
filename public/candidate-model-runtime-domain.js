@@ -14,7 +14,7 @@
   const MODEL_ID = "deepseek-v4-flash-vision-exp";
   const PROTOCOL = "OPENAI_CHAT_COMPLETIONS";
   const ADAPTER_VERSION = "deepseek-candidate-multimodal-v2";
-  const PROMPT_VERSION = "candidate_workspace_v2_item_types";
+  const PROMPT_VERSION = "candidate_workspace_v3_atomic_awards";
   const SCHEMA_VERSION = "job-radar-candidate-context-v2-step1";
   const DELIVERY_METHOD = "source_or_rendered_images";
   const CREDENTIAL_REF = "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision";
@@ -115,7 +115,8 @@
     return {
       item_id: item.item_id,
       item_type: item.item_type,
-      item_subtype: subtype,
+      // Explicit model classification takes precedence; omitted subtype keeps legacy proposal compatibility.
+      item_subtype: item.item_subtype || subtype,
       title: item.title,
       subtitle: item.subtitle || null,
       time: item.time || null,

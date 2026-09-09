@@ -90,6 +90,12 @@ const result = {
   operation_id: operationIdentity.operation_id, provider_response_id: "response-synthetic-1", candidate_proposal: candidateProposal, network_call_made: true,
 };
 const proposals = CandidateModel.proposalsFor({ source, run: running, result, operationIdentity });
+const awardResult = structuredClone(result);
+awardResult.candidate_proposal.items[0] = { ...awardResult.candidate_proposal.items[0], item_type: "OTHER", item_subtype: "award", title: "Synthetic Design Challenge", subtitle: "Shortlisted", facts: [] };
+const awardProposal = CandidateModel.proposalsFor({ source, run: running, result: awardResult, operationIdentity });
+assert.equal(CandidateModel.workingCardsFor(awardProposal)[0].item_subtype, "award", "explicit semantic subtype must not depend on award keywords in facts");
+awardResult.candidate_proposal.items[0].item_subtype = "education";
+assert.throws(() => CandidateModel.proposalsFor({ source, run: running, result: awardResult, operationIdentity }), /candidate_model_proposal_contract_failed/);
 const docxSource = { ...source, source_type: "DOCX", mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", filename: "synthetic.docx", file: { name: "synthetic.docx" } };
 const docxResult = { ...result, rendered_page_count: 0, outbound_image_count: 1, source_delivery: "docx_text_and_embedded_images_v1" };
 assert.equal(CandidateModel.proposalsFor({ source: docxSource, run: running, result: docxResult, operationIdentity }).length, 1);
@@ -324,7 +330,7 @@ assert.match(modelWorkspaceUi, /data-entry-type="EXECUTION_EVENT"/);
 assert.match(pages, /ModelWorkspaceUI\.renderProgress\(byId\("candidate-understanding-events"\)/);
 assert.match(pages, /ProductShell\.showWorkspace\(workspace, \{ source_name: sourceName \|\| "当前材料", processing, model_workspace_ui: ModelWorkspaceUI/);
 assert.match(productShell, /modelWorkspaceUi\.setProcessingState\(\{ processing: workspace\.processing, content: workspace\.content, save: workspace\.save, active: processing \}\)/);
-assert.match(pages, /data-entry-type="CLARIFYING_QUESTION"/);
+assert.match(pages, /candidateClarifications\?\.update/);
 assert.match(pages, /CandidateModel\.editedCandidateWorkingModel/);
 assert.match(pages, /CandidateModel\.synchronizedCandidateWorkingModel/);
 assert.match(pages, /canonicalRevision\.contract_id === "ariadne-context-revision-v2"/);

@@ -58,6 +58,10 @@
     if (!item || typeof item !== "object" || Array.isArray(item)) { errors.push("invalid_candidate_item"); return; }
     requiredString(item.item_id, "item_id", errors);
     validEnum(item.item_type, ITEM_TYPES, "item_type", errors);
+    if (Object.hasOwn(item, "item_subtype")) {
+      const subtypes = { WORK_EXPERIENCE: ["work_experience"], PROJECT: ["project"], EDUCATION: ["education"], OTHER: ["award", "skill_group", "language", "custom_section"] };
+      validEnum(item.item_subtype, subtypes[item.item_type] || [], "item_subtype", errors);
+    }
     requiredString(item.title, "item_title", errors);
     optionalString(item.subtitle, "item_subtitle", errors);
     optionalString(item.time, "item_time", errors);

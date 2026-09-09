@@ -29,6 +29,15 @@ VALID_ITEM = {
 
 
 class CandidateContextProviderRegression(unittest.TestCase):
+    def test_explicit_award_classification_is_validated_and_preserved(self) -> None:
+        item = {**VALID_ITEM, "item_type": "OTHER", "item_subtype": "award", "title": "Synthetic Design Challenge", "subtitle": "H module · Shortlisted"}
+        proposal = extract_deepseek_candidate_proposal(self.response(json.dumps({"material_type": "resume", "items": [item]})), SOURCE_ID, "run-1", "model")
+        self.assertEqual(proposal["items"][0]["item_subtype"], "award")
+        self.assertEqual(proposal["items"][0]["source_refs"], item["source_refs"])
+        for invalid in ("AWARD", "education", None, [], {}):
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(CandidateProposalError, "invalid_item_subtype"):
+                extract_deepseek_candidate_proposal(self.response(json.dumps({"material_type": "resume", "items": [{**item, "item_subtype": invalid}]})), SOURCE_ID, "run-1", "model")
+
     def test_prompt_card_types_match_validation_authority(self) -> None:
         prompt = candidate_proposal_instruction()
         self.assertIn(json.dumps(sorted(ITEM_TYPES)), prompt)

@@ -633,7 +633,7 @@ await Integration.executeListTurn({
 const detailRendererBody = pages.match(/function renderCandidateWorkspaceCardDetail\(itemId\) \{([\s\S]*?)\n  \}\n\n  async function openCandidateWorkspaceCardDetail/)?.[1] || "";
 assert.match(detailRendererBody, /candidate-card-detail-title[\s\S]*item\.title/);
 assert.match(detailRendererBody, /candidate-card-detail-facts[\s\S]*visibleFacts\.map\(\(fact\)[\s\S]*canonical_display_label[\s\S]*fact\.value/);
-const rootSubmitBody = pages.match(/async function submitCandidateWorkspaceConversation\(content\) \{([\s\S]*?)\n  \}\n\n  function returnToCandidateCardList/)?.[1] || "";
+const rootSubmitBody = pages.match(/async function submitCandidateWorkspaceConversation\(content, options = \{\}\) \{([\s\S]*?)\n  \}\n\n  function returnToCandidateCardList/)?.[1] || "";
 assert(rootSubmitBody.includes("CandidateWorkspaceConversationRuntime.executeListTurn"));
 assert(!rootSubmitBody.includes("applyCandidateWorkspaceCorrection"));
 assert.doesNotMatch(pages, /applyCandidateWorkspaceCorrection|workspaceItemPatch/);
@@ -706,4 +706,56 @@ for (const hasLegacy of [false, true]) {
   assert.equal(grid.innerHTML.includes("legacy retained"), hasLegacy);
 }
 assert.match(fs.readFileSync(path.join(root,"public/personal-information.html"),"utf8"),/product-shell-domain.js/);
+// Selective answers bind to one current question, preserve unrelated state and never confirm data.
+const Clarifications = require("../public/candidate-clarifications.js");
+const answerDb = memoryDatabase();
+const answerWorking = structuredClone(initialWorking);
+answerWorking.payload.items.forEach((item) => { item.uncertainties = [
+  { uncertainty_id: "same-id-across-cards", question: "Does the story begin in 2025 or 2030?", affects: "fact", status: "OPEN" },
+  { uncertainty_id: "role-question", question: "What was your role?", affects: "ownership", status: "OPEN" },
+]; });
+answerWorking.fingerprint = await fingerprint(answerWorking.payload);
+answerDb.records.get("candidate_working_models").set(answerWorking.working_model_id, answerWorking);
+answerDb.records.get("source_documents").set(answerWorking.source_document_id, { source_document_id: answerWorking.source_document_id });
+const answerSession = await Integration.resolveSession(answerDb, answerWorking.source_document_id, "2026-09-03T08:01:00Z");
+const entries = Clarifications.entriesFor(answerWorking, [{ source_document_id: answerWorking.source_document_id, filename: "Synthetic portfolio.pdf" }]);
+assert.equal(new Set(entries.map(e => e.key)).size, 4, "same uncertainty ID on different projects is not the same question");
+assert.match(entries[0].sources[0], /Synthetic portfolio.pdf.*synthetic:1/);
+assert.throws(() => Clarifications.answerMessage(entries[0], "   "), /CLARIFICATION_ANSWER_REQUIRED/);
+const selected = entries[0];
+const focus = { type: "ITEM", item_id: selected.item_id };
+let answerCalls = 0;
+const answerTurn = (send, entry = selected) => Integration.executeListTurn({
+  database: answerDb, session: answerSession, focus, human_message: Clarifications.answerMessage(entry, "The fictional story begins in 2030."),
+  runtime_snapshot: snapshot(), id_factory: idFactory, now,
+  call_runtime: request => Clarifications.runBoundAnswer(entry, request, async bound => { answerCalls++; return send(bound); }),
+});
+const actionForAnswer = (request, operations, target = selected.item_id) => runtimeResult(request, {
+  contract_id: Conversation.ACTION_CONTRACT_ID, action: "PATCH_ITEM", message: "已更新草稿，尚未保存。",
+  observed_working_model: Conversation.observedWorkingModel(request.observation), clarification: null,
+  patches: [{ target_item_id: target, operations, reason: "Human supplied an answer.", origin: "MODEL_PROPOSAL", evidence_refs: [] }],
+});
+await assert.rejects(answerTurn(async () => { throw Error("PROVIDER_FAILED"); }), /PROVIDER_FAILED/);
+assert.equal(answerDb.records.get("candidate_working_models").size, 1);
+await assert.rejects(answerTurn(r => actionForAnswer(r, [{ operation: "SET_UNCERTAINTY_STATUS", uncertainty_id: "role-question", status: "RESOLVED" }])), /FOCUS_VIOLATION/);
+await assert.rejects(answerTurn(r => actionForAnswer(r, [], answerWorking.payload.items[1].item_id)), /FOCUS_VIOLATION/);
+const insufficient = await answerTurn(r => noPatches(r, "ASK_CLARIFICATION", "还需要补充。", "故事年份还是实际项目年份？"));
+assert.equal(insufficient.working_model.payload.items[0].uncertainties[0].status, "OPEN");
+const answered = await answerTurn(r => actionForAnswer(r, [
+  { operation: "SET_ITEM_FIELD", field: "summary", value: "The fictional story begins in 2030." },
+  { operation: "SET_UNCERTAINTY_STATUS", uncertainty_id: selected.uncertainty_id, status: "RESOLVED" },
+]));
+assert.equal(answered.status, "SUCCEEDED");
+assert.equal(answered.working_model.payload.items[0].time, answerWorking.payload.items[0].time);
+assert.equal(answered.working_model.payload.items[0].uncertainties[0].status, "RESOLVED");
+assert.equal(answered.working_model.payload.items[0].uncertainties[1].status, "OPEN");
+assert.deepEqual(answered.working_model.payload.items[1], answerWorking.payload.items[1]);
+assert.deepEqual(answered.working_model.payload.items[0].grounding_refs, answerWorking.payload.items[0].grounding_refs);
+assert.equal(answerDb.records.get("candidate_context_revisions").size, 0);
+assert.equal(answerDb.records.get("candidate_workspace_acceptances").size, 0);
+assert.equal(answerDb.records.get("candidate_working_models").size, 2);
+const beforeStale = answerCalls;
+await assert.rejects(answerTurn(r => noPatches(r, "EXPLAIN", "Should not run")), /STALE_WORKING_OBSERVATION/);
+assert.equal(answerCalls, beforeStale, "stale or already answered question never calls Provider");
+assert.equal(Clarifications.entriesFor(await Integration.latestWorkingModel(answerDb, answerWorking.source_document_id)).length, 3);
 console.log("candidate_workspace_conversation_integration=pass");

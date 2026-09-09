@@ -57,6 +57,8 @@
   let candidateConsentId = null;
   let activeCandidateModelOperation = null;
   let activeCandidateWorkingModel = null;
+  let candidateClarifications = null;
+  let candidateClarificationSources = [];
   let activeCandidateWorkspaceItemId = null;
   let candidateWorkspaceEditDirty = false;
   let candidateWorkspaceExitIntent = null;
@@ -1324,6 +1326,7 @@
   async function renderLatestCandidateWorkspaceSurface(sourceId, durableHead, viewGeneration) {
     if (!workspaceViewIsCurrent(viewGeneration)) return;
     activeCandidateWorkingModel = durableHead;
+    candidateClarifications?.update(durableHead, candidateClarificationSources);
     const detailItemId = activeCandidateWorkspaceItemId;
     if (detailItemId === null) {
       await renderCandidateWorkingWorkspace(sourceId, { workingModel: durableHead, viewGeneration });
@@ -1352,8 +1355,8 @@
     showCandidateWorkspaceLayer(source?.filename || "当前材料", false);
     byId("candidate-working-groups").innerHTML = candidateWorkingGroupsMarkup(cards);
     setCandidateWorkspaceProgress(["材料已准备", candidateSourceReadLabel(source), "模型已完成理解", `已生成 ${cards.length} 张候选卡片`]);
-    const questions = cards.flatMap((card) => card.uncertainties || []).filter((uncertainty) => uncertainty.status === "OPEN");
-    byId("candidate-clarification-list").innerHTML = questions.length ? `<h3>有几处信息可以稍后确认</h3>${questions.map((uncertainty) => `<p data-entry-type="CLARIFYING_QUESTION">${escapeHtml(uncertainty.question)}</p>`).join("")}` : '<p data-entry-type="CLARIFYING_QUESTION_EMPTY">当前没有需要补充的问题。</p>';
+    candidateClarificationSources = records.source_documents;
+    candidateClarifications?.update(activeCandidateWorkingModel, candidateClarificationSources);
     const accepted = records.candidate_workspace_acceptances.some((event) => event.working_model_id === activeCandidateWorkingModel.working_model_id);
     byId("candidate-workspace-save").disabled = !cards.length || accepted;
     byId("candidate-workspace-save-status").textContent = accepted ? "这版候选人信息已保存。" : "";
@@ -1363,6 +1366,7 @@
   }
 
   function enterCandidateWorkspaceEdit() {
+    if (candidateConversationTurnActive) return;
     const item = activeCandidateWorkingModel?.payload?.items?.find((entry) => entry.item_id === activeCandidateWorkspaceItemId);
     if (!item) return;
     byId("candidate-working-edit-title").value = item.title || "";
@@ -1422,8 +1426,8 @@
     return next;
   }
 
-  async function callCandidateConversationRuntime(request) {
-    const attachments = window.AriadneConversationAttachments;
+  async function callCandidateConversationRuntime(request, { includeAttachments = true } = {}) {
+    const attachments = includeAttachments ? window.AriadneConversationAttachments : null;
     const signatureResponse = await (globalThis.AriadneConnector || globalThis).fetch("/api/candidate-conversation-runtime-signature", { cache: "no-store" });
     const signaturePayload = await signatureResponse.json().catch(() => null);
     const frontendSignature = CandidateWorkspaceConversationRuntime.runtimeSignature();
@@ -1470,15 +1474,15 @@
     return result;
   }
 
-  async function submitCandidateWorkspaceConversation(content) {
+  async function submitCandidateWorkspaceConversation(content, options = {}) {
     const humanMessage = String(content || "").trim();
     if (!humanMessage || !activeCandidateWorkingModel || candidateConversationTurnActive) return;
     if (!CandidateWorkspaceConversationRuntime || !CandidateConversationPersistence) throw new Error("candidate_conversation_runtime_dependencies_unavailable");
     const sourceId = activeCandidateWorkingModel.source_document_id;
     const viewGeneration = candidateWorkspaceViewGeneration;
-    const focus = activeCandidateWorkspaceItemId === null
+    const focus = options.focus || (activeCandidateWorkspaceItemId === null
       ? Object.freeze({ type: "CANDIDATE" })
-      : Object.freeze({ type: "ITEM", item_id: activeCandidateWorkspaceItemId });
+      : Object.freeze({ type: "ITEM", item_id: activeCandidateWorkspaceItemId }));
     let terminalCopy = "";
     let database = null;
     candidateConversationTurnActive = true;
@@ -1497,7 +1501,10 @@
         human_message: humanMessage,
         focus,
         runtime_snapshot: snapshot,
-        call_runtime: callCandidateConversationRuntime,
+        call_runtime: options.clarification
+          ? (request) => window.AriadneCandidateClarifications.runBoundAnswer(options.clarification, request,
+            (boundRequest) => callCandidateConversationRuntime(boundRequest, { includeAttachments: false }))
+          : callCandidateConversationRuntime,
         on_user_persisted: async () => {
           const restored = await CandidateConversationPersistence.restoreConversation(database, session.conversation_id);
           if (!workspaceViewIsCurrent(viewGeneration)) return;
@@ -1539,7 +1546,7 @@
           }
         } catch (_restoreError) { /* Preserve the safe failure copy. */ }
       }
-      return null;
+      return { status: failureCode === "STALE_WORKING_OBSERVATION" ? "STALE" : "FAILED", message: terminalCopy };
     } finally {
       database?.close?.();
       candidateConversationTurnActive = false;
@@ -2296,6 +2303,20 @@
   }
 
   function initPersonalImport() {
+    if (window.AriadneCandidateClarifications && byId("candidate-clarification-list")) {
+      candidateClarifications = window.AriadneCandidateClarifications.mount(byId("candidate-clarification-list"), {
+        onAnswer: (entry, answer) => {
+          if (candidateConversationTurnActive) return { status: "BUSY", message: "请等当前对话完成后再回答，输入已保留。" };
+          if (!byId("candidate-card-edit-form").classList.contains("hidden")) {
+            return { status: "EDITING", message: "请先确认或取消左侧卡片编辑，再回答这个问题。输入已保留。" };
+          }
+          if (entry.source_document_id !== activeCandidateWorkingModel?.source_document_id) return { status: "STALE" };
+          return submitCandidateWorkspaceConversation(window.AriadneCandidateClarifications.answerMessage(entry, answer), {
+            focus: { type: "ITEM", item_id: entry.item_id }, clarification: entry,
+          });
+        },
+      });
+    }
     ProductShell.bindImportShell(document);
     candidateSharedWorkspace();
     renderAwaitingCandidateReviews({ sourceIds: [] }).catch(showPersonalError);
