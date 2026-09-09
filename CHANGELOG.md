@@ -14,4 +14,4 @@
 
 ### 使用边界
 
-开源发布不包含维护者的 API Key、Codex 登录、个人原件、数据库或浏览器存储。Codex/OpenAI 及其他 Provider 使用使用者自己的账号和额度。当前完整文件处理验收以 macOS 为主；Linux CI 仅验证离线契约和 HTTP 隔离，不认证该平台的完整 OCR/真实模型路径。公网 Web 服务尚未发布，网站可链接到此 GitHub 项目。
+开源发布不包含维护者的 API Key、Codex 登录、个人原件、数据库或浏览器存储。Codex/OpenAI 及其他 Provider 使用使用者自己的账号和额度。当前完整文件处理验收以 macOS 为主；CI 使用 macOS 运行完整离线回归；不认证 Linux/Windows 的完整 OCR 或真实模型路径。公网 Web 服务尚未发布，网站可链接到此 GitHub 项目。
