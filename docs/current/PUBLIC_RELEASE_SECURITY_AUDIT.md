@@ -18,6 +18,6 @@
 
 ## 持续检查与限制
 
-GitHub CI 使用 macOS 15（保留真实 PDF/Swift 回归）、固定 commit 的 Actions、只读权限、完整历史 checkout、离线回归、公开文件检查、VI 门禁与固定版本 Gitleaks；凭据不进入 workflow。发布时另行核对 GitHub CI、公开状态、secret scanning、push protection 与私密漏洞报告设置。
+GitHub CI 使用 macOS 15（保留真实 PDF/Swift 回归）、固定 commit 的 Actions、只读权限、完整历史 checkout、离线回归、公开文件检查、VI 门禁与固定版本 Gitleaks；凭据不进入 workflow。2026-09-09 已核对：仓库公开、MIT 识别和匿名访问正常；[macOS CI](https://github.com/KAI-NEX/Ariadne/actions/runs/34358916060) 全部通过；secret scanning、push protection 与私密漏洞报告均已启用，核对时开放秘密告警为零。发布 tag 为 [v0.1.0](https://github.com/KAI-NEX/Ariadne/releases/tag/v0.1.0)，对应 `005b387`。
 
 扫描与回归是针对已知格式和边界的证据，不是所有未来缺陷或所有第三方软件的安全保证。公开项目不启动作者电脑的公网服务；真正的 Web 托管、HTTPS 本地网络权限及其他平台完整材料路径需要单独验收。

@@ -1,5 +1,12 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-09 — v0.1.0 MIT 公开发布（PUBLISHED）
+
+- 现有 [KAI-NEX/Ariadne](https://github.com/KAI-NEX/Ariadne) 已公开，MIT 许可已由 GitHub 识别，匿名访问验证通过；保留已核验 Git 历史。[v0.1.0 开源预览版](https://github.com/KAI-NEX/Ariadne/releases/tag/v0.1.0) 对应 `005b387`，本地 annotated tag 与远端同步。
+- [云端检查](https://github.com/KAI-NEX/Ariadne/actions/runs/34358916060) 通过 78/78 离线回归、VI 门禁与全历史 Gitleaks。首次 Linux 执行暴露真实 PDF 测试的 macOS 依赖，已改用 macOS 15，未删减 PDF 回归；本机也已通过干净检出与空工作区验收。
+- GitHub secret scanning、push protection 和私密漏洞报告均已启用并经 API 核对；核对时开放秘密告警为零。本机 API/Codex 凭据、私人资料、数据库和浏览器存储未加入 Git/发布。本机 8000 已加载 Host/Origin 隔离，Codex 选择仍有效，外部 Origin 返回 403。
+- 当前模型选择背景参数保留为默认基准。此发布提供源码与版本链接，未部署公网 Web、DNS 或作者电脑隧道；其他并行启动器/公开域名决策改动仍独立保留。
+
 ## 2026-09-09 — 添加模型菜单文案精简（COMPLETE）
 
 - 首页模型下拉菜单「＋ 添加新的模型」改为「添加新的模型」，其余文案与点击行为保持。
