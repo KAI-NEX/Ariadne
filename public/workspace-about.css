@@ -6,6 +6,10 @@
 .v1-detail-overlay.is-about .v1-detail-overlay-preview { container-type: inline-size; display: grid; place-items: center; }
 .v1-detail-overlay.is-about .v1-detail-overlay-preview .v1-wordmark { font-size: clamp(12px, 8cqw, 44px); font-weight: 550; grid-column: 1; letter-spacing: -.06em; }
 .v1-detail-overlay.is-about .v1-detail-overlay-content > header .v1-back { justify-self: start; }
+.v1-detail-overlay.is-about.is-closing .v1-detail-overlay-preview { visibility: hidden; }
+.v1-about-return-wordmark { pointer-events: none; position: fixed; white-space: pre; }
+.v1-body [data-about-trigger].is-pointer-return:focus-visible { outline: none; }
+.v1-detail-overlay.is-about.is-closing .v1-back:focus-visible { outline: none; }
 @media (max-width: 700px) {
   .v1-detail-overlay.is-about .v1-about-copy { padding: 22px 24px 28px; }
   .v1-about-copy h1 { font-size: 38px; }

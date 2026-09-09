@@ -610,6 +610,39 @@
     let closing = false;
     let revealTimer = null;
     let afterClose = null;
+    let aboutKeyboardInteraction = false;
+    let aboutReturnWordmark = null;
+    let aboutFadeAnimation = null;
+
+    function prepareAboutReturn() {
+      const heading = aboutCopy.querySelector("h1");
+      const showingCopy = Number(getComputedStyle(content).opacity) >= 0.5;
+      const origin = showingCopy ? heading : preview.firstElementChild;
+      const start = origin.getBoundingClientRect();
+      const end = sourceCard.getBoundingClientRect();
+      const startStyle = getComputedStyle(origin);
+      const endStyle = getComputedStyle(sourceCard);
+      const typographyFrame = (rect, style) => ({
+        left: `${rect.left}px`, top: `${rect.top}px`, fontSize: style.fontSize,
+        fontWeight: style.fontWeight, letterSpacing: style.letterSpacing,
+        lineHeight: style.lineHeight === "normal" ? `${rect.height}px` : style.lineHeight,
+      });
+      const first = typographyFrame(start, startStyle);
+      const last = typographyFrame(end, endStyle);
+      // Freeze the content geometry: fading copy must not wrap into the shrinking surface.
+      content.style.width = `${content.getBoundingClientRect().width}px`;
+      content.style.height = `${content.getBoundingClientRect().height}px`;
+      aboutReturnWordmark = document.createElement("span");
+      aboutReturnWordmark.className = "v1-wordmark v1-about-return-wordmark";
+      aboutReturnWordmark.textContent = sourceCard.textContent;
+      aboutReturnWordmark.setAttribute("aria-hidden", "true");
+      Object.assign(aboutReturnWordmark.style, last);
+      overlay.append(aboutReturnWordmark);
+      heading.style.visibility = "hidden";
+      const opacity = getComputedStyle(showingCopy ? content : preview).opacity;
+      aboutReturnWordmark.animate([{ ...first, opacity }, { ...last, opacity: 1 }], { duration: 480, easing: "cubic-bezier(.16,1,.3,1)", fill: "both" });
+      aboutFadeAnimation = surface.animate([{ opacity: getComputedStyle(surface).opacity }, { opacity: 0 }], { duration: 160, easing: "ease", fill: "both" });
+    }
 
     function setImportOverlayView(view = "import") {
       const workspace = view === "workspace";
@@ -715,6 +748,13 @@
       const finishedSource = sourceCard;
       const completion = afterClose;
       surfaceAnimation?.cancel();
+      aboutFadeAnimation?.cancel();
+      aboutFadeAnimation = null;
+      aboutReturnWordmark?.remove();
+      aboutReturnWordmark = null;
+      content.style.width = "";
+      content.style.height = "";
+      aboutCopy.querySelector("h1").style.visibility = "";
       backdrop.getAnimations().forEach((animation) => animation.cancel());
       frame.onload = null;
       frame.src = "about:blank";
@@ -730,6 +770,7 @@
         if (aboutWorkspace) {
           if (pageShell) pageShell.inert = wasPageInert;
           finishedSource.setAttribute("aria-expanded", "false");
+          finishedSource.classList.toggle("is-pointer-return", !aboutKeyboardInteraction);
         }
         finishedSource.style.visibility = "";
         finishedSource.focus({ preventScroll: true });
@@ -746,6 +787,7 @@
       if (!sourceCard || closing) return;
       closing = true;
       window.clearTimeout(revealTimer);
+      if (aboutWorkspace) prepareAboutReturn();
       overlay.classList.add("is-closing");
       const currentRect = surface.getBoundingClientRect();
       const destinationRect = sourceCard.getBoundingClientRect();
@@ -759,6 +801,8 @@
       ], { duration: 480, easing: "cubic-bezier(.16,1,.3,1)", fill: "both" });
       if (aboutWorkspace && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         backdrop.getAnimations().forEach((animation) => animation.finish());
+        aboutReturnWordmark?.getAnimations().forEach((animation) => animation.finish());
+        aboutFadeAnimation?.finish();
         surfaceAnimation.finish();
       }
       surfaceAnimation.finished.then(finishClose).catch(finishClose);
@@ -769,6 +813,10 @@
       if (!card || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
       event.stopImmediatePropagation();
+      if (aboutWorkspace) {
+        aboutKeyboardInteraction = event.detail === 0;
+        card.classList.remove("is-pointer-return");
+      }
       safeSession.remove();
       if (!aboutWorkspace && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { window.location.assign(card.href); return; }
       openOverlay(card);
@@ -783,8 +831,13 @@
     workspaceCloseButton.addEventListener("click", () => frame.contentWindow?.postMessage({ type: "job-radar-v1-workspace-close" }, window.location.origin));
     editButton.addEventListener("click", () => frame.contentWindow?.postMessage({ type: "job-radar-v1-open-detail-edit" }, window.location.origin));
     backdrop.addEventListener("click", closeOverlay);
-    document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeOverlay(); });
+    document.addEventListener("pointerdown", () => { if (aboutWorkspace && sourceCard) aboutKeyboardInteraction = false; });
     document.addEventListener("keydown", (event) => {
+      if (aboutWorkspace) {
+        aboutKeyboardInteraction = true;
+        document.querySelector("[data-about-trigger]")?.classList.remove("is-pointer-return");
+      }
+      if (event.key === "Escape") closeOverlay();
       if (!aboutWorkspace || !sourceCard || closing || event.key !== "Tab") return;
       event.preventDefault();
       closeButton.focus({ preventScroll: true });
