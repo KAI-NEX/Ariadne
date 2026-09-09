@@ -1,5 +1,11 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-09 — GitHub 仓库创建与首次同步（COMPLETE）
+
+- 按用户授权，通过 GitHub CLI 创建私有仓库 [KAI-NEX/Ariadne](https://github.com/KAI-NEX/Ariadne)，配置 HTTPS `origin`，将本地 `main` 推送并建立 `origin/main` 跟踪关系；GitHub 返回默认分支 `main`、可见性 `PRIVATE`。
+- 首次推送包含聊天修复 `b82d68b`、卡片 UI 收口 `8ee8cd0` 及其已有历史；未改写历史。下方“没有远程地址、待推送”的条目为当时状态，由本条更新。
+- GitHub CLI 使用官方发布包并校验 SHA-256，保留在忽略目录 `.cache/github-cli/`；通过设备授权完成登录，凭据与 QA/运行数据未加入本次提交。本条记录随后随 `main` 推送。
+
 ## 2026-09-09 — 卡片 UI 改动提交收口（COMPLETE）
 
 - 根据用户本轮明确的命令行 commit / GitHub 同步请求，将此前保留在工作区的类型标签左移 1 px、卡片副标题移除分隔点及空行高度规则一并纳入本地提交；下方原有“未提交”条目记录的是当时状态，现由本条补充收口。
