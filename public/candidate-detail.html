@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ariadne · 个人材料详情</title>
-    <link rel="stylesheet" href="/styles.css?v=candidate-job-parity-v1&amp;vi=1&amp;composer=2">
+    <link rel="stylesheet" href="/styles.css?v=candidate-job-parity-v1&amp;vi=1&amp;composer=2&amp;edit-footer=1">
     <link rel="stylesheet" href="/personal-understanding.css">
   </head>
   <body class="v1-body" data-v1-page="candidate-detail">
@@ -45,7 +45,7 @@
             <label class="v1-edit-field" data-ariadne-edit-field>日期<input id="candidate-edit-time"></label>
             <label class="v1-edit-field" data-ariadne-edit-field>摘要<textarea id="candidate-edit-summary"></textarea></label>
             <label class="v1-edit-field" data-ariadne-edit-field>事实（每行一条）<textarea id="candidate-edit-facts"></textarea></label>
-            <div class="v1-button-row v1-edit-actions" data-ariadne-edit-actions><button id="cancel-direct-edit" class="v1-tertiary-button" data-edit-cancel type="button">取消</button><span class="v1-edit-primary-actions"><button id="preview-direct-edit" class="v1-primary-button" data-edit-preview type="button">预览修改</button><button id="open-candidate-delete" class="v1-primary-button v1-detail-remove-button" data-edit-destructive type="button">删除</button></span></div>
+            <div class="v1-button-row v1-edit-actions" data-ariadne-edit-actions><button id="preview-direct-edit" class="v1-edit-text-action" data-edit-preview type="button">确认修改</button><span class="v1-edit-secondary-actions"><button id="cancel-direct-edit" class="v1-edit-text-action" data-edit-cancel type="button">取消</button><button id="open-candidate-delete" class="v1-edit-text-action v1-detail-remove-button" data-edit-destructive type="button">删除</button></span></div>
           </form>
           <section id="direct-edit-preview" class="v1-patch-card hidden">
             <p class="v1-section-label">直接编辑预览</p>

@@ -23,13 +23,13 @@ for (const detail of [candidateDetail, jobDetail]) {
   assert.match(detail, /v1-delete-popover/);
   assert.match(detail, /仅删除这张卡片[\s\S]*移除此文件导入的所有内容[\s\S]*取消/);
   assert.doesNotMatch(detail, /id="(?:candidate|job)-delete-first"|id="(?:candidate|job)-delete-scope"|要从个人资料中移除内容吗？|要从职位描述中移除内容吗？/);
-  assert.match(detail, /class="v1-primary-button v1-detail-remove-button"/);
+  assert.match(detail, /class="v1-edit-text-action v1-detail-remove-button"/);
 }
 assert.match(styles, /\.v1-detail-edit-button \{ background: #20232a;[^}]*color: #fff/);
-assert.match(styles, /\.v1-detail-remove-button \{ background: #bd2f2a;[^}]*border-color: #bd2f2a[^}]*color: #fff/);
+assert.match(styles, /\.v1-detail-remove-button \{ background: transparent;[^}]*border-color: transparent[^}]*color: #bd2f2a/);
 assert.doesNotMatch(styles, /\.v1-detail-remove-button \{[^}]*border-radius|\.v1-detail-remove-button \{[^}]*font-size|\.v1-detail-remove-button \{[^}]*min-height|\.v1-detail-remove-button \{[^}]*padding/);
-assert.match(styles, /\.v1-edit-actions \{[^}]*justify-content: space-between/);
-assert.match(styles, /\.v1-edit-primary-actions \{[^}]*justify-content: flex-end/);
+assert.match(styles, /\.v1-button-row\.v1-edit-actions \{[^}]*justify-content: space-between/);
+assert.match(styles, /\.v1-edit-secondary-actions \{[^}]*justify-content: flex-end/);
 assert.match(styles, /\.v1-delete-popover-menu \{[^}]*position: fixed/);
 assert.match(styles, /\.v1-delete-popover-menu \{[^}]*border-radius: 20px[^}]*padding: 4px[^}]*width: max-content/);
 assert.doesNotMatch(styles, /\.v1-delete-popover-menu \{[^}]*min-width/);
@@ -89,5 +89,15 @@ const candidateRemove = pages.slice(pages.indexOf('document.querySelectorAll("[d
 assert.match(candidateRemove, /persistSourceHardDelete/);
 assert.match(candidateRemove, /hardDeleteLegacySource/);
 assert.doesNotMatch(candidateRemove, /Promise\.all\(related\.map/);
+
+
+for (const detail of [candidateDetail, jobDetail]) {
+  const footer = detail.match(/<div class="v1-button-row v1-edit-actions"[^\n]+<\/div>/)[0];
+  assert.match(footer, /data-edit-preview[^>]*>确认修改<[^]*data-edit-cancel[^>]*>取消<[^]*data-edit-destructive[^>]*>删除</);
+  assert.doesNotMatch(footer, /v1-primary-button|v1-tertiary-button/);
+}
+assert.match(styles, /\.v1-edit-actions \.v1-edit-text-action \{[^}]*background: transparent;[^}]*border: 0;[^}]*box-shadow: none;[^}]*color: #1f222a;[^}]*padding: 8px 0;[^}]*scale: 1;[^}]*transform: none/);
+assert.match(styles, /\.v1-edit-actions \[data-edit-cancel\] \{ color: #737b8c; \}/);
+assert.match(styles, /\.v1-edit-actions \[data-edit-destructive\] \{ color: #bd2f2a; \}/);
 
 console.log("personal_job_lifecycle_final=pass");
