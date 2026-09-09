@@ -10,6 +10,62 @@
   const renderedCounts = new WeakMap();
   const renderedEnds = new WeakMap();
   const enhancedForms = new WeakSet();
+  const awaitingReplies = new WeakSet();
+  const renderedKeys = new WeakMap();
+  const reveals = new WeakMap();
+
+  function takeDraft(input) {
+    const text = input.value;
+    let edited = false, finished = false;
+    const onInput = () => { edited = true; };
+    input.value = "";
+    input.addEventListener("input", onInput);
+    return { text, finish(restore = false) {
+      if (finished) return;
+      finished = true;
+      input.removeEventListener("input", onInput);
+      if (restore && !edited && input.value === "") input.value = text;
+    } };
+  }
+
+  function revealReply(target, bubble, key, previous = null) {
+    const view = target.ownerDocument?.defaultView;
+    if (!view?.queueMicrotask || view.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const state = { key, view, timer: null, started: previous?.started ?? view.performance.now(), shown: previous?.shown || 0 };
+    reveals.set(target, state);
+    bubble.style.visibility = "hidden";
+    target.setAttribute("aria-busy", "true");
+    // Callers may append source links or findings synchronously after rendering.
+    // Reveal their text too, preserving the actual DOM and the stored reply.
+    view.queueMicrotask(() => {
+      if (reveals.get(target) !== state || !bubble.isConnected) return;
+      const walker = target.ownerDocument.createTreeWalker(bubble, 4);
+      const segmenter = typeof Intl.Segmenter === "function" ? new Intl.Segmenter("zh", { granularity: "grapheme" }) : null;
+      const records = [];
+      let node, length = 0;
+      while ((node = walker.nextNode())) {
+        const text = node.data, chars = segmenter ? [...segmenter.segment(text)].map((part) => part.segment) : Array.from(text);
+        records.push({ node, text, chars, start: length });
+        length += chars.length;
+      }
+      const duration = Math.min(1800, Math.max(120, length * 6));
+      const paint = (now) => {
+        if (reveals.get(target) !== state || !bubble.isConnected) return;
+        const scroll = target.closest(".v1-conversation-scroll, .v1-workspace-history");
+        const follow = scroll && scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 32;
+        state.shown = Math.min(length, Math.max(state.shown, 1, Math.floor(length * (now - state.started) / duration)));
+        records.forEach((record) => {
+          const count = Math.max(0, state.shown - record.start);
+          record.node.data = count >= record.chars.length ? record.text : record.chars.slice(0, count).join("");
+        });
+        bubble.style.visibility = "";
+        if (follow) scroll.scrollTop = scroll.scrollHeight;
+        if (state.shown < length) state.timer = view.setTimeout(() => paint(view.performance.now()), 16);
+        else { reveals.delete(target); target.setAttribute("aria-busy", "false"); }
+      };
+      paint(view.performance.now());
+    });
+  }
 
   function enhanceComposers(documentObject = globalThis.document) {
     if (!documentObject?.querySelectorAll) return;
@@ -107,11 +163,20 @@
     const readingHistory = scroll && previousCount > 0 && previousTop + scroll.clientHeight < previousHeight - 32;
     const previousEnds = renderedEnds.get(target);
     const first = messages.length ? textFor(messages[0]) : "", last = messages.length ? textFor(messages.at(-1)) : "";
+    const keys = messages.map((message) => message.message_id || message.id || `${message.role}:${textFor(message)}`);
+    const oldKeys = renderedKeys.get(target) || [];
+    const previousReveal = reveals.get(target);
+    if (previousReveal) {
+      previousReveal.view.clearTimeout(previousReveal.timer);
+      reveals.delete(target);
+      target.setAttribute("aria-busy", "false");
+    }
     target.innerHTML = messages.length
       ? messages.map((message, index) => `<p class="v1-conversation-message ${message.role === "USER" ? "user" : "assistant"}${previousCount > 0 && index >= previousCount ? " is-entering" : ""}">${escapeHtml(textFor(message))}</p>`).join("")
       : `<p class="v1-conversation-empty">${escapeHtml(emptyText || "")}</p>`;
     renderedCounts.set(target, messages.length);
     renderedEnds.set(target, { first, last });
+    renderedKeys.set(target, keys);
     const scheduleFrame = globalThis.requestAnimationFrame || ((callback) => globalThis.setTimeout(callback, 0));
     scheduleFrame(() => target.querySelectorAll(".v1-conversation-message.is-entering").forEach((message) => message.classList.remove("is-entering")));
     if (readingHistory) {
@@ -119,11 +184,20 @@
       scroll.scrollTop = previousTop + (prepended ? scroll.scrollHeight - previousHeight : 0);
     } else if (scroll) scroll.scrollTop = scroll.scrollHeight;
     else target.lastElementChild?.scrollIntoView?.({ block: "nearest" });
+    const lastKey = keys.at(-1);
+    const continuing = previousReveal && previousReveal.key === lastKey;
+    const newReply = awaitingReplies.has(target) && messages.at(-1)?.role === "ASSISTANT" && !oldKeys.includes(lastKey);
+    if (continuing || newReply) {
+      awaitingReplies.delete(target);
+      revealReply(target, target.lastElementChild, lastKey, continuing ? previousReveal : null);
+    }
   }
 
   function setExecutionState({ form, status = null, active, copy = "" }) {
     const submit = form?.querySelector?.('button[type="submit"]');
     const textarea = form?.querySelector?.("textarea");
+    const target = form?.closest?.(".v1-conversation-pane, .v1-ariadne-pane")?.querySelector(".v1-conversation-messages");
+    if (target) { if (active) awaitingReplies.add(target); else awaitingReplies.delete(target); }
     if (status && ProcessingIndicator) ProcessingIndicator.set(status, { active: Boolean(active), copy, state: active ? "WAITING" : copy ? "TERMINAL" : "IDLE" });
     else if (status) status.textContent = copy;
     if (submit && ProcessingIndicator?.setButton) ProcessingIndicator.setButton(submit, { active: Boolean(active) });
@@ -148,5 +222,5 @@
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => enhanceComposers(), { once: true });
     else enhanceComposers();
   }
-  return Object.freeze({ renderMessages, humanSafeText, setExecutionState, settle, waitForIndicatorPaint, enhanceComposers, ProcessingIndicator });
+  return Object.freeze({ renderMessages, humanSafeText, setExecutionState, settle, waitForIndicatorPaint, enhanceComposers, takeDraft, ProcessingIndicator });
 }));

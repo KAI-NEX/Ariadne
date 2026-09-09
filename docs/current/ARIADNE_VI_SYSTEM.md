@@ -141,6 +141,7 @@ VI 页面提供 `vi-resume-sheet/row/label/content/heading` 的**合成排版样
 - **主/次/轻操作**：复用 `v1-primary-button / secondary / tertiary / consent-action`，禁止每个页面复制按钮尺寸。
 - **来源入口**：Candidate/Job 共用 source input、dropzone、预览与错误说明；不可用视觉提示替代材料传输确认。
 - **消息线程**：Human 白底靠右、Assistant 深底靠左；最大宽度 88%；提示、输入与发送由共享组件管理。
+- **发送与回复**：通过发送前置检查后立即清空输入，等待期间的新草稿不被返回结果清除；两个整体对话页失败时恢复未被编辑的原草稿。共用消息组件只对本轮新回复快速逐字展开（按字素约 6 ms，总时长 120–1800 ms）；历史读取不重播，重绘续接进度，来源链接和原始回复保留。减少动态效果时直接完整显示。此为已校验回复的展示动效，模型处理期间仍显示等待状态，不代表 Provider 流式传输。
 - **composer**：初始外框 46 / textarea 44 / send 42 px；聚焦反馈由圆角 field 统一承担，textarea 不叠加方形 outline。输入框上沿共用拖柄可上下调整高度，也支持方向键、Home/End；高度受当前视口和至少 80 px 的历史阅读空间限制（上限 320 px）。消息区独立滚动，输入 dock 悬浮可用；加载不重置用户调整的高度。共享实现为 `ConversationUI.enhanceComposers()`，Candidate/Job 导入、详情与两个整体对话页使用同一控件。
 - **详情/编辑/确认**：使用 ProductShell，标签同时说明 Working/保存/失败；颜色不跨越数据权限。
 - **浮窗**：可访问标题、初始焦点、键盘约束、Esc/返回后焦点恢复，原对象展开/缩回位置保持。

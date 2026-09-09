@@ -2,7 +2,7 @@
 (async function jobOverviewPage() {
   const Domain = window.AriadneJobOverview, Truth = window.AriadneTruthPersistence, Gate = window.JobRadarRuntimeGate, UI = window.AriadneConversationUI;
   const el = (id) => document.getElementById(id), esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  let busy = false, state, visible = 15;
+  let busy = false, state, visible = 15, pendingMessage = null;
   const status = (copy, error = false) => { el("job-overview-status").textContent = copy; el("job-overview-status").classList.toggle("error", error); };
   function runtime() {
     const gate = Gate.operationGate("job_overview"), current = gate.authority.runtime;
@@ -29,7 +29,8 @@
     el("job-overview-insights").innerHTML = insightsMarkup(overview?.insights);
     el("job-overview-unknowns").innerHTML = overview?.uncertainties?.length ? `<div class="personal-unknowns"><h3>还需要确认</h3>${unknownMarkup(overview.uncertainties)}</div>` : "";
     el("job-overview-directory").innerHTML = snapshot.records.map((record) => `<div class="job-overview-directory-item">${links([record.identity])}<div>${esc(record.semantic.location || "地点未明确")} · ${record.version ? `当前版本 ${record.version}` : "尚未保存为正式职位"}</div></div>`).join("") || "暂无 JD。";
-    const messages = turns.slice(-visible).flatMap((turn) => [{ role: "USER", text: turn.human_message }, ...(turn.status === "SUCCEEDED" ? [{ role: "ASSISTANT", text: `${turn.fingerprint !== snapshot.fingerprint ? "（基于当时职位版本的历史回答）\n" : ""}${turn.output.message}`, result: turn.output }] : [])]);
+    const messages = turns.slice(-visible).flatMap((turn) => [{ id: `${turn.turn_id}:user`, role: "USER", text: turn.human_message }, ...(turn.status === "SUCCEEDED" ? [{ id: `${turn.turn_id}:assistant`, role: "ASSISTANT", text: `${turn.fingerprint !== snapshot.fingerprint ? "（基于当时职位版本的历史回答）\n" : ""}${turn.output.message}`, result: turn.output }] : [])]);
+    if (pendingMessage) messages.push({ role: "USER", text: pendingMessage });
     const target = el("job-overview-messages");
     UI.renderMessages(target, messages, { empty_text: "从整体概况、岗位共性或某几份 JD 的差异开始。这里不读取个人资料。" });
     const bubbles = target.querySelectorAll(".v1-conversation-message");
@@ -40,18 +41,25 @@
     runtime();
   }
   async function load() { const db = await Truth.openDatabase(); try { state = { snapshot: await Domain.snapshotFromDatabase(db), turns: (await Domain.getAll(db, "job_overview_turns")).sort((a, b) => a.created_at.localeCompare(b.created_at)) }; render(); } finally { db.close(); } }
-  async function run(task) {
+  async function run(task, input = null) {
     if (busy || !runtime().allowed || !el("job-overview-consent").checked) return;
-    busy = true; runtime(); status(""); UI.setExecutionState({ form: el("job-overview-form"), status: el("job-overview-processing"), active: true, copy: "正在读取当前职位…" }); let db;
+    const draft = input ? UI.takeDraft(input) : null;
+    pendingMessage = draft?.text.trim() || null;
+    busy = true; if (state) render(); runtime(); status(""); UI.setExecutionState({ form: el("job-overview-form"), status: el("job-overview-processing"), active: true, copy: "正在读取当前职位…" }); let db;
     try {
       db = await Truth.openDatabase(); const captured = Domain.runtimeSnapshot();
       const call = async (request) => { const current = Gate.operationGate("job_overview"); if (!current.allowed || current.authority.runtime.provider !== captured.provider || current.authority.runtime.model !== captured.model || !el("job-overview-consent").checked) throw new Error("JOB_OVERVIEW_RUNTIME_CHANGED"); return Domain.callRuntime(request); };
       await task(db, { runtime_snapshot: captured, consent: true, call, onProgress: (copy) => UI.setExecutionState({ form: el("job-overview-form"), status: el("job-overview-processing"), active: true, copy }) });
     } catch (error) {
+      draft?.finish(true);
       status(/CONTEXT_CHANGED/.test(error.message) ? "职位已经变化，本次结果未保存。请基于最新 JD 重试。" : /RUNTIME|CONSENT|capability/.test(error.message) ? "运行方式或资料传输确认已变化，请核对后重试。" : "本次处理未完成，没有生成替代回答或修改任何 JD。原始资料与历史保留，可以重试。", true);
-    } finally { db?.close(); busy = false; UI.setExecutionState({ form: el("job-overview-form"), status: el("job-overview-processing"), active: false }); await load(); }
+    } finally {
+      db?.close(); draft?.finish(); pendingMessage = null;
+      try { await load(); }
+      finally { busy = false; UI.setExecutionState({ form: el("job-overview-form"), status: el("job-overview-processing"), active: false }); runtime(); }
+    }
   }
-  el("job-overview-form").addEventListener("submit", (event) => { event.preventDefault(); const message = el("job-overview-message").value.trim(); if (message) run(async (db, options) => { await Domain.discuss(db, { ...options, human_message: message }); el("job-overview-message").value = ""; }); });
+  el("job-overview-form").addEventListener("submit", (event) => { event.preventDefault(); const message = el("job-overview-message").value.trim(); if (message) run(async (db, options) => { await Domain.discuss(db, { ...options, human_message: message }); }, el("job-overview-message")); });
   el("refresh-job-overview").addEventListener("click", () => run(async (db, options) => { const result = await Domain.refresh(db, options); status(!result.snapshot.records.length ? "请先添加真实 JD。" : result.cached ? "当前职位没有变化，无需重复调用模型。" : `概况已更新：复用 ${result.snapshot.overview.reused_fragments} 段摘要，新理解 ${result.snapshot.overview.refreshed_fragments} 段。`); }));
   el("job-overview-consent").addEventListener("change", runtime);
   el("job-overview-older").addEventListener("click", () => { visible += 20; render(); });

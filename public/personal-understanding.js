@@ -7,6 +7,7 @@
   const byId = (name) => document.getElementById(name);
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const labels = { FACT: "经历与背景", PREFERENCE: "个人偏好", GOAL: "已确认目标", CORRECTION: "理解修正" };
+  let pendingMessage = null;
   let busy = false, state, origin = { type: "PERSONAL" }, visibleTurns = 15, draftLoaded = false;
   const status = (value, error = false) => { byId("personal-message-status").textContent = value; byId("personal-message-status").classList.toggle("error", error); };
   function runtimeMode() {
@@ -52,7 +53,8 @@
     byId("saved-memories").innerHTML = memories.map((entry) => `<article class="personal-memory" data-inactive="${!activeIds.has(entry.memory_id)}"><small>${esc(labels[entry.kind])} · 版本 ${entry.version}${activeIds.has(entry.memory_id) ? "" : " · 关联资料已变化，暂不使用"}</small><p>${esc(entry.text)}</p><button type="button" class="personal-text-button" data-memory-edit="${esc(entry.memory_id)}">修改这条补充</button><button type="button" class="personal-text-button" data-memory-forget="${esc(entry.memory_id)}">不再使用</button></article>`).join("") || '<p class="personal-meta">尚未保存补充。对话中的建议只有经你确认，才会出现在这里。</p>';
     byId("memory-history").innerHTML = [...state.memories].sort((a, b) => b.created_at.localeCompare(a.created_at)).map((entry) => `<p>${esc(labels[entry.kind])} · v${entry.version} · ${entry.status === "RETRACTED" ? "已停止使用，历史保留" : "已保存"}<br>${esc(entry.text)}</p>`).join("") || "暂无历史版本。";
     const turns = state.turns.filter((entry) => entry.kind === "DISCUSSION").sort((a, b) => a.created_at.localeCompare(b.created_at));
-    const messages = turns.slice(-visibleTurns).flatMap((turn) => [{ role: "USER", text: turn.human_message }, ...(turn.status === "SUCCEEDED" ? [{ role: "ASSISTANT", text: turn.output.message }] : [])]);
+    const messages = turns.slice(-visibleTurns).flatMap((turn) => [{ id: `${turn.turn_id}:user`, role: "USER", text: turn.human_message }, ...(turn.status === "SUCCEEDED" ? [{ id: `${turn.turn_id}:assistant`, role: "ASSISTANT", text: turn.output.message }] : [])]);
+    if (pendingMessage) messages.push({ role: "USER", text: pendingMessage });
     UI.renderMessages(byId("personal-conversation-messages"), messages, { empty_text: "这里的对话围绕你已添加的资料展开，可以跨文件讨论，也可以直接补充新的个人信息。" });
     byId("personal-older-messages").classList.toggle("hidden", turns.length <= visibleTurns);
     const decided = new Set(state.decisions.map((entry) => entry.proposal_id));
@@ -80,11 +82,13 @@
       render();
     } finally { db.close(); }
   }
-  async function run(task) {
+  async function run(task, input = null) {
     if (busy) return;
     const gate = runtimeMode();
     if (!gate.allowed || !byId("personal-model-consent").checked) { status("请先选择可用模型，并确认本次资料传输与费用。", true); return; }
-    busy = true; status(""); runtimeMode();
+    const draft = input ? UI.takeDraft(input) : null;
+    pendingMessage = draft?.text.trim() || null;
+    busy = true; status(""); if (state) render(); runtimeMode();
     UI.setExecutionState({ form: byId("personal-conversation-form"), status: byId("personal-processing"), active: true, copy: "正在准备当前个人资料…" });
     let db;
     try {
@@ -97,15 +101,19 @@
       };
       await task(db, { runtime_snapshot: snapshot, consent: true, call,
         onProgress: (copy) => UI.setExecutionState({ form: byId("personal-conversation-form"), status: byId("personal-processing"), active: true, copy }) });
-    } catch (error) { status(errorCopy(error), true); }
-    finally { db?.close(); busy = false; UI.setExecutionState({ form: byId("personal-conversation-form"), status: byId("personal-processing"), active: false }); await load(); }
+    } catch (error) { draft?.finish(true); status(errorCopy(error), true); }
+    finally {
+      db?.close(); draft?.finish(); pendingMessage = null;
+      try { await load(); }
+      finally { busy = false; UI.setExecutionState({ form: byId("personal-conversation-form"), status: byId("personal-processing"), active: false }); runtimeMode(); }
+    }
   }
   byId("personal-conversation-form").addEventListener("submit", (event) => {
     event.preventDefault(); const humanMessage = byId("personal-message").value.trim(); if (!humanMessage) return;
     run(async (db, options) => {
       await Understanding.discuss(db, { ...options, human_message: humanMessage, origin });
-      byId("personal-message").value = ""; byId("personal-origin").classList.add("hidden"); origin = { type: "PERSONAL" };
-    });
+      byId("personal-origin").classList.add("hidden"); origin = { type: "PERSONAL" };
+    }, byId("personal-message"));
   });
   byId("refresh-understanding").addEventListener("click", () => run(async (db, options) => {
     const result = await Understanding.refresh(db, options);
