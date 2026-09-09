@@ -19,7 +19,7 @@ function navigateWithPageTransition(destination, source) {
   document.body.classList.add("runtime-page-leaving");
   window.dispatchEvent(new Event("job-radar-runtime-leave"));
   source.disabled = true;
-  window.setTimeout(() => window.location.assign(destination), 240);
+  window.setTimeout(() => window.location.assign(destination), 320);
 }
 
 function readLocalJson(key, fallback) {
@@ -269,6 +269,15 @@ byId("runtime-add-model").addEventListener("click", () => {
   closeMenu();
   addModelSheet.open(originRect, returnRect);
 });
+window.addEventListener("pageshow", (event) => {
+  document.body.classList.remove("runtime-page-leaving");
+  if (!event.persisted) return;
+  document.body.style.animation = "none";
+  void document.body.offsetWidth;
+  document.body.style.animation = "";
+  render();
+});
+
 byId("runtime-action").addEventListener("click", () => {
   if (state.phase === "READY" || state.phase === "OFFICIAL_READY" || state.phase === "LOCAL_READY") navigateWithPageTransition("/workspace.html", byId("runtime-action"));
 });

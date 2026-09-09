@@ -78,7 +78,7 @@ assert.match(script, /navigateWithPageTransition\("\/workspace\.html", byId\("ru
 assert.match(script, /runtime-page-leaving/);
 assert.match(script, /job-radar-runtime-leave/);
 assert.doesNotMatch(script, /runtime-entry-bloom/);
-assert.match(script, /window\.setTimeout\(\(\) => window\.location\.assign\(destination\), 240\)/);
+assert.match(script, /window\.setTimeout\(\(\) => window\.location\.assign\(destination\), 320\)/);
 assert.match(css, /\.runtime-spinner/);
 assert.match(css, /#runtime-action-symbol svg \{[^}]*stroke-linecap: round[^}]*stroke-linejoin: round[^}]*stroke-width: 2\.4/s);
 assert.match(css, /\.runtime-chevron svg \{[^}]*stroke-linecap: round[^}]*stroke-linejoin: round[^}]*stroke-width: 2\.4/s);
@@ -101,7 +101,7 @@ assert.doesNotMatch(html, /ascii-tuner|ascii-opacity|ascii-font-size|ascii-flow-
 assert.match(css, /\.ascii-tuner-panel\.is-open/);
 assert.match(css, /\.runtime-page button:not\(:disabled\):active[^}]*scale: \.97/s);
 assert.match(css, /\.runtime-page\.runtime-page-leaving[^}]*opacity: 0/s);
-assert.match(css, /\.runtime-page \{[^}]*animation: v1-page-fade-in 420ms cubic-bezier\(\.22,\.78,\.24,1\)[^}]*opacity: 1[^}]*transition: opacity 240ms/s);
+assert.match(css, /\.runtime-page \{[^}]*animation: v1-page-fade-in 420ms cubic-bezier\(\.22,\.78,\.24,1\)[^}]*opacity: 1[^}]*transition: opacity 320ms/s);
 assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*\.runtime-page, \.v1-page-shell \{ animation: none; \}/);
 assert.doesNotMatch(css, /@keyframes runtime-entry-bloom|\.runtime-entry-bloom/);
 assert.match(css, /\.runtime-ascii-waves[^}]*opacity: 1/);

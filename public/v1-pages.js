@@ -524,10 +524,8 @@
       const destination = item.href;
       if (!destination || item.getAttribute("aria-current") === "page") { event.preventDefault(); return; }
       event.preventDefault();
-      if (prefersReducedMotion) { window.location.assign(destination); return; }
       showFor(item);
-      document.body.classList.add("v1-route-leaving");
-      window.setTimeout(() => window.location.assign(destination), 320);
+      navigateWithPageFade(destination);
     }
 
     navItems.forEach((item) => {
@@ -560,8 +558,41 @@
   const currentRoute = () => routeKey(new URL(window.location.href));
   const routeFor = (href) => routeKey(new URL(href, window.location.href));
   const transitionSourceSelector = ".v1-candidate-card, .v1-add-guide-card";
-  const pageFadeSourceSelector = ".v1-object-folder, .v1-back[href='/workspace.html']";
+  const pageFadeSourceSelector = "a[href]";
   const pagePaperColor = () => getComputedStyle(document.body).getPropertyValue("--paper").trim() || "#f7f7f9";
+
+  let pageFadeTimer = null;
+  function pageFadeDestination(source) {
+    if (!source || source.matches(transitionSourceSelector) || source.hasAttribute("download")) return null;
+    const target = source.getAttribute("target");
+    if (target && target.toLowerCase() !== "_self") return null;
+    let destination;
+    try { destination = new URL(source.getAttribute("href"), window.location.href); }
+    catch (_error) { return null; }
+    if (destination.origin !== window.location.origin || !/^(?:\/|.*\.html)$/.test(destination.pathname)) return null;
+    if (destination.pathname === window.location.pathname && destination.search === window.location.search) return null;
+    return destination.href;
+  }
+
+  function navigateWithPageFade(destination) {
+    if (pageFadeTimer !== null) return;
+    safeSession.remove();
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { window.location.assign(destination); return; }
+    document.body.classList.add("v1-route-leaving");
+    pageFadeTimer = window.setTimeout(() => window.location.assign(destination), 320);
+  }
+
+  function restorePageFade(event) {
+    window.clearTimeout(pageFadeTimer);
+    pageFadeTimer = null;
+    document.body.classList.remove("v1-route-leaving");
+    if (!event.persisted) return;
+    const shell = document.querySelector(".v1-page-shell");
+    if (!shell) return;
+    shell.style.animation = "none";
+    void shell.offsetWidth;
+    shell.style.animation = "";
+  }
 
   function installDetailCardOverlay() {
     if (isEmbeddedDetail || !["personal", "jd", "workspace"].includes(page)) return;
@@ -937,13 +968,10 @@
     document.addEventListener("click", (event) => {
       const fadeSource = event.target.closest(pageFadeSourceSelector);
       if (fadeSource && !event.defaultPrevented && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
-        const fadeDestination = fadeSource.getAttribute("href");
+        const fadeDestination = pageFadeDestination(fadeSource);
         if (fadeDestination) {
           event.preventDefault();
-          safeSession.remove();
-          if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { window.location.assign(fadeDestination); return; }
-          document.body.classList.add("v1-route-leaving");
-          window.setTimeout(() => window.location.assign(fadeDestination), 320);
+          navigateWithPageFade(fadeDestination);
           return;
         }
       }
@@ -957,6 +985,8 @@
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { window.location.assign(destination); return; }
       animateCardToPage(source, destination);
     });
+
+    window.addEventListener("pageshow", restorePageFade);
 
     document.querySelectorAll(".v1-back[href]").forEach((back) => back.addEventListener("click", (event) => {
       const route = safeSession.get();
