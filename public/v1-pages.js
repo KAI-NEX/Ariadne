@@ -117,7 +117,7 @@
     const source = selectedCandidateSources[0];
     // The candidate picker currently accepts files only. Before a file exists,
     // gate the picker with the same multimodal operation it can actually start.
-    if (!source || ["PDF", "IMAGE"].includes(source.source_type)) return "candidate_image_import";
+    if (!source || ["PDF", "IMAGE", "DOCX"].includes(source.source_type)) return "candidate_image_import";
     return "candidate_text_import";
   }
 
@@ -214,9 +214,13 @@
       source_document_legacy_collision: "来源身份与旧版记录冲突；未覆盖任何已有资料。",
       source_document_canonical_collision: "来源身份与已有正式记录冲突；未覆盖任何已有资料。",
       candidate_model_runtime_not_eligible: "当前运行方式不支持这次模型整理；没有发送材料。",
-      candidate_model_multimodal_source_required: "当前模型导入需要一张图片或一个 PDF。",
+      candidate_model_multimodal_source_required: "当前模型导入支持图片、PDF 和 DOCX。",
+      docx_complex_content_export_pdf: "Word 文件含暂不能完整读取的图表或嵌入对象，请导出为 PDF 后重试。",
+      docx_archive_invalid: "Word 文件无法读取，请确认是未加密且可以正常打开的 DOCX。",
+      docx_archive_limit: "Word 文件解压后内容过大，请拆分文件后重试。",
+      attachment_content_limit: "文件内容超过完整处理预算，请拆分后重试；未截断发送。",
       candidate_model_pdf_required: "当前模型导入只支持 PDF 文件。",
-      candidate_model_source_not_resolved: "无法从本机恢复当前 PDF；没有发送材料。",
+      candidate_model_source_not_resolved: "无法从本机恢复当前材料；没有发送材料。",
       candidate_model_consent_required: "发送前需要你的明确确认。",
       candidate_model_consent_mismatch: "当前文件或运行方式已变化；请重新确认。",
       candidate_model_credential_reference_invalid: "模型凭据引用无效；没有发送材料。",
@@ -307,7 +311,7 @@
     button.textContent = modelReady
       ? candidateExecutionState === "PROCESSING" ? "正在使用模型分析" : candidateExecutionState === "COMPLETE" ? "查看工作区" : "使用模型分析"
       : !local ? "模型导入尚不可用" : candidateExecutionState === "COMPLETED_SOURCE" ? "确认" : candidateExecutionState === "COMPLETE" ? "本地提取已完成" : candidateExecutionState === "PROCESSING" ? "正在本地提取" : "开始本地提取";
-    const modelSourceIneligible = modelReady && (selectedCandidateSources.length !== 1 || !["PDF", "IMAGE"].includes(selectedCandidateSources[0]?.source_type));
+    const modelSourceIneligible = modelReady && (selectedCandidateSources.length !== 1 || !["PDF", "IMAGE", "DOCX"].includes(selectedCandidateSources[0]?.source_type));
     button.disabled = candidateProcessingInProgress || (!modelReady && candidateExecutionState === "COMPLETE") || candidateExecutionState === "COMPLETED_SOURCE" || !selectedCandidateSources.length || !gate.allowed || modelSourceIneligible;
     button.classList.toggle("hidden", modelReady && candidateExecutionState === "PROCESSING");
     byId("personal-file-input").disabled = (!local && !modelReady) || candidateProcessingInProgress;
@@ -320,7 +324,7 @@
       ? `本次模型导入：${runtimeLabel(gate.authority.runtime)} · 图像能力已验证`
       : local ? "当前运行：本地确定规则。材料不会发送给模型服务商。" : unavailableCopy(gate, "个人材料语义结构化");
     const candidateBoundary = byId("personal-processing-boundary");
-    if (candidateBoundary) candidateBoundary.textContent = modelReady ? "正在处理当前 PDF；模型结果只进入非权威工作区" : "仅本地读取、提取与确定规则；不调用模型服务商";
+    if (candidateBoundary) candidateBoundary.textContent = modelReady ? "正在处理当前材料；模型结果只进入待审核工作区" : "仅本地读取、提取与确定规则；不调用模型服务商";
     setRuntimeGateMessage("personal-page-message", gate.allowed ? "" : unavailableCopy(gate, "个人材料语义结构化"));
     return gate;
   }
@@ -1252,7 +1256,7 @@
   function showCandidateWorkspaceLayer(sourceName, processing = false) {
     const workspace = candidateSharedWorkspace();
     byId("candidate-card-detail").classList.add("hidden");
-    const previousFocus = ProductShell.showWorkspace(workspace, { source_name: sourceName || "当前 PDF", processing, model_workspace_ui: ModelWorkspaceUI, embedded: isEmbeddedDetail });
+    const previousFocus = ProductShell.showWorkspace(workspace, { source_name: sourceName || "当前材料", processing, model_workspace_ui: ModelWorkspaceUI, embedded: isEmbeddedDetail });
     if (previousFocus) candidateWorkspacePreviousFocus = previousFocus;
   }
 
@@ -1324,7 +1328,7 @@
     const cards = activeCandidateWorkingModel.payload.items || [];
     await restoreCandidateWorkspaceConversation(sourceId);
     if (!workspaceViewIsCurrent(viewGeneration)) return [];
-    showCandidateWorkspaceLayer(source?.filename || "当前 PDF", false);
+    showCandidateWorkspaceLayer(source?.filename || "当前材料", false);
     byId("candidate-working-groups").innerHTML = candidateWorkingGroupsMarkup(cards);
     setCandidateWorkspaceProgress(["材料已准备", candidateSourceReadLabel(source), "模型已完成理解", `已生成 ${cards.length} 张候选卡片`]);
     const questions = cards.flatMap((card) => card.uncertainties || []).filter((uncertainty) => uncertainty.status === "OPEN");
@@ -1398,6 +1402,7 @@
   }
 
   async function callCandidateConversationRuntime(request) {
+    const attachments = window.AriadneConversationAttachments;
     const signatureResponse = await (globalThis.AriadneConnector || globalThis).fetch("/api/candidate-conversation-runtime-signature", { cache: "no-store" });
     const signaturePayload = await signatureResponse.json().catch(() => null);
     const frontendSignature = CandidateWorkspaceConversationRuntime.runtimeSignature();
@@ -1424,12 +1429,15 @@
       };
       throw error;
     }
-    const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/candidate-conversation-turn", {
+    const outboundRequest = attachments ? await attachments.prepare(request, "CANDIDATE") : request;
+    let response;
+    try { response = await (globalThis.AriadneConnector || globalThis).fetch("/api/candidate-conversation-turn", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
-    });
+      body: JSON.stringify(outboundRequest),
+    }); } catch (error) { attachments?.finish(request, false, error); throw error; }
     const result = await response.json().catch(() => ({ error: "MALFORMED_RESPONSE" }));
+    attachments?.finish(request, response.ok && !result.error, result.error);
     if (!response.ok) {
       const error = new Error(result.error || "CANDIDATE_CONVERSATION_FAILED");
       error.code = result.error || "CANDIDATE_CONVERSATION_FAILED";
@@ -1707,7 +1715,7 @@
     let sources;
     try {
       sources = (await LocalCandidateReview.getAll(database, "source_documents")).filter((source) => source.contract_id === "ariadne-source-document-v1"
-        && source.material_type === "CANDIDATE" && source.source_type === "PDF" && source.mime_type === "application/pdf" && source.local_reference);
+        && source.material_type === "CANDIDATE" && ["PDF", "DOCX", "IMAGE"].includes(source.source_type) && source.local_reference);
     } finally { database.close(); }
     const selected = selectedCandidateSources.find((item) => sources.some((source) => source.source_document_id === item.source_document_id));
     byId("saved-candidate-source-summary").textContent = selected ? selected.filename || selected.file?.name : "选择已保存在本机的资料";
@@ -2151,9 +2159,9 @@
     candidateBatchAbortController = abortController;
     byId("replace-personal-file").textContent = "取消本次分析";
     showCandidateWorkspaceLayer(source.file.name, true);
-    setCandidateWorkspaceProgress(["正在准备材料", "正在读取 PDF", "等待模型理解", "整理候选卡片"], 0);
+    setCandidateWorkspaceProgress(["正在准备材料", candidateSourceReadLabel(source, "reading"), "等待模型理解", "整理候选卡片"], 0);
     byId("candidate-clarification-list").innerHTML = '<p data-entry-type="CLARIFYING_QUESTION_EMPTY">完成理解后，需要补充的问题会显示在这里。</p>';
-    setCandidateExtractionState("PREPARING", `正在校验本机保存的原始${source.source_type === "IMAGE" ? "图片" : "PDF"}`);
+    setCandidateExtractionState("PREPARING", "正在校验本机保存的原始材料");
     refreshCandidateImportGate();
     await ConversationUI.waitForIndicatorPaint();
     let database = null;
@@ -2169,7 +2177,7 @@
       const startedAt = new Date().toISOString();
       run = CandidateModel.processingRunFor(source, snapshot.snapshot_id, "RUNNING", startedAt, { run_id: run.run_id, started_at: startedAt });
       await Truth.persistRecord(database, "processing_runs", run);
-      setCandidateExtractionState("EXTRACTING", source.source_type === "IMAGE" ? "正在准备原始图片" : "正在准备完整 PDF 渲染页面");
+      setCandidateExtractionState("EXTRACTING", source.source_type === "IMAGE" ? "正在准备原始图片" : source.source_type === "DOCX" ? "正在准备 Word 正文和内嵌图片" : "正在准备完整 PDF 渲染页面");
       setCandidateWorkspaceProgress(["材料已准备", candidateSourceReadLabel(source, "reading"), "等待模型理解", "整理候选卡片"], 1);
       const documentDataUrl = await LocalCandidate.readAsDataURL(resolved.file, sourceDocument.mime_type);
       if (abortController.signal.aborted) throw Object.assign(new Error("candidate_model_cancelled"), { name: "AbortError" });
@@ -2358,7 +2366,7 @@
       else await renderAwaitingCandidateReviews({ reset: true, sourceIds: [] });
       candidateExecutionState = modelReady ? "READY" : actionable.length ? "READY" : completedSources.length && !active.length && !pending.length ? "COMPLETED_SOURCE" : "COMPLETE";
       if (pending.length && !actionable.length) byId("personal-page-message").textContent = "该文件已有待审核内容，已恢复审核队列。";
-      else if (completedSources.length && !actionable.length && !active.length) byId("personal-page-message").textContent = "该 PDF 已被读取。点击确认返回个人资料。";
+      else if (completedSources.length && !actionable.length && !active.length) byId("personal-page-message").textContent = "该资料已被读取。点击确认返回个人资料。";
       else if (active.length && !actionable.length) byId("personal-page-message").textContent = "该文件已导入，无需重复处理。";
       else if (active.length || pending.length || completedSources.length) byId("personal-page-message").textContent = `已跳过 ${active.length + pending.length + completedSources.length} 个已导入或待审核文件；其余文件可以继续${modelReady ? "模型分析" : "本地提取"}。`;
       else byId("personal-page-message").textContent = "";
@@ -3655,6 +3663,7 @@
   }
 
   async function callJobConversationRuntime(request) {
+    const attachments = window.AriadneConversationAttachments;
     const signatureResponse = await (globalThis.AriadneConnector || globalThis).fetch("/api/job-conversation-runtime-signature", { cache: "no-store" });
     const signaturePayload = await signatureResponse.json().catch(() => null);
     if (!signatureResponse.ok || !JobConversation.runtimeSignaturesMatch(JobConversation.runtimeSignature(), signaturePayload?.runtime_signature)) {
@@ -3663,18 +3672,22 @@
       error.network_call_made = false;
       throw error;
     }
-    const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/job-conversation-turn", {
+    const outboundRequest = attachments ? await attachments.prepare(request, "JOB") : request;
+    let response;
+    try { response = await (globalThis.AriadneConnector || globalThis).fetch("/api/job-conversation-turn", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
-    });
+      body: JSON.stringify(outboundRequest),
+    }); } catch (error) { attachments?.finish(request, false, error); throw error; }
     const result = await response.json().catch(() => ({ error: "MALFORMED_RESPONSE" }));
     if (!response.ok) {
+      attachments?.finish(request, false, result.error);
       const error = new Error(result.error || "JOB_CONVERSATION_FAILED");
       error.code = result.error || "JOB_CONVERSATION_FAILED";
       error.network_call_made = result.network_call_made === true;
       throw error;
     }
+    attachments?.finish(request, true);
     return result;
   }
 

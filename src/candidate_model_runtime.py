@@ -27,6 +27,7 @@ from src.candidate_context import (
 from src.execution_contract import ExecutionContractError, validate_runtime_snapshot
 from src.provider_runtime import OPENAI_CHAT_COMPLETIONS, ProviderRuntimeError
 from src.upload_limits import MAX_FILE_BYTES
+from src.material_delivery import DOCX, material_parts
 
 
 PROVIDER_ID = "deepseek"
@@ -150,11 +151,12 @@ def _validate_source(value: Any) -> dict[str, Any]:
     mime_type = value.get("mime_type")
     valid_pdf = source_type == "PDF" and mime_type == "application/pdf" and filename.lower().endswith(".pdf")
     valid_image = source_type == "IMAGE" and mime_type in {"image/png", "image/jpeg"} and filename.lower().endswith((".png", ".jpg", ".jpeg"))
+    valid_docx = source_type == "DOCX" and mime_type == DOCX and filename.lower().endswith(".docx")
     if (
         value.get("contract_id") != "ariadne-source-document-v1"
         or value.get("material_type") != "CANDIDATE"
         or value.get("authority") != "SOURCE_INPUT_ONLY"
-        or not (valid_pdf or valid_image)
+        or not (valid_pdf or valid_image or valid_docx)
         or not source_id.startswith("source-candidate-")
     ):
         raise CandidateModelRuntimeError("candidate_model_multimodal_source_required", "source")
@@ -176,6 +178,7 @@ def _decode_source(data_url: Any, source: dict[str, Any]) -> bytes:
     valid_signature = source["source_type"] == "PDF" and source_bytes.startswith(b"%PDF-")
     valid_signature = valid_signature or source["mime_type"] == "image/png" and source_bytes.startswith(b"\x89PNG\r\n\x1a\n")
     valid_signature = valid_signature or source["mime_type"] == "image/jpeg" and source_bytes.startswith(b"\xff\xd8\xff")
+    valid_signature = valid_signature or source["mime_type"] == DOCX and source_bytes.startswith(b"PK\x03\x04")
     if not source_bytes or len(source_bytes) > MAX_SOURCE_BYTES or not valid_signature:
         raise CandidateModelRuntimeError("candidate_model_source_payload_invalid", "source")
     resolved_hash = "sha256:" + hashlib.sha256(source_bytes).hexdigest()
@@ -304,7 +307,23 @@ def execute_candidate_model_request(
 ) -> dict[str, Any]:
     request = validate_candidate_model_request(payload)
     credential = resolve_credential(request.runtime_snapshot["credential_ref"], credential_reader)
-    if request.source_document["source_type"] == "PDF":
+    if request.source_document["source_type"] == "DOCX":
+        try:
+            document_parts = material_parts(DOCX, request.source_bytes)
+        except ValueError as error:
+            raise CandidateModelRuntimeError(str(error), "delivery") from error
+        from src.candidate_context import candidate_proposal_instruction
+        provider_payload = {
+            "model": request.runtime_snapshot["model"],
+            "messages": [{"role": "user", "content": [
+                {"type": "text", "text": candidate_proposal_instruction()},
+                {"type": "text", "text": f"Source document ID: {request.source_document['source_document_id']}. Use DOCX section names or paragraph excerpts as locations, not invented page numbers."},
+                *document_parts]}],
+            "response_format": {"type": "json_object"}, "thinking": {"type": "disabled"}, "temperature": 0, "max_tokens": 8000,
+        }
+        rendered_pages = []
+        outbound_images = sum(part["type"] == "image_url" for part in document_parts)
+    elif request.source_document["source_type"] == "PDF":
         try:
             rendered_pages = render_pages(request.source_bytes)
         except Exception as error:
@@ -313,11 +332,13 @@ def execute_candidate_model_request(
     else:
         rendered_pages = [("1", request.source_bytes)]
         media_type = request.source_document["mime_type"]
-    if not rendered_pages or any(not page_number or not image for page_number, image in rendered_pages):
-        raise CandidateModelRuntimeError("candidate_model_source_delivery_failed", "delivery")
-    provider_payload = build_deepseek_candidate_proposal_payload(
-        request.source_document["source_document_id"], request.runtime_snapshot["model"], rendered_pages, media_type,
-    )
+    if request.source_document["source_type"] != "DOCX":
+        if not rendered_pages or any(not page_number or not image for page_number, image in rendered_pages):
+            raise CandidateModelRuntimeError("candidate_model_source_delivery_failed", "delivery")
+        provider_payload = build_deepseek_candidate_proposal_payload(
+            request.source_document["source_document_id"], request.runtime_snapshot["model"], rendered_pages, media_type,
+        )
+        outbound_images = len(rendered_pages)
     http_status, provider_response = provider_call(credential, provider_payload)
     diagnostics = response_diagnostics(provider_response, http_status)
     diagnostics["rendered_page_count"] = len(rendered_pages)
@@ -361,7 +382,8 @@ def execute_candidate_model_request(
         "processing_run_id": request.processing_run_id,
         "operation_id": request.operation_id,
         "rendered_page_count": len(rendered_pages),
-        "outbound_image_count": len(rendered_pages),
+        "outbound_image_count": outbound_images,
+        **({"source_delivery": "docx_text_and_embedded_images_v1"} if request.source_document["source_type"] == "DOCX" else {}),
         "provider_response_id": provider_response.get("id"),
         "usage": provider_response.get("usage") if isinstance(provider_response.get("usage"), dict) else {},
         "candidate_proposal": candidate_proposal,

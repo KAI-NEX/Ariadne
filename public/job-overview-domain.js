@@ -73,8 +73,15 @@
   async function callRuntime(request) {
     const check = await (globalThis.AriadneConnector || globalThis).fetch("/api/job-overview-signature", { cache: "no-store" }), checked = await check.json();
     if (!check.ok || !same(checked.runtime_signature, signature())) throw new Error("RUNTIME_CONTRACT_VERSION_MISMATCH");
-    const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/job-overview-turn", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) });
-    const result = await response.json(); if (!response.ok) throw new Error(result.error || "JOB_OVERVIEW_FAILED"); return result;
+    const attachments = globalThis.AriadneConversationAttachments;
+    const outbound = attachments ? await attachments.prepare(request, "JOB_OVERVIEW") : request;
+    let response, result;
+    try {
+      response = await (globalThis.AriadneConnector || globalThis).fetch("/api/job-overview-turn", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(outbound) });
+      result = await response.json();
+    } catch (error) { attachments?.finish(request, false, error); throw error; }
+    attachments?.finish(request, response.ok && !result.error, result.error);
+    if (!response.ok) throw new Error(result.error || "JOB_OVERVIEW_FAILED"); return result;
   }
   function validateResult(result, request) {
     if (result?.contract_id !== Contract.result_contract || result.request_id !== request.request_id || result.phase !== request.phase || result.runtime_snapshot_id !== request.runtime_snapshot.snapshot_id

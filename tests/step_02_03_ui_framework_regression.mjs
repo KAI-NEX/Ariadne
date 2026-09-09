@@ -413,7 +413,7 @@ assert.match(pages, /const visible = JobConversation\.connectedHistory\(messages
 assert.match(pages, /ConversationUI\.renderMessages\(target, visible,/);
 assert.match(pages, /ModelWorkspaceUI\.renderProgress\(byId\("candidate-understanding-events"\)/);
 assert.match(pages, /ModelWorkspaceUI\.renderProgress\(byId\("job-understanding-events"\)/);
-assert.match(pages, /ProductShell\.showWorkspace\(workspace, \{ source_name: sourceName \|\| "当前 PDF"/);
+assert.match(pages, /ProductShell\.showWorkspace\(workspace, \{ source_name: sourceName \|\| "当前材料"/);
 assert.match(pages, /ProductShell\.showWorkspace\(jobSharedWorkspace\(\), \{ source_name:/);
 assert.match(styles, /corner-shape: squircle/);
 assert.match(workspace, />Ariadne</);

@@ -90,6 +90,10 @@ const result = {
   operation_id: operationIdentity.operation_id, provider_response_id: "response-synthetic-1", candidate_proposal: candidateProposal, network_call_made: true,
 };
 const proposals = CandidateModel.proposalsFor({ source, run: running, result, operationIdentity });
+const docxSource = { ...source, source_type: "DOCX", mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", filename: "synthetic.docx", file: { name: "synthetic.docx" } };
+const docxResult = { ...result, rendered_page_count: 0, outbound_image_count: 1, source_delivery: "docx_text_and_embedded_images_v1" };
+assert.equal(CandidateModel.proposalsFor({ source: docxSource, run: running, result: docxResult, operationIdentity }).length, 1);
+assert.throws(() => CandidateModel.proposalsFor({ source: docxSource, run: running, result: { ...docxResult, source_delivery: null }, operationIdentity }));
 assert.equal(proposals.length, 1);
 assert.equal(proposals[0].status, "AWAITING_REVIEW");
 assert.equal(proposals[0].authority, Truth.AUTHORITY.proposal);
@@ -318,7 +322,7 @@ assert.match(html, /placeholder="直接说想了解什么，或哪里需要修�
 assert.doesNotMatch(html, /SYSTEM|grounding|source-scoped|非权威 Working Cards/);
 assert.match(modelWorkspaceUi, /data-entry-type="EXECUTION_EVENT"/);
 assert.match(pages, /ModelWorkspaceUI\.renderProgress\(byId\("candidate-understanding-events"\)/);
-assert.match(pages, /ProductShell\.showWorkspace\(workspace, \{ source_name: sourceName \|\| "当前 PDF", processing, model_workspace_ui: ModelWorkspaceUI/);
+assert.match(pages, /ProductShell\.showWorkspace\(workspace, \{ source_name: sourceName \|\| "当前材料", processing, model_workspace_ui: ModelWorkspaceUI/);
 assert.match(productShell, /modelWorkspaceUi\.setProcessingState\(\{ processing: workspace\.processing, content: workspace\.content, save: workspace\.save, active: processing \}\)/);
 assert.match(pages, /data-entry-type="CLARIFYING_QUESTION"/);
 assert.match(pages, /CandidateModel\.editedCandidateWorkingModel/);

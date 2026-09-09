@@ -69,7 +69,8 @@
     const name = String(source?.file?.name || source?.filename || "").toLowerCase();
     const pdf = source?.source_type === "PDF" && source?.mime_type === "application/pdf" && name.endsWith(".pdf");
     const image = source?.source_type === "IMAGE" && ["image/png", "image/jpeg"].includes(source?.mime_type) && /\.(?:png|jpe?g)$/.test(name);
-    if (!pdf && !image) throw new Error("candidate_model_multimodal_source_required");
+    const docx = source?.source_type === "DOCX" && source?.mime_type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" && name.endsWith(".docx");
+    if (!pdf && !image && !docx) throw new Error("candidate_model_multimodal_source_required");
     return source;
   }
 
@@ -187,8 +188,10 @@
       || result?.runtime_snapshot_id !== run.runtime_snapshot_id || result?.processing_run_id !== run.run_id
       || result?.operation_id !== operationIdentity?.operation_id
       || result?.source_document_id !== source.source_document_id || result?.content_hash !== source.content_hash
-      || result?.network_call_made !== true || !Number.isInteger(result?.rendered_page_count) || result.rendered_page_count < 1
-      || result.outbound_image_count !== result.rendered_page_count) {
+      || result?.network_call_made !== true || !Number.isInteger(result?.rendered_page_count)
+      || (source.source_type === "DOCX"
+        ? result.source_delivery !== "docx_text_and_embedded_images_v1" || result.rendered_page_count !== 0 || !Number.isInteger(result.outbound_image_count) || result.outbound_image_count < 0 || result.outbound_image_count > 48
+        : result.rendered_page_count < 1 || result.outbound_image_count !== result.rendered_page_count)) {
       throw new Error("candidate_model_response_contract_failed");
     }
     const modelProposal = result.candidate_proposal;

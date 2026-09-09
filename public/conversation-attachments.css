@@ -1,0 +1,10 @@
+.v1-conversation-attachments { color: var(--vi-text-secondary); font-family: var(--vi-font-ui); font-size: var(--vi-text-caption); margin-block: var(--vi-space-8); min-width: 0; }
+.v1-conversation-attachments summary { cursor: pointer; }
+.v1-conversation-attachments[open] { max-height: 40vh; overflow-y: auto; }
+.v1-conversation-attachments ul { list-style: none; padding: 0; margin: 0; max-height: 20vh; overflow-y: auto; }
+.v1-conversation-attachments li { display: flex; align-items: center; gap: var(--vi-space-8); }
+.v1-conversation-attachments li span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.v1-conversation-attachments img { width: var(--vi-space-48); height: var(--vi-space-48); object-fit: contain; }
+.v1-attachment-consent { display: flex; gap: var(--vi-space-8); align-items: flex-start; }
+.v1-attachment-consent input { flex: 0 0 auto; }
+.v1-attachment-status { overflow-wrap: anywhere; }

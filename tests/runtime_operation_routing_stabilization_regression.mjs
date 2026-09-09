@@ -61,7 +61,7 @@ const pages = read("public/v1-pages.js");
 const candidateModelFlow = pages.slice(pages.indexOf("async function executeCandidateModelProcessing"), pages.indexOf("function initPersonalImport"));
 const jobModelFlow = pages.slice(pages.indexOf("async function executeJobModelProcessing"), pages.indexOf("async function runJobProcessing"));
 assert.match(pages, /candidateImportOperation/);
-assert.match(pages, /if \(!source \|\| \["PDF", "IMAGE"\]\.includes\(source\.source_type\)\) return "candidate_image_import"/);
+assert.match(pages, /if \(!source \|\| \["PDF", "IMAGE", "DOCX"\]\.includes\(source\.source_type\)\) return "candidate_image_import"/);
 assert.match(pages, /function candidateSourceReadLabel/);
 assert.match(pages, /source\?\.source_type === "IMAGE" \? "图片"/);
 assert.match(pages, /if \(!selectedJobSources\.length\) return selectedJobImportType === "Paste" \? "job_text_import" : "job_image_import"/);

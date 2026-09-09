@@ -1,6 +1,7 @@
 """Read-only reasoning over a current Job collection; no Candidate or mutation actions."""
 from __future__ import annotations
 from src.conversation_semantics import HUMAN_CONVERSATION_PRINCIPLES
+from src.conversation_attachments import validate_attachments, augment_payload
 
 from src.runtime_binding import valid_binding, resolve_runtime_credential
 
@@ -25,7 +26,7 @@ def signature():
     return {key: MANIFEST[key] for key in ("contract_id", "request_contract", "result_contract", "operation", "adapter_version", "prompt_version", "request_config_version")}
 
 def validate_request(value):
-    if not isinstance(value, dict) or set(value) != {"contract_id", "phase", "request_id", "runtime_snapshot", "human_message", "context", "consent"}:
+    if not isinstance(value, dict) or set(value) - {"attachments"} != {"contract_id", "phase", "request_id", "runtime_snapshot", "human_message", "context", "consent"}:
         raise JobOverviewError("JOB_OVERVIEW_REQUEST_INVALID")
     if value["contract_id"] != MANIFEST["request_contract"] or value["phase"] not in MANIFEST["phases"]:
         raise JobOverviewError("JOB_OVERVIEW_REQUEST_INVALID")
@@ -67,6 +68,7 @@ def validate_request(value):
         raise JobOverviewError("JOB_OVERVIEW_RUNTIME_INVALID", "runtime")
     if value["consent"] != {"confirmed": True, "purpose": "JOB_OVERVIEW", "provider": value.get("runtime_snapshot", {}).get("provider"), "model": value.get("runtime_snapshot", {}).get("model")}:
         raise JobOverviewError("JOB_OVERVIEW_CONSENT_REQUIRED", "consent")
+    validate_attachments(value, JobOverviewError)
     return value
 
 def prompt(phase):
@@ -87,10 +89,10 @@ Follow the function schema exactly. uncertainties is an array of plain STRINGS, 
 
 def build_payload(request):
     phase = request["phase"]
-    return {"model": request["runtime_snapshot"]["model"], "messages": [{"role": "system", "content": prompt(phase)},
+    return augment_payload({"model": request["runtime_snapshot"]["model"], "messages": [{"role": "system", "content": prompt(phase)},
         {"role": "user", "content": json.dumps({"context": request["context"], "human_message": request["human_message"]}, ensure_ascii=False, separators=(",", ":"))}],
         "tools": [{"type": "function", "function": {"name": TOOL, "strict": True, "parameters": digest_schema("DISTILL" if phase == "DISTILL" else "SYNTHESIZE")}}],
-        "tool_choice": {"type": "function", "function": {"name": TOOL}}, "thinking": {"type": "disabled"}, "temperature": 0, "max_tokens": 6000}
+        "tool_choice": {"type": "function", "function": {"name": TOOL}}, "thinking": {"type": "disabled"}, "temperature": 0, "max_tokens": 6000}, request, JobOverviewError)
 
 def validate_output(output, request):
     # Share only shape, coverage and grounding validation; Job prompts, context,

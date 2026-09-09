@@ -19,6 +19,7 @@ from urllib.parse import quote
 
 from src.runtime_binding import valid_binding, resolve_runtime_credential
 from src.conversation_semantics import HUMAN_CONVERSATION_PRINCIPLES
+from src.conversation_attachments import validate_attachments, augment_payload
 
 from src.execution_contract import ExecutionContractError, validate_runtime_snapshot
 from src.provider_runtime import OPENAI_CHAT_COMPLETIONS, ProviderRuntimeError
@@ -375,7 +376,7 @@ def _validate_compiled_context(value: Any, conversation: dict[str, Any], observa
 def validate_candidate_conversation_request(payload: Any) -> CandidateConversationRequest:
     request = _mapping(payload, "EXACT_SCHEMA_FAILURE")
     base_keys = {"contract_id", "conversation", "human_message", "observation", "working_model", "runtime_snapshot", "draft", "turn"}
-    if set(request) not in (base_keys, base_keys | {"compiled_context"}):
+    if set(request) - {"attachments"} not in (base_keys, base_keys | {"compiled_context"}):
         raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation")
     if request.get("contract_id") != RUNTIME_REQUEST_CONTRACT_VERSION:
         raise CandidateConversationRuntimeError("EXACT_SCHEMA_FAILURE", "contract_validation")
@@ -392,6 +393,7 @@ def validate_candidate_conversation_request(payload: Any) -> CandidateConversati
     if "compiled_context" in request:
         compiled_context = _validate_compiled_context(request.get("compiled_context"), conversation, observation, working_model, human_message)
     snapshot = _validate_snapshot(request.get("runtime_snapshot"))
+    validate_attachments(request, CandidateConversationRuntimeError)
     draft_value = request.get("draft")
     draft = None
     if observation["focus"]["type"] == "ITEM_DRAFT":
@@ -1271,7 +1273,7 @@ def execute_candidate_conversation_request(
         )
     except ProviderRuntimeError as error:
         raise CandidateConversationRuntimeError(error.code, error.failure_layer) from error
-    provider_payload = build_candidate_conversation_payload(request)
+    provider_payload = augment_payload(build_candidate_conversation_payload(request), payload, CandidateConversationRuntimeError)
     http_status, provider_response = provider_call(credential, provider_payload)
     action, _resolution_verifications, usage = _normalize_candidate_conversation_response_with_verifications(provider_response, request, http_status)
     print(

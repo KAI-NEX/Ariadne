@@ -13,6 +13,7 @@ import time
 from urllib.parse import urlparse
 
 GET_PATHS = frozenset({
+    "/api/conversation-attachment-capabilities",
     "/api/runtime-options", "/api/candidate-conversation-runtime-signature",
     "/api/job-conversation-runtime-signature", "/api/job-model-import-runtime-signature",
     "/api/personal-understanding-signature", "/api/job-overview-signature",

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from src.runtime_binding import valid_binding, resolve_runtime_credential
+from src.conversation_attachments import validate_attachments, augment_payload
 
 from src.execution_contract import ExecutionContractError, validate_runtime_snapshot
 from src.provider_runtime import OPENAI_CHAT_COMPLETIONS, ProviderRuntimeError
@@ -118,7 +119,7 @@ def validate_job_conversation_request(payload: Any) -> JobConversationRequest:
         "contract_id", "conversation", "human_message", "observation", "candidate_manifest",
         "candidate_snapshot_summary", "candidate_delta", "source_excerpt_manifest", "compiled_context", "runtime_snapshot", "turn",
     }
-    if set(value) != required or value.get("contract_id") != REQUEST_CONTRACT:
+    if set(value) - {"attachments"} != required or value.get("contract_id") != REQUEST_CONTRACT:
         raise JobConversationRuntimeError("REQUEST_INVALID", "contract_validation")
     conversation = dict(_mapping(value["conversation"], "CONVERSATION_INVALID"))
     if set(conversation) != {"contract_id", "conversation_id", "created_at"} or conversation.get("contract_id") != MANIFEST["conversation_session_version"]:
@@ -180,6 +181,7 @@ def validate_job_conversation_request(payload: Any) -> JobConversationRequest:
     turn = _mapping(value["turn"], "TURN_INVALID")
     if set(turn) != {"execution_id", "generation"}:
         raise JobConversationRuntimeError("TURN_INVALID", "contract_validation")
+    validate_attachments(value, JobConversationRuntimeError)
     return JobConversationRequest(
         conversation=conversation,
         human_message=human_message,
@@ -481,7 +483,7 @@ def execute_job_conversation_request(
         )
     except ProviderRuntimeError as error:
         raise JobConversationRuntimeError(error.code, error.failure_layer) from error
-    provider_payload = build_job_conversation_payload(request)
+    provider_payload = augment_payload(build_job_conversation_payload(request), payload, JobConversationRuntimeError)
     status, response = provider_call(credential, provider_payload)
     output, usage = normalize_job_conversation_response(response, request, status)
     print(

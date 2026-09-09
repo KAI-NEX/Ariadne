@@ -159,7 +159,7 @@ assert.match(reviewMarkup, /data-review-action="confirm"/);
 assert.match(reviewMarkup, /data-review-action="reject"/);
 assert.doesNotMatch(reviewMarkup, /data-review-action="edit-confirm"/);
 assert.match(pages, /candidateExecutionState === "COMPLETED_SOURCE"/);
-assert.match(pages, /该 PDF 已被读取。点击确认返回个人资料。/);
+assert.match(pages, /该资料已被读取。点击确认返回个人资料。/);
 assert.match(html, /id="completed-source-sheet"/);
 assert.match(html, /id="confirm-completed-source"/);
 assert.match(html, /id="document-size-limit-dialog"/);

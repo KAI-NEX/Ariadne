@@ -12,6 +12,7 @@ from typing import Any, Callable
 
 from src.runtime_binding import valid_binding, resolve_runtime_credential
 from src.conversation_semantics import HUMAN_CONVERSATION_PRINCIPLES
+from src.conversation_attachments import validate_attachments, augment_payload
 
 from src.execution_contract import validate_runtime_snapshot, ExecutionContractError
 from src.provider_runtime import ProviderRuntimeError
@@ -39,7 +40,7 @@ def text(value: Any, maximum: int, *, empty: bool = False) -> str:
 
 
 def validate_request(value: Any) -> dict:
-    if not isinstance(value, dict) or set(value) != {"contract_id", "phase", "request_id", "runtime_snapshot", "human_message", "context", "consent"}:
+    if not isinstance(value, dict) or set(value) - {"attachments"} != {"contract_id", "phase", "request_id", "runtime_snapshot", "human_message", "context", "consent"}:
         raise PersonalUnderstandingError("PERSONAL_REQUEST_INVALID")
     if value["contract_id"] != MANIFEST["request_contract"] or value["phase"] not in MANIFEST["phases"]:
         raise PersonalUnderstandingError("PERSONAL_REQUEST_INVALID")
@@ -75,6 +76,7 @@ def validate_request(value: Any) -> dict:
         for layer in ("confirmed", "working"):
             if not isinstance(context["candidate"].get(layer), list):
                 raise PersonalUnderstandingError("PERSONAL_CONTEXT_INVALID", "context")
+    validate_attachments(value, PersonalUnderstandingError)
     return value
 
 
@@ -131,12 +133,12 @@ Nothing is saved by this response. Tell the Human to review the proposal and Sav
 
 
 def build_payload(request: dict) -> dict:
-    return {"model": request["runtime_snapshot"]["model"], "messages": [
+    return augment_payload({"model": request["runtime_snapshot"]["model"], "messages": [
         {"role": "system", "content": prompt(request["phase"])},
         {"role": "user", "content": json.dumps({"context": request["context"], "human_message": request["human_message"]}, ensure_ascii=False, separators=(",", ":"))},
     ], "tools": [{"type": "function", "function": {"name": "deliver_personal_understanding", "strict": True, "parameters": output_schema(request["phase"])}}],
         "tool_choice": {"type": "function", "function": {"name": "deliver_personal_understanding"}},
-        "thinking": {"type": "disabled"}, "temperature": 0, "max_tokens": 6000}
+        "thinking": {"type": "disabled"}, "temperature": 0, "max_tokens": 6000}, request, PersonalUnderstandingError)
 
 
 def validate_output(output: Any, request: dict) -> dict:

@@ -5,6 +5,7 @@ from __future__ import annotations
 from src.runtime_binding import CODEX_MODEL, CODEX_CREDENTIAL, CODEX_PROTOCOL, codex_enabled, local_runtime_preference
 from src.codex_runtime import call_codex
 from src.pdf_delivery import render_complete_pdf_pages
+from src.conversation_attachments import CONTRACT as ATTACHMENTS_CONTRACT, REQUEST_LIMIT as ATTACHMENTS_REQUEST_LIMIT
 
 import json
 import base64
@@ -905,6 +906,9 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/job-conversation-runtime-signature":
             self.send_json(HTTPStatus.OK, {"runtime_signature": job_conversation_runtime_signature(), "network_call_made": False})
             return
+        if parsed.path == "/api/conversation-attachment-capabilities":
+            self.send_json(HTTPStatus.OK, {"contract_id": ATTACHMENTS_CONTRACT, "max_files": 4, "max_total_bytes": MAX_FILE_BYTES, "network_call_made": False})
+            return
         if parsed.path == "/job-overview-contract.js":
             body = ("window.AriadneJobOverviewContract = " + json.dumps(JOB_OVERVIEW_MANIFEST) + ";").encode("utf-8")
             self.send_response(HTTPStatus.OK)
@@ -1243,7 +1247,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         generation = None
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
-            if content_length <= 0 or content_length > 2_000_000:
+            if content_length <= 0 or content_length > ATTACHMENTS_REQUEST_LIMIT:
                 raise CandidateConversationRuntimeError("REQUEST_SIZE_INVALID", "request")
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
             validated = validate_candidate_conversation_request(payload)
@@ -1319,7 +1323,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
     def run_job_overview_turn(self) -> None:
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            if not 0 < length <= 160_000:
+            if not 0 < length <= ATTACHMENTS_REQUEST_LIMIT:
                 raise JobOverviewError("JOB_OVERVIEW_REQUEST_SIZE_INVALID", "request")
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
             result = execute_job_overview(payload, read_deepseek_key,
@@ -1339,7 +1343,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
     def run_personal_understanding_turn(self) -> None:
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            if not 0 < length <= 160_000:
+            if not 0 < length <= ATTACHMENTS_REQUEST_LIMIT:
                 raise PersonalUnderstandingError("PERSONAL_REQUEST_SIZE_INVALID", "request")
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
             result = execute_personal_understanding(payload, read_deepseek_key,
@@ -1362,7 +1366,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         generation = None
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
-            if content_length <= 0 or content_length > 2_000_000:
+            if content_length <= 0 or content_length > ATTACHMENTS_REQUEST_LIMIT:
                 raise JobConversationRuntimeError("REQUEST_SIZE_INVALID", "request")
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
             validated = validate_job_conversation_request(payload)
