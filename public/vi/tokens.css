@@ -66,6 +66,9 @@
   --vi-motion-loop: .82s;
   --vi-motion-open: 540ms;
   --vi-motion-close: 480ms;
+  --vi-motion-about-open: 900ms;
+  --vi-ease-about: cubic-bezier(.4,0,.2,1);
+  --vi-motion-about-close: 800ms;
   --vi-shadow-card: 0 10px 24px rgba(31,34,42,.06);
   --vi-shadow-dialog: 0 34px 90px rgba(31,34,42,.2), 0 5px 18px rgba(31,34,42,.08);
   --vi-focus-ring: 0 0 0 3px rgba(82,111,218,.16);

@@ -680,11 +680,20 @@
     let aboutKeyboardInteraction = false;
     let aboutReturnWordmark = null;
     let aboutFadeAnimation = null;
+    const aboutMotion = getComputedStyle(overlay);
+    const aboutOpenDuration = parseFloat(aboutMotion.getPropertyValue("--vi-motion-about-open")) || 900;
+    const aboutCloseDuration = parseFloat(aboutMotion.getPropertyValue("--vi-motion-about-close")) || 800;
+    const aboutEasing = aboutMotion.getPropertyValue("--vi-ease-about").trim() || "cubic-bezier(.4,0,.2,1)";
+
+    // Keep the final layout throughout motion; only composite its position and scale.
+    function aboutTransform(from, to) {
+      const scale = Math.min(to.width / from.width, to.height / from.height);
+      return `translate(${to.left + to.width / 2 - from.left - from.width / 2}px, ${to.top + to.height / 2 - from.top - from.height / 2}px) scale(${scale})`;
+    }
 
     function prepareAboutReturn() {
       const heading = aboutCopy.querySelector("h1");
-      const showingCopy = Number(getComputedStyle(content).opacity) >= 0.5;
-      const origin = showingCopy ? heading.querySelector(".v1-about-name") : preview.firstElementChild;
+      const origin = heading.querySelector(".v1-about-name");
       const start = origin.getBoundingClientRect();
       const end = sourceCard.getBoundingClientRect();
       const startStyle = getComputedStyle(origin);
@@ -696,9 +705,14 @@
       });
       const first = typographyFrame(start, startStyle);
       const last = typographyFrame(end, endStyle);
+      // Early dismissal can interrupt a scaled opening frame.
+      const paintedScale = surface.getBoundingClientRect().width / surface.offsetWidth;
+      for (const property of ["fontSize", "letterSpacing", "lineHeight"]) {
+        first[property] = `${parseFloat(first[property]) * paintedScale}px`;
+      }
       // Freeze the content geometry: fading copy must not wrap into the shrinking surface.
-      content.style.width = `${content.getBoundingClientRect().width}px`;
-      content.style.height = `${content.getBoundingClientRect().height}px`;
+      content.style.width = `${content.offsetWidth}px`;
+      content.style.height = `${content.offsetHeight}px`;
       aboutReturnWordmark = document.createElement("span");
       aboutReturnWordmark.className = "v1-wordmark v1-about-return-wordmark";
       aboutReturnWordmark.textContent = sourceCard.textContent;
@@ -706,9 +720,10 @@
       Object.assign(aboutReturnWordmark.style, last);
       overlay.append(aboutReturnWordmark);
       heading.style.visibility = "hidden";
-      const opacity = getComputedStyle(showingCopy ? content : preview).opacity;
-      aboutReturnWordmark.animate([{ ...first, opacity }, { ...last, opacity: 1 }], { duration: 480, easing: "cubic-bezier(.16,1,.3,1)", fill: "both" });
-      aboutFadeAnimation = surface.animate([{ opacity: getComputedStyle(surface).opacity }, { opacity: 0 }], { duration: 160, easing: "ease", fill: "both" });
+      const opacity = getComputedStyle(surface).opacity;
+      aboutReturnWordmark.animate([{ ...first, opacity }, { ...last, opacity: 1 }], { duration: aboutCloseDuration, easing: aboutEasing, fill: "both" });
+      // Fade the paper before it reaches wordmark size, so no tiny box trails the title.
+      aboutFadeAnimation = surface.animate([{ opacity }, { opacity: 0, offset: 0.65 }, { opacity: 0 }], { duration: aboutCloseDuration, easing: aboutEasing, fill: "both" });
     }
 
     function setImportOverlayView(view = "import") {
@@ -787,19 +802,20 @@
       const detailUrl = new URL(card.href, window.location.href);
       detailUrl.searchParams.set("embed", "1");
       detailUrl.searchParams.delete("v");
-      frame.onload = () => {
+      frame.onload = aboutWorkspace ? null : () => {
         window.clearTimeout(revealTimer);
         revealTimer = window.setTimeout(() => {
           if (!closing && sourceCard) overlay.classList.add("is-content-ready");
         }, 260);
       };
       if (aboutWorkspace) {
-        revealTimer = window.setTimeout(() => {
-          if (!closing && sourceCard) overlay.classList.add("is-content-ready");
-        }, window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 260);
+        overlay.classList.add("is-content-ready");
       } else frame.src = detailUrl.href;
-      backdrop.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 320, easing: "ease", fill: "both" });
-      surfaceAnimation = surface.animate([
+      backdrop.animate([{ opacity: 0 }, { opacity: 1 }], { duration: aboutWorkspace ? aboutOpenDuration : 320, easing: aboutWorkspace ? aboutEasing : "ease", fill: "both" });
+      surfaceAnimation = aboutWorkspace ? surface.animate([
+        { transform: aboutTransform(destinationRect, sourceRect) },
+        { transform: "none" },
+      ], { duration: aboutOpenDuration, easing: aboutEasing, fill: "both" }) : surface.animate([
         rectFrame(sourceRect, sourceRadius),
         rectFrame(destinationRect, "28px"),
       ], { duration: 540, easing: "cubic-bezier(.16,1,.3,1)", fill: "both" });
@@ -858,12 +874,17 @@
       if (aboutWorkspace) prepareAboutReturn();
       overlay.classList.add("is-closing");
       const currentRect = surface.getBoundingClientRect();
+      const currentTransform = getComputedStyle(surface).transform;
       const destinationRect = sourceCard.getBoundingClientRect();
       const destinationRadius = getComputedStyle(sourceCard).borderRadius;
       surfaceAnimation?.cancel();
+      const backdropOpacity = getComputedStyle(backdrop).opacity;
       backdrop.getAnimations().forEach((animation) => animation.cancel());
-      backdrop.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 360, easing: "ease", fill: "both" });
-      surfaceAnimation = surface.animate([
+      backdrop.animate([{ opacity: backdropOpacity }, { opacity: 0 }], { duration: aboutWorkspace ? aboutCloseDuration : 360, easing: aboutWorkspace ? aboutEasing : "ease", fill: "both" });
+      surfaceAnimation = aboutWorkspace ? surface.animate([
+        { transform: currentTransform },
+        { transform: aboutTransform(surface.getBoundingClientRect(), destinationRect) },
+      ], { duration: aboutCloseDuration, easing: aboutEasing, fill: "both" }) : surface.animate([
         rectFrame(currentRect, "28px"),
         rectFrame(destinationRect, destinationRadius),
       ], { duration: 480, easing: "cubic-bezier(.16,1,.3,1)", fill: "both" });

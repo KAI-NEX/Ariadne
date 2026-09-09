@@ -403,6 +403,24 @@
       "label": "详情缩回（JS 现状契约）"
     },
     {
+      "name": "--vi-motion-about-open",
+      "value": "900ms",
+      "group": "motion",
+      "label": "介绍浮窗整体展开（JS 读取 token）"
+    },
+    {
+      "name": "--vi-ease-about",
+      "value": "cubic-bezier(.4,0,.2,1)",
+      "group": "motion",
+      "label": "介绍浮窗柔和起步与收束"
+    },
+    {
+      "name": "--vi-motion-about-close",
+      "value": "800ms",
+      "group": "motion",
+      "label": "介绍浮窗连续缩回（JS 读取 token）"
+    },
+    {
       "name": "--vi-shadow-card",
       "value": "0 10px 24px rgba(31,34,42,.06)",
       "group": "effect",

@@ -3,10 +3,10 @@
 .v1-about-copy .v1-about-name-zh { color: var(--vi-muted); font-family: var(--vi-font-cjk); font-size: .86em; font-weight: inherit; letter-spacing: 0; }
 .v1-about-copy p { color: var(--vi-brand-muted); font-size: 14px; line-height: 1.85; margin: 16px 0 0; }
 .v1-about-copy .v1-about-intro { color: var(--ink); font-size: 20px; margin-top: 0; }
-.v1-detail-overlay.is-about .v1-detail-overlay-preview { container-type: inline-size; display: grid; place-items: center; }
-.v1-detail-overlay.is-about .v1-detail-overlay-preview .v1-wordmark { font-size: clamp(12px, 8cqw, 44px); font-weight: 550; grid-column: 1; letter-spacing: -.06em; }
+.v1-detail-overlay.is-about .v1-detail-overlay-preview { display: none; }
+.v1-detail-overlay.is-about .v1-detail-overlay-surface { transform-origin: center; will-change: transform, opacity; }
+.v1-detail-overlay.is-about .v1-detail-overlay-content { opacity: 1; transition: none; }
 .v1-detail-overlay.is-about .v1-detail-overlay-content > header .v1-back { justify-self: start; }
-.v1-detail-overlay.is-about.is-closing .v1-detail-overlay-preview { visibility: hidden; }
 .v1-about-return-wordmark { pointer-events: none; position: fixed; white-space: pre; }
 .v1-body [data-about-trigger].is-pointer-return:focus-visible { outline: none; }
 .v1-detail-overlay.is-about.is-closing .v1-back:focus-visible { outline: none; }
