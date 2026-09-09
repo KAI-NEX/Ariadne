@@ -15,9 +15,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+from src.runtime_binding import valid_binding, resolve_runtime_credential
+from src.pdf_delivery import render_complete_pdf_pages
+
 from src.candidate_model_runtime import runtime_fingerprint
 from src.execution_contract import ExecutionContractError, validate_runtime_snapshot
-from src.provider_runtime import OPENAI_CHAT_COMPLETIONS, ProviderRuntimeError, resolve_credential_reference
+from src.provider_runtime import OPENAI_CHAT_COMPLETIONS, ProviderRuntimeError
 from src.upload_limits import MAX_FILE_BYTES
 
 
@@ -105,13 +108,13 @@ def _validate_snapshot(value: Any) -> dict[str, Any]:
     except ExecutionContractError as error:
         raise JobModelRuntimeError("job_model_runtime_snapshot_invalid", "runtime") from error
     if (
-        snapshot.mode != "model" or snapshot.provider != PROVIDER_ID or snapshot.model != MODEL_ID
-        or snapshot.protocol != PROTOCOL or snapshot.adapter_version != RUNTIME["adapter_version"]
+        snapshot.mode != "model"
+        or not valid_binding(snapshot, RUNTIME["adapter_version"])
         or snapshot.prompt_version != RUNTIME["prompt_version"] or snapshot.schema_version != PROPOSAL_CONTRACT
         or snapshot.operation not in OPERATIONS or snapshot.action_schema_version != PROPOSAL_CONTRACT
         or snapshot.request_config_version != RUNTIME["request_config_version"]
         or snapshot.delivery_method != RUNTIME["delivery_method"]
-        or snapshot.credential_ref != CREDENTIAL_REF
+
         or snapshot.capabilities.semantic_understanding != "supported"
         or snapshot.capabilities.job_model_structuring != "supported"
         or snapshot.capabilities.vision != "supported"
@@ -209,17 +212,21 @@ def _validate_source_inputs(value: Any, sources: list[dict[str, Any]]) -> list[d
     inputs = [] if value is None else value
     if not isinstance(inputs, list):
         raise JobModelRuntimeError("job_model_source_inputs_invalid", "source")
-    image_sources = [source for source in sources if source.get("source_type") == "IMAGE"]
+    image_sources = [source for source in sources if source.get("source_type") in {"IMAGE", "PDF"}]
     if len(inputs) != len(image_sources):
         raise JobModelRuntimeError("job_model_source_inputs_invalid", "source")
     validated = []
     for index, raw in enumerate(inputs):
         item = _mapping(raw, "job_model_source_inputs_invalid")
         source = image_sources[index]
-        if set(item) != {"source_document_id", "image_data_url"} or item.get("source_document_id") != source["source_document_id"]:
+        is_pdf = source.get("source_type") == "PDF"
+        data_key = "document_data_url" if is_pdf else "image_data_url"
+        if is_pdf and source.get("mime_type") != "application/pdf":
+            raise JobModelRuntimeError("job_pdf_original_invalid", "source")
+        if set(item) != {"source_document_id", data_key} or item.get("source_document_id") != source["source_document_id"]:
             raise JobModelRuntimeError("job_model_source_inputs_invalid", "source")
         prefix = f"data:{source['mime_type']};base64,"
-        data_url = item.get("image_data_url")
+        data_url = item.get(data_key)
         if not isinstance(data_url, str) or not data_url.startswith(prefix):
             raise JobModelRuntimeError("job_model_source_inputs_invalid", "source")
         try:
@@ -228,9 +235,10 @@ def _validate_source_inputs(value: Any, sources: list[dict[str, Any]]) -> list[d
             raise JobModelRuntimeError("job_model_source_inputs_invalid", "source") from error
         valid_signature = source["mime_type"] == "image/png" and body.startswith(b"\x89PNG\r\n\x1a\n")
         valid_signature = valid_signature or source["mime_type"] == "image/jpeg" and body.startswith(b"\xff\xd8\xff")
+        valid_signature = valid_signature or is_pdf and body.startswith(b"%PDF-")
         if not body or len(body) > MAX_FILE_BYTES or not valid_signature or "sha256:" + hashlib.sha256(body).hexdigest() != source["content_hash"]:
             raise JobModelRuntimeError("job_model_source_inputs_invalid", "source")
-        validated.append({"source_index": sources.index(source) + 1, "image_data_url": data_url})
+        validated.append({"source_index": sources.index(source) + 1, **({"pdf_bytes": body} if is_pdf else {"image_data_url": data_url})})
     return validated
 
 
@@ -328,10 +336,22 @@ def build_job_model_payload(request: JobModelRequest) -> dict[str, Any]:
     _assert_provider_safe(provider_source)
     user_content: list[dict[str, Any]] = [{"type": "text", "text": json.dumps({"job_source": provider_source}, ensure_ascii=False, separators=(",", ":"))}]
     for item in request.source_inputs:
+        if "pdf_bytes" in item:
+            try:
+                pages = render_complete_pdf_pages(item["pdf_bytes"])
+            except (ValueError, OSError) as error:
+                raise JobModelRuntimeError("job_pdf_complete_render_failed", "delivery") from error
+            blocks = request.source_preparations[item["source_index"] - 1]["blocks"]
+            if len(pages) > 48 or [block["location"] for block in blocks] != [f"p. {page}" for page, _ in pages]:
+                raise JobModelRuntimeError("job_pdf_complete_page_manifest_mismatch", "delivery")
+            for (page, image), block in zip(pages, blocks):
+                user_content.append({"type": "text", "text": f"Ordered job source {item['source_index']}, PDF page {page}, source_ref {block['source_ref']}. The page marker is a location reference, not source text; read this complete page visually."})
+                user_content.append({"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(image).decode("ascii")}})
+            continue
         user_content.append({"type": "text", "text": f"Ordered job source image {item['source_index']}."})
         user_content.append({"type": "image_url", "image_url": {"url": item["image_data_url"]}})
     return {
-        "model": MODEL_ID,
+        "model": request.runtime_snapshot["model"],
         "messages": [
             {"role": "system", "content": job_model_prompt()},
             {"role": "user", "content": user_content},
@@ -402,7 +422,7 @@ def normalize_job_model_response(provider_response: Any, request: JobModelReques
     if http_status != 200:
         raise JobModelRuntimeError("deepseek_provider_http_error", "provider", True)
     response = _mapping(provider_response, "deepseek_response_malformed")
-    if response.get("model") != MODEL_ID:
+    if response.get("model") != request.runtime_snapshot["model"]:
         raise JobModelRuntimeError("deepseek_returned_model_mismatch", "model", True)
     choices = response.get("choices")
     if not isinstance(choices, list) or not choices or not isinstance(choices[0], Mapping) or choices[0].get("finish_reason") != "stop":
@@ -421,7 +441,7 @@ def normalize_job_model_response(provider_response: Any, request: JobModelReques
 def execute_job_model_request(payload: Any, credential_reader: Callable[[], str | None], provider_call: Callable[[str, dict[str, Any]], tuple[int, dict[str, Any]]]) -> dict[str, Any]:
     request = validate_job_model_request(payload)
     try:
-        credential = resolve_credential_reference(
+        credential = resolve_runtime_credential(
             request.runtime_snapshot["credential_ref"], CREDENTIAL_REF, credential_reader,
             invalid_code="job_model_credential_reference_invalid", missing_code="deepseek_key_not_configured",
         )
@@ -432,10 +452,10 @@ def execute_job_model_request(payload: Any, credential_reader: Callable[[], str 
     proposal, usage = normalize_job_model_response(response, request, status)
     return {
         "contract_id": RESULT_CONTRACT,
-        "provider": PROVIDER_ID,
-        "model": MODEL_ID,
-        "protocol": PROTOCOL,
-        "adapter_version": RUNTIME["adapter_version"],
+        "provider": request.runtime_snapshot["provider"],
+        "model": request.runtime_snapshot["model"],
+        "protocol": request.runtime_snapshot["protocol"],
+        "adapter_version": request.runtime_snapshot["adapter_version"],
         "runtime_snapshot_id": request.runtime_snapshot["snapshot_id"],
         "source_document_id": request.source_document["source_document_id"],
         "source_document_ids": request.source_bundle["source_document_ids"],

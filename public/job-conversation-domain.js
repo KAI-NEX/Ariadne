@@ -225,12 +225,14 @@
   }
 
   function createRuntimeSnapshot(options = {}) {
-    return Runtime.createRuntimeSnapshot({ mode: "model", provider: PROVIDER, model: MODEL }, {
-      modelDescriptor: RuntimeGate.JOB_CONVERSATION_MODEL_ADAPTER,
+    const currentRuntime = RuntimeGate.runtimeForSnapshot("job_conversation", options.runtime);
+    const descriptor = RuntimeGate.modelDescriptorForRuntime(currentRuntime, "job_conversation");
+    return Runtime.createRuntimeSnapshot(currentRuntime, {
+      modelDescriptor: descriptor,
       snapshotId: options.snapshot_id,
       capturedAt: options.captured_at || nowIso(),
-      credentialRef: CREDENTIAL_REF,
-      adapterVersion: CONTRACTS.adapter_version,
+      credentialRef: RuntimeGate.credentialFor(currentRuntime),
+      adapterVersion: descriptor?.adapter_version,
       promptVersion: CONTRACTS.prompt_version,
       schemaVersion: Manifest.semantic_output_version,
       operation: OPERATION,
@@ -388,7 +390,7 @@
   function validateRuntimeResult(value, execution, session, runtimeSnapshot, compiledContext) {
     if (!isObject(value) || value.contract_id !== CONTRACTS.result_contract_version || value.execution_id !== execution.execution_id
       || value.generation !== execution.generation || value.conversation_id !== session.conversation_id || value.operation !== OPERATION
-      || value.provider !== PROVIDER || value.model !== MODEL || value.protocol !== PROTOCOL || value.runtime_snapshot_id !== runtimeSnapshot.snapshot_id
+      || value.provider !== runtimeSnapshot.provider || value.model !== runtimeSnapshot.model || value.protocol !== runtimeSnapshot.protocol || value.runtime_snapshot_id !== runtimeSnapshot.snapshot_id
       || value.finish_reason !== "stop" || value.network_call_made !== true || value.provider_called !== true
       || value.assistant_copy_source !== "PROVIDER" || value.persistence !== "not_written") throw new JobConversationError("job_runtime_result_invalid");
     return Object.freeze({ ...clone(value), output: validateSemanticOutput(value.output, compiledContext) });

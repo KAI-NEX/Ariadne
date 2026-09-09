@@ -133,7 +133,7 @@ assert len(failed_calls) == 1
 missing_key_calls = []
 expect("deepseek_key_not_configured", lambda: execute_job_model_request(request(), lambda: None, lambda *_: missing_key_calls.append(True)))
 assert missing_key_calls == []
-assert job_model_import_runtime_signature()["adapter_version"] == "deepseek-job-multimodal-import-v2"
+assert job_model_import_runtime_signature()["adapter_version"] == "deepseek-job-multimodal-import-v3"
 
 second_image = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
 second_hash = "sha256:" + hashlib.sha256(second_image).hexdigest()

@@ -185,7 +185,7 @@ def validate_candidate_proposal(raw: Any, source_document_id: str) -> tuple[dict
 
 
 def extract_deepseek_candidate_proposal(
-    provider_response: dict[str, Any], source_document_id: str, processing_run_id: str, model: str,
+    provider_response: dict[str, Any], source_document_id: str, processing_run_id: str, model: str, *, provider: str = "deepseek",
 ) -> dict[str, Any]:
     """Parse JSON output into a non-authoritative proposal; never confirmed context."""
     try:
@@ -206,7 +206,7 @@ def extract_deepseek_candidate_proposal(
         "candidate_proposal_id": f"candidate-proposal-{processing_run_id}",
         "source_document_id": source_document_id,
         "processing_run_id": processing_run_id,
-        "provider": "deepseek",
+        "provider": provider,
         "model": model,
         "prompt_version": PROMPT_VERSION,
         "review_status": REVIEW_STATUS,

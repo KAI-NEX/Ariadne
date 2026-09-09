@@ -57,7 +57,7 @@
               <footer class="v1-workspace-content-footer"><p id="job-workspace-save-status" aria-live="polite"></p><button id="job-workspace-save" class="v1-primary-button" type="button" disabled>保存职位</button></footer>
             </section>
             <aside class="v1-ariadne-pane" aria-labelledby="job-understanding-title">
-              <header class="v1-workspace-pane-header"><div><h2 id="job-understanding-title">Ariadne AI</h2><p id="job-workspace-runtime">Conversation · DeepSeek · deepseek-v4-flash-vision-exp</p></div></header>
+              <header class="v1-workspace-pane-header"><div><h2 id="job-understanding-title">Ariadne AI</h2><p id="job-workspace-runtime"></p></div></header>
               <div id="job-workspace-history" class="v1-workspace-history" tabindex="0" aria-live="polite">
                 <ol id="job-understanding-events" class="v1-understanding-events"></ol>
                 <div id="job-workspace-authority" class="v1-clarification-list"><p>模型职位是非权威 Working 信息。你可以继续对话或编辑；只有“保存职位”会创建不可变的已确认版本。</p></div>
@@ -81,8 +81,8 @@
     </main>
     <dialog id="job-model-consent-dialog" class="v1-model-consent-dialog" aria-labelledby="job-model-consent-title">
       <h2 id="job-model-consent-title">确认发送职位材料</h2>
-      <p>原始来源已经保存在本机。确认后，系统会先进行只读技术解析；图片导入会把有界文本证据与按顺序排列的原始图片发送给 DeepSeek 进行职位语义理解。</p>
-      <dl><div><dt>Provider</dt><dd>DeepSeek</dd></div><div><dt>Model</dt><dd>deepseek-v4-flash-vision-exp</dd></div></dl>
+      <p>原始来源已经保存在本机。确认后，系统会先进行只读技术解析；图片导入会把有界文本证据与按顺序排列的原始图片发送给下方选定的模型进行职位语义理解。PDF 将完整逐页转图后发送，超过完整处理上限时会停止。</p>
+      <dl><div><dt>Provider</dt><dd id="job-model-consent-provider"></dd></div><div><dt>Model</dt><dd id="job-model-consent-model"></dd></div></dl>
       <div class="v1-button-row"><button id="confirm-job-model-consent" class="v1-consent-action" type="button">确认并发送</button><button id="cancel-job-model-consent" class="v1-tertiary-button" type="button">取消</button></div>
     </dialog>
     <dialog id="job-model-failure-dialog" class="v1-error-dialog" aria-labelledby="job-model-failure-title">
@@ -91,6 +91,7 @@
       <p>如需改用本地整理，请返回“运行方式”将 ARIADNE 切换为本地运行，再发起一次新的导入。</p>
       <div class="v1-button-row"><a class="v1-primary-button" href="/index.html">打开运行方式</a><button id="dismiss-job-model-failure" class="v1-dialog-dismiss" type="button">关闭</button></div>
     </dialog>
+    <script src="/local-connector.js"></script>
     <script src="/runtime-capabilities.js?v=runtime-gate-v1"></script>
     <script src="/runtime-capability-gate.js?v=runtime-gate-v1"></script>
     <script src="/truth-persistence-domain.js?v=job-intelligence-v1"></script>

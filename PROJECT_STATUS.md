@@ -1,5 +1,15 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-09 — Codex 本机运行与 Web 配对连接器（COMPLETE）
+
+- 按用户要求增加「Web 网页 → 本机配对连接器 → Codex」第二种方式，并在当前电脑启用「本机 Ariadne → Codex」第一种方式。当前本机 `http://127.0.0.1:8000` 已启动；忽略目录中的显式本机偏好首次选择 Codex，后续尊重用户切换。使用本机已有 ChatGPT 登录和 `gpt-5.6-sol`，没有复制登录凭据或修改开发任务模型。详见 [运行与配对指南](docs/current/CODEX_RUNTIME_CONNECTOR.md)。
+- 六个语义领域沿用原有来源、schema、版本、Working/Proposal 与 Human Save 校验，新增独立 Codex identity/adapter 和有界 CLI 传输。执行使用临时独立目录、ephemeral 会话、HTTPS provider 配置，关闭 shell、浏览器、插件与其他工具；optional schema 在 wire 层转换后恢复并进行原领域验证。Local 零 Provider 调用，失败不静默降级。
+- 连接器只监听 loopback，校验准确 Origin/Host、一次性配对及有时限可撤销 token，仅允许列出的领域/技术准备接口及 Codex 执行。前端显式路由，凭据不发往网页后端；未配对、断连、重启、过期和撤销均明确失败。模型确认框同步实际 Provider/model。
+- 发现并修复 Job PDF 旧路径只发送提取文字的问题：保留原始 PDF，验证 hash、完整页数与位置后附带全部页图，Codex/DeepSeek 共用完整渲染器；Job import adapter 升至 v3。缺少原件、hash 变化、缺页或超过完整处理预算时停止，不截取部分页面冒充完整理解。
+- 验收：**77/77** Python/Node 回归、VI 门禁及 diff 检查通过。真实 Codex 合成调用覆盖独立图片、两页 PDF 标记、Candidate 导入、Job 文本/PDF 导入、Candidate/Job 对话与修改提案、个人理解和职位概况；初次 Candidate optional schema 失败已修复并复验，原失败证据保留。
+- egolite 在独立网页/连接器 origin 完成配对、Candidate/Job 两页 PDF 真实导入、来源恢复和人工保存：两域各自保存前确认 revision 为零，保存后为一，六条 source document 记录保留；断连及旧 token 失败不降级。Chrome 补做桌面/移动视觉与溢出检查（egolite 截图接口超时），并验证本机初始 Codex、切换 Local 后刷新仍保留选择及真实同源 HTTP Codex 请求。
+- 合成输入、结果、截图与回归留在 `.cache/codex-integration-20260909/`；本机配置、运行数据、凭据与 QA 不提交。没有使用私人资料作质量认证，没有发布公网、配置 DNS 或 push；真实 HTTPS origin 的浏览器本地网络授权须部署后验收，模型输出仍可能失败。已有公开入口决策的并行未提交内容原地保留。
+
 ## 2026-09-09 — GitHub 仓库创建与首次同步（COMPLETE）
 
 - 按用户授权，通过 GitHub CLI 创建私有仓库 [KAI-NEX/Ariadne](https://github.com/KAI-NEX/Ariadne)，配置 HTTPS `origin`，将本地 `main` 推送并建立 `origin/main` 跟踪关系；GitHub 返回默认分支 `main`、可见性 `PRIVATE`。

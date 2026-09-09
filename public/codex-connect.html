@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' http://127.0.0.1:8765; img-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+    <title>Ariadne · 连接本机 Codex</title>
+    <link rel="stylesheet" href="/styles.css?vi=1" />
+  </head>
+  <body class="runtime-page runtime-connect-page">
+    <main class="vi-container vi-grid">
+    <section class="runtime-connect-shell vi-span-12">
+      <a class="runtime-back-link" href="/">返回运行选择</a>
+      <p class="runtime-step">Codex · 本机连接</p>
+      <h1>连接本机 Codex</h1>
+      <p class="runtime-connect-copy">在这台电脑登录 Codex，并从 Ariadne 项目目录运行下面的命令。将终端显示的配对码填入此页；配对码五分钟内有效，仅能使用一次。</p>
+      <pre>python3 scripts/run_codex_connector.py</pre>
+      <p class="runtime-connect-copy">配对后，本标签页的资料处理请求会发送到本机连接器；模型分析再由 Codex 发送至 OpenAI，使用本机登录账号的额度。Codex 登录凭据留在本机。图片与 PDF 会按原图或完整逐页图片传送。每次材料发送仍需确认，模型结果仍需人工保存。</p>
+      <form id="codex-connect-form" class="runtime-connect-form">
+        <label for="codex-pairing-code">本机终端中的配对码</label>
+        <input id="codex-pairing-code" type="password" autocomplete="off" spellcheck="false" required />
+        <button type="submit" id="codex-connect">同意连接本机 Codex</button>
+        <button type="button" id="codex-disconnect">断开本页连接</button>
+      </form>
+      <p id="codex-connect-message" class="runtime-message" aria-live="polite"></p>
+      <p class="runtime-connect-copy">如浏览器询问本地网络访问权限，请允许此站点连接本机。连接最长保留八小时；停止连接器即可撤销。电脑休眠、断网或连接器退出时，网页会明确报错。</p>
+    </section>
+    </main>
+    <script src="/local-connector.js"></script>
+    <script src="/runtime-capabilities.js"></script>
+    <script src="/runtime-capability-gate.js"></script>
+    <script src="/codex-connect.js"></script>
+  </body>
+</html>

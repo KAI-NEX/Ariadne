@@ -239,7 +239,8 @@ const consentFlow = pages.slice(pages.indexOf("async function openCandidateModel
 assert.match(html, /id="candidate-model-consent-dialog"/);
 assert.match(html, /id="candidate-model-failure-dialog"/);
 assert.match(html, /id="confirm-candidate-model-failure" class="v1-dialog-dismiss" type="button">知道了</);
-assert.match(html, /deepseek-v4-flash-vision-exp/);
+assert.match(html, /id="candidate-model-consent-model"/);
+assert.match(pages, /candidate-model-consent-model"\)\.textContent = gate\.authority\.runtime\.model/);
 assert.match(html, /这次操作会把当前文件内容发送到模型服务商进行候选人材料理解。/);
 assert.doesNotMatch(html, /candidate-model-consent-source|candidate-model-consent-outbound|v1-model-consent-note/);
 assert.ok(pages.indexOf("function openCandidateModelConsent") < pages.indexOf("function runCandidateModelProcessing"));

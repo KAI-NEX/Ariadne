@@ -1,9 +1,13 @@
 """Read-only reasoning over a current Job collection; no Candidate or mutation actions."""
 from __future__ import annotations
+
+from src.runtime_binding import valid_binding, resolve_runtime_credential
+
+from src.runtime_binding import valid_binding, resolve_runtime_credential
 import json
 from pathlib import Path
 from src.execution_contract import validate_runtime_snapshot, ExecutionContractError
-from src.provider_runtime import resolve_credential_reference, ProviderRuntimeError
+from src.provider_runtime import ProviderRuntimeError
 from src.job_conversation_runtime import _assert_provider_safe, JobConversationRuntimeError
 from src.personal_understanding_runtime import (text, output_schema as digest_schema, validate_output as validate_digest_output,
     PersonalUnderstandingError, MODEL, CREDENTIAL_REF)
@@ -29,8 +33,6 @@ def validate_request(value):
         text(value["human_message"], 6000, empty=value["phase"] != "DISCUSS")
     except PersonalUnderstandingError as error:
         raise JobOverviewError("JOB_OVERVIEW_REQUEST_INVALID") from error
-    if value["consent"] != {"confirmed": True, "purpose": "JOB_OVERVIEW", "provider": "deepseek", "model": MODEL}:
-        raise JobOverviewError("JOB_OVERVIEW_CONSENT_REQUIRED", "consent")
     context = value["context"]
     if not isinstance(context, dict) or len(json.dumps(context, ensure_ascii=False, separators=(",", ":")).encode()) > MANIFEST["limits"]["context_bytes"]:
         raise JobOverviewError("JOB_OVERVIEW_CONTEXT_LIMIT", "context")
@@ -55,13 +57,15 @@ def validate_request(value):
         runtime = validate_runtime_snapshot(value["runtime_snapshot"])
     except (KeyError, TypeError, ValueError, ExecutionContractError, JobConversationRuntimeError) as error:
         raise JobOverviewError("JOB_OVERVIEW_RUNTIME_OR_CONTEXT_INVALID", "context") from error
-    if (runtime.mode != "model" or runtime.provider != "deepseek" or runtime.model != MODEL or runtime.protocol != "OPENAI_CHAT_COMPLETIONS"
-        or runtime.operation != MANIFEST["operation"] or runtime.adapter_version != MANIFEST["adapter_version"]
+    if (runtime.mode != "model"
+        or runtime.operation != MANIFEST["operation"] or not valid_binding(runtime, MANIFEST["adapter_version"])
         or runtime.prompt_version != MANIFEST["prompt_version"] or runtime.schema_version != MANIFEST["contract_id"]
         or runtime.action_schema_version != MANIFEST["contract_id"] or runtime.request_config_version != MANIFEST["request_config_version"]
         or runtime.delivery_method != "compiled_context_text" or runtime.capability_basis != "adapter_verified"
         or runtime.capabilities.vision != "supported" or runtime.capabilities.semantic_understanding != "supported" or runtime.capabilities.ai_conversation != "supported"):
         raise JobOverviewError("JOB_OVERVIEW_RUNTIME_INVALID", "runtime")
+    if value["consent"] != {"confirmed": True, "purpose": "JOB_OVERVIEW", "provider": value.get("runtime_snapshot", {}).get("provider"), "model": value.get("runtime_snapshot", {}).get("model")}:
+        raise JobOverviewError("JOB_OVERVIEW_CONSENT_REQUIRED", "consent")
     return value
 
 def prompt(phase):
@@ -82,7 +86,7 @@ Follow the function schema exactly. uncertainties is an array of plain STRINGS, 
 
 def build_payload(request):
     phase = request["phase"]
-    return {"model": MODEL, "messages": [{"role": "system", "content": prompt(phase)},
+    return {"model": request["runtime_snapshot"]["model"], "messages": [{"role": "system", "content": prompt(phase)},
         {"role": "user", "content": json.dumps({"context": request["context"], "human_message": request["human_message"]}, ensure_ascii=False, separators=(",", ":"))}],
         "tools": [{"type": "function", "function": {"name": TOOL, "strict": True, "parameters": digest_schema("DISTILL" if phase == "DISTILL" else "SYNTHESIZE")}}],
         "tool_choice": {"type": "function", "function": {"name": TOOL}}, "thinking": {"type": "disabled"}, "temperature": 0, "max_tokens": 6000}
@@ -104,7 +108,7 @@ def validate_output(output, request):
 def execute(payload, credential_reader, provider_call):
     request = validate_request(payload)
     try:
-        key = resolve_credential_reference(request["runtime_snapshot"]["credential_ref"], CREDENTIAL_REF, credential_reader, invalid_code="CREDENTIAL_REFERENCE_INVALID", missing_code="deepseek_key_not_configured")
+        key = resolve_runtime_credential(request["runtime_snapshot"]["credential_ref"], CREDENTIAL_REF, credential_reader, invalid_code="CREDENTIAL_REFERENCE_INVALID", missing_code="deepseek_key_not_configured")
     except ProviderRuntimeError as error:
         raise JobOverviewError(error.code, error.failure_layer) from error
     try:
@@ -113,7 +117,7 @@ def execute(payload, credential_reader, provider_call):
         raise JobOverviewError("JOB_OVERVIEW_PROVIDER_RESPONSE_INVALID", "provider", True) from error
     if status != 200: raise JobOverviewError("JOB_OVERVIEW_PROVIDER_HTTP_ERROR", "provider", True)
     try:
-        if response["model"] != MODEL: raise ValueError("model")
+        if response["model"] != request["runtime_snapshot"]["model"]: raise ValueError("model")
         choice = response["choices"][0]
         if choice["finish_reason"] != "tool_calls": raise ValueError("finish")
         calls = choice["message"]["tool_calls"]
@@ -122,6 +126,6 @@ def execute(payload, credential_reader, provider_call):
     except JobOverviewError: raise
     except (KeyError, IndexError, ValueError, TypeError, AttributeError) as error:
         raise JobOverviewError("JOB_OVERVIEW_OUTPUT_INVALID", "model_output", True) from error
-    return {"contract_id": MANIFEST["result_contract"], "request_id": request["request_id"], "phase": request["phase"], "provider": "deepseek", "model": MODEL,
+    return {"contract_id": MANIFEST["result_contract"], "request_id": request["request_id"], "phase": request["phase"], "provider": request["runtime_snapshot"]["provider"], "model": request["runtime_snapshot"]["model"],
         "runtime_snapshot_id": request["runtime_snapshot"]["snapshot_id"], "output": output, "usage": {k: v for k, v in (response.get("usage") or {}).items() if k in ("prompt_tokens", "completion_tokens", "total_tokens") and isinstance(v, int) and v >= 0},
         "network_call_made": True, "persistence": "not_written", "authority": "NON_AUTHORITATIVE_JOB_OVERVIEW"}

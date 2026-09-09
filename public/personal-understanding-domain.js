@@ -14,9 +14,10 @@
   }
   function runtimeSnapshot(storage = globalThis.localStorage) {
     const gate = Gate.requireOperation("personal_understanding", Gate.operationAuthority("personal_understanding", storage));
+    const descriptor = Gate.modelDescriptorForRuntime(gate.authority.runtime, "personal_understanding");
     return Runtime.createRuntimeSnapshot(gate.authority.runtime, {
-      modelDescriptor: Gate.PERSONAL_UNDERSTANDING_MODEL_ADAPTER, snapshotId: Memory.id("runtime-personal"), capturedAt: Memory.now(),
-      credentialRef: "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision", adapterVersion: Contract.adapter_version,
+      modelDescriptor: descriptor, snapshotId: Memory.id("runtime-personal"), capturedAt: Memory.now(),
+      credentialRef: Gate.credentialFor(gate.authority.runtime), adapterVersion: descriptor.adapter_version,
       promptVersion: Contract.prompt_version, schemaVersion: Contract.contract_id, operation: Contract.operation,
       capabilityBasis: "adapter_verified", actionSchemaVersion: Contract.contract_id,
       requestConfigVersion: Contract.request_config_version, deliveryMethod: "compiled_context_text",
@@ -24,16 +25,16 @@
   }
   function requestFor(phase, context, humanMessage, snapshot, consent) {
     if (!Contract.phases.includes(phase) || Context.bytes(context) > Contract.limits.context_bytes) throw new Error("PERSONAL_CONTEXT_LIMIT");
-    if (!consent || snapshot.mode !== "model" || snapshot.provider !== "deepseek" || snapshot.model !== Gate.PERSONAL_UNDERSTANDING_MODEL_ADAPTER.model_id) throw new Error("PERSONAL_CONSENT_REQUIRED");
+    if (!consent || snapshot.mode !== "model" || !Gate.isModelRuntimeEligible({ mode: snapshot.mode, provider: snapshot.provider, model: snapshot.model })) throw new Error("PERSONAL_CONSENT_REQUIRED");
     return { contract_id: Contract.request_contract, request_id: Memory.id("personal-request"), phase,
       context: clone(context), human_message: humanMessage, runtime_snapshot: snapshot,
       consent: { confirmed: true, purpose: "PERSONAL_UNDERSTANDING", provider: snapshot.provider, model: snapshot.model } };
   }
   async function callRuntime(request) {
-    const check = await fetch("/api/personal-understanding-signature", { cache: "no-store" });
+    const check = await (globalThis.AriadneConnector || globalThis).fetch("/api/personal-understanding-signature", { cache: "no-store" });
     const payload = await check.json();
     if (!check.ok || !Memory.same(payload.runtime_signature, signature())) throw new Error("RUNTIME_CONTRACT_VERSION_MISMATCH");
-    const response = await fetch("/api/personal-understanding-turn", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) });
+    const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/personal-understanding-turn", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "PERSONAL_PROVIDER_FAILED");
     return result;

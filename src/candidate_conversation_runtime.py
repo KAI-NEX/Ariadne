@@ -17,8 +17,10 @@ from threading import Lock
 from typing import Any, Callable, Mapping
 from urllib.parse import quote
 
+from src.runtime_binding import valid_binding, resolve_runtime_credential
+
 from src.execution_contract import ExecutionContractError, validate_runtime_snapshot
-from src.provider_runtime import OPENAI_CHAT_COMPLETIONS, ProviderRuntimeError, resolve_credential_reference
+from src.provider_runtime import OPENAI_CHAT_COMPLETIONS, ProviderRuntimeError
 from src.truth_persistence import TruthPersistenceError, validate_candidate_working_model
 
 
@@ -271,17 +273,13 @@ def _validate_snapshot(value: Any) -> dict[str, Any]:
     capabilities = snapshot.capabilities.to_dict()
     if (
         snapshot.mode != "model"
-        or snapshot.provider != PROVIDER_ID
-        or snapshot.model != MODEL_ID
-        or snapshot.protocol != PROTOCOL
-        or snapshot.adapter_version != ADAPTER_VERSION
+        or not valid_binding(snapshot, ADAPTER_VERSION)
         or snapshot.prompt_version != PROMPT_VERSION
         or snapshot.operation != OPERATION
         or snapshot.capability_basis != CAPABILITY_BASIS
         or snapshot.action_schema_version != ACTION_SCHEMA_VERSION
         or snapshot.request_config_version != REQUEST_CONFIG_VERSION
         or snapshot.delivery_method != "compiled_context_text"
-        or snapshot.credential_ref != CREDENTIAL_REF
         or capabilities.get("vision") != "supported"
         or capabilities.get("ai_conversation") != "supported"
         or capabilities.get("semantic_understanding") != "supported"
@@ -1061,7 +1059,7 @@ def build_candidate_conversation_payload(request: CandidateConversationRequest) 
             messages.append({"role": "assistant", "content": str(turn["assistant"]["text"])})
         messages.append({"role": "user", "content": request.human_message})
     return {
-        "model": MODEL_ID,
+        "model": request.runtime_snapshot["model"],
         "messages": messages,
         "tools": [candidate_conversation_tool()],
         "tool_choice": {"type": "function", "function": {"name": "deliver_candidate_action"}},
@@ -1121,11 +1119,12 @@ def _normalize_candidate_conversation_response_with_verifications(
     provider_response: Any, request: CandidateConversationRequest, http_status: int = 200
 ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
     diagnostics = response_diagnostics(provider_response, http_status)
+    diagnostics["exact_returned_model_match"] = diagnostics.get("returned_model") == request.runtime_snapshot["model"]
     if http_status != 200:
         raise CandidateConversationRuntimeError("PROVIDER_HTTP_ERROR", "provider", True, {**diagnostics, **_diagnostic("PROVIDER_ENVELOPE", "PROVIDER_HTTP_ERROR")})
     if not isinstance(provider_response, Mapping):
         raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "parsing", True, {**diagnostics, **_diagnostic("PROVIDER_ENVELOPE", "MALFORMED_RESPONSE")})
-    if provider_response.get("model") != MODEL_ID:
+    if provider_response.get("model") != request.runtime_snapshot["model"]:
         raise CandidateConversationRuntimeError("WRONG_RETURNED_MODEL", "model", True, {**diagnostics, **_diagnostic("MODEL_IDENTITY", "WRONG_RETURNED_MODEL")})
     choices = provider_response.get("choices")
     if not isinstance(choices, list) or not choices or not isinstance(choices[0], Mapping):
@@ -1190,7 +1189,7 @@ def execute_candidate_conversation_request(
 ) -> dict[str, Any]:
     request = validate_candidate_conversation_request(payload)
     try:
-        credential = resolve_credential_reference(
+        credential = resolve_runtime_credential(
             request.runtime_snapshot["credential_ref"], CREDENTIAL_REF, credential_reader,
             invalid_code="CREDENTIAL_REFERENCE_INVALID", missing_code="deepseek_key_not_configured",
         )
@@ -1201,7 +1200,7 @@ def execute_candidate_conversation_request(
     action, _resolution_verifications, usage = _normalize_candidate_conversation_response_with_verifications(provider_response, request, http_status)
     print(
         "candidate_conversation_acceptance submit_event=fired domain=candidate "
-        f"operation={OPERATION} provider_called=true provider=deepseek model=deepseek-v4-flash-vision-exp "
+        f"operation={OPERATION} provider_called=true provider={request.runtime_snapshot['provider']} model={request.runtime_snapshot['model']} "
         f"result_type={action['action']} working_proposal_created={'yes' if action['patches'] else 'no'} "
         "confirmed_mutation_before_save=no",
         flush=True,
@@ -1212,9 +1211,9 @@ def execute_candidate_conversation_request(
         "generation": request.generation,
         "conversation_id": request.conversation["conversation_id"],
         "operation": OPERATION,
-        "provider": PROVIDER_ID,
-        "model": MODEL_ID,
-        "protocol": PROTOCOL,
+        "provider": request.runtime_snapshot["provider"],
+        "model": request.runtime_snapshot["model"],
+        "protocol": request.runtime_snapshot["protocol"],
         "runtime_snapshot_id": request.runtime_snapshot["snapshot_id"],
         "finish_reason": "stop",
         "usage": usage,

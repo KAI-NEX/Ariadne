@@ -13,8 +13,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+from src.runtime_binding import valid_binding, resolve_runtime_credential
+
 from src.execution_contract import ExecutionContractError, validate_runtime_snapshot
-from src.provider_runtime import OPENAI_CHAT_COMPLETIONS, ProviderRuntimeError, resolve_credential_reference
+from src.provider_runtime import OPENAI_CHAT_COMPLETIONS, ProviderRuntimeError
 
 
 MANIFEST_PATH = Path(__file__).resolve().parents[1] / "data" / "job_intelligence_contract_v1.json"
@@ -163,8 +165,8 @@ def validate_job_conversation_request(payload: Any) -> JobConversationRequest:
     except ExecutionContractError as error:
         raise JobConversationRuntimeError("RUNTIME_SNAPSHOT_INVALID", "runtime") from error
     if (
-        snapshot.mode != "model" or snapshot.provider != PROVIDER_ID or snapshot.model != MODEL_ID
-        or snapshot.protocol != PROTOCOL or snapshot.adapter_version != RUNTIME["adapter_version"]
+        snapshot.mode != "model"
+        or not valid_binding(snapshot, RUNTIME["adapter_version"])
         or snapshot.prompt_version != RUNTIME["prompt_version"] or snapshot.schema_version != SEMANTIC_OUTPUT_CONTRACT
         or snapshot.operation != OPERATION or snapshot.action_schema_version != SEMANTIC_OUTPUT_CONTRACT
         or snapshot.request_config_version != RUNTIME["request_config_version"]
@@ -298,7 +300,7 @@ def build_job_conversation_payload(request: JobConversationRequest) -> dict[str,
         messages.append({"role": role, "content": _text(turn.get("content"), "CONTEXT_INVALID", MANIFEST["limits"]["analysis_message"])})
     messages.append({"role": "user", "content": request.human_message})
     return {
-        "model": MODEL_ID,
+        "model": request.runtime_snapshot["model"],
         "messages": messages,
         "tools": [job_conversation_tool()],
         "tool_choice": {"type": "function", "function": {"name": "deliver_job_conversation"}},
@@ -425,7 +427,7 @@ def normalize_job_conversation_response(provider_response: Any, request: JobConv
     if http_status != 200:
         raise JobConversationRuntimeError("PROVIDER_HTTP_ERROR", "provider", True)
     response = _mapping(provider_response, "MALFORMED_RESPONSE")
-    if response.get("model") != MODEL_ID:
+    if response.get("model") != request.runtime_snapshot["model"]:
         raise JobConversationRuntimeError("WRONG_RETURNED_MODEL", "model", True)
     choices = response.get("choices")
     if not isinstance(choices, list) or not choices or not isinstance(choices[0], Mapping):
@@ -471,7 +473,7 @@ def execute_job_conversation_request(
         flush=True,
     )
     try:
-        credential = resolve_credential_reference(
+        credential = resolve_runtime_credential(
             request.runtime_snapshot["credential_ref"], CREDENTIAL_REF, credential_reader,
             invalid_code="CREDENTIAL_REFERENCE_INVALID", missing_code="deepseek_key_not_configured",
         )
@@ -482,7 +484,7 @@ def execute_job_conversation_request(
     output, usage = normalize_job_conversation_response(response, request, status)
     print(
         "job_conversation_acceptance submit_event=fired domain=job "
-        f"operation={OPERATION} provider_called=true provider=deepseek model=deepseek-v4-flash-vision-exp "
+        f"operation={OPERATION} provider_called=true provider={request.runtime_snapshot['provider']} model={request.runtime_snapshot['model']} "
         f"result_type={output['action']} working_proposal_created={'yes' if output['job_edit'] else 'no'} "
         "confirmed_mutation_before_save=no assistant_copy_source=PROVIDER",
         flush=True,
@@ -493,9 +495,9 @@ def execute_job_conversation_request(
         "generation": request.generation,
         "conversation_id": request.conversation["conversation_id"],
         "operation": OPERATION,
-        "provider": PROVIDER_ID,
-        "model": MODEL_ID,
-        "protocol": PROTOCOL,
+        "provider": request.runtime_snapshot["provider"],
+        "model": request.runtime_snapshot["model"],
+        "protocol": request.runtime_snapshot["protocol"],
         "runtime_snapshot_id": request.runtime_snapshot["snapshot_id"],
         "finish_reason": "stop",
         "usage": usage,

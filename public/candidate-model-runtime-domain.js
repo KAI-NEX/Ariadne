@@ -56,7 +56,7 @@
     const runtime = gate?.authority?.runtime;
     const capability = gate?.authority?.capabilities;
     if (!gate?.allowed || gate.capability !== "candidate_model_structuring"
-      || runtime?.mode !== "model" || runtime.provider !== PROVIDER_ID || runtime.model !== MODEL_ID
+      || runtime?.mode !== "model" || !globalThis.JobRadarRuntimeGate?.isModelRuntimeEligible(runtime)
       || capability?.semantic_understanding !== "supported"
       || capability?.candidate_model_structuring !== "supported"
       || capability?.vision !== "supported") {
@@ -180,10 +180,10 @@
     return accepted;
   }
 
-  function proposalsFor({ source, run, result, operationIdentity }) {
+  function proposalsFor({ source, run, result, operationIdentity, snapshot = { provider: PROVIDER_ID, model: MODEL_ID, protocol: PROTOCOL, adapter_version: ADAPTER_VERSION } }) {
     assertMultimodalSource(source);
-    if (result?.provider !== PROVIDER_ID || result?.model !== MODEL_ID || result?.protocol !== PROTOCOL
-      || result?.adapter_version !== ADAPTER_VERSION || result?.delivery_method !== DELIVERY_METHOD
+    if (result?.provider !== snapshot.provider || result?.model !== snapshot.model || result?.protocol !== snapshot.protocol
+      || result?.adapter_version !== snapshot.adapter_version || result?.delivery_method !== DELIVERY_METHOD
       || result?.runtime_snapshot_id !== run.runtime_snapshot_id || result?.processing_run_id !== run.run_id
       || result?.operation_id !== operationIdentity?.operation_id
       || result?.source_document_id !== source.source_document_id || result?.content_hash !== source.content_hash
@@ -194,8 +194,8 @@
     const modelProposal = result.candidate_proposal;
     const errors = Candidate.validateCandidateProposal(modelProposal);
     if (errors.length || modelProposal.source_document_id !== source.source_document_id
-      || modelProposal.processing_run_id !== run.run_id || modelProposal.provider !== PROVIDER_ID
-      || modelProposal.model !== MODEL_ID || modelProposal.prompt_version !== PROMPT_VERSION
+      || modelProposal.processing_run_id !== run.run_id || modelProposal.provider !== snapshot.provider
+      || modelProposal.model !== snapshot.model || modelProposal.prompt_version !== PROMPT_VERSION
       || modelProposal.review_status !== "NEEDS_REVIEW") {
       throw new Error("candidate_model_proposal_contract_failed");
     }
@@ -223,9 +223,9 @@
         created_at: now(),
         payload: {
           contract_id: PAYLOAD_CONTRACT_ID,
-          provider: PROVIDER_ID,
-          model: MODEL_ID,
-          adapter_version: ADAPTER_VERSION,
+          provider: snapshot.provider,
+          model: snapshot.model,
+          adapter_version: snapshot.adapter_version,
           prompt_version: PROMPT_VERSION,
           schema_version: SCHEMA_VERSION,
           delivery_method: DELIVERY_METHOD,

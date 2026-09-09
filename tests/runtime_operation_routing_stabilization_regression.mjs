@@ -78,7 +78,7 @@ assert.match(runtimeSelection, /图片 \/ PDF 导入/);
 const server = read("app.py");
 assert.match(server, /snapshot\.capabilities\.candidate_model_structuring/);
 assert.match(server, /snapshot\.capabilities\.job_model_structuring/);
-assert.match(read("public/jd-import.html"), /按顺序排列的原始图片发送给 DeepSeek/);
+assert.match(read("public/jd-import.html"), /按顺序排列的原始图片发送给下方选定的模型/);
 
 const styles = resolveVICSS(read("public/styles.css"));
 const minibarRule = styles.match(/\.v1-mini-sidebar \{[^}]+\}/)?.[0] || "";

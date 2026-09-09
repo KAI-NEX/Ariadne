@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://generativelanguage.googleapis.com; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' http://127.0.0.1:8765 https://generativelanguage.googleapis.com; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'" />
     <title>Ariadne · 运行方式选择</title>
     <link rel="stylesheet" href="/styles.css?v=runtime-ui-v48&amp;vi=1" />
   </head>
@@ -19,6 +19,7 @@
         </button>
         <div id="runtime-menu" class="runtime-menu" role="listbox" aria-label="选择运行方式" aria-hidden="true">
           <div id="runtime-model-options"></div>
+          <a href="/codex-connect.html" class="runtime-menu-item" role="option"><span>连接本机 Codex</span><small>网页通过配对使用这台电脑</small></a>
           <button id="runtime-add-model" class="runtime-menu-item runtime-add-model" type="button" role="option">
             <span>＋ 添加新的模型</span><small>连接 API 后读取可用模型</small>
           </button>
@@ -47,6 +48,7 @@
     <script src="/ascii-waves.js?v=runtime-ui-v48"></script>
     <script src="/floating-window.js?v=runtime-ui-v48"></script>
     <script src="/add-model-sheet.js?v=runtime-ui-v48"></script>
+    <script src="/local-connector.js"></script>
     <script src="/runtime-capabilities.js?v=runtime-routing-v1"></script>
     <script src="/runtime-capability-gate.js?v=runtime-routing-v1"></script>
     <script src="/runtime-selection.js?v=runtime-routing-v1"></script>

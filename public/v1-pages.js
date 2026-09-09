@@ -169,7 +169,7 @@
 
   function runtimeLabel(runtime) {
     if (runtime.mode !== "model") return "本地运行";
-    const provider = ({ deepseek: "DeepSeek", gemini: "Gemini", qwen: "Qwen" }[runtime.provider] || runtime.provider || "模型");
+    const provider = ({ codex: "Codex / OpenAI", deepseek: "DeepSeek", gemini: "Gemini", qwen: "Qwen" }[runtime.provider] || runtime.provider || "模型");
     return runtime.model ? `${provider} · ${runtime.model}` : provider;
   }
 
@@ -220,6 +220,8 @@
       candidate_model_consent_required: "发送前需要你的明确确认。",
       candidate_model_consent_mismatch: "当前文件或运行方式已变化；请重新确认。",
       candidate_model_credential_reference_invalid: "模型凭据引用无效；没有发送材料。",
+      CONNECTOR_UNREACHABLE: "无法连接本机连接器，请检查它是否运行及浏览器本地网络权限。没有改用其他模型。",
+      CONNECTOR_PAIRING_REQUIRED: "本机连接已过期或撤销，请重新配对。",
       deepseek_key_not_configured: "尚未配置可用的 DeepSeek 本机凭据；没有发送材料。",
       candidate_model_pdf_render_failed: "PDF 页面无法完整渲染；没有发送不完整内容。",
       candidate_model_request_size_invalid: "模型请求超过本地服务允许的大小；没有发送材料。",
@@ -227,10 +229,10 @@
       candidate_model_source_payload_invalid: "图片或 PDF 内容校验失败；没有发送材料。",
       candidate_model_source_delivery_failed: "图片或 PDF 无法发送给图文模型；没有发送材料。",
       candidate_model_source_identity_mismatch: "PDF 来源身份校验失败；没有发送材料。",
-      deepseek_network_error: "连接 DeepSeek 失败；未保存任何模型提案。",
-      deepseek_provider_http_error: "DeepSeek 未能完成这次请求；未保存任何模型提案。",
-      deepseek_response_too_large: "DeepSeek 返回内容超过安全上限；未保存任何模型提案。",
-      deepseek_response_malformed: "DeepSeek 返回内容无法解析；未保存任何模型提案。",
+      deepseek_network_error: "连接模型失败；未保存任何模型提案。",
+      deepseek_provider_http_error: "模型未能完成这次请求；未保存任何模型提案。",
+      deepseek_response_too_large: "模型返回内容超过安全上限；未保存任何模型提案。",
+      deepseek_response_malformed: "模型返回内容无法解析；未保存任何模型提案。",
       deepseek_returned_model_mismatch: "服务商返回的模型身份与所选模型不一致；未保存任何模型提案。",
       candidate_model_response_contract_failed: "模型结果未通过运行契约校验；未保存任何模型提案。",
       candidate_model_proposal_contract_failed: "模型提案未通过结构校验；未保存任何模型提案。",
@@ -255,11 +257,13 @@
       job_model_consent_required: "发送前需要你的明确确认。",
       job_model_consent_mismatch: "当前来源或运行方式已变化；请重新确认。",
       job_model_credential_reference_invalid: "模型凭据引用无效；没有发送职位内容。",
+      CONNECTOR_UNREACHABLE: "无法连接本机连接器，请检查它是否运行及浏览器本地网络权限。没有改用其他模型。",
+      CONNECTOR_PAIRING_REQUIRED: "本机连接已过期或撤销，请重新配对。",
       deepseek_key_not_configured: "尚未配置可用的 DeepSeek 本机凭据。",
-      deepseek_network_error: "连接 DeepSeek 失败。",
-      deepseek_provider_http_error: "DeepSeek 未能完成这次职位理解。",
-      deepseek_response_too_large: "DeepSeek 返回内容超过安全上限。",
-      deepseek_response_malformed: "DeepSeek 返回内容无法解析。",
+      deepseek_network_error: "连接模型失败。",
+      deepseek_provider_http_error: "模型未能完成这次职位理解。",
+      deepseek_response_too_large: "模型返回内容超过安全上限。",
+      deepseek_response_malformed: "模型返回内容无法解析。",
       deepseek_returned_model_mismatch: "服务商返回的模型与已验证运行方式不一致。",
       job_model_proposal_contract_failed: "模型职位提案未通过结构校验。",
       job_model_grounding_validation_failed: "模型职位提案缺少真实来源依据。",
@@ -294,13 +298,14 @@
     const mode = currentAriadneMode();
     const operation = mode === "model" ? candidateImportOperation() : "candidate_import";
     const gate = currentOperationGate(operation);
+    if (byId("candidate-understanding-provider")) byId("candidate-understanding-provider").textContent = runtimeLabel(gate.authority.runtime);
     const button = byId("start-personal-processing");
     if (!button) return gate;
     const local = gate.authority.runtime.mode === "local";
     const modelReady = gate.allowed && gate.authority.runtime.mode === "model";
     document.body.dataset.candidateImportRuntime = local ? "local" : modelReady ? "model-ready" : "model-unavailable";
     button.textContent = modelReady
-      ? candidateExecutionState === "PROCESSING" ? "正在使用 DeepSeek 分析" : candidateExecutionState === "COMPLETE" ? "查看工作区" : "使用 DeepSeek 分析"
+      ? candidateExecutionState === "PROCESSING" ? "正在使用模型分析" : candidateExecutionState === "COMPLETE" ? "查看工作区" : "使用模型分析"
       : !local ? "模型导入尚不可用" : candidateExecutionState === "COMPLETED_SOURCE" ? "确认" : candidateExecutionState === "COMPLETE" ? "本地提取已完成" : candidateExecutionState === "PROCESSING" ? "正在本地提取" : "开始本地提取";
     const modelSourceIneligible = modelReady && (selectedCandidateSources.length !== 1 || !["PDF", "IMAGE"].includes(selectedCandidateSources[0]?.source_type));
     button.disabled = candidateProcessingInProgress || (!modelReady && candidateExecutionState === "COMPLETE") || candidateExecutionState === "COMPLETED_SOURCE" || !selectedCandidateSources.length || !gate.allowed || modelSourceIneligible;
@@ -340,7 +345,7 @@
     byId("job-dropzone").setAttribute("aria-disabled", String(jobProcessingInProgress || !gate.allowed));
     byId("job-import-types")?.querySelectorAll("button").forEach((item) => { item.disabled = jobProcessingInProgress; });
     byId("job-runtime-summary").textContent = modelMode && gate.allowed
-      ? `本次模型导入：${runtimeLabel(gate.authority.runtime)} · ${gate.operation === "job_image_import" ? "图像能力已验证" : "文本语义能力已验证"}`
+      ? `本次模型导入：${runtimeLabel(gate.authority.runtime)} · ${selectedJobSources.some((source) => source.source_type === "PDF") ? "完整 PDF 图像理解" : gate.operation === "job_image_import" ? "图像能力已验证" : "文本语义能力已验证"}`
       : modelMode ? unavailableCopy(gate, gate.operation === "job_image_import" ? "职位图片理解" : "职位文本理解")
       : "本地确定规则；不会调用模型服务商。";
     const jobBoundary = byId("job-processing-boundary");
@@ -1010,7 +1015,7 @@
   }
 
   function personalGuideCardMarkup() {
-    return `<a class="v1-add-guide-card personal" data-transition-key="personal-guide" href="/personal-import.html"><span class="v1-add-guide-icon" aria-hidden="true">＋</span><span><b>添加个人材料</b></span><p class="v1-guide-copy"><span>点击进入导入页面，建立待审核的职业对象。</span><span aria-hidden="true">文件仅在当前浏览器中处理</span></p></a>`;
+    return `<a class="v1-add-guide-card personal" data-transition-key="personal-guide" href="/personal-import.html"><span class="v1-add-guide-icon" aria-hidden="true">＋</span><span><b>添加个人材料</b></span><p class="v1-guide-copy"><span>点击进入导入页面，建立待审核的职业对象。</span><span aria-hidden="true">原件保存在浏览器，发送模型前需确认</span></p></a>`;
   }
 
   async function localizedCandidateRecords(records) {
@@ -1254,7 +1259,7 @@
     if (!workspaceViewIsCurrent(viewGeneration)) return [];
     showCandidateWorkspaceLayer(source?.filename || "当前 PDF", false);
     byId("candidate-working-groups").innerHTML = candidateWorkingGroupsMarkup(cards);
-    setCandidateWorkspaceProgress(["材料已准备", candidateSourceReadLabel(source), "DeepSeek 已完成理解", `已生成 ${cards.length} 张候选卡片`]);
+    setCandidateWorkspaceProgress(["材料已准备", candidateSourceReadLabel(source), "模型已完成理解", `已生成 ${cards.length} 张候选卡片`]);
     const questions = cards.flatMap((card) => card.uncertainties || []).filter((uncertainty) => uncertainty.status === "OPEN");
     byId("candidate-clarification-list").innerHTML = questions.length ? `<h3>有几处信息可以稍后确认</h3>${questions.map((uncertainty) => `<p data-entry-type="CLARIFYING_QUESTION">${escapeHtml(uncertainty.question)}</p>`).join("")}` : '<p data-entry-type="CLARIFYING_QUESTION_EMPTY">当前没有需要补充的问题。</p>';
     const accepted = records.candidate_workspace_acceptances.some((event) => event.working_model_id === activeCandidateWorkingModel.working_model_id);
@@ -1311,7 +1316,7 @@
   }
 
   async function callCandidateConversationRuntime(request) {
-    const signatureResponse = await fetch("/api/candidate-conversation-runtime-signature", { cache: "no-store" });
+    const signatureResponse = await (globalThis.AriadneConnector || globalThis).fetch("/api/candidate-conversation-runtime-signature", { cache: "no-store" });
     const signaturePayload = await signatureResponse.json().catch(() => null);
     const frontendSignature = CandidateWorkspaceConversationRuntime.runtimeSignature();
     const backendSignature = signaturePayload?.runtime_signature;
@@ -1337,7 +1342,7 @@
       };
       throw error;
     }
-    const response = await fetch("/api/candidate-conversation-turn", {
+    const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/candidate-conversation-turn", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -1683,7 +1688,7 @@
     const notices = humanReviewNotices(warnings);
     const materialLabel = materialTypeLabels[proposal.payload.candidate_material_type] || "个人材料";
     const modelProposal = proposal.payload.contract_id === CandidateModel?.PAYLOAD_CONTRACT_ID;
-    const sourceKind = modelProposal ? "DeepSeek 模型提案" : "本地确定规则";
+    const sourceKind = modelProposal ? "模型提案" : "本地确定规则";
     return `<article class="v1-review-card" data-proposal-id="${escapeHtml(proposal.proposal_id)}"><p class="v1-review-progress">第 ${position} / ${total} 条</p><h3>${escapeHtml(candidateTypeLabel(items[0]))} · ${escapeHtml(materialLabel)}</h3><p class="v1-review-note">来源：${escapeHtml(proposal.source_label || "本地文件")} · ${sourceKind}${proposal.payload.manual_review_required ? " · 需要人工核对" : ""}</p>${notices.length ? `<p class="v1-review-warning">${escapeHtml(notices.join(" "))}</p>` : ""}${items.map((item, index) => proposalItemEditor(item, index, proposal.grounding_refs)).join("")}<p class="v1-review-note">确认会保存当前字段；如字段经过修改，系统会在内部记录为用户编辑。原始提案始终保留。</p><div class="v1-button-row"><button type="button" class="v1-primary-button" data-review-action="confirm">确认</button><button type="button" class="v1-tertiary-button" data-review-action="reject">拒绝</button></div></article>`;
   }
 
@@ -1763,7 +1768,7 @@
     ProcessingIndicator.set(byId("personal-processing"), {
       active,
       copy: label,
-      boundary: currentAriadneMode() === "model" ? "正在等待 DeepSeek 时不会改用本地结果" : "本地确定性处理 · Provider 调用 0",
+      boundary: currentAriadneMode() === "model" ? "正在等待模型时不会改用本地结果" : "本地确定性处理 · Provider 调用 0",
       state,
     });
   }
@@ -1784,7 +1789,7 @@
   }
 
   async function localOcrEnvironmentCapability() {
-    const response = await fetch("/api/local-ocr-capability", { method: "POST" });
+    const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/local-ocr-capability", { method: "POST" });
     const payload = await response.json();
     if (!response.ok || !["supported", "unsupported", "unverified"].includes(payload.local_ocr)) {
       throw new Error(payload.error || "local_ocr_capability_unavailable");
@@ -1795,7 +1800,7 @@
   async function extractCandidateSource(source, snapshot, signal) {
     const documentDataUrl = await LocalCandidate.readAsDataURL(source.file, source.mime_type);
     const image = source.source_type === "IMAGE";
-    const response = await fetch(image ? "/api/local-candidate-image-ocr" : "/api/local-candidate-extract", {
+    const response = await (globalThis.AriadneConnector || globalThis).fetch(image ? "/api/local-candidate-image-ocr" : "/api/local-candidate-extract", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal,
@@ -1868,7 +1873,7 @@
     await Truth.persistRecord(database, "processing_runs", run);
     try {
       setCandidateExtractionState("STRUCTURING", `正在按本地确定规则整理：${source.file.name}`);
-      const response = await fetch("/api/local-candidate-structure", { method: "POST", headers: { "Content-Type": "application/json" }, signal, body: JSON.stringify({ source_document_id: source.source_document_id, runtime_snapshot: snapshot, candidate_material_type: artifact.payload.candidate_material_type, pages: artifact.payload.pages }) });
+      const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/local-candidate-structure", { method: "POST", headers: { "Content-Type": "application/json" }, signal, body: JSON.stringify({ source_document_id: source.source_document_id, runtime_snapshot: snapshot, candidate_material_type: artifact.payload.candidate_material_type, pages: artifact.payload.pages }) });
       const result = await response.json();
       if (!response.ok || result.model_call_made !== false || result.runtime_snapshot_id !== snapshot.snapshot_id) throw new Error(result.error || "candidate_local_structuring_failed");
       const proposals = LocalCandidateProposal.proposalsFor({ source, artifact, structuringRun: run, result });
@@ -1888,6 +1893,7 @@
   }
 
   async function runCandidateProcessing() {
+    if (byId("candidate-understanding-provider")) byId("candidate-understanding-provider").textContent = runtimeLabel(gate.authority.runtime);
     const button = byId("start-personal-processing");
     const gate = refreshCandidateImportGate();
     if (!gate.allowed || gate.authority.runtime.mode !== "local") throw new Error(`runtime_capability_${gate.state}`);
@@ -2017,8 +2023,8 @@
     candidateConsentSelectionVersion = selectionVersion;
     candidateConsentRuntimeIdentity = selectedRuntimeIdentity;
     candidateConsentId = `consent-candidate-model-${crypto.randomUUID()}`;
-    byId("candidate-model-consent-provider").textContent = "DeepSeek";
-    byId("candidate-model-consent-model").textContent = CandidateModel.MODEL_ID;
+    byId("candidate-model-consent-provider").textContent = gate.authority.runtime.provider === "codex" ? "Codex / OpenAI" : gate.authority.runtime.provider;
+    byId("candidate-model-consent-model").textContent = gate.authority.runtime.model;
     const dialog = byId("candidate-model-consent-dialog");
     if (!dialog.open) dialog.showModal();
     return undefined;
@@ -2042,8 +2048,8 @@
     const descriptor = RuntimeGate.modelDescriptorForRuntime(gate.authority.runtime, gate.operation);
     const snapshot = RuntimeExecution.createRuntimeSnapshot(gate.authority.runtime, {
       modelDescriptor: descriptor,
-      credentialRef: CandidateModel.CREDENTIAL_REF,
-      adapterVersion: CandidateModel.ADAPTER_VERSION,
+      credentialRef: RuntimeGate.credentialFor(gate.authority.runtime),
+      adapterVersion: descriptor.adapter_version,
       promptVersion: CandidateModel.PROMPT_VERSION,
       schemaVersion: CandidateModel.SCHEMA_VERSION,
       deliveryMethod: CandidateModel.DELIVERY_METHOD,
@@ -2061,7 +2067,7 @@
     candidateBatchAbortController = abortController;
     byId("replace-personal-file").textContent = "取消本次分析";
     showCandidateWorkspaceLayer(source.file.name, true);
-    setCandidateWorkspaceProgress(["正在准备材料", "正在读取 PDF", "等待 DeepSeek 理解", "整理候选卡片"], 0);
+    setCandidateWorkspaceProgress(["正在准备材料", "正在读取 PDF", "等待模型理解", "整理候选卡片"], 0);
     byId("candidate-clarification-list").innerHTML = '<p data-entry-type="CLARIFYING_QUESTION_EMPTY">完成理解后，需要补充的问题会显示在这里。</p>';
     setCandidateExtractionState("PREPARING", `正在校验本机保存的原始${source.source_type === "IMAGE" ? "图片" : "PDF"}`);
     refreshCandidateImportGate();
@@ -2080,7 +2086,7 @@
       run = CandidateModel.processingRunFor(source, snapshot.snapshot_id, "RUNNING", startedAt, { run_id: run.run_id, started_at: startedAt });
       await Truth.persistRecord(database, "processing_runs", run);
       setCandidateExtractionState("EXTRACTING", source.source_type === "IMAGE" ? "正在准备原始图片" : "正在准备完整 PDF 渲染页面");
-      setCandidateWorkspaceProgress(["材料已准备", candidateSourceReadLabel(source, "reading"), "等待 DeepSeek 理解", "整理候选卡片"], 1);
+      setCandidateWorkspaceProgress(["材料已准备", candidateSourceReadLabel(source, "reading"), "等待模型理解", "整理候选卡片"], 1);
       const documentDataUrl = await LocalCandidate.readAsDataURL(resolved.file, sourceDocument.mime_type);
       if (abortController.signal.aborted) throw Object.assign(new Error("candidate_model_cancelled"), { name: "AbortError" });
       const request = CandidateModel.requestFor({
@@ -2092,9 +2098,9 @@
         consent,
         operationIdentity,
       });
-      setCandidateExtractionState("STRUCTURING", `正在使用 DeepSeek 分析：${source.file.name}`);
-      setCandidateWorkspaceProgress(["材料已准备", candidateSourceReadLabel(source), "DeepSeek 正在理解材料", "整理候选卡片"], 2);
-      const response = await fetch("/api/candidate-model-structure", {
+      setCandidateExtractionState("STRUCTURING", `正在使用模型分析：${source.file.name}`);
+      setCandidateWorkspaceProgress(["材料已准备", candidateSourceReadLabel(source), "模型正在理解材料", "整理候选卡片"], 2);
+      const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/candidate-model-structure", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: abortController.signal,
@@ -2109,7 +2115,7 @@
         throw error;
       }
       if (abortController.signal.aborted) throw Object.assign(new Error("candidate_model_cancelled"), { name: "AbortError" });
-      const proposals = CandidateModel.proposalsFor({ source: { ...source, file: resolved.file }, run, result, operationIdentity });
+      const proposals = CandidateModel.proposalsFor({ source: { ...source, file: resolved.file }, run, result, operationIdentity, snapshot });
       const isCurrentOperation = () => attemptGeneration === candidateModelAttemptGeneration && selectedCandidateSources[0]?.source_document_id === source.source_document_id;
       await CandidateModel.persistSuccessfulResult(database, run, proposals, abortController.signal, isCurrentOperation);
       const records = await readCandidateRecords(database);
@@ -2128,7 +2134,7 @@
           activeCandidateWorkingModel = null;
           showCandidateWorkspaceLayer(source.file.name, false);
           byId("candidate-working-groups").innerHTML = '<p class="v1-conversation-empty">模型没有发现可形成卡片的候选信息。</p>';
-          setCandidateWorkspaceProgress(["材料已准备", candidateSourceReadLabel(source), "DeepSeek 已完成理解", "没有发现可形成卡片的信息"]);
+          setCandidateWorkspaceProgress(["材料已准备", candidateSourceReadLabel(source), "模型已完成理解", "没有发现可形成卡片的信息"]);
           byId("candidate-clarification-list").innerHTML = '<p data-entry-type="CLARIFYING_QUESTION_EMPTY">当前没有需要补充的问题。</p>';
           byId("candidate-workspace-save-status").textContent = "没有可保存的候选人信息。";
         }
@@ -2688,7 +2694,7 @@
       const sourceId = sourceIdFor(activeCandidate, canonicalRevision);
       try {
         if (scope === "source" && canonicalRevision && String(sourceId || "").startsWith("source-candidate-")) {
-          const response = await fetch("/api/candidate-model-operation-state/delete", {
+          const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/candidate-model-operation-state/delete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ source_document_id: sourceId }),
@@ -2783,7 +2789,7 @@
   }
 
   function jobGuideCardMarkup() {
-    return `<a class="v1-add-guide-card job" data-transition-key="job-guide" href="/jd-import.html"><span class="v1-add-guide-icon" aria-hidden="true">＋</span><span><b>添加职位描述</b></span><p class="v1-guide-copy"><span>点击进入导入页面，建立期望职位卡片。</span><span aria-hidden="true">文件仅在当前浏览器中处理</span></p></a>`;
+    return `<a class="v1-add-guide-card job" data-transition-key="job-guide" href="/jd-import.html"><span class="v1-add-guide-icon" aria-hidden="true">＋</span><span><b>添加职位描述</b></span><p class="v1-guide-copy"><span>点击进入导入页面，建立期望职位卡片。</span><span aria-hidden="true">原件保存在浏览器，发送模型前需确认</span></p></a>`;
   }
 
   async function localizedJobRecords(records) {
@@ -2858,7 +2864,7 @@
     ProcessingIndicator.set(byId("job-processing"), {
       active: !["READY_FOR_REVIEW", "WORKING_READY", "CANCELLED", "FAILED"].includes(state),
       copy,
-      boundary: modelMode ? "正在等待 DeepSeek 时不会改用本地结果" : "本地确定性处理 · Provider 调用 0",
+      boundary: modelMode ? "正在等待模型时不会改用本地结果" : "本地确定性处理 · Provider 调用 0",
       state,
     });
   }
@@ -2884,7 +2890,7 @@
     byId("job-working-location").value = payload.location || "";
     byId("job-working-summary").value = payload.summary || "";
     byId("job-working-requirements").value = (payload.requirements || []).map((item) => item.detail).join("\n");
-    setJobWorkspaceProgress(["职位材料已准备", "职位内容已读取", "DeepSeek 已完成理解", "Working Job 已生成"]);
+    setJobWorkspaceProgress(["职位材料已准备", "职位内容已读取", "模型已完成理解", "Working Job 已生成"]);
     byId("job-review-surface").classList.add("hidden");
     const database = await Truth.openDatabase();
     try {
@@ -3020,7 +3026,7 @@
   async function extractJobSource(source, snapshot, signal) {
     const documentDataUrl = await LocalJob.readAsDataURL(source.file, source.mime_type);
     const image = source.source_type === "IMAGE";
-    const response = await fetch(image ? "/api/local-job-image-ocr" : "/api/local-job-extract", {
+    const response = await (globalThis.AriadneConnector || globalThis).fetch(image ? "/api/local-job-image-ocr" : "/api/local-job-extract", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal,
@@ -3086,7 +3092,7 @@
     const resolved = await LocalJob.resolveRawSource(database, sourceDocument);
     const dataUrl = await LocalJob.readAsDataURL(resolved.file || resolved.blob, sourceDocument.mime_type);
     const image = ["image/png", "image/jpeg"].includes(sourceDocument.mime_type);
-    const response = await fetch("/api/local-source-read", {
+    const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/local-source-read", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal,
@@ -3106,12 +3112,13 @@
     }
     return {
       preparation_result: result,
-      source_input: image ? { source_document_id: sourceDocument.source_document_id, image_data_url: dataUrl } : null,
+      source_input: image ? { source_document_id: sourceDocument.source_document_id, image_data_url: dataUrl }
+        : sourceDocument.mime_type === "application/pdf" ? { source_document_id: sourceDocument.source_document_id, document_data_url: dataUrl } : null,
     };
   }
 
   async function callJobModelRuntime(request, signal) {
-    const signatureResponse = await fetch("/api/job-model-import-runtime-signature", { cache: "no-store", signal });
+    const signatureResponse = await (globalThis.AriadneConnector || globalThis).fetch("/api/job-model-import-runtime-signature", { cache: "no-store", signal });
     const signaturePayload = await signatureResponse.json().catch(() => null);
     if (!signatureResponse.ok || !JobModel.runtimeSignaturesMatch(JobModel.runtimeSignature(), signaturePayload?.runtime_signature)) {
       const error = new Error("RUNTIME_CONTRACT_VERSION_MISMATCH");
@@ -3119,7 +3126,7 @@
       error.network_call_made = false;
       throw error;
     }
-    const response = await fetch("/api/job-model-structure", {
+    const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/job-model-structure", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal,
@@ -3159,6 +3166,8 @@
     jobModelConsentRuntimeIdentity = runtimeIdentity(currentGate.authority.runtime);
     jobModelConsentId = `consent-job-model-import-${crypto.randomUUID()}`;
     jobModelConsentBundle = await JobModel.sourceBundleFor(sources, sourceDocuments);
+    byId("job-model-consent-provider").textContent = gate.authority.runtime.provider === "codex" ? "Codex / OpenAI" : gate.authority.runtime.provider;
+    byId("job-model-consent-model").textContent = gate.authority.runtime.model;
     const dialog = byId("job-model-consent-dialog");
     if (!dialog.open) dialog.showModal();
   }
@@ -3219,7 +3228,7 @@
       const request = JobModel.requestFor({ source_bundle: sourceBundle, source_documents: sourceDocuments, source_preparations: preparations, source_inputs: sourceInputs, snapshot: runtimeSnapshot, run, consent, operation_identity: operationIdentity });
       const result = await callJobModelRuntime(request, abortController.signal);
       setJobWorkspaceProgress(["职位材料已准备", "职位内容已读取", "职位要求已提取", "正在生成职位信息"], 3);
-      const proposal = JobModel.proposalFor({ sources, source_documents: sourceDocuments, source_preparations: preparations, source_bundle: sourceBundle, run, result });
+      const proposal = JobModel.proposalFor({ sources, source_documents: sourceDocuments, source_preparations: preparations, source_bundle: sourceBundle, run, result, snapshot: runtimeSnapshot });
       const isCurrent = () => attemptGeneration === jobModelAttemptGeneration && selectionVersion === jobSelectionVersion && refreshJobImportGate().authority.runtime.mode === "model" && JSON.stringify(selectedJobSources.map((entry) => entry.source_document_id)) === JSON.stringify(sourceBundle.source_document_ids);
       await JobModel.persistSuccessfulResult(database, run, proposal, abortController.signal, isCurrent);
       if (!isCurrent()) throw new Error("job_model_processing_run_stale");
@@ -3550,7 +3559,7 @@
   }
 
   async function callJobConversationRuntime(request) {
-    const signatureResponse = await fetch("/api/job-conversation-runtime-signature", { cache: "no-store" });
+    const signatureResponse = await (globalThis.AriadneConnector || globalThis).fetch("/api/job-conversation-runtime-signature", { cache: "no-store" });
     const signaturePayload = await signatureResponse.json().catch(() => null);
     if (!signatureResponse.ok || !JobConversation.runtimeSignaturesMatch(JobConversation.runtimeSignature(), signaturePayload?.runtime_signature)) {
       const error = new Error("RUNTIME_CONTRACT_VERSION_MISMATCH");
@@ -3558,7 +3567,7 @@
       error.network_call_made = false;
       throw error;
     }
-    const response = await fetch("/api/job-conversation-turn", {
+    const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/job-conversation-turn", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -3624,7 +3633,7 @@
           runtime_snapshot: runtimeSnapshot,
           ...(source.mime_type === "image/png" || source.mime_type === "image/jpeg" ? { image_data_url: dataUrl } : { document_data_url: dataUrl }),
         };
-        const response = await fetch("/api/local-source-read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/local-source-read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
         const result = await response.json().catch(() => null);
         if (!response.ok || !result?.read_only || result.writeback !== false || result.model_call_made !== false) throw new Error(result?.error || "SOURCE_UNAVAILABLE");
         return result;

@@ -33,6 +33,7 @@
 
 ## 3. 当前实现与边界
 
+- 2026-09-09 已实现 Codex 本机直连及 Web 配对连接器，当前验证组合为 `codex / gpt-5.6-sol / CODEX_EXEC_JSONL`。两种方式均经本机客户端向 OpenAI 推理，保持 Model、来源完整性与人工保存边界；公开 HTTPS origin 的本地网络授权仍待实际部署验收。启动、配对与限制见 [Codex 运行指南](docs/current/CODEX_RUNTIME_CONNECTOR.md)。
 - 2026-09-08 用户确认模型接入最低要求：所有 Model 操作（包括纯文字对话）只使用有明确图片输入和视觉 PDF 处理能力的多模态模型。PDF 可原生发送，也可完整逐页转图；仅 OCR/文本抽取、模型列表存在、名称含 vision 或一次文字连通检查都不能替代能力证据。未来 Gemini/其他 Provider 同样遵守此门槛，且须完成对应 Ariadne adapter 验证后才能执行。
 - 当前基础为 Candidate/Job 导入、Working、人工保存、确认版本、详情编辑、来源恢复和范围明确的模型对话；具体已验收路径与故障以 PROJECT_STATUS 最新条目及对应证据为准。
 - 新增「个人理解」入口：跨资料派生理解、用户审阅保存的个人补充、当前指纹绑定的缓存及有界上下文已实现；个人/JD 对话读取当前有效补充。原始事实、用户自述与模型推断分层，仍依赖底层模型，不声称完全理解用户。详见 [持续个人理解 v1](docs/current/ARIADNE_PERSONAL_UNDERSTANDING_V1.md)。

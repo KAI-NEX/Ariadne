@@ -93,12 +93,12 @@ function failureCopy(layer) {
 }
 
 function isVerifiedRuntimeModel(model) {
-  return model?.provider_id === "deepseek" && model.runtime_capability_basis === "adapter_verified"
+  return ["deepseek", "codex"].includes(model?.provider_id) && model.runtime_capability_basis === "adapter_verified"
     && window.AriadneRuntimeExecution.isEligibleModelDescriptor(model);
 }
 
-function selectVerifiedRuntimeModel(model) {
-  const descriptor = selectableModels().find((item) => item.provider_id === "deepseek" && item.model_id === model);
+function selectVerifiedRuntimeModel(model, provider = "deepseek") {
+  const descriptor = selectableModels().find((item) => item.provider_id === provider && item.model_id === model);
   applyReadyModel(descriptor);
   closeMenu(); render();
 }
@@ -132,7 +132,7 @@ async function checkModel(model) {
   state.mode = "ai"; state.provider = "deepseek"; state.model = model; state.phase = "CHECKING"; state.diagnostics = null;
   setMessage(""); render(); closeMenu();
   try {
-    const response = await fetch("/api/runtime-check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model }) });
+    const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/runtime-check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model }) });
     const result = await response.json();
     if (!response.ok) throw Object.assign(new Error(result.error || "runtime_check_failed"), { result });
     if (!result.diagnostics?.multimodal_connection_ready
@@ -165,18 +165,28 @@ function renderModels() {
   });
   document.querySelectorAll(".runtime-existing-model").forEach((button) => button.addEventListener("click", () => {
     const model = selectableModels().find((item) => item.model_id === button.dataset.model && item.provider_id === button.dataset.provider);
-    if (isVerifiedRuntimeModel(model)) selectVerifiedRuntimeModel(button.dataset.model);
+    if (isVerifiedRuntimeModel(model)) selectVerifiedRuntimeModel(button.dataset.model, button.dataset.provider);
     else if (model?.connection_verified) selectAddedMultimodalModel(model);
     else checkModel(button.dataset.model);
   }));
 }
 
+function applyLocalPreference(preference) {
+  if (!["127.0.0.1", "localhost"].includes(location.hostname) || preference?.id !== "local-codex-v1"
+    || preference.provider !== "codex" || preference.model !== "gpt-5.6-sol") return;
+  const key = "ariadne-applied-local-runtime-preference";
+  if (readLocalJson(key, null) === preference.id) return;
+  const model = selectableModels().find((item) => item.provider_id === preference.provider && item.model_id === preference.model);
+  if (model && applyReadyModel(model)) writeLocalJson(key, preference.id);
+}
+
 async function loadModels() {
   try {
-    const response = await fetch("/api/runtime-options");
+    const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/runtime-options");
     const result = await response.json();
     if (!response.ok) throw Object.assign(new Error(result.error || "runtime_options_failed"), { result });
     state.models = result.models || [];
+    applyLocalPreference(result.local_preference);
     if (!(["READY", "OFFICIAL_READY", "LOCAL_READY"].includes(state.phase) && (state.model || state.mode === "local"))) {
       const restoredModel = selectableModels().find((model) => model.provider_id === state.provider && model.model_id === state.model);
       if (state.mode === "ai") applyReadyModel(restoredModel, false);

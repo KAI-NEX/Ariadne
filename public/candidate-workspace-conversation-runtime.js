@@ -102,13 +102,14 @@
   }
 
   function createRuntimeSnapshot({ snapshot_id: snapshotId, captured_at: capturedAt = new Date() } = {}) {
-    const currentRuntime = { mode: "model", provider: PROVIDER, model: MODEL };
+    const currentRuntime = RuntimeGate.runtimeForSnapshot("candidate_conversation");
+    const descriptor = RuntimeGate.modelDescriptorForRuntime(currentRuntime, "candidate_conversation");
     return Runtime.createRuntimeSnapshot(currentRuntime, {
-      modelDescriptor: RuntimeGate.CANDIDATE_CONVERSATION_MODEL_ADAPTER,
+      modelDescriptor: descriptor,
       snapshotId,
       capturedAt: capturedAt instanceof Date ? capturedAt.toISOString() : String(capturedAt),
-      credentialRef: CREDENTIAL_REF,
-      adapterVersion: ADAPTER_VERSION,
+      credentialRef: RuntimeGate.credentialFor(currentRuntime),
+      adapterVersion: descriptor?.adapter_version,
       promptVersion: PROMPT_VERSION,
       schemaVersion: ACTION_SCHEMA_VERSION,
       operation: Conversation.OPERATION,
@@ -160,8 +161,8 @@
     const result = exactKeys(value, RESULT_KEYS, "RUNTIME_RESULT_SHAPE_INVALID");
     if (result.contract_id !== RESULT_CONTRACT || result.execution_id !== execution.execution_id
       || result.generation !== execution.generation || result.conversation_id !== session.conversation_id
-      || result.operation !== Conversation.OPERATION || result.provider !== PROVIDER || result.model !== MODEL
-      || result.protocol !== PROTOCOL || result.runtime_snapshot_id !== snapshot.snapshot_id
+      || result.operation !== Conversation.OPERATION || result.provider !== snapshot.provider || result.model !== snapshot.model
+      || result.protocol !== snapshot.protocol || result.runtime_snapshot_id !== snapshot.snapshot_id
       || result.finish_reason !== "stop" || result.authority !== "NON_AUTHORITATIVE_WORKING_ACTION"
       || result.network_call_made !== true || result.persistence !== "not_written" || !isPlainObject(result.usage)) {
       throw new CandidateWorkspaceConversationError("RUNTIME_RESULT_IDENTITY_INVALID");

@@ -16,7 +16,7 @@
   "job_model_import_runtime_contracts": {
     "request_contract_version": "ariadne-job-model-import-runtime-request-v2",
     "result_contract_version": "ariadne-job-model-import-runtime-result-v2",
-    "adapter_version": "deepseek-job-multimodal-import-v2",
+    "adapter_version": "deepseek-job-multimodal-import-v3",
     "prompt_version": "ariadne-job-model-import-prompt-v2",
     "request_config_version": "deepseek-job-model-import-request-v2",
     "delivery_method": "source_images_with_prepared_text"

@@ -34,7 +34,7 @@
     const runtime = value?.authority?.runtime;
     const capability = value?.authority?.capabilities;
     if (!value?.allowed || value.capability !== "job_model_structuring" || runtime?.mode !== "model"
-      || runtime.provider !== PROVIDER_ID || runtime.model !== MODEL_ID
+      || !RuntimeGate.isModelRuntimeEligible(runtime)
       || capability?.semantic_understanding !== "supported" || capability?.job_model_structuring !== "supported"
       || capability?.vision !== "supported") {
       throw new Error("job_model_runtime_not_eligible");
@@ -43,12 +43,14 @@
   }
 
   function createRuntimeSnapshot(options = {}) {
-    return Runtime.createRuntimeSnapshot({ mode: "model", provider: PROVIDER_ID, model: MODEL_ID }, {
-      modelDescriptor: RuntimeGate.JOB_MULTIMODAL_IMPORT_ADAPTER,
+    const currentRuntime = RuntimeGate.runtimeForSnapshot("job_text_import", options.runtime);
+    const descriptor = RuntimeGate.modelDescriptorForRuntime(currentRuntime, "job_text_import");
+    return Runtime.createRuntimeSnapshot(currentRuntime, {
+      modelDescriptor: descriptor,
       snapshotId: options.snapshot_id,
       capturedAt: options.captured_at || nowIso(),
-      credentialRef: CREDENTIAL_REF,
-      adapterVersion: CONTRACTS.adapter_version,
+      credentialRef: RuntimeGate.credentialFor(currentRuntime),
+      adapterVersion: descriptor?.adapter_version,
       promptVersion: CONTRACTS.prompt_version,
       schemaVersion: PROPOSAL_CONTRACT,
       operation: String(options.operation || "job_text_import").toUpperCase(),
@@ -97,6 +99,16 @@
     const source = Truth.validateSourceDocument(sourceDocument);
     if (source.material_type !== "JOB" || sourceReadResult?.read_only !== true || sourceReadResult?.writeback !== false
       || sourceReadResult?.model_call_made !== false || sourceReadResult?.content_hash !== source.content_hash) throw new Error("job_model_source_preparation_invalid");
+    if (source.source_type === "PDF") {
+      const count = sourceReadResult.visual_page_count;
+      if (!Number.isInteger(count) || count < 1 || count > Math.min(48, options.max_blocks || 48)) throw new Error("job_pdf_complete_page_limit");
+      const prefix = Number.isInteger(options.source_index) ? `job-source-${options.source_index}-block` : "job-source-block";
+      const blocks = Array.from({ length: count }, (_, index) => ({ source_ref: `${prefix}-${index + 1}`, location: `p. ${index + 1}`, text: `Original PDF visual page ${index + 1}` }));
+      return Object.freeze({ contract_id: PREPARATION_CONTRACT, source_document_id: source.source_document_id,
+        content_hash: source.content_hash, source_type: source.source_type, mime_type: source.mime_type,
+        extraction_method: "complete_pdf_page_manifest_v1", read_only: true, writeback: false, semantic_structuring: false,
+        blocks, character_count: blocks.reduce((total, block) => total + block.text.length, 0) });
+    }
     const lines = String(sourceReadResult.extracted_text || "").normalize("NFKC").split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
     if (!lines.length) throw new Error("job_model_source_text_required");
     const blocks = [];
@@ -218,15 +230,15 @@
     return { source_document_id: preparation.source_document_id, location: block.location, excerpt_or_reference: block.text };
   }
 
-  function proposalFor({ source, source_document: sourceDocument, source_preparation: preparation, sources, source_documents: sourceDocuments, source_preparations: sourcePreparations, source_bundle: sourceBundle, run, result }) {
+  function proposalFor({ source, source_document: sourceDocument, source_preparation: preparation, sources, source_documents: sourceDocuments, source_preparations: sourcePreparations, source_bundle: sourceBundle, run, result, snapshot = { provider: PROVIDER_ID, model: MODEL_ID, adapter_version: CONTRACTS.adapter_version } }) {
     const orderedSources = sources || [source];
     const orderedDocuments = sourceDocuments || [sourceDocument];
     const preparations = sourcePreparations || [preparation];
     const sourceIds = orderedDocuments.map((document) => document.source_document_id);
     const primarySource = orderedSources[0];
     const primaryDocument = orderedDocuments[0];
-    if (result?.contract_id !== CONTRACTS.result_contract_version || result.provider !== PROVIDER_ID || result.model !== MODEL_ID
-      || result.adapter_version !== CONTRACTS.adapter_version || result.runtime_snapshot_id !== run.runtime_snapshot_id
+    if (result?.contract_id !== CONTRACTS.result_contract_version || result.provider !== snapshot.provider || result.model !== snapshot.model
+      || result.adapter_version !== snapshot.adapter_version || result.runtime_snapshot_id !== run.runtime_snapshot_id
       || result.source_document_id !== primarySource.source_document_id || result.processing_run_id !== run.run_id
       || result.network_call_made !== true || result.persistence !== "browser_working_job_save_required") throw new Error("job_model_result_contract_invalid");
     if (result.source_document_ids && JSON.stringify(result.source_document_ids) !== JSON.stringify(sourceIds)) throw new Error("job_model_result_contract_invalid");

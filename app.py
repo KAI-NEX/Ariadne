@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from src.runtime_binding import CODEX_MODEL, CODEX_CREDENTIAL, CODEX_PROTOCOL, codex_enabled, local_runtime_preference
+from src.codex_runtime import call_codex
+from src.pdf_delivery import render_complete_pdf_pages
+
 import json
 import base64
 import hashlib
@@ -222,32 +226,6 @@ def decode_image_data_urls(payload: dict) -> list[tuple[str, bytes]]:
     return decoded_images
 
 
-def render_complete_pdf_pages(pdf_bytes: bytes) -> list[tuple[str, bytes]]:
-    """Render every original PDF page transiently for an account-enabled vision model.
-
-    This is a transport adapter, not Local Mode entity extraction: no OCR text,
-    DocumentBlock or CareerEntity is created before the provider response.
-    """
-    with tempfile.TemporaryDirectory(prefix="job-radar-career-pages-") as directory:
-        root = Path(directory)
-        source = root / "source.pdf"
-        source.write_bytes(pdf_bytes)
-        output_prefix = root / "page"
-        try:
-            subprocess.run(
-                ["pdftoppm", "-jpeg", "-r", "120", "-jpegopt", "quality=82", str(source), str(output_prefix)],
-                check=True, capture_output=True, timeout=120,
-            )
-        except (subprocess.SubprocessError, OSError) as error:
-            raise AICareerIngestionError("pdf_page_render_failed") from error
-        paths = sorted(root.glob("page-*.jpg"), key=lambda path: int(path.stem.rsplit("-", 1)[1]))
-        if not paths:
-            raise AICareerIngestionError("pdf_page_render_empty")
-        pages = [(str(index), path.read_bytes()) for index, path in enumerate(paths, start=1)]
-        if sum(len(image) for _, image in pages) > 40_000_000:
-            raise AICareerIngestionError("rendered_pages_exceed_request_limit")
-        return pages
-
 
 def save_local_evidence(decoded_images: list[tuple[str, bytes]]) -> list[dict]:
     """Persist original screenshots locally before either OCR or a cloud model sees them."""
@@ -375,6 +353,12 @@ def candidate_conversation_failure_diagnostics(error: CandidateConversationRunti
         key_names = [name for name in raw["message_key_names"] if isinstance(name, str) and len(name) <= 128]
         if len(key_names) == len(raw["message_key_names"]): result["message_key_names"] = key_names
     return result
+
+
+def call_ariadne_model(credential: str, payload: dict, *, response_limit: int) -> tuple[int, dict]:
+    if credential == CODEX_CREDENTIAL:
+        return call_codex(credential, payload)
+    return call_deepseek_chat_completions(credential, payload, response_limit=response_limit)
 
 
 def call_deepseek_chat_completions(api_key: str, payload: dict, *, response_limit: int, timeout: int = 240) -> tuple[int, dict]:
@@ -991,6 +975,12 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802 - required by the standard library
         parsed = urlparse(self.path)
+        if codex_enabled() and not getattr(self, "connector_authorized", False):
+            host = self.headers.get("Host", "")
+            origin = self.headers.get("Origin")
+            if host not in {f"127.0.0.1:{self.server.server_port}", f"localhost:{self.server.server_port}"} or (origin and origin != f"http://{host}"):
+                self.send_json(HTTPStatus.FORBIDDEN, {"error": "LOCAL_ORIGIN_REQUIRED", "network_call_made": False})
+                return
         if parsed.path in LEGACY_PROVIDER_ACTION_PATHS:
             self.legacy_provider_action_unavailable()
             return
@@ -1074,8 +1064,16 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
     def runtime_options(self) -> None:
         """List current runtime choices without sending career material or an inference."""
         descriptors = deepseek_model_descriptors([DEEPSEEK_VISION_MODEL])
+        models = [item.to_public_dict() for item in v1_runtime_selector_descriptors(descriptors)]
+        if codex_enabled():
+            codex = dict(models[0])
+            codex.update(provider_id="codex", model_id=CODEX_MODEL, display_name=f"Codex · {CODEX_MODEL}",
+                protocol=CODEX_PROTOCOL, discovery_source="ariadne_codex_qualification_2026-09-09",
+                adapter_version="codex-candidate-multimodal-v2", runtime_default=True)
+            models.insert(0, codex)
         self.send_json(HTTPStatus.OK, {
-            "provider": "deepseek", "models": [item.to_public_dict() for item in v1_runtime_selector_descriptors(descriptors)], "network_call_made": False,
+            "provider": "codex" if codex_enabled() else "deepseek", "models": models, "network_call_made": False,
+            "local_preference": local_runtime_preference(),
             "career_data_sent": False,
         })
 
@@ -1140,7 +1138,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
 
             def provider_call(api_key: str, provider_payload: dict) -> tuple[int, dict]:
                 try:
-                    return call_deepseek_chat_completions(api_key, provider_payload, response_limit=8_000_000)
+                    return call_ariadne_model(api_key, provider_payload, response_limit=8_000_000)
                 except ValueError as error:
                     code = "deepseek_response_too_large" if str(error) == "provider_response_too_large" else "deepseek_response_malformed"
                     raise CandidateModelRuntimeError(code, "parsing", True) from error
@@ -1227,7 +1225,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
 
             def provider_call(api_key: str, provider_payload: dict) -> tuple[int, dict]:
                 try:
-                    return call_deepseek_chat_completions(api_key, provider_payload, response_limit=2_000_000)
+                    return call_ariadne_model(api_key, provider_payload, response_limit=2_000_000)
                 except ValueError as error:
                     raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "parsing", True) from error
 
@@ -1245,8 +1243,8 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             safe_diagnostics = candidate_conversation_failure_diagnostics(error)
             print(
                 "candidate_conversation_failure "
-                f"provider_called={str(error.network_call_made).lower()} provider=deepseek "
-                f"model=deepseek-v4-flash-vision-exp stage={error.failure_layer} "
+                f"provider_called={str(error.network_call_made).lower()} "
+                f"stage={error.failure_layer} "
                 f"error_code={error.code} field_category={safe_diagnostics.get('field_category', 'unknown')} "
                 f"action_type={safe_diagnostics.get('action_type', 'unknown')} assistant_copy_source=NONE",
                 flush=True,
@@ -1293,7 +1291,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                 raise JobOverviewError("JOB_OVERVIEW_REQUEST_SIZE_INVALID", "request")
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
             result = execute_job_overview(payload, read_deepseek_key,
-                lambda key, body: call_deepseek_chat_completions(key, body, response_limit=2_000_000))
+                lambda key, body: call_ariadne_model(key, body, response_limit=2_000_000))
         except JobOverviewError as error:
             self.send_json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": error.code, "failure_layer": error.failure_layer,
                 "network_call_made": error.network_call_made, "persistence": "not_written"})
@@ -1313,7 +1311,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                 raise PersonalUnderstandingError("PERSONAL_REQUEST_SIZE_INVALID", "request")
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
             result = execute_personal_understanding(payload, read_deepseek_key,
-                lambda key, body: call_deepseek_chat_completions(key, body, response_limit=2_000_000))
+                lambda key, body: call_ariadne_model(key, body, response_limit=2_000_000))
         except PersonalUnderstandingError as error:
             self.send_json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": error.code, "failure_layer": error.failure_layer,
                 "network_call_made": error.network_call_made, "persistence": "not_written"})
@@ -1346,7 +1344,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
 
             def provider_call(api_key: str, provider_payload: dict) -> tuple[int, dict]:
                 try:
-                    return call_deepseek_chat_completions(api_key, provider_payload, response_limit=2_000_000)
+                    return call_ariadne_model(api_key, provider_payload, response_limit=2_000_000)
                 except ValueError as error:
                     raise JobConversationRuntimeError("MALFORMED_RESPONSE", "parsing", True) from error
 
@@ -1362,8 +1360,8 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                 JOB_CONVERSATION_EXECUTIONS.fail(execution_id, generation)
             print(
                 "job_conversation_failure "
-                f"provider_called={str(error.network_call_made).lower()} provider=deepseek "
-                f"model=deepseek-v4-flash-vision-exp stage={error.failure_layer} "
+                f"provider_called={str(error.network_call_made).lower()} "
+                f"stage={error.failure_layer} "
                 f"error_code={error.code} assistant_copy_source=NONE",
                 flush=True,
             )
@@ -1420,9 +1418,9 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             claimed_operation_id = validated.operation_id
 
             def provider_call(api_key: str, provider_payload: dict) -> tuple[int, dict]:
-                print("job_model_import_provider_call provider=deepseek model=deepseek-v4-flash-vision-exp", flush=True)
+                print(f"job_model_import_provider_call model={provider_payload['model']}", flush=True)
                 try:
-                    return call_deepseek_chat_completions(api_key, provider_payload, response_limit=2_000_000)
+                    return call_ariadne_model(api_key, provider_payload, response_limit=2_000_000)
                 except ValueError as error:
                     code = "deepseek_response_too_large" if str(error) == "provider_response_too_large" else "deepseek_response_malformed"
                     raise JobModelRuntimeError(code, "parsing", True) from error
@@ -1967,6 +1965,18 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                     ocr = run_apple_vision_ocr(image_path)
                 lines = [line.strip() for line in ocr["text"].splitlines() if line.strip()]
                 result = {"extracted_text": "\n".join(lines), "content_hash": "sha256:" + hashlib.sha256(image_bytes).hexdigest(), "extraction_method": "ephemeral_apple_vision_source_read_v1"}
+            elif material_type == "JOB" and media_type == "application/pdf" and snapshot.operation in {"JOB_TEXT_IMPORT", "JOB_IMAGE_IMPORT"}:
+                data_url = payload.get("document_data_url", "")
+                if not data_url.startswith("data:application/pdf;base64,"):
+                    raise CareerDocumentError("job_pdf_original_required")
+                pdf_bytes = base64.b64decode(data_url.split(",", 1)[1], validate=True)
+                if not pdf_bytes.startswith(b"%PDF-") or len(pdf_bytes) > MAX_FILE_BYTES:
+                    raise CareerDocumentError("job_pdf_original_invalid")
+                pages = render_complete_pdf_pages(pdf_bytes)
+                if len(pages) > 48:
+                    raise CareerDocumentError("job_pdf_complete_page_limit")
+                result = {"content_hash": "sha256:" + hashlib.sha256(pdf_bytes).hexdigest(), "extracted_text": "",
+                    "visual_page_count": len(pages), "extraction_method": "complete_pdf_page_manifest_v1"}
             elif material_type == "JOB":
                 result = extract_job_document_only(payload, PDF_TEXT_SCRIPT_PATH, PDF_VISUAL_OCR_SCRIPT_PATH)
             else:
@@ -1978,6 +1988,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                 "content_hash": result["content_hash"],
                 "extracted_text": result["extracted_text"],
                 "extraction_method": result["extraction_method"],
+                **({"visual_page_count": result["visual_page_count"]} if "visual_page_count" in result else {}),
                 "read_only": True,
                 "writeback": False,
                 "model_call_made": False,

@@ -15,6 +15,8 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Callable
 
+from src.runtime_binding import valid_binding, resolve_runtime_credential
+
 from src.candidate_context import (
     CONTRACT_ID as CANDIDATE_SCHEMA_VERSION,
     PROMPT_VERSION,
@@ -23,7 +25,7 @@ from src.candidate_context import (
     extract_deepseek_candidate_proposal,
 )
 from src.execution_contract import ExecutionContractError, validate_runtime_snapshot
-from src.provider_runtime import OPENAI_CHAT_COMPLETIONS, ProviderRuntimeError, resolve_credential_reference
+from src.provider_runtime import OPENAI_CHAT_COMPLETIONS, ProviderRuntimeError
 from src.upload_limits import MAX_FILE_BYTES
 
 
@@ -126,15 +128,11 @@ def _validate_snapshot(value: Any) -> dict[str, Any]:
     }
     if (
         snapshot.mode != "model"
-        or snapshot.provider != PROVIDER_ID
-        or snapshot.model != MODEL_ID
-        or snapshot.protocol != OPENAI_CHAT_COMPLETIONS
-        or snapshot.adapter_version != ADAPTER_VERSION
+        or not valid_binding(snapshot, ADAPTER_VERSION)
         or snapshot.prompt_version != PROMPT_VERSION
         or snapshot.schema_version != CANDIDATE_SCHEMA_VERSION
         or snapshot.operation != "CANDIDATE_IMAGE_IMPORT"
         or snapshot.delivery_method != DELIVERY_METHOD
-        or snapshot.credential_ref != CREDENTIAL_REF
         or any(capabilities.get(name) != state for name, state in expected_capabilities.items())
     ):
         raise CandidateModelRuntimeError("candidate_model_runtime_not_eligible", "runtime")
@@ -251,7 +249,7 @@ def validate_candidate_model_request(payload: Any) -> CandidateModelRequest:
 
 def resolve_credential(credential_ref: str, reader: Callable[[], str | None]) -> str:
     try:
-        return resolve_credential_reference(
+        return resolve_runtime_credential(
             credential_ref, CREDENTIAL_REF, reader,
             invalid_code="candidate_model_credential_reference_invalid",
             missing_code="deepseek_key_not_configured",
@@ -318,7 +316,7 @@ def execute_candidate_model_request(
     if not rendered_pages or any(not page_number or not image for page_number, image in rendered_pages):
         raise CandidateModelRuntimeError("candidate_model_source_delivery_failed", "delivery")
     provider_payload = build_deepseek_candidate_proposal_payload(
-        request.source_document["source_document_id"], MODEL_ID, rendered_pages, media_type,
+        request.source_document["source_document_id"], request.runtime_snapshot["model"], rendered_pages, media_type,
     )
     http_status, provider_response = provider_call(credential, provider_payload)
     diagnostics = response_diagnostics(provider_response, http_status)
@@ -328,7 +326,7 @@ def execute_candidate_model_request(
         raise CandidateModelRuntimeError("deepseek_provider_http_error", "provider", True, diagnostics)
     if not isinstance(provider_response, dict):
         raise CandidateModelRuntimeError("deepseek_response_malformed", "parsing", True, diagnostics)
-    if provider_response.get("model") != MODEL_ID:
+    if provider_response.get("model") != request.runtime_snapshot["model"]:
         raise CandidateModelRuntimeError("deepseek_returned_model_mismatch", "model", True, diagnostics)
     if diagnostics.get("finish_reason") == "length":
         diagnostics.update({
@@ -339,7 +337,7 @@ def execute_candidate_model_request(
         raise CandidateModelRuntimeError("model_output_truncated", "model_output", True, diagnostics)
     try:
         candidate_proposal = extract_deepseek_candidate_proposal(
-            provider_response, request.source_document["source_document_id"], request.processing_run_id, MODEL_ID,
+            provider_response, request.source_document["source_document_id"], request.processing_run_id, request.runtime_snapshot["model"], provider=request.runtime_snapshot["provider"],
         )
     except CandidateProposalError as error:
         detail = str(error)
@@ -352,10 +350,10 @@ def execute_candidate_model_request(
         diagnostics["candidate_validation_code"] = detail[:240]
         raise CandidateModelRuntimeError(code, layer, True, diagnostics) from error
     return {
-        "provider": PROVIDER_ID,
-        "model": MODEL_ID,
-        "protocol": OPENAI_CHAT_COMPLETIONS,
-        "adapter_version": ADAPTER_VERSION,
+        "provider": request.runtime_snapshot["provider"],
+        "model": request.runtime_snapshot["model"],
+        "protocol": request.runtime_snapshot["protocol"],
+        "adapter_version": request.runtime_snapshot["adapter_version"],
         "delivery_method": DELIVERY_METHOD,
         "runtime_snapshot_id": request.runtime_snapshot["snapshot_id"],
         "source_document_id": request.source_document["source_document_id"],

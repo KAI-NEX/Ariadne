@@ -10,8 +10,10 @@ import re
 from pathlib import Path
 from typing import Any, Callable
 
+from src.runtime_binding import valid_binding, resolve_runtime_credential
+
 from src.execution_contract import validate_runtime_snapshot, ExecutionContractError
-from src.provider_runtime import resolve_credential_reference, ProviderRuntimeError
+from src.provider_runtime import ProviderRuntimeError
 from src.job_conversation_runtime import _assert_provider_safe, JobConversationRuntimeError
 
 MANIFEST = json.loads((Path(__file__).resolve().parents[1] / "data/personal_understanding_contract_v1.json").read_text())
@@ -42,8 +44,6 @@ def validate_request(value: Any) -> dict:
         raise PersonalUnderstandingError("PERSONAL_REQUEST_INVALID")
     text(value["request_id"], 150)
     text(value["human_message"], MANIFEST["limits"]["human_message"], empty=value["phase"] != "DISCUSS")
-    if value["consent"] != {"confirmed": True, "purpose": "PERSONAL_UNDERSTANDING", "provider": "deepseek", "model": MODEL}:
-        raise PersonalUnderstandingError("PERSONAL_CONSENT_REQUIRED", "consent")
     context = value["context"]
     if not isinstance(context, dict) or len(json.dumps(context, ensure_ascii=False, separators=(",", ":")).encode()) > MANIFEST["limits"]["context_bytes"]:
         raise PersonalUnderstandingError("PERSONAL_CONTEXT_LIMIT", "context")
@@ -52,14 +52,16 @@ def validate_request(value: Any) -> dict:
         snapshot = validate_runtime_snapshot(value["runtime_snapshot"])
     except (ExecutionContractError, JobConversationRuntimeError) as error:
         raise PersonalUnderstandingError("PERSONAL_RUNTIME_OR_CONTEXT_INVALID", "runtime") from error
-    if (snapshot.mode != "model" or snapshot.provider != "deepseek" or snapshot.model != MODEL
-        or snapshot.protocol != "OPENAI_CHAT_COMPLETIONS" or snapshot.operation != MANIFEST["operation"]
-        or snapshot.adapter_version != MANIFEST["adapter_version"] or snapshot.prompt_version != MANIFEST["prompt_version"]
+    if (snapshot.mode != "model"
+        or snapshot.operation != MANIFEST["operation"]
+        or not valid_binding(snapshot, MANIFEST["adapter_version"]) or snapshot.prompt_version != MANIFEST["prompt_version"]
         or snapshot.schema_version != MANIFEST["contract_id"] or snapshot.action_schema_version != MANIFEST["contract_id"]
         or snapshot.request_config_version != MANIFEST["request_config_version"] or snapshot.delivery_method != "compiled_context_text"
         or snapshot.capability_basis != "adapter_verified" or snapshot.capabilities.vision != "supported"
         or snapshot.capabilities.semantic_understanding != "supported" or snapshot.capabilities.ai_conversation != "supported"):
         raise PersonalUnderstandingError("PERSONAL_RUNTIME_INVALID", "runtime")
+    if value["consent"] != {"confirmed": True, "purpose": "PERSONAL_UNDERSTANDING", "provider": value.get("runtime_snapshot", {}).get("provider"), "model": value.get("runtime_snapshot", {}).get("model")}:
+        raise PersonalUnderstandingError("PERSONAL_CONSENT_REQUIRED", "consent")
     if value["phase"] in ("DISTILL", "SYNTHESIZE"):
         if not isinstance(context.get("evidence"), list) or not context["evidence"] or len(context["evidence"]) > 60:
             raise PersonalUnderstandingError("PERSONAL_EVIDENCE_INVALID", "context")
@@ -128,7 +130,7 @@ Nothing is saved by this response. Tell the Human to review the proposal and Sav
 
 
 def build_payload(request: dict) -> dict:
-    return {"model": MODEL, "messages": [
+    return {"model": request["runtime_snapshot"]["model"], "messages": [
         {"role": "system", "content": prompt(request["phase"])},
         {"role": "user", "content": json.dumps({"context": request["context"], "human_message": request["human_message"]}, ensure_ascii=False, separators=(",", ":"))},
     ], "tools": [{"type": "function", "function": {"name": "deliver_personal_understanding", "strict": True, "parameters": output_schema(request["phase"])}}],
@@ -198,7 +200,7 @@ def validate_output(output: Any, request: dict) -> dict:
 def execute(payload: Any, credential_reader: Callable, provider_call: Callable) -> dict:
     request = validate_request(payload)
     try:
-        credential = resolve_credential_reference(request["runtime_snapshot"]["credential_ref"], CREDENTIAL_REF, credential_reader,
+        credential = resolve_runtime_credential(request["runtime_snapshot"]["credential_ref"], CREDENTIAL_REF, credential_reader,
             invalid_code="CREDENTIAL_REFERENCE_INVALID", missing_code="deepseek_key_not_configured")
     except ProviderRuntimeError as error:
         raise PersonalUnderstandingError(error.code, error.failure_layer) from error
@@ -209,7 +211,7 @@ def execute(payload: Any, credential_reader: Callable, provider_call: Callable) 
     if status != 200:
         raise PersonalUnderstandingError("PERSONAL_PROVIDER_HTTP_ERROR", "provider", True)
     try:
-        if response.get("model") != MODEL: raise ValueError("model")
+        if response.get("model") != request["runtime_snapshot"]["model"]: raise ValueError("model")
         choice = response["choices"][0]
         if choice["finish_reason"] != "tool_calls": raise ValueError("finish")
         calls = choice["message"]["tool_calls"]
@@ -221,6 +223,6 @@ def execute(payload: Any, credential_reader: Callable, provider_call: Callable) 
         raise PersonalUnderstandingError("PERSONAL_OUTPUT_INVALID", "model_output", True) from error
     usage = response.get("usage") or {}
     return {"contract_id": MANIFEST["result_contract"], "request_id": request["request_id"], "phase": request["phase"],
-        "provider": "deepseek", "model": MODEL, "runtime_snapshot_id": request["runtime_snapshot"]["snapshot_id"],
+        "provider": request["runtime_snapshot"]["provider"], "model": request["runtime_snapshot"]["model"], "runtime_snapshot_id": request["runtime_snapshot"]["snapshot_id"],
         "output": output, "usage": {key: value for key, value in usage.items() if key in ("prompt_tokens", "completion_tokens", "total_tokens") and isinstance(value, int) and value >= 0},
         "network_call_made": True, "persistence": "not_written", "authority": "NON_AUTHORITATIVE_PERSONAL_UNDERSTANDING"}

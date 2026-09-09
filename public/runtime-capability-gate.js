@@ -86,7 +86,7 @@
       candidate_model_structuring: "unsupported",
       job_model_structuring: "supported",
     }),
-    adapter_version: "deepseek-job-multimodal-import-v2",
+    adapter_version: "deepseek-job-multimodal-import-v3",
     delivery_method: "source_images_with_prepared_text",
   });
   const OPERATION_CAPABILITIES = Object.freeze({
@@ -133,6 +133,11 @@
   function modelDescriptorForRuntime(runtime, operation = null) {
     const normalized = Contract.normalizeCurrentRuntime(runtime);
     if (normalized.mode !== "model") return null;
+    if (normalized.provider === "codex" && normalized.model === "gpt-5.6-sol") {
+      const domain = modelDescriptorForRuntime({ mode: "model", provider: "deepseek", model: "deepseek-v4-flash-vision-exp" }, operation);
+      return Object.freeze({ ...domain, provider_id: "codex", model_id: "gpt-5.6-sol", protocol: "CODEX_EXEC_JSONL",
+        discovery_source: "ariadne_codex_qualification_2026-09-09", adapter_version: domain.adapter_version?.replace(/^deepseek-/, "codex-") ?? null });
+    }
     if (normalized.provider === CANDIDATE_PDF_MODEL_ADAPTER.provider_id && normalized.model === CANDIDATE_PDF_MODEL_ADAPTER.model_id) {
       if (operation === "job_conversation") return JOB_CONVERSATION_MODEL_ADAPTER;
       if (operation === "job_overview") return JOB_OVERVIEW_MODEL_ADAPTER;
@@ -150,6 +155,18 @@
       model_id: normalized.model,
       discovery_source: "current_runtime_selection",
     });
+  }
+
+  function credentialFor(runtime) {
+    return runtime?.provider === "codex" ? "local-codex://authenticated-session" : "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision";
+  }
+
+  function runtimeForSnapshot(operation, supplied) {
+    if (supplied) return Contract.normalizeCurrentRuntime(supplied);
+    // Node contract tests have no browser selection; browser execution always
+    // resolves the actual operation authority, including an explicit Local.
+    if (typeof globalThis.localStorage === "undefined") return { mode: "model", provider: "deepseek", model: "deepseek-v4-flash-vision-exp" };
+    return runtimeForOperation(operation);
   }
 
   function currentAuthority(storage = globalThis.localStorage) {
@@ -262,6 +279,7 @@
     CURRENT_RUNTIME_STORAGE_KEY,
     OPERATION_RUNTIME_STORAGE_KEY,
     OPERATION_CAPABILITIES,
+    credentialFor, runtimeForSnapshot,
     CANDIDATE_PDF_MODEL_ADAPTER,
     CANDIDATE_MULTIMODAL_IMPORT_ADAPTER,
     DEEPSEEK_VISION_MODEL_DESCRIPTOR,

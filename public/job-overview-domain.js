@@ -58,21 +58,22 @@
   function signature() { return Object.fromEntries(["contract_id", "request_contract", "result_contract", "operation", "adapter_version", "prompt_version", "request_config_version"].map((key) => [key, Contract[key]])); }
   function runtimeSnapshot(storage = globalThis.localStorage) {
     const gate = Gate.requireOperation("job_overview", Gate.operationAuthority("job_overview", storage));
-    return Runtime.createRuntimeSnapshot(gate.authority.runtime, { modelDescriptor: Gate.JOB_OVERVIEW_MODEL_ADAPTER, snapshotId: id("runtime-job-overview"), capturedAt: now(),
-      credentialRef: "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision", adapterVersion: Contract.adapter_version, promptVersion: Contract.prompt_version,
+    const descriptor = Gate.modelDescriptorForRuntime(gate.authority.runtime, "job_overview");
+    return Runtime.createRuntimeSnapshot(gate.authority.runtime, { modelDescriptor: descriptor, snapshotId: id("runtime-job-overview"), capturedAt: now(),
+      credentialRef: Gate.credentialFor(gate.authority.runtime), adapterVersion: descriptor.adapter_version, promptVersion: Contract.prompt_version,
       schemaVersion: Contract.contract_id, actionSchemaVersion: Contract.contract_id, requestConfigVersion: Contract.request_config_version,
       operation: Contract.operation, capabilityBasis: "adapter_verified", deliveryMethod: "compiled_context_text" });
   }
   function requestFor(phase, context, humanMessage, runtime, consent) {
-    if (!consent || runtime?.mode !== "model" || runtime?.model !== Gate.JOB_OVERVIEW_MODEL_ADAPTER.model_id) throw new Error("JOB_OVERVIEW_CONSENT_REQUIRED");
+    if (!consent || runtime?.mode !== "model" || !Gate.isModelRuntimeEligible({ mode: runtime.mode, provider: runtime.provider, model: runtime.model })) throw new Error("JOB_OVERVIEW_CONSENT_REQUIRED");
     if (!Contract.phases.includes(phase) || Context.bytes(context) > Contract.limits.context_bytes) throw new Error("JOB_OVERVIEW_CONTEXT_LIMIT");
     return { contract_id: Contract.request_contract, request_id: id("job-overview-request"), phase, context: clone(context), human_message: humanMessage, runtime_snapshot: runtime,
       consent: { confirmed: true, purpose: "JOB_OVERVIEW", provider: runtime.provider, model: runtime.model } };
   }
   async function callRuntime(request) {
-    const check = await fetch("/api/job-overview-signature", { cache: "no-store" }), checked = await check.json();
+    const check = await (globalThis.AriadneConnector || globalThis).fetch("/api/job-overview-signature", { cache: "no-store" }), checked = await check.json();
     if (!check.ok || !same(checked.runtime_signature, signature())) throw new Error("RUNTIME_CONTRACT_VERSION_MISMATCH");
-    const response = await fetch("/api/job-overview-turn", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) });
+    const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/job-overview-turn", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) });
     const result = await response.json(); if (!response.ok) throw new Error(result.error || "JOB_OVERVIEW_FAILED"); return result;
   }
   function validateResult(result, request) {

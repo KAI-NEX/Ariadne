@@ -82,7 +82,7 @@
               <footer class="v1-workspace-content-footer"><p id="candidate-workspace-save-status" aria-live="polite"></p><button id="candidate-workspace-save" class="v1-primary-button" type="button" disabled>保存到个人资料</button></footer>
             </section>
             <aside class="v1-ariadne-pane" aria-labelledby="candidate-understanding-title">
-              <header class="v1-workspace-pane-header"><div><h2 id="candidate-understanding-title">Ariadne AI</h2><p>DeepSeek</p></div></header>
+              <header class="v1-workspace-pane-header"><div><h2 id="candidate-understanding-title">Ariadne AI</h2><p id="candidate-understanding-provider"></p></div></header>
               <div id="candidate-workspace-history" class="v1-workspace-history" tabindex="0" aria-live="polite">
                 <ol id="candidate-understanding-events" class="v1-understanding-events"></ol>
                 <div id="candidate-clarification-list" class="v1-clarification-list"></div>
@@ -126,8 +126,8 @@
       <h2 id="candidate-model-consent-title">确认发送个人材料</h2>
       <p>这次操作会把当前文件内容发送到模型服务商进行候选人材料理解。</p>
       <dl>
-        <div><dt>Provider</dt><dd id="candidate-model-consent-provider">DeepSeek</dd></div>
-        <div><dt>Model</dt><dd id="candidate-model-consent-model">deepseek-v4-flash-vision-exp</dd></div>
+        <div><dt>Provider</dt><dd id="candidate-model-consent-provider"></dd></div>
+        <div><dt>Model</dt><dd id="candidate-model-consent-model"></dd></div>
       </dl>
       <div class="v1-button-row">
         <button id="confirm-candidate-model-consent" class="v1-consent-action" type="button">确认并发送</button>
@@ -147,6 +147,7 @@
       <p id="candidate-card-unsaved-title">当前的修改尚未保存，是否保存后返回？</p>
       <div class="v1-card-unsaved-actions"><button id="candidate-card-unsaved-save" type="button">是</button><button id="candidate-card-unsaved-discard" type="button">否</button></div>
     </dialog>
+    <script src="/local-connector.js"></script>
     <script src="/runtime-capabilities.js?v=candidate-model-runtime-v1"></script>
     <script src="/runtime-capability-gate.js?v=candidate-model-runtime-v1"></script>
     <script src="/truth-persistence-domain.js?v=candidate-workspace-authority-v1"></script>
