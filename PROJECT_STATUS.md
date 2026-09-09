@@ -1,5 +1,12 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-09 — Ariadne · 衡 介绍入口改为浮窗（COMPLETE）
+
+- 按用户最新要求，Workspace 标题不再跳转独立页面：点击 Ariadne 从字标位置展开为简短介绍浮窗，说明产品用途、可做的事与「衡」的寓意。复用已有详情浮窗的展开/缩回动画（540/480 ms）及系统 `v1-back` 返回图标；点击左上角、浮窗外侧或 Esc 返回原处。
+- 新样式仅在 Workspace 加载；支持窄屏、减少动态效果偏好、键盘焦点约束及关闭后的焦点恢复。原 `about.html` / `about.css` 保留原地，不再作为标题入口，本次不增加账号、下载或部署功能。
+- 验证：3 项现有 Node 回归（UI framework、shared product shell、UI contract addendum）通过。egolite 验证标题打开、不换 URL、返回；截图技术超时后使用已安装 Chrome/Playwright 验证返回按钮、外侧、Esc、Tab、打开中途关闭、减少动态效果、390 px 窄屏，以及个人资料/职位原有 iframe 浮窗。无 pageerror；1280×800、390×700 和展开中间态截图已审阅，修复预览字标继承网格列导致的偏移。证据保存在忽略目录 `.cache/about-popup-20260909/`。
+- 本地提交仅包含 Workspace 入口、介绍样式、共用浮窗中本次相关代码及此记录；并行个人理解任务的未完成改动保留、不纳入提交。无真实 Provider 请求或发布。
+
 ## 2026-09-09 — Ariadne · 衡 产品介绍页（COMPLETE）
 
 - 文件夹选择页（Workspace）顶部 Ariadne 字标链接至 `about.html`。新增独立介绍页及作用域 CSS，延续既有字体、浅灰背景与深色按钮；包含中文品牌名「衡」、英文名典故、产品用途、三项现有能力、资料与保存边界、可展开 FAQ、本地启动说明和返回应用入口。

@@ -559,7 +559,8 @@
   const pagePaperColor = () => getComputedStyle(document.body).getPropertyValue("--paper").trim() || "#f7f7f9";
 
   function installDetailCardOverlay() {
-    if (isEmbeddedDetail || (page !== "personal" && page !== "jd")) return;
+    if (isEmbeddedDetail || !["personal", "jd", "workspace"].includes(page)) return;
+    const aboutWorkspace = page === "workspace";
     const importCopy = page === "jd"
       ? Object.freeze({ title: "添加职位描述", close: "关闭添加职位描述", workspace: "职位描述" })
       : Object.freeze({ title: "添加个人材料", close: "关闭添加个人材料", workspace: "候选人信息" });
@@ -570,6 +571,13 @@
         <div class="v1-detail-overlay-content">
           <header><button class="v1-detail-overlay-close" type="button" aria-label="关闭详情"></button><p></p><span class="v1-detail-overlay-header-actions"><button class="v1-detail-overlay-edit" type="button" aria-label="编辑当前内容">编辑</button><button class="v1-detail-overlay-workspace-close hidden" type="button" aria-label="关闭导入">×</button></span></header>
           <iframe title="本地资料详情"></iframe>
+          <div class="v1-about-copy hidden">
+            <h1>Ariadne <span>衡</span></h1>
+            <p class="v1-about-intro">先理解你，再理解机会。</p>
+            <p>Ariadne · 衡是一个帮助你探索职业方向的工具。它理解你的经历与作品，也理解你选择的职位，帮你看清两者的关系。</p>
+            <p>你可以整理个人资料、了解职位要求，并通过对话讨论已有的支持、待补充的信息和下一步。</p>
+            <p class="v1-about-principle">「衡」是衡量，也是判断与取舍。<br>目标由你选择，修改由你确认。</p>
+          </div>
         </div>
       </section>
     </div>`);
@@ -583,6 +591,15 @@
     const editButton = overlay.querySelector(".v1-detail-overlay-edit");
     const workspaceCloseButton = overlay.querySelector(".v1-detail-overlay-workspace-close");
     const frame = overlay.querySelector("iframe");
+    const aboutCopy = overlay.querySelector(".v1-about-copy");
+    const pageShell = document.querySelector(".v1-page-shell");
+    const wasPageInert = pageShell?.inert || false;
+    if (aboutWorkspace) {
+      overlay.classList.add("is-about");
+      closeButton.classList.replace("v1-detail-overlay-close", "v1-back");
+      backdrop.setAttribute("aria-label", "关闭介绍，返回工作空间");
+      backdrop.tabIndex = -1;
+    }
     const surfaceControls = window.JobRadarFloatingWindow?.mount(surface, {
       dragHandle: content.querySelector("header"),
       minWidth: 520,
@@ -608,6 +625,11 @@
       const viewportWidth = window.visualViewport?.width || window.innerWidth;
       const viewportHeight = window.visualViewport?.height || window.innerHeight;
       const compact = viewportWidth < 760;
+      if (aboutWorkspace) {
+        const width = Math.min(620, viewportWidth * 0.92);
+        const height = Math.min(480, viewportHeight * 0.86);
+        return { left: (viewportWidth - width) / 2, top: (viewportHeight - height) / 2, width, height };
+      }
       const width = viewportWidth * (compact ? 0.94 : 0.8);
       const height = viewportHeight * (compact ? 0.9 : 0.8);
       return { left: (viewportWidth - width) / 2, top: (viewportHeight - height) / 2, width, height };
@@ -622,8 +644,8 @@
       surfaceControls?.reset();
       sourceCard = card;
       const isImport = card.matches(".v1-add-guide-card");
-      editButton.classList.toggle("hidden", isImport);
-      editButton.disabled = isImport;
+      editButton.classList.toggle("hidden", isImport || aboutWorkspace);
+      editButton.disabled = isImport || aboutWorkspace;
       const sourceRect = card.getBoundingClientRect();
       const destinationRect = targetRect();
       const sourceRadius = getComputedStyle(card).borderRadius;
@@ -647,6 +669,16 @@
       }
       surface.setAttribute("aria-label", isImport ? title.textContent : "资料详情");
       frame.title = isImport ? title.textContent : "资料详情";
+      frame.classList.toggle("hidden", aboutWorkspace);
+      aboutCopy.classList.toggle("hidden", !aboutWorkspace);
+      if (aboutWorkspace) {
+        title.textContent = "关于";
+        surface.setAttribute("aria-label", "关于 Ariadne · 衡");
+        closeButton.setAttribute("aria-label", "返回工作空间");
+        sourceCard.setAttribute("aria-expanded", "true");
+        if (pageShell) pageShell.inert = true;
+        aboutCopy.scrollTop = 0;
+      }
       overlay.classList.remove("hidden", "is-content-ready", "is-closing");
       overlay.setAttribute("aria-hidden", "false");
       document.body.classList.add("v1-detail-overlay-open");
@@ -661,14 +693,22 @@
           if (!closing && sourceCard) overlay.classList.add("is-content-ready");
         }, 260);
       };
-      frame.src = detailUrl.href;
+      if (aboutWorkspace) {
+        revealTimer = window.setTimeout(() => {
+          if (!closing && sourceCard) overlay.classList.add("is-content-ready");
+        }, window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 260);
+      } else frame.src = detailUrl.href;
       backdrop.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 320, easing: "ease", fill: "both" });
       surfaceAnimation = surface.animate([
         rectFrame(sourceRect, sourceRadius),
         rectFrame(destinationRect, "28px"),
       ], { duration: 540, easing: "cubic-bezier(.16,1,.3,1)", fill: "both" });
+      if (aboutWorkspace && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        backdrop.getAnimations().forEach((animation) => animation.finish());
+        surfaceAnimation.finish();
+      }
       surfaceAnimation.finished.then(() => {
-        if (!closing) { surfaceAnimation.cancel(); surfaceAnimation = null; surface.focus({ preventScroll: true }); }
+        if (!closing) { surfaceAnimation.cancel(); surfaceAnimation = null; (aboutWorkspace ? closeButton : surface).focus({ preventScroll: true }); }
       }).catch(() => {});
     }
 
@@ -688,6 +728,10 @@
       document.body.classList.remove("v1-detail-overlay-open");
       surfaceControls?.reset();
       if (finishedSource) {
+        if (aboutWorkspace) {
+          if (pageShell) pageShell.inert = wasPageInert;
+          finishedSource.setAttribute("aria-expanded", "false");
+        }
         finishedSource.style.visibility = "";
         finishedSource.focus({ preventScroll: true });
         if (finishedSource.matches(".v1-add-guide-card")) window.requestAnimationFrame(() => finishedSource.classList.remove("v1-transition-light"));
@@ -714,16 +758,20 @@
         rectFrame(currentRect, "28px"),
         rectFrame(destinationRect, destinationRadius),
       ], { duration: 480, easing: "cubic-bezier(.16,1,.3,1)", fill: "both" });
+      if (aboutWorkspace && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        backdrop.getAnimations().forEach((animation) => animation.finish());
+        surfaceAnimation.finish();
+      }
       surfaceAnimation.finished.then(finishClose).catch(finishClose);
     }
 
     document.addEventListener("click", (event) => {
-      const card = event.target.closest(".v1-candidate-card, .v1-add-guide-card");
+      const card = aboutWorkspace ? event.target.closest(".v1-wordmark[data-about-trigger]") : event.target.closest(".v1-candidate-card, .v1-add-guide-card");
       if (!card || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       safeSession.remove();
-      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { window.location.assign(card.href); return; }
+      if (!aboutWorkspace && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { window.location.assign(card.href); return; }
       openOverlay(card);
     });
     closeButton.addEventListener("click", () => {
@@ -737,6 +785,11 @@
     editButton.addEventListener("click", () => frame.contentWindow?.postMessage({ type: "job-radar-v1-open-detail-edit" }, window.location.origin));
     backdrop.addEventListener("click", closeOverlay);
     document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeOverlay(); });
+    document.addEventListener("keydown", (event) => {
+      if (!aboutWorkspace || !sourceCard || closing || event.key !== "Tab") return;
+      event.preventDefault();
+      closeButton.focus({ preventScroll: true });
+    });
     window.addEventListener("resize", () => {
       if (!sourceCard || closing || surface.classList.contains("floating-window-positioned")) return;
       Object.assign(surface.style, rectFrame(targetRect(), "28px"));
