@@ -209,6 +209,13 @@ const connected = Conversation.connectedHistory([
   Conversation.createMessage(historySession, "USER", "latest failed orphan", "2026-09-04T04:10:06.000Z"),
 ]);
 assert.deepEqual(connected.map((entry) => entry.content), ["first", "answer", "retry", "retry answer"]);
+const memorySnapshot = { ...candidateA, memory_revision_count: 3 };
+const memoryCompile = (messages, delta = candidateDelta) => Conversation.compileContext({ job_revision: modelAccepted.revision, candidate_snapshot: memorySnapshot, candidate_delta: delta, source_excerpt_manifest: fromArtifact, human_message: "当前资料", messages });
+assert.equal(memoryCompile(connected).history.length, 0, "old unbound conversation must not resurrect saved/retracted personal memory");
+assert.equal(memoryCompile(connected.map((entry) => entry.role === "ASSISTANT" ? { ...entry, candidate_fingerprint: candidateA.aggregate_fingerprint } : entry)).history.length, 4);
+const removedMemoryDelta = { ...candidateDelta, provider_view: [{ change_ref: "candidate-change-1", change: "REMOVED", layer: "CONFIRMED", previous_candidate: { item_type: "PERSONAL_MEMORY", summary: "removed private preference" }, current_candidate: null, changed_fields: [] }] };
+assert(!JSON.stringify(memoryCompile([], removedMemoryDelta)).includes("removed private preference"));
+assert.equal(memoryCompile([], removedMemoryDelta).candidate_delta_coverage.complete, false);
 assert.equal(compiled.turn_scope.scope, "CURRENT_CANDIDATE_X_ACTIVE_JOB");
 assert.equal(compiled.turn_scope.referent, "CANDIDATE_GAPS_RELATIVE_TO_ACTIVE_JOB");
 assert.equal(compiled.turn_scope.ambiguity, "RESOLVED_BY_ACTIVE_JOB_SCOPE");

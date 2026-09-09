@@ -137,7 +137,7 @@
       const transaction = database.transaction(["job_turn_executions", "job_analyses", "job_conversation_messages"], "readwrite");
       transaction.objectStore("job_turn_executions").put(clone(completed));
       transaction.objectStore("job_analyses").add(clone(analysis));
-      transaction.objectStore("job_conversation_messages").add(clone(assistantMessage));
+      transaction.objectStore("job_conversation_messages").add({ ...clone(assistantMessage), candidate_fingerprint: analysis.candidate_observation.aggregate_fingerprint });
       transaction.oncomplete = () => resolve(Object.freeze({ execution: completed, analysis, assistant_message: assistantMessage }));
       transaction.onerror = () => reject(transaction.error || new JobPersistenceError("job_turn_persistence_failed"));
       transaction.onabort = () => reject(transaction.error || new JobPersistenceError("job_turn_persistence_failed"));

@@ -1,6 +1,6 @@
 /* Browser-only Ariadne storage: no app.py route and no network request. */
 const DB_NAME = "job-radar-local-first-v1";
-const DB_VERSION = 15;
+const DB_VERSION = 16;
 const JOBS = "jobs";
 const CANDIDATES = "candidates";
 const RuntimeGate = window.JobRadarRuntimeGate;
@@ -53,6 +53,12 @@ function openDatabase() {
       if (!db.objectStoreNames.contains("job_turn_executions")) db.createObjectStore("job_turn_executions", { keyPath: "execution_id" });
       if (!db.objectStoreNames.contains("job_change_proposals")) db.createObjectStore("job_change_proposals", { keyPath: "job_change_proposal_id" });
       if (!db.objectStoreNames.contains("job_change_decisions")) db.createObjectStore("job_change_decisions", { keyPath: "job_change_decision_id" });
+      if (!db.objectStoreNames.contains("personal_memory_revisions")) db.createObjectStore("personal_memory_revisions", { keyPath: "revision_id" });
+      if (!db.objectStoreNames.contains("personal_memory_proposals")) db.createObjectStore("personal_memory_proposals", { keyPath: "proposal_id" });
+      if (!db.objectStoreNames.contains("personal_memory_decisions")) db.createObjectStore("personal_memory_decisions", { keyPath: "decision_id" });
+      if (!db.objectStoreNames.contains("personal_understanding_fragments")) db.createObjectStore("personal_understanding_fragments", { keyPath: "fragment_id" });
+      if (!db.objectStoreNames.contains("personal_understanding_snapshots")) db.createObjectStore("personal_understanding_snapshots", { keyPath: "understanding_id" });
+      if (!db.objectStoreNames.contains("personal_conversation_turns")) db.createObjectStore("personal_conversation_turns", { keyPath: "turn_id" });
       if (!db.objectStoreNames.contains("demo_candidate_items")) db.createObjectStore("demo_candidate_items", { keyPath: "item_id" });
       if (!db.objectStoreNames.contains("demo_job_contexts")) db.createObjectStore("demo_job_contexts", { keyPath: "job_context_id" });
       if (!db.objectStoreNames.contains("demo_conversations")) db.createObjectStore("demo_conversations", { keyPath: "conversation_id" });

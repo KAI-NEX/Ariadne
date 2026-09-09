@@ -961,3 +961,8 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 @media (min-width: 980px) { .jobs-gallery { columns: 3; } }
 
 @media (max-width: 560px) { .search-row, dl, .entity-fields, .correction-form { grid-template-columns: 1fr; display: grid; } }
+
+/* A contextual entry within the personal library. */
+.personal-understanding-entry { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--ink); text-decoration: none; margin: 20px 0 30px; padding: 18px 22px; border: 1px solid #dce2ec; border-radius: 14px; background: #f5f7fa; }
+.personal-understanding-entry strong { display: block; font-size: 15px; margin-bottom: 6px; }
+.personal-understanding-entry small { color: #697487; font-size: 12px; }

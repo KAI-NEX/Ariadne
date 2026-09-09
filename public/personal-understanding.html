@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ariadne · 个人理解</title>
+    <link rel="stylesheet" href="/styles.css?v=personal-understanding-v1">
+    <link rel="stylesheet" href="/personal-understanding.css">
+  </head>
+  <body class="v1-body" data-v1-page="personal-understanding">
+    <main class="v1-page-shell personal-understanding-shell">
+      <header class="v1-topbar">
+        <a class="v1-back" href="/personal-information.html" aria-label="返回个人资料"></a>
+        <p class="v1-detail-breadcrumb">个人资料 / 个人理解</p>
+        <a class="personal-add-link" href="/personal-import.html">＋ 添加资料</a>
+      </header>
+      <div class="personal-understanding-layout">
+        <section class="personal-knowledge" aria-labelledby="understanding-heading">
+          <div class="personal-heading-row"><div><p class="v1-section-label">随资料与补充更新</p><h1 id="understanding-heading">我目前如何理解你</h1></div><button id="refresh-understanding" class="v1-secondary-button" type="button">更新理解</button></div>
+          <p id="understanding-state" class="personal-meta" aria-live="polite">正在读取个人资料…</p>
+          <a class="personal-chat-jump" href="#personal-dialogue-heading">开始对话 ↓</a>
+          <p id="understanding-summary" class="personal-overview"></p>
+          <div id="understanding-insights"></div>
+          <div id="understanding-unknowns"></div>
+          <section class="personal-memories" aria-labelledby="memory-heading">
+            <div class="personal-heading-row"><h2 id="memory-heading">你已保存的补充</h2><span id="memory-count" class="personal-meta"></span></div>
+            <p class="personal-meta">这些信息会用于之后的个人对话和职位分析。资料原文与模型推断仍分别保留。</p>
+            <div id="saved-memories"></div>
+          </section>
+          <details class="personal-history"><summary>查看补充的历史版本</summary><div id="memory-history"></div></details>
+        </section>
+        <section class="personal-dialogue v1-conversation-pane" aria-labelledby="personal-dialogue-heading">
+          <div class="personal-heading-row"><h2 id="personal-dialogue-heading">聊聊你的经历与方向</h2><span id="personal-runtime" class="personal-meta"></span></div>
+          <p class="personal-meta">可以跨资料讨论，也可以随时补充。需要记住的信息会先放到下方，由你确认保存。</p>
+          <div id="personal-origin" class="personal-origin hidden"></div>
+          <div class="personal-prompts" aria-label="开始讨论">
+            <button type="button" data-personal-prompt="结合我的不同资料，你目前如何理解我的经历？哪些地方还不确定？">你目前如何理解我</button>
+            <button type="button" data-personal-prompt="不同资料之间，有哪些互补或相互矛盾的信息需要我澄清？">资料之间的联系</button>
+            <button type="button" data-personal-prompt="我想补充一条个人信息：">补充一点关于我</button>
+          </div>
+          <button id="personal-older-messages" type="button" class="personal-text-button hidden">查看更早对话</button>
+          <div id="personal-conversation-messages" class="v1-conversation-messages v1-conversation-thread" aria-live="polite"></div>
+          <section id="personal-proposals" aria-label="待确认的个人补充"></section>
+          <div id="personal-processing" class="v1-conversation-status hidden" aria-live="polite"></div>
+          <form id="personal-conversation-form" class="v1-conversation-form">
+            <label class="sr-only" for="personal-message">讨论经历或补充个人信息</label>
+            <div class="v1-composer-field"><textarea id="personal-message" maxlength="6000" placeholder="告诉我一个新的经历，或者纠正我对你的理解…"></textarea></div>
+            <button type="submit" aria-label="发送"></button>
+          </form>
+          <label class="personal-consent"><input id="personal-model-consent" type="checkbox"><span id="personal-consent-copy">允许将本次问题及相关个人资料发送给当前模型；更新理解可能分批处理资料并产生 API 费用。</span></label>
+          <p id="personal-context-usage" class="personal-meta"></p>
+          <p id="personal-message-status" class="v1-inline-message" aria-live="polite"></p>
+        </section>
+      </div>
+    </main>
+    <script src="/runtime-capabilities.js"></script>
+    <script src="/runtime-capability-gate.js"></script>
+    <script src="/truth-persistence-domain.js"></script>
+    <script src="/personal-memory-domain.js"></script>
+    <script src="/personal-context-domain.js"></script>
+    <script src="/job-intelligence-contract-manifest.js"></script>
+    <script src="/personal-understanding-contract.js"></script>
+    <script src="/job-candidate-context-domain.js"></script>
+    <script src="/personal-understanding-domain.js"></script>
+    <script src="/processing-indicator-domain.js"></script>
+    <script src="/conversation-ui-domain.js"></script>
+    <script src="/v1-demo-domain.js"></script>
+    <script src="/v1-pages.js"></script>
+    <script src="/personal-understanding.js"></script>
+  </body>
+</html>

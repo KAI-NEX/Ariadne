@@ -6,7 +6,7 @@
   "use strict";
 
   const DB_NAME = "job-radar-local-first-v1";
-  const DB_VERSION = 15;
+  const DB_VERSION = 16;
   const DATA_CLASS = "DEMO_FIXTURE";
   const STORES = [
     ["jobs", "job_id"], ["candidates", "candidate_id"], ["source_documents", "source_document_id"],
@@ -25,6 +25,13 @@
     ["job_conversation_messages", "message_id"], ["job_turn_executions", "execution_id"],
     ["job_change_proposals", "job_change_proposal_id"],
     ["job_change_decisions", "job_change_decision_id"],
+    ["personal_memory_revisions", "revision_id"],
+    ["personal_memory_proposals", "proposal_id"],
+    ["personal_memory_decisions", "decision_id"],
+    ["personal_understanding_fragments", "fragment_id"],
+    ["personal_understanding_snapshots", "understanding_id"],
+    ["personal_conversation_turns", "turn_id"],
+
     ["demo_candidate_items", "item_id"], ["demo_job_contexts", "job_context_id"],
     ["demo_conversations", "conversation_id"], ["demo_ui_state", "state_id"],
   ];

@@ -219,6 +219,9 @@ Return exactly one JSON object, no Markdown and no chain-of-thought.
 Use this schema: {semantic_output_schema()}
 Use only the supplied Job, Candidate and source excerpts. Never invent Candidate experience, projects, skills or source evidence.
 Confirmed Candidate information has higher authority. Working Candidate information is NON_AUTHORITATIVE and must be described as unconfirmed.
+PERSONAL_MEMORY records were explicitly saved by the Human. Saved CORRECTION records qualify the claims in related_candidate_refs; preserve the distinction between source history and the Human's correction. Preferences and goals are not capability evidence.
+Keep responsibility claims specific: assigning one delivery activity to a colleague does not assign all related design, evaluation or tradeoff decisions to that colleague. Do not infer unmentioned responsibilities or infer AI-domain expertise from generic research alone; describe possible relevance and ask for missing details.
+candidate_context_coverage describes the selected detailed evidence, not all stored material. If incomplete or truncated, do not claim to have exhaustively checked every experience. personal_understanding is a current but NON_AUTHORITATIVE synthesis; use it as orientation, not proof of unsupported facts. Incomplete candidate_delta_coverage must not be interpreted as no other changes.
 Missing evidence is not proof of a capability gap. Prefer EVIDENCE_GAP, UNKNOWN or NEEDS_CLARIFICATION unless reliable evidence supports CAPABILITY_GAP.
 Interpret “我还需要补充什么？” in the active Job context as asking which capability evidence, presentation, relevance, or project information is missing relative to this Job. Use the supplied real Candidate context and the approved gap taxonomy.
 Honor context.turn_scope. When its ambiguity is RESOLVED_BY_ACTIVE_JOB_SCOPE, do not ask whether the Human means Candidate evidence or Job details; analyze the current Candidate relative to the active Job.

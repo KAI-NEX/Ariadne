@@ -401,7 +401,7 @@
 
   function installMiniSidebar() {
     if (isEmbeddedDetail) return;
-    const activeSection = page === "candidate-detail" || page === "personal-import" ? "personal" : page === "job-detail" || page === "job-import" ? "jd" : page;
+    const activeSection = page === "candidate-detail" || page === "personal-import" || page === "personal-understanding" ? "personal" : page === "job-detail" || page === "job-import" ? "jd" : page;
     const items = [
       { id: "runtime", label: "运行方式", href: "/index.html", width: 84, base: 8 },
       { id: "workspace", label: "工作空间", href: "/workspace.html", width: 106, base: 8 },
@@ -1098,6 +1098,7 @@
     const target = byId("candidate-workspace-conversation");
     if (!target) return;
     ConversationUI.renderMessages(target, candidateWorkspaceConversation, { empty_text: "你可以告诉 Ariadne 哪些内容需要调整。", text_for: (message) => ConversationUI.humanSafeText(message.text ?? message.content) });
+    window.AriadnePersonalMemoryBridge?.attachActions(target, candidateWorkspaceConversation, { type: "CANDIDATE", conversation_id: activeCandidateConversationSession?.conversation_id || null });
   }
 
   function setCandidateConversationExecutionState(copy = "", active = candidateConversationTurnActive) {
@@ -1381,6 +1382,7 @@
       empty_text: "",
       text_for: (message) => ConversationUI.humanSafeText(message.text ?? message.content),
     });
+    window.AriadnePersonalMemoryBridge?.attachActions(byId("candidate-conversation-messages"), messages || [], { type: "CANDIDATE_DETAIL", item_id: activeCandidate?.item_id || null });
   }
 
   async function restoreCandidateDetailConversation(database, conversationId, at = new Date().toISOString()) {
@@ -3459,6 +3461,7 @@
       if (latest?.role === "USER" && !visible.some((entry) => entry.message_id === latest.message_id)) visible.push(latest);
     }
     ConversationUI.renderMessages(target, visible, { empty_text: "可以询问岗位要求、证据差距、项目或简历表达；结论不会自动改写职位或个人资料。", text_for: (message) => ConversationUI.humanSafeText(message.content ?? message.text) });
+    window.AriadnePersonalMemoryBridge?.attachActions(target, visible, { type: "JOB", job_context_id: activeJobRevision?.context_id || null });
   }
 
   function showJobChangeProposal(proposal) {

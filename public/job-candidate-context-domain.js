@@ -3,10 +3,12 @@
 (function attachJobCandidateContext(root, factory) {
   const manifest = root.AriadneJobIntelligenceContract
     || (typeof module === "object" && module.exports ? require("../data/job_intelligence_contract_v1.json") : null);
-  const api = factory(manifest);
+  const memory = root.AriadnePersonalMemory || (typeof module === "object" && module.exports ? require("./personal-memory-domain.js") : null);
+  const personalContract = root.AriadnePersonalUnderstandingContract || (typeof module === "object" && module.exports ? require("../data/personal_understanding_contract_v1.json") : null);
+  const api = factory(manifest, memory, personalContract);
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.AriadneJobCandidateContext = api;
-}(typeof globalThis !== "undefined" ? globalThis : this, function createJobCandidateContext(Manifest) {
+}(typeof globalThis !== "undefined" ? globalThis : this, function createJobCandidateContext(Manifest, Memory, PersonalContract) {
   if (!Manifest) throw new Error("job_candidate_context_manifest_required");
 
   const SNAPSHOT_CONTRACT = Manifest.candidate_snapshot_version;
@@ -118,7 +120,19 @@
       source_ids: [...(entry.source_document_ids || [])],
       lineage: { legacy_store: "career_evidence", created_at: entry.created_at || null },
     }));
-    return [...canonicalRecords, ...legacyEntities, ...legacyEvidence];
+    const base = [...canonicalRecords, ...legacyEntities, ...legacyEvidence];
+    if ((input.personal_memory_revisions || []).length && !Memory) throw new CandidateSnapshotError("personal_memory_dependency_required");
+    const memories = Memory ? Memory.active(input.personal_memory_revisions, [...base, ...workingRecords(input)]).map((raw) => {
+      const entry = Memory.validateRevision(raw);
+      return {
+        identity: `memory:${entry.memory_id}`, identity_stability: "CANONICAL", authority: "CONFIRMED", source_ids: [],
+        semantic: { ...semanticItem({ item_type: "PERSONAL_MEMORY", item_subtype: entry.kind, title: entry.text, summary: entry.text }),
+          memory_kind: entry.kind },
+        related_identities: entry.related_identities,
+        lineage: { memory_id: entry.memory_id, revision_id: entry.revision_id, version: entry.version },
+      };
+    }) : [];
+    return [...base, ...memories];
   }
 
   function workingRecords(input) {
@@ -182,7 +196,11 @@
     const workingManifest = manifestEntries(working);
     const confirmedFingerprint = await fingerprint(confirmedManifest);
     const workingFingerprint = await fingerprint(workingManifest);
-    const aggregateFingerprint = await fingerprint({ confirmed: confirmedFingerprint, working: workingFingerprint, include_working: true });
+    // A save/replace/retract cycle can return to the same active evidence.
+    // Keep a memory version marker so old chats and portraits cannot become
+    // current again merely because that visible set happens to match.
+    const memoryHeads = (Memory?.latest(input.personal_memory_revisions || []) || []).map((entry) => ({ memory_id: entry.memory_id, revision_id: entry.revision_id, version: entry.version, status: entry.status })).sort((a, b) => a.memory_id.localeCompare(b.memory_id));
+    const aggregateFingerprint = await fingerprint({ confirmed: confirmedFingerprint, working: workingFingerprint, include_working: true, ...(memoryHeads.length ? { memory_heads: memoryHeads } : {}) });
     const eligibleRecordCount = (input.candidate_context_revisions || []).filter((entry) => entry?.context_type === "CANDIDATE" && entry?.authority === "AUTHORITATIVE_CONFIRMED_CONTEXT").length
       + (input.candidate_working_models || []).length
       + (input.career_entities || []).filter((entry) => entry?.review_status === "confirmed").length
@@ -196,6 +214,10 @@
     const providerConfirmed = providerItems(confirmed, "confirmed-candidate");
     const providerWorking = providerItems(working, "working-candidate");
     const providerRecords = [...providerConfirmed, ...providerWorking];
+    const refByIdentity = new Map([...confirmed, ...working].map((entry, index) => [entry.identity, providerRecords[index].candidate_ref]));
+    [...confirmed, ...working].forEach((entry, index) => {
+      if (entry.related_identities) providerRecords[index].related_candidate_refs = entry.related_identities.map((identity) => refByIdentity.get(identity)).filter(Boolean);
+    });
     const structuralCounts = Object.freeze({
       candidate_snapshot_present: true,
       confirmed_count: providerConfirmed.length,
@@ -216,7 +238,7 @@
       provider_view: Object.freeze({
         confirmed: providerConfirmed,
         working: providerWorking,
-        policy: "Working information is NON_AUTHORITATIVE and must never be phrased as confirmed truth.",
+        policy: "Working information is NON_AUTHORITATIVE and must never be phrased as confirmed truth. PERSONAL_MEMORY is explicitly saved by the Human. A saved CORRECTION qualifies the claims in its related_candidate_refs; retain source history, acknowledge conflicts, and never infer that material claims override the Human correction.",
       }),
       uncertainties: [...confirmed, ...working].flatMap((entry) => entry.semantic.uncertainties.map((uncertainty) => ({ authority: entry.authority, ...uncertainty }))),
     });
@@ -310,9 +332,13 @@
   }
 
   async function buildSnapshotFromDatabase(database) {
-    const names = ["candidate_context_revisions", "candidate_context_lifecycle", "candidate_working_models", "candidate_workspace_acceptances", "career_entities", "career_evidence", "source_documents"];
+    const names = ["candidate_context_revisions", "candidate_context_lifecycle", "candidate_working_models", "candidate_workspace_acceptances", "career_entities", "career_evidence", "source_documents", "personal_memory_revisions", "personal_understanding_snapshots"];
     const values = await Promise.all(names.map((name) => getAll(database, name)));
-    return buildSnapshot(Object.fromEntries(names.map((name, index) => [name, values[index]])));
+    const records = Object.fromEntries(names.map((name, index) => [name, values[index]]));
+    const snapshot = await buildSnapshot(records);
+    const understanding = records.personal_understanding_snapshots.filter((entry) => entry.authority === "NON_AUTHORITATIVE_PERSONAL_UNDERSTANDING" && PersonalContract && entry.prompt_version === PersonalContract.prompt_version && entry.source_fingerprint === snapshot.aggregate_fingerprint)
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0] || null;
+    return Object.freeze({ ...snapshot, memory_revision_count: records.personal_memory_revisions.length, personal_understanding: understanding });
   }
 
   function observationsMatch(left, right) {

@@ -1,6 +1,6 @@
 # Ariadne 项目上下文
 
-更新：2026-09-08。用途：新任务的项目入口与稳定产品约束；当前实现进度和验收结果由 [PROJECT_STATUS.md](PROJECT_STATUS.md) 记录。本文依据用户本次明确的产品目标整理，择要保留已有项目决策，不复制个人背景或学习记录。
+更新：2026-09-09。用途：新任务的项目入口与稳定产品约束；当前实现进度和验收结果由 [PROJECT_STATUS.md](PROJECT_STATUS.md) 记录。本文依据用户本次明确的产品目标整理，择要保留已有项目决策，不复制个人背景或学习记录。
 
 ## 1. 要解决的问题
 
@@ -35,6 +35,7 @@
 
 - 2026-09-08 用户确认模型接入最低要求：所有 Model 操作（包括纯文字对话）只使用有明确图片输入和视觉 PDF 处理能力的多模态模型。PDF 可原生发送，也可完整逐页转图；仅 OCR/文本抽取、模型列表存在、名称含 vision 或一次文字连通检查都不能替代能力证据。未来 Gemini/其他 Provider 同样遵守此门槛，且须完成对应 Ariadne adapter 验证后才能执行。
 - 当前基础为 Candidate/Job 导入、Working、人工保存、确认版本、详情编辑、来源恢复和范围明确的模型对话；具体已验收路径与故障以 PROJECT_STATUS 最新条目及对应证据为准。
+- 新增「个人理解」入口：跨资料派生理解、用户审阅保存的个人补充、当前指纹绑定的缓存及有界上下文已实现；个人/JD 对话读取当前有效补充。原始事实、用户自述与模型推断分层，仍依赖底层模型，不声称完全理解用户。详见 [持续个人理解 v1](docs/current/ARIADNE_PERSONAL_UNDERSTANDING_V1.md)。
 - Candidate Material Detail 的当前版本/同源 Working 同步，以及 Local/Model 隔离，是已修复且有回归覆盖的行为契约；后续改动应保留。
 - Job 已有基于 Candidate 上下文的讨论、差距分类和建议契约；这不等于已完成建议执行、成果反馈及持续进展闭环。
 - 完整目标推进、建议落实后回写 Candidate、自动简历优化与投递等后续能力，需在具体任务中定义和验收。本文整理不启动 J2，不改变当前功能或 Provider。
@@ -64,5 +65,5 @@
 - 持久化：当前交互数据主要在原浏览器 profile 的 IndexedDB；legacy JD 数据在 `data/job_radar.db`。改变浏览器 profile、host 或端口会改变浏览器数据上下文。
 - 从仓库根启动：`PYTHONDONTWRITEBYTECODE=1 python3 app.py`，正常入口为 `http://127.0.0.1:8000/`。重启前先核对占用端口进程的 cwd 与身份。
 - Node 回归按文件运行：`node tests/<name>_regression.mjs`；Python：`PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 python3 tests/<name>_regression.py`。跨语言 route suite 必要时设置 `ARIADNE_NODE_BINARY` 为现有 Node 可执行路径。
-- 最新已记录的自动回归基线为 41 Node + 22 Python（2026-09-09）；计数会随项目变化，应以实际文件与运行结果为准。常驻 stub server、可选私有 fixture 和可选 smoke 不计作默认回归套件。
+- 最新已记录的自动回归基线为 42 Node + 23 Python（2026-09-09）；计数会随项目变化，应以实际文件与运行结果为准。常驻 stub server、可选私有 fixture 和可选 smoke 不计作默认回归套件。
 - 这是本地运行项目，当前没有 package/requirements/lock manifest；不要为文档整理安装依赖或引入新框架。测试日志、编译产物和私人截图保存在仓库外。

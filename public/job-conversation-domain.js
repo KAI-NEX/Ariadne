@@ -11,10 +11,11 @@
     || (typeof module === "object" && module.exports ? require("./job-context-domain.js") : null);
   const manifest = root.AriadneJobIntelligenceContract
     || (typeof module === "object" && module.exports ? require("../data/job_intelligence_contract_v1.json") : null);
-  const api = factory(runtime, gate, truth, jobContext, manifest);
+  const personalContext = root.AriadnePersonalContext || (typeof module === "object" && module.exports ? require("./personal-context-domain.js") : null);
+  const api = factory(runtime, gate, truth, jobContext, manifest, personalContext);
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.AriadneJobConversation = api;
-}(typeof globalThis !== "undefined" ? globalThis : this, function createJobConversation(Runtime, RuntimeGate, Truth, JobContext, Manifest) {
+}(typeof globalThis !== "undefined" ? globalThis : this, function createJobConversation(Runtime, RuntimeGate, Truth, JobContext, Manifest, PersonalContext) {
   if (!Runtime || !RuntimeGate || !Truth || !JobContext || !Manifest) throw new Error("job_conversation_dependencies_required");
 
   const PROVIDER = "deepseek";
@@ -156,7 +157,29 @@
     const payload = subject.payload;
     if (candidateSnapshot?.contract_id !== Manifest.candidate_snapshot_version || candidateDelta?.contract_id !== Manifest.candidate_delta_version) throw new JobConversationError("candidate_context_invalid");
     if (sourceManifest?.contract_id !== Manifest.source_excerpt_manifest_version) throw new JobConversationError("source_excerpt_manifest_invalid");
-    const history = connectedHistory(messages).slice(-(Manifest.limits.history_turns * 2)).map((entry) => ({ role: entry.role, content: entry.content }));
+    if (!PersonalContext) throw new JobConversationError("personal_context_dependency_required");
+    const selected = PersonalContext.select(candidateSnapshot, `${humanMessage}\n${JSON.stringify(payload)}`);
+    const recent = connectedHistory(messages).slice(-(Manifest.limits.history_turns * 2));
+    const history = []; let historyBytes = 0;
+    for (let index = recent.length - 2; index >= 0; index -= 2) {
+      const assistant = recent[index + 1];
+      // Once personal memory exists, only reuse turns understood against this
+      // exact current context. Old turns stay visible but cannot restore a
+      // removed or corrected memory through conversation history.
+      if ((candidateSnapshot.memory_revision_count > 0 || assistant.candidate_fingerprint)
+        && assistant.candidate_fingerprint !== candidateSnapshot.aggregate_fingerprint) continue;
+      const pair = recent.slice(index, index + 2).map((entry) => ({ role: entry.role, content: entry.content }));
+      const size = PersonalContext.bytes(pair);
+      if (historyBytes + size > 8000) break;
+      history.unshift(...pair); historyBytes += size;
+    }
+    const changes = []; let changeBytes = 0;
+    for (const entry of candidateDelta.provider_view || []) {
+      const value = (PersonalContext.bytes(entry) > 6000 || entry.previous_candidate?.item_type === "PERSONAL_MEMORY") ? { change_ref: entry.change_ref, change: entry.change, layer: entry.layer, details_omitted: true } : clone(entry);
+      if (changeBytes + PersonalContext.bytes(value) > 8000) break;
+      changes.push(value); changeBytes += PersonalContext.bytes(value);
+    }
+    const understanding = candidateSnapshot.personal_understanding;
     const context = {
       contract_id: "ariadne-job-provider-context-v1",
       job: {
@@ -168,9 +191,15 @@
         source_availability: payload.source_availability,
         authority: subject.authority,
       },
-      candidate: clone(candidateSnapshot.provider_view),
-      candidate_context_status: clone(candidateSnapshot.structural_counts),
-      candidate_delta: clone(candidateDelta.provider_view),
+      candidate: clone(selected.provider_view),
+      candidate_context_status: clone(selected.structural_counts),
+      candidate_context_coverage: clone(selected.context_coverage),
+      personal_understanding: understanding?.source_fingerprint === candidateSnapshot.aggregate_fingerprint ? {
+        authority: "NON_AUTHORITATIVE_PERSONAL_UNDERSTANDING", summary: understanding.summary,
+        uncertainties: understanding.uncertainties, covered_records: understanding.covered_records,
+      } : null,
+      candidate_delta: changes,
+      candidate_delta_coverage: { total: candidateDelta.provider_view.length, included: changes.length, complete: changes.length === candidateDelta.provider_view.length && !changes.some((entry) => entry.details_omitted) },
       source_excerpts: clone(sourceManifest.provider_view),
       source_status: sourceManifest.status,
       turn_scope: resolveJobDetailReferent(humanMessage, candidateSnapshot),
@@ -286,8 +315,8 @@
         working_manifest: clone(candidateSnapshot.working_manifest),
         working_inclusion_policy: candidateSnapshot.working_inclusion_policy,
       },
-      candidate_snapshot_summary: clone(candidateSnapshot.structural_counts),
-      candidate_delta: clone(candidateDelta),
+      candidate_snapshot_summary: clone(compiledContext.candidate_context_status),
+      candidate_delta: { ...clone(candidateDelta), provider_view: clone(compiledContext.candidate_delta) },
       source_excerpt_manifest: { ...clone(sourceManifest), provider_view: [] },
       compiled_context: clone(compiledContext),
       runtime_snapshot: clone(runtimeSnapshot),

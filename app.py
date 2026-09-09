@@ -57,6 +57,10 @@ from src.candidate_conversation_runtime import (
     validate_candidate_conversation_request,
     candidate_conversation_runtime_signature,
 )
+from src.personal_understanding_runtime import (
+    signature as personal_understanding_signature, execute as execute_personal_understanding,
+    PersonalUnderstandingError, MANIFEST as PERSONAL_UNDERSTANDING_MANIFEST,
+)
 from src.job_conversation_runtime import (
     JobConversationRuntimeError,
     execute_job_conversation_request,
@@ -877,6 +881,17 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/job-conversation-runtime-signature":
             self.send_json(HTTPStatus.OK, {"runtime_signature": job_conversation_runtime_signature(), "network_call_made": False})
             return
+        if parsed.path == "/personal-understanding-contract.js":
+            body = ("window.AriadnePersonalUnderstandingContract = " + json.dumps(PERSONAL_UNDERSTANDING_MANIFEST) + ";").encode("utf-8")
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if parsed.path == "/api/personal-understanding-signature":
+            self.send_json(HTTPStatus.OK, {"runtime_signature": personal_understanding_signature(), "network_call_made": False})
+            return
         if parsed.path == "/api/job-model-import-runtime-signature":
             self.send_json(HTTPStatus.OK, {"runtime_signature": job_model_import_runtime_signature(), "network_call_made": False})
             return
@@ -1020,6 +1035,9 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/job-conversation-turn":
             self.run_job_conversation_turn()
+            return
+        if parsed.path == "/api/personal-understanding-turn":
+            self.run_personal_understanding_turn()
             return
         if parsed.path == "/api/job-model-structure":
             self.structure_model_job_proposal()
@@ -1247,6 +1265,26 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                 "error": "REQUEST_INVALID", "failure_layer": "request",
                 "network_call_made": False, "persistence": "not_written",
             })
+            return
+        self.send_json(HTTPStatus.OK, result)
+
+    def run_personal_understanding_turn(self) -> None:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= 160_000:
+                raise PersonalUnderstandingError("PERSONAL_REQUEST_SIZE_INVALID", "request")
+            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            result = execute_personal_understanding(payload, read_deepseek_key,
+                lambda key, body: call_deepseek_chat_completions(key, body, response_limit=2_000_000))
+        except PersonalUnderstandingError as error:
+            self.send_json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": error.code, "failure_layer": error.failure_layer,
+                "network_call_made": error.network_call_made, "persistence": "not_written"})
+            return
+        except (HTTPError, URLError, TimeoutError, OSError):
+            self.send_json(HTTPStatus.BAD_GATEWAY, {"error": "PERSONAL_PROVIDER_TRANSPORT_ERROR", "network_call_made": True, "persistence": "not_written"})
+            return
+        except (ValueError, TypeError, UnicodeDecodeError):
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": "PERSONAL_REQUEST_INVALID", "network_call_made": False, "persistence": "not_written"})
             return
         self.send_json(HTTPStatus.OK, result)
 

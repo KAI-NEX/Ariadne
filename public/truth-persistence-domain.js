@@ -10,7 +10,7 @@
 
   const CONTRACT_ID = "ariadne-truth-persistence-v1";
   const DB_NAME = "job-radar-local-first-v1";
-  const DB_VERSION = 15;
+  const DB_VERSION = 16;
   const STORE_SPECS = Object.freeze([
     Object.freeze({ name: "source_documents", keyPath: "source_document_id", lifecycle: "reused" }),
     Object.freeze({ name: "runtime_snapshots", keyPath: "snapshot_id", lifecycle: "new" }),
@@ -34,6 +34,12 @@
     Object.freeze({ name: "job_turn_executions", keyPath: "execution_id", lifecycle: "new" }),
     Object.freeze({ name: "job_change_proposals", keyPath: "job_change_proposal_id", lifecycle: "new" }),
     Object.freeze({ name: "job_change_decisions", keyPath: "job_change_decision_id", lifecycle: "new" }),
+    Object.freeze({ name: "personal_memory_revisions", keyPath: "revision_id", lifecycle: "new" }),
+    Object.freeze({ name: "personal_memory_proposals", keyPath: "proposal_id", lifecycle: "new" }),
+    Object.freeze({ name: "personal_memory_decisions", keyPath: "decision_id", lifecycle: "new" }),
+    Object.freeze({ name: "personal_understanding_fragments", keyPath: "fragment_id", lifecycle: "new" }),
+    Object.freeze({ name: "personal_understanding_snapshots", keyPath: "understanding_id", lifecycle: "new" }),
+    Object.freeze({ name: "personal_conversation_turns", keyPath: "turn_id", lifecycle: "new" }),
   ]);
   const STORE_NAMES = Object.freeze(Object.fromEntries(STORE_SPECS.map((spec) => [spec.name.toUpperCase(), spec.name])));
   const NEW_STORE_SPECS = Object.freeze(STORE_SPECS.filter((spec) => spec.lifecycle === "new"));
