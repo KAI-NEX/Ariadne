@@ -168,7 +168,7 @@ assert.deepEqual(editedProviderDelta.changed_fields, [{ field: "summary", before
 assert(!JSON.stringify(editedDelta.provider_view).includes("canonical:"));
 assert(!JSON.stringify(editedDelta.provider_view).includes("sha256:"));
 const candidateRemoved = structuredClone(candidateEdited);
-candidateRemoved.candidate_context_lifecycle.push({ context_id: "candidate-context-synthetic", item_id: "project-alpha", state: "REMOVED" });
+candidateRemoved.candidate_context_lifecycle.push({ context_id: "candidate-context-synthetic", item_id: "project-alpha", state: "REMOVED", authority: Truth.AUTHORITY.lifecycle });
 const candidateD = await CandidateContext.buildSnapshot(candidateRemoved);
 const removedDelta = CandidateContext.candidateDelta(candidateC, candidateD);
 assert(removedDelta.changes.some((entry) => entry.change === "REMOVED"));

@@ -1,5 +1,13 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-09 — 个人理解架构审计与快照移除一致性修复（本阶段 COMPLETE）
+
+- 完成 [个人理解与 Candidate × Job 审计](docs/current/ARIADNE_PERSONAL_UNDERSTANDING_AUDIT.md)：JD 每轮实际接入跨资料最新个人快照；Candidate 详情仍限定当前卡片，来源工作区限定当前来源；尚无跨来源长期个人模型及 JD 新信息经提案保存回 Candidate 的闭环。不能宣称项目已实现“越聊越了解整个人”。
+- 修复已移除卡片通过未接受的 Working 回流到 JD；移除记录只认可用户决定 authority，按 source/item 身份过滤，保留其他来源的独立条目。修复全部移除及仅未确认 legacy 数据时的空快照误报，保留异常接线的 fail-closed 检查；历史与来源不被快照编译改写。
+- 41 Node + 22 Python = **63/63** 默认回归通过；新增移除回流用例修复前失败、修复后通过。egolite 隔离合成浏览器 4 轮验证跨资料入模、人工修正传播、逐项移除与合法空资料；生产后端校验后的 Provider payload 候选数量为 `2/2 → 2/2 → 1/1 → 0/0`（Confirmed/Working）。测试在外部请求前主动停止，Provider 调用 0，失败状态正确，历史保留。
+- 仍未覆盖真实模型对私人多材料的理解质量；长期记忆、冲突综合、超长上下文，以及既有个人编辑预览不展示摘要变化的问题见审计。egolite 截图技术超时，本次以 DOM、IndexedDB 及后端 payload 作为交互证据，不声称布局验收。产物保留在忽略目录 `.cache/personal-understanding-audit-20260909/`。
+- 本阶段仅本地提交相关实现、回归与项目记录；无 Provider/model 更换、原始文件清理、旧 Learning OS 写入或 push。
+
 ## 2026-09-09 — 文件上传上限统一为 30 MB（COMPLETE）
 
 - 按用户要求，个人资料与职位描述上传的文档和 PNG/JPEG 均调整为每文件 ≤30,000,000 bytes（十进制 30 MB）；旧职业资料入口同步采用同一应用限制。后端共用 `src/upload_limits.py`，同步覆盖 Local 读取/OCR、Model 来源读取、Candidate/Job Model 原始输入校验；单文件 HTTP 请求允许 40 MB Base64 加 1 MB 元数据，多图请求允许四份满额文件的编码体积加元数据，仍保留有界请求。

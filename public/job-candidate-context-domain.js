@@ -63,7 +63,21 @@
   }
 
   function lifecycleRemovedKeys(records) {
-    return new Set((records || []).filter((entry) => entry?.state === "REMOVED").map((entry) => `${entry.context_id}|${entry.item_id}`));
+    return new Set((records || []).filter((entry) => entry?.state === "REMOVED" && entry?.authority === "AUTHORITATIVE_USER_DECISION").map((entry) => `${entry.context_id}|${entry.item_id}`));
+  }
+
+  function removedWorkingItemKeys(input) {
+    const removed = lifecycleRemovedKeys(input.candidate_context_lifecycle);
+    const keys = new Set();
+    // Lifecycle decisions address confirmed contexts. Resolve their source/item
+    // identities through retained revisions, never through titles or item ID alone.
+    (input.candidate_context_revisions || []).filter((revision) => revision?.context_type === "CANDIDATE" && revision?.authority === "AUTHORITATIVE_CONFIRMED_CONTEXT").forEach((revision) => {
+      (revision.payload?.items || []).forEach((item) => {
+        if (!item?.item_id || !removed.has(`${revision.context_id}|${item.item_id}`)) return;
+        (revision.provenance?.source_document_ids || []).forEach((sourceId) => keys.add(`${sourceId}|${item.item_id}`));
+      });
+    });
+    return keys;
   }
 
   function confirmedRecords(input) {
@@ -110,9 +124,10 @@
   function workingRecords(input) {
     const accepted = new Set((input.candidate_workspace_acceptances || []).map((entry) => `${entry.working_model_id}|${entry.working_model_fingerprint}`));
     const heads = latestBy(input.candidate_working_models || [], (entry) => entry.source_document_id);
+    const removed = removedWorkingItemKeys(input);
     return heads.flatMap((working) => {
       if (accepted.has(`${working.working_model_id}|${working.fingerprint}`)) return [];
-      return (working.payload?.items || []).filter(isObject).map((item) => ({
+      return (working.payload?.items || []).filter((item) => isObject(item) && !removed.has(`${working.source_document_id}|${item.item_id}`)).map((item) => ({
         identity: `working:${working.source_document_id}:${item.item_id || "unstable"}`,
         identity_stability: item.item_id ? "WORKING_LINEAGE_SCOPED" : "UNSTABLE",
         semantic: semanticItem(item),
@@ -168,9 +183,16 @@
     const confirmedFingerprint = await fingerprint(confirmedManifest);
     const workingFingerprint = await fingerprint(workingManifest);
     const aggregateFingerprint = await fingerprint({ confirmed: confirmedFingerprint, working: workingFingerprint, include_working: true });
-    const rawCandidateRecordCount = ["candidate_context_revisions", "candidate_working_models", "career_entities", "career_evidence"]
-      .reduce((total, key) => total + (Array.isArray(input[key]) ? input[key].length : 0), 0);
-    if (rawCandidateRecordCount > 0 && confirmed.length + working.length === 0) throw new CandidateSnapshotError("CANDIDATE_CONTEXT_WIRING_EMPTY");
+    const eligibleRecordCount = (input.candidate_context_revisions || []).filter((entry) => entry?.context_type === "CANDIDATE" && entry?.authority === "AUTHORITATIVE_CONFIRMED_CONTEXT").length
+      + (input.candidate_working_models || []).length
+      + (input.career_entities || []).filter((entry) => entry?.review_status === "confirmed").length
+      + (input.career_evidence || []).filter((entry) => ["confirmed", "derived_from_confirmed_entities"].includes(entry?.review_status) || entry?.authority === "HUMAN_CONFIRMED").length;
+    if (eligibleRecordCount > 0 && confirmed.length + working.length === 0) {
+      const beforeRemoval = { ...input, candidate_context_lifecycle: [] };
+      // A deliberate removal is a valid empty profile. Retain the wiring guard
+      // when eligible records cannot produce context even before removals.
+      if (confirmedRecords(beforeRemoval).length + workingRecords(beforeRemoval).length === 0) throw new CandidateSnapshotError("CANDIDATE_CONTEXT_WIRING_EMPTY");
+    }
     const providerConfirmed = providerItems(confirmed, "confirmed-candidate");
     const providerWorking = providerItems(working, "working-candidate");
     const providerRecords = [...providerConfirmed, ...providerWorking];

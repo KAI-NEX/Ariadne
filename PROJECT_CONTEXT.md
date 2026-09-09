@@ -62,5 +62,5 @@
 - 持久化：当前交互数据主要在原浏览器 profile 的 IndexedDB；legacy JD 数据在 `data/job_radar.db`。改变浏览器 profile、host 或端口会改变浏览器数据上下文。
 - 从仓库根启动：`PYTHONDONTWRITEBYTECODE=1 python3 app.py`，正常入口为 `http://127.0.0.1:8000/`。重启前先核对占用端口进程的 cwd 与身份。
 - Node 回归按文件运行：`node tests/<name>_regression.mjs`；Python：`PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 python3 tests/<name>_regression.py`。跨语言 route suite 必要时设置 `ARIADNE_NODE_BINARY` 为现有 Node 可执行路径。
-- 最新已记录的自动回归基线为 39 Node + 20 Python；计数会随项目变化，应以实际文件与运行结果为准。常驻 stub server、可选私有 fixture 和可选 smoke 不计作默认回归套件。
+- 最新已记录的自动回归基线为 41 Node + 22 Python（2026-09-09）；计数会随项目变化，应以实际文件与运行结果为准。常驻 stub server、可选私有 fixture 和可选 smoke 不计作默认回归套件。
 - 这是本地运行项目，当前没有 package/requirements/lock manifest；不要为文档整理安装依赖或引入新框架。测试日志、编译产物和私人截图保存在仓库外。

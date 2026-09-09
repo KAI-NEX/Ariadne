@@ -9,6 +9,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const Truth = require("../public/truth-persistence-domain.js");
 const RawSource = require("../public/raw-source-storage-domain.js");
 const Review = require("../public/local-candidate-review-domain.js");
+const CandidateContext = require("../public/job-candidate-context-domain.js");
 
 const sourceA = "source-removal-a";
 const sourceB = "source-removal-b";
@@ -75,6 +76,45 @@ assert.deepEqual(database.records.candidate_context_revisions, revisions);
 assert.deepEqual(Review.activeConfirmedRevisions(revisions, database.records.candidate_context_lifecycle).map((revision) => revision.payload.items[0].item_id).sort(), ["candidate-A", "candidate-C"]);
 assert.deepEqual(Review.latestConfirmedRevisions(revisions).map((revision) => revision.payload.items[0].item_id).sort(), ["candidate-A", "candidate-B", "candidate-C"]);
 await assert.rejects(Review.persistRemoval(database, confirmedBv2, "candidate-B"), /candidate_item_already_removed/);
+
+// A removed card must not return to JD through an unaccepted source Working head.
+// The same item ID in another source is a different identity and must survive.
+const workingFor = (sourceId, items) => ({
+  working_model_id: `working-${sourceId}`, source_document_id: sourceId,
+  version: 1, previous_working_model_id: null, fingerprint: `sha256:${"a".repeat(64)}`,
+  payload: { items: structuredClone(items) },
+});
+const removedInput = {
+  ...database.records,
+  candidate_working_models: [
+    workingFor(sourceA, [candidateItem("A", sourceA), candidateItem("B", sourceA)]),
+    workingFor(sourceB, [candidateItem("B", sourceB)]),
+  ],
+};
+const preservedInput = structuredClone(removedInput);
+const removedSnapshot = await CandidateContext.buildSnapshot(removedInput);
+assert(!removedSnapshot.working_manifest.some((entry) => entry.identity === `working:${sourceA}:candidate-B`), "removed Candidate leaked to JD as Working");
+assert(removedSnapshot.working_manifest.some((entry) => entry.identity === `working:${sourceA}:candidate-A`));
+assert(removedSnapshot.working_manifest.some((entry) => entry.identity === `working:${sourceB}:candidate-B`));
+assert.deepEqual(removedInput, preservedInput, "compiling context must not rewrite historical records");
+
+// A non-authoritative tombstone cannot hide human-confirmed data.
+const unauthorized = { candidate_context_revisions: [confirmedBv2], candidate_context_lifecycle: [{ ...removal, authority: "NON_AUTHORITATIVE_PROPOSAL" }] };
+assert.equal((await CandidateContext.buildSnapshot(unauthorized)).provider_view.confirmed.length, 1);
+
+// Removing the last card is a valid empty profile, while malformed active data
+// must still fail closed rather than masquerade as a successfully wired profile.
+const allRemoved = {
+  candidate_context_revisions: [confirmedBv1, confirmedBv2],
+  candidate_context_lifecycle: [removal],
+  candidate_working_models: [workingFor(sourceA, [candidateItem("B", sourceA)])],
+};
+const emptySnapshot = await CandidateContext.buildSnapshot(allRemoved);
+assert.equal(emptySnapshot.structural_counts.confirmed_count, 0);
+assert.equal(emptySnapshot.structural_counts.working_count, 0);
+assert.equal(emptySnapshot.structural_counts.candidate_snapshot_present, true);
+assert.equal((await CandidateContext.buildSnapshot({ career_entities: [{ entity_id: "unreviewed", review_status: "pending" }] })).provider_view.confirmed.length, 0);
+await assert.rejects(CandidateContext.buildSnapshot({ candidate_context_revisions: [{ ...confirmedBv2, payload: { items: [{}] } }] }), /CANDIDATE_CONTEXT_WIRING_EMPTY/);
 
 // A failed lifecycle write leaves the card active.
 const failedDatabase = removalDatabase(revisions, [], true);
