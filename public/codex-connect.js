@@ -4,6 +4,7 @@
   const byId = (id) => document.getElementById(id);
   const sheet = byId("codex-connect-sheet");
   const panel = byId("codex-connect-panel");
+  const more = byId("codex-more-dialog");
   const input = byId("codex-pairing-code");
   const button = byId("codex-connect");
   const message = byId("codex-connect-message");
@@ -38,9 +39,15 @@
     background.inert = true;
     message.textContent = root.AriadneConnector.connected() ? "本标签页已保存配对信息；连接器需要保持运行。" : "";
     render(); input.focus();
+    requestAnimationFrame(() => {
+      if (!opened) return;
+      const height = panel.querySelector(".add-model-header").offsetHeight + byId("codex-connect-form").scrollHeight + panel.querySelector(".add-model-footer").offsetHeight + 2;
+      panel.style.setProperty("--add-model-sheet-height", `${height}px`);
+    });
   }
   function close() {
     if (!sheet || !opened) return;
+    more?.close();
     opened = false; generation += 1; input.value = "";
     const current = panel.getBoundingClientRect();
     const destination = origin.getBoundingClientRect();
@@ -94,11 +101,19 @@
     message.textContent = "已断开本页连接。要撤销所有页面的访问，请停止本机连接器。";
     render();
   });
+  if (more) {
+    byId("codex-more-link").addEventListener("click", (event) => { event.preventDefault(); more.showModal(); });
+    byId("codex-more-close").addEventListener("click", () => more.close());
+    more.addEventListener("click", (event) => {
+      const rect = more.getBoundingClientRect();
+      if (event.target === more && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) more.close();
+    });
+  }
   if (sheet) {
     byId("codex-connect-close").addEventListener("click", close);
     byId("codex-connect-backdrop").addEventListener("click", close);
     document.addEventListener("keydown", (event) => {
-      if (!opened) return;
+      if (!opened || more?.open) return;
       if (event.key === "Escape") { event.preventDefault(); close(); }
       if (event.key === "Tab") {
         const items = [...panel.querySelectorAll("button:not(:disabled), input:not(:disabled), a[href]")].filter((item) => item.getClientRects().length);

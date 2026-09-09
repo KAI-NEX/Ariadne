@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' http://127.0.0.1:8765 https://generativelanguage.googleapis.com; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'" />
     <title>Ariadne · 运行方式选择</title>
-    <link rel="stylesheet" href="/styles.css?v=codex-modal-v1&amp;vi=1" />
+    <link rel="stylesheet" href="/styles.css?v=codex-more-v1&amp;vi=1" />
   </head>
   <body class="runtime-page">
     <canvas id="runtime-ascii-waves" class="runtime-ascii-waves" aria-hidden="true"></canvas>
@@ -53,19 +53,31 @@
           <form id="codex-connect-form" class="add-model-body">
             <section><p class="add-model-label">使用这台电脑的 Codex 登录</p><p class="add-model-hint">先在本机登录 Codex，再从 Ariadne 项目目录运行下方命令。将终端显示的一次性配对码填入下方，五分钟内有效。</p><pre class="codex-connect-command">python3 scripts/run_codex_connector.py</pre></section>
             <section><label class="add-model-label" for="codex-pairing-code">本机配对码</label><div class="add-model-key-row"><input id="codex-pairing-code" type="password" autocomplete="off" spellcheck="false" placeholder="输入终端中的配对码" required /></div><p class="add-model-hint">无需填写 API Key，Codex 登录凭据留在本机。</p></section>
-            <section><p class="add-model-hint">模型分析由本机 Codex 发送至 OpenAI，使用登录账号的额度。图片和 PDF 会按原图或完整逐页图片传送；发送材料仍需确认，结果仍由你保存。</p><p class="add-model-hint">如浏览器询问本地网络访问权限，请允许此站点连接本机。连接器需要保持运行；配对最长八小时，停止连接器即可撤销。</p></section>
+            <a id="codex-more-link" class="add-model-key-link" href="#codex-more-dialog" aria-haspopup="dialog">更多</a>
           </form>
         </div>
         <footer class="add-model-footer"><p id="codex-connect-message" class="add-model-hint" aria-live="polite"></p><button id="codex-connect" class="add-model-connect" type="submit" form="codex-connect-form" disabled>同意连接本地 Codex</button><a id="codex-disconnect" class="add-model-key-link hidden" href="#">断开本页连接</a></footer>
       </section>
     </div>
+    <dialog id="codex-more-dialog" class="add-model-panel codex-more-dialog" aria-labelledby="codex-more-title">
+      <header class="add-model-header"><button id="codex-more-close" class="sheet-icon-button" type="button" aria-label="关闭更多说明"></button><h2 id="codex-more-title">更多 · 本地 Codex</h2></header>
+      <div class="add-model-scroll-area">
+        <div class="add-model-body codex-more-copy">
+          <section><h3 class="add-model-label">材料、额度与权限</h3><p>模型分析由本机 Codex 发送至 OpenAI，使用登录账号的额度。图片和 PDF 会按原图或完整逐页图片传送；发送材料仍需确认，结果仍由你保存。</p><p>如浏览器询问本地网络访问权限，请允许此站点连接本机。连接器需要保持运行；配对最长八小时，停止连接器即可撤销。</p></section>
+          <section><h3 class="add-model-label">断开网页配对</h3><ol><li>返回运行方式菜单，打开「连接本地 Codex」。</li><li>点击弹窗底部的「断开本页连接」。本页保存的配对信息会清除；连接器在线时，也会撤销此配对授权，共用该授权的其他页面需重新配对。</li><li>如果连接器离线，页面仍会清除本页配对信息。要确保其他页面也无法继续连接，请停止本机连接器。</li></ol></section>
+          <section><h3 class="add-model-label">停止连接器，撤销所有网页访问</h3><p>找到运行 <code>python3 scripts/run_codex_connector.py</code> 的终端窗口，按 <kbd>Ctrl</kbd> + <kbd>C</kbd>。连接器退出后，所有配对授权立即失效；仅关闭这个说明窗或配对窗不会断开已建立的连接。</p><p>再次连接时，重新运行该命令，并用新显示的配对码配对。旧配对码与旧授权不能继续使用。</p></section>
+          <section><h3 class="add-model-label">这台电脑直接运行 Ariadne 时</h3><p>本机直连无需配对连接器；没有网页配对信息时，不会显示「断开本页连接」。要停止后续使用 Codex，请返回运行方式页，选择「本地运行」（不调用模型）或其他已接入模型。断开网页配对本身不会自动更换当前模型；本机直连仍可能使用已选的 Codex。</p></section>
+          <section><h3 class="add-model-label">断开之后会发生什么</h3><p>已有资料、原件和保存结果会保留，本机 Codex 账号不会退出。已经发送到 OpenAI 的请求不保证能立即停止，可能仍产生额度消耗；网页断连后会明确报错，不会自动切换其他模型。</p></section>
+        </div>
+      </div>
+    </dialog>
     <script src="/ascii-waves.js?v=runtime-ui-v48"></script>
     <script src="/floating-window.js?v=runtime-ui-v48"></script>
     <script src="/add-model-sheet.js?v=runtime-ui-v48&amp;ui=codex-modal-v1"></script>
     <script src="/local-connector.js"></script>
     <script src="/runtime-capabilities.js?v=runtime-routing-v1"></script>
     <script src="/runtime-capability-gate.js?v=runtime-routing-v1"></script>
-    <script src="/codex-connect.js?v=codex-modal-v1"></script>
+    <script src="/codex-connect.js?v=codex-more-v1"></script>
     <script src="/runtime-selection.js?v=runtime-routing-v1&amp;ui=codex-modal-v1"></script>
   </body>
 </html>
