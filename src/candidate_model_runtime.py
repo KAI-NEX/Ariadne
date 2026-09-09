@@ -24,6 +24,7 @@ from src.candidate_context import (
 )
 from src.execution_contract import ExecutionContractError, validate_runtime_snapshot
 from src.provider_runtime import OPENAI_CHAT_COMPLETIONS, ProviderRuntimeError, resolve_credential_reference
+from src.upload_limits import MAX_FILE_BYTES
 
 
 PROVIDER_ID = "deepseek"
@@ -31,7 +32,7 @@ MODEL_ID = "deepseek-v4-flash-vision-exp"
 ADAPTER_VERSION = "deepseek-candidate-multimodal-v2"
 DELIVERY_METHOD = "source_or_rendered_images"
 CREDENTIAL_REF = "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision"
-MAX_SOURCE_BYTES = 8_000_000
+MAX_SOURCE_BYTES = MAX_FILE_BYTES
 
 
 class CandidateModelRuntimeError(ValueError):

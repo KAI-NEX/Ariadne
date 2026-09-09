@@ -171,7 +171,7 @@ const candidateRun = pages.slice(pages.indexOf("async function runCandidateProce
 assert.ok(candidateRun.indexOf("const sources = selectedCandidateSources.filter") < candidateRun.indexOf('candidateExecutionState = "PROCESSING"'));
 assert.ok(candidateRun.indexOf("if (!sources.length)") < candidateRun.indexOf('setCandidateExtractionState("PREPARING"'));
 assert.match(candidateRun, /if \(candidateExecutionState === "PROCESSING"\) candidateExecutionState = "COMPLETE"/);
-assert.match(pages, /document_size_limit_exceeded: "当前本地导入仅支持不超过 8 MB 的文档；请压缩后重试。"/);
+assert.match(pages, /document_size_limit_exceeded: "每个文件最大支持 30 MB；请压缩后重试。"/);
 assert.match(pages, /function showPersonalError\(error, selectionVersion = candidateSelectionVersion\) \{[\s\S]*byId\("personal-processing"\)\?\.classList\.add\("hidden"\)/);
 assert.match(pages, /document_size_limit_exceeded"\) \{[\s\S]*dialog\.showModal\(\)/);
 assert.match(pages, /confirm-document-size-limit"\)\.addEventListener\("click"[\s\S]*resetInvalidCandidateSelection\(\)/);

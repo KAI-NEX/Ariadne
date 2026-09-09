@@ -1,5 +1,14 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-09 — 文件上传上限统一为 30 MB（COMPLETE）
+
+- 按用户要求，个人资料与职位描述上传的文档和 PNG/JPEG 均调整为每文件 ≤30,000,000 bytes（十进制 30 MB）；旧职业资料入口同步采用同一应用限制。后端共用 `src/upload_limits.py`，同步覆盖 Local 读取/OCR、Model 来源读取、Candidate/Job Model 原始输入校验；单文件 HTTP 请求允许 40 MB Base64 加 1 MB 元数据，多图请求允许四份满额文件的编码体积加元数据，仍保留有界请求。
+- 原 8 MB 是早期 Local intake 的应用常量，见本文件历史 Inputs 条目及 TECHNICAL_EVIDENCE 的 Local intake boundary。历史记录未解释为何恰好选择 8 MB，没有依据把它归因于服务商硬限制；图片原先另限 5 MB。Provider 能力目录中的自身限制保持原义。
+- 超限弹窗和两域提示同步为 30 MB；职位批量选择现在显示实际拒绝原因。连同上一轮已验证的“已保存在本机的 PDF”→“资料”文案一并收口。
+- 验证：6 Node + 6 Python 相关回归文件通过，包括新增所有支持格式恰好 30 MB 接收、超 1 byte/空文件拒绝、后端 PDF/PNG/JPEG 解码与 hash 边界，以及 8 个真实 HTTP handler 的完整 Base64 请求读取/超限拒绝（下游执行用测试替身停止）。原有来源持久化、Local/Model 和领域回归通过。
+- egolite 在正常 `:8000` 页验证个人资料 30 MB 合成文件选入及超限弹窗、职位 30 MB 合成图片选入及超限提示。浏览器仅验证选择与大小限制，未执行这些合成文件的 PDF/OCR/模型语义处理或 Human Save；未发起真实 Provider 请求。没有以本次验证宣称任意 30 MB 复杂文件的识别质量。
+- 已启动本项目 `:8000` 服务供刷新使用；按阶段规则创建本地 commit，不 push。
+
 ## 2026-09-08 — 全操作多模态模型接入修复（COMPLETE）
 
 - 用户明确要求所有可调用模型至少能理解图片和 PDF，后续 Gemini/其他 Provider 同样适用。规则已写入 AGENTS、PROJECT_CONTEXT 和 Runtime Contract 顶部增量条目；取代历史 Pro 对话例外，原历史记录保留。

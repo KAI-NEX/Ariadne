@@ -303,7 +303,7 @@ async function ingestWithAI(file, forceRegenerate = false, documentType = byId("
   const providerGate = candidateProviderGate();
   if (!providerGate.allowed) throw new Error("current_runtime_candidate_model_structuring_unavailable");
   if (mediaTypeFor(file) !== "application/pdf") throw new Error("AI 模式当前只接受原始 PDF");
-  if (file.size > 50_000_000) throw new Error("原始 PDF 超过当前模型服务商 50 MB 直传上限；原文件不会被改写或压缩后偷偷上传");
+  if (file.size > 30_000_000) throw new Error("每个文件最大支持 30 MB；请压缩后重试。");
   const sourceHash = await sha256File(file);
   const source = await aiSourceDocument(file, documentType, sourceHash);
   await put(SOURCE_DOCUMENTS, source);

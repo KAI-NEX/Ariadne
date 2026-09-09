@@ -237,8 +237,8 @@ async function acceptImages(files) {
   const incoming = [...files];
   if (!incoming.length) return;
   if (pendingImages.length + incoming.length > 4) { show("ocr-message", "一次最多 4 张同一职位的截图。", true); return; }
-  if (incoming.some((file) => !["image/png", "image/jpeg"].includes(file.type) || file.size > 5_000_000)) {
-    show("ocr-message", "每张图片必须是 5 MB 以内的 PNG 或 JPEG。", true); return;
+  if (incoming.some((file) => !["image/png", "image/jpeg"].includes(file.type) || file.size > 30_000_000)) {
+    show("ocr-message", "每张图片必须是不超过 30 MB 的 PNG 或 JPEG。", true); return;
   }
   pendingImages = pendingImages.concat(await Promise.all(incoming.map(readImage)));
   renderPendingImages();

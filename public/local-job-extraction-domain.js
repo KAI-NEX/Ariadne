@@ -11,8 +11,8 @@
 }(typeof globalThis !== "undefined" ? globalThis : this, function createLocalJobExtraction(Truth, RawSource) {
   if (!Truth || !RawSource) throw new Error("local_job_extraction_dependencies_required");
 
-  const MAX_DOCUMENT_BYTES = 8_000_000;
-  const MAX_IMAGE_BYTES = 5_000_000;
+  const MAX_DOCUMENT_BYTES = 30_000_000;
+  const MAX_IMAGE_BYTES = MAX_DOCUMENT_BYTES;
   const MIME_BY_EXTENSION = Object.freeze({
     pdf: "application/pdf",
     docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

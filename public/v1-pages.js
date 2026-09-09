@@ -195,8 +195,8 @@
       unsupported_document_type: "暂不支持这种文件格式。",
       invalid_document_size: "文件大小不符合本地导入要求。",
       document_read_failed: "无法读取这个本地文件。",
-      document_size_limit_exceeded: "当前本地导入仅支持不超过 8 MB 的文档；请压缩后重试。",
-      image_size_limit_exceeded: "当前本地导入仅支持不超过 5 MB 的图片；请压缩后重试。",
+      document_size_limit_exceeded: "每个文件最大支持 30 MB；请压缩后重试。",
+      image_size_limit_exceeded: "每个文件最大支持 30 MB；请压缩后重试。",
       raw_source_reference_missing: "原始文件的本地引用不存在；操作已停止。",
       raw_source_reference_invalid: "原始文件的本地引用无效；操作已停止。",
       raw_source_reference_unsupported: "原始文件的本地引用无法由当前版本解析；操作已停止。",
@@ -246,8 +246,8 @@
     const messages = {
       unsupported_document_type: "暂不支持这种文件格式。",
       invalid_document_size: "文件大小不符合导入要求。",
-      document_size_limit_exceeded: "当前导入仅支持不超过 8 MB 的文档。",
-      image_size_limit_exceeded: "当前导入仅支持不超过 5 MB 的图片。",
+      document_size_limit_exceeded: "每个文件最大支持 30 MB。",
+      image_size_limit_exceeded: "每个文件最大支持 30 MB。",
       job_model_single_source_required: "ARIADNE AI 每次只处理一个职位来源。",
       job_model_runtime_not_eligible: "当前 ARIADNE AI 职位导入运行契约不可用。",
       job_model_source_text_required: "当前来源没有可供模型理解的文字内容。",
@@ -1510,7 +1510,7 @@
         && source.material_type === "CANDIDATE" && source.source_type === "PDF" && source.mime_type === "application/pdf" && source.local_reference);
     } finally { database.close(); }
     const selected = selectedCandidateSources.find((item) => sources.some((source) => source.source_document_id === item.source_document_id));
-    byId("saved-candidate-source-summary").textContent = selected ? selected.filename || selected.file?.name : "选择已保存在本机的 PDF";
+    byId("saved-candidate-source-summary").textContent = selected ? selected.filename || selected.file?.name : "选择已保存在本机的资料";
     byId("saved-candidate-source-list").innerHTML = sources.map((source, index) => `<button type="button" class="runtime-menu-item v1-saved-source-button" style="--runtime-menu-index:${index + 1}" role="option" data-saved-candidate-source="${escapeHtml(source.source_document_id)}" aria-selected="${selectedCandidateSources.some((item) => item.source_document_id === source.source_document_id)}"><span>${escapeHtml(source.filename)}</span></button>`).join("");
     section.classList.toggle("hidden", !sources.length);
   }
@@ -2896,7 +2896,10 @@
     if (duplicateCount) messages.push(`${duplicateCount} 个完全相同的文件已合并处理。`);
     if (activeCount) messages.push(`${activeCount} 个来源已导入，不会重复生成。`);
     if (pendingCount) messages.push(`${pendingCount} 个来源将恢复现有待审核草稿。`);
-    if (rejectedCount) messages.push(`${rejectedCount} 个不支持的文件已跳过。`);
+    if (rejectedCount) {
+      const reasons = [...new Set(settled.filter((result) => result.status === "rejected").map((result) => jobErrorCopy(result.reason)))];
+      messages.push(`${rejectedCount} 个文件已跳过。${reasons.join(" ")}`);
+    }
     byId("job-page-message").textContent = messages.join(" ");
     byId("job-page-message").classList.toggle("error", !selectedJobSources.length);
     await renderAwaitingJobReviews({ reset: true });

@@ -20,8 +20,10 @@ from io import BytesIO
 from pathlib import Path
 from xml.etree import ElementTree
 
+from src.upload_limits import MAX_FILE_BYTES
 
-MAX_DOCUMENT_BYTES = 8_000_000
+
+MAX_DOCUMENT_BYTES = MAX_FILE_BYTES
 ENTITY_CONTRACT_ID = "job-radar-career-entity-v1"
 EXTRACTOR_VERSION = "career-entity-deterministic-v2-document-block"
 DOCUMENT_BLOCK_CONTRACT_ID = "job-radar-document-block-v1"

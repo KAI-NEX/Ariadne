@@ -13,12 +13,13 @@ import hashlib
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from src.upload_limits import MAX_FILE_BYTES
 
 
 CONTRACT_ID = "job-radar-canonical-career-context-v1"
 PROMPT_VERSION = "canonical_career_context_v2_flexible"
 DEFAULT_MODEL = ""
-MAX_ORIGINAL_BYTES = 50_000_000
+MAX_ORIGINAL_BYTES = MAX_FILE_BYTES
 SUPPORTED_DOCUMENT_TYPES = {"resume", "portfolio"}
 SUPPORTED_MEDIA_TYPES = {"application/pdf"}
 EPISTEMIC_MARKERS = (

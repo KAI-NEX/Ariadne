@@ -18,6 +18,7 @@ from typing import Any, Callable, Mapping
 from src.candidate_model_runtime import runtime_fingerprint
 from src.execution_contract import ExecutionContractError, validate_runtime_snapshot
 from src.provider_runtime import OPENAI_CHAT_COMPLETIONS, ProviderRuntimeError, resolve_credential_reference
+from src.upload_limits import MAX_FILE_BYTES
 
 
 MANIFEST_PATH = Path(__file__).resolve().parents[1] / "data" / "job_intelligence_contract_v1.json"
@@ -227,7 +228,7 @@ def _validate_source_inputs(value: Any, sources: list[dict[str, Any]]) -> list[d
             raise JobModelRuntimeError("job_model_source_inputs_invalid", "source") from error
         valid_signature = source["mime_type"] == "image/png" and body.startswith(b"\x89PNG\r\n\x1a\n")
         valid_signature = valid_signature or source["mime_type"] == "image/jpeg" and body.startswith(b"\xff\xd8\xff")
-        if not body or len(body) > 5_000_000 or not valid_signature or "sha256:" + hashlib.sha256(body).hexdigest() != source["content_hash"]:
+        if not body or len(body) > MAX_FILE_BYTES or not valid_signature or "sha256:" + hashlib.sha256(body).hexdigest() != source["content_hash"]:
             raise JobModelRuntimeError("job_model_source_inputs_invalid", "source")
         validated.append({"source_index": sources.index(source) + 1, "image_data_url": data_url})
     return validated

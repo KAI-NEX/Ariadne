@@ -21,6 +21,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 from src.career_evidence import CareerDocumentError, _document_blocks, extract_career_document, extract_career_document_only, extract_job_document_only, propose_entities
 from src.execution_contract import ExecutionContractError, validate_runtime_snapshot
+from src.upload_limits import MAX_FILE_BYTES, MAX_FILE_REQUEST_BYTES, MAX_IMAGE_BATCH_BYTES, MAX_IMAGE_BATCH_REQUEST_BYTES
 from src.ai_career_ingestion import (
     AICareerIngestionError,
     DEFAULT_MODEL as AI_CAREER_DEFAULT_MODEL,
@@ -205,10 +206,10 @@ def decode_image_data_urls(payload: dict) -> list[tuple[str, bytes]]:
         if mime_type not in {"image/png", "image/jpeg"}:
             raise ValueError("invalid_image_type")
         image_bytes = base64.b64decode(encoded, validate=True)
-        if not image_bytes or len(image_bytes) > 5_000_000:
+        if not image_bytes or len(image_bytes) > MAX_FILE_BYTES:
             raise ValueError("invalid_image_size")
         decoded_images.append((mime_type, image_bytes))
-    if sum(len(image_bytes) for _, image_bytes in decoded_images) > 12_000_000:
+    if sum(len(image_bytes) for _, image_bytes in decoded_images) > MAX_IMAGE_BATCH_BYTES:
         raise ValueError("request_too_large")
     return decoded_images
 
@@ -1083,7 +1084,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         claimed_operation_id = None
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
-            if content_length <= 0 or content_length > 12_000_000:
+            if content_length <= 0 or content_length > MAX_FILE_REQUEST_BYTES:
                 raise CandidateModelRuntimeError("candidate_model_request_size_invalid", "request")
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
             validated_request = validate_candidate_model_request(payload)
@@ -1326,7 +1327,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         claimed_operation_id = None
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
-            if content_length <= 0 or content_length > 32_000_000:
+            if content_length <= 0 or content_length > MAX_IMAGE_BATCH_REQUEST_BYTES:
                 raise JobModelRuntimeError("job_model_request_size_invalid", "request")
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
             validated = validate_job_model_request(payload)
@@ -1655,7 +1656,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         """Extract one bounded career file locally and return review-only Career Entities."""
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
-            if content_length <= 0 or content_length > 12_000_000:
+            if content_length <= 0 or content_length > MAX_FILE_REQUEST_BYTES:
                 raise CareerDocumentError("invalid_document_request_size")
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
             if not isinstance(payload, dict):
@@ -1681,7 +1682,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         """Slice 4A mechanical document extraction; never creates a Candidate Proposal."""
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
-            if content_length <= 0 or content_length > 12_000_000:
+            if content_length <= 0 or content_length > MAX_FILE_REQUEST_BYTES:
                 raise CareerDocumentError("invalid_document_request_size")
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
             if not isinstance(payload, dict):
@@ -1710,7 +1711,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         """Use only the pure local Apple Vision OCR core for one Candidate image."""
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
-            if content_length <= 0 or content_length > 12_000_000:
+            if content_length <= 0 or content_length > MAX_FILE_REQUEST_BYTES:
                 raise CareerDocumentError("invalid_document_request_size")
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
             if not isinstance(payload, dict):
@@ -1772,7 +1773,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         """Mechanical Job extraction only; never calls a Provider or creates a Proposal."""
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
-            if content_length <= 0 or content_length > 12_000_000:
+            if content_length <= 0 or content_length > MAX_FILE_REQUEST_BYTES:
                 raise CareerDocumentError("invalid_document_request_size")
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
             if not isinstance(payload, dict):
@@ -1801,7 +1802,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         """Run pure local Apple Vision OCR for one canonical Job image."""
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
-            if content_length <= 0 or content_length > 12_000_000:
+            if content_length <= 0 or content_length > MAX_FILE_REQUEST_BYTES:
                 raise CareerDocumentError("invalid_document_request_size")
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
             if not isinstance(payload, dict):
@@ -1859,7 +1860,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         """Read original source ephemerally for Model-mode retrieval; never write back."""
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
-            if content_length <= 0 or content_length > 12_000_000:
+            if content_length <= 0 or content_length > MAX_FILE_REQUEST_BYTES:
                 raise CareerDocumentError("invalid_source_read_request_size")
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
             snapshot = validate_runtime_snapshot(payload.get("runtime_snapshot"))
@@ -1956,7 +1957,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         """Run macOS Vision OCR locally; never forwards the image to the internet."""
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
-            if content_length <= 0 or content_length > 18_000_000:
+            if content_length <= 0 or content_length > MAX_IMAGE_BATCH_REQUEST_BYTES:
                 raise ValueError
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
             decoded_images = decode_image_data_urls(payload)
@@ -2104,7 +2105,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         """Make exactly one user-triggered vision call; failed calls never create a job."""
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
-            if content_length <= 0 or content_length > 18_000_000:
+            if content_length <= 0 or content_length > MAX_IMAGE_BATCH_REQUEST_BYTES:
                 raise ValueError
             request_payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
             prompt_version = request_payload.get("prompt_version", VISION_PROMPT_VERSION)

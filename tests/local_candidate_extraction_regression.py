@@ -98,7 +98,7 @@ def test_truthful_input_failures_and_pdf_no_ocr_fail_closed() -> None:
     expect("document_extension_mismatch", lambda: extract_career_document_only(document_payload("candidate.pdf", "text/plain", b"text"), Path("unused")))
     expect("text_document_not_utf8", lambda: extract_career_document_only(document_payload("candidate.txt", "text/plain", b"\xff"), Path("unused")))
     expect("docx_text_extraction_failed", lambda: extract_career_document_only(document_payload("candidate.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", b"broken"), Path("unused")))
-    expect("invalid_document_size", lambda: extract_career_document_only(document_payload("candidate.txt", "text/plain", b"x" * 8_000_001), Path("unused")))
+    expect("invalid_document_size", lambda: extract_career_document_only(document_payload("candidate.txt", "text/plain", b"x" * 30_000_001), Path("unused")))
 
     original_pages, original_visual = career_evidence._pdf_pages, career_evidence._pdf_visual_pages
     try:
