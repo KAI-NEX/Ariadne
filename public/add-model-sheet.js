@@ -122,9 +122,9 @@
     }
     function fitPanelToContent() {
       window.requestAnimationFrame(() => {
-        const headerHeight = byId("panel").querySelector(".add-model-header").getBoundingClientRect().height;
+        const headerHeight = byId("panel").querySelector(".add-model-header").offsetHeight;
         const bodyHeight = byId("panel").querySelector(".add-model-body").scrollHeight;
-        const footerHeight = byId("panel").querySelector(".add-model-footer").getBoundingClientRect().height;
+        const footerHeight = byId("panel").querySelector(".add-model-footer").offsetHeight;
         setPanelHeight(headerHeight + bodyHeight + footerHeight + 2, true);
       });
     }

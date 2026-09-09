@@ -990,3 +990,8 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .personal-understanding-entry { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--ink); text-decoration: none; margin: 20px 0 30px; padding: 18px 22px; border: 1px solid #dce2ec; border-radius: 14px; background: #f5f7fa; }
 .personal-understanding-entry strong { display: block; font-size: 15px; margin-bottom: 6px; }
 .personal-understanding-entry small { color: #697487; font-size: 12px; }
+
+/* Codex uses the shared model dialog; only its command and status spacing differ. */
+.codex-connect-command { background: var(--vi-surface); border: 1px solid var(--vi-line); border-radius: var(--vi-radius-small); color: var(--vi-ink); font-family: var(--vi-font-mono); font-size: var(--vi-text-caption); padding: var(--vi-space-12); white-space: pre-wrap; overflow-wrap: anywhere; }
+#codex-connect-message { margin: 0 0 var(--vi-space-12); }
+#codex-connect-form.add-model-body { margin: 0; }

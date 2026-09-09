@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' http://127.0.0.1:8765 https://generativelanguage.googleapis.com; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'" />
     <title>Ariadne · 运行方式选择</title>
-    <link rel="stylesheet" href="/styles.css?v=runtime-ui-v48&amp;vi=1" />
+    <link rel="stylesheet" href="/styles.css?v=codex-modal-v1&amp;vi=1" />
   </head>
   <body class="runtime-page">
     <canvas id="runtime-ascii-waves" class="runtime-ascii-waves" aria-hidden="true"></canvas>
@@ -19,10 +19,10 @@
         </button>
         <div id="runtime-menu" class="runtime-menu" role="listbox" aria-label="选择运行方式" aria-hidden="true">
           <div id="runtime-model-options"></div>
-          <a href="/codex-connect.html" class="runtime-menu-item" role="option"><span>连接本机 Codex</span><small>网页通过配对使用这台电脑</small></a>
           <button id="runtime-add-model" class="runtime-menu-item runtime-add-model" type="button" role="option">
             <span>＋ 添加新的模型</span><small>连接 API 后读取可用模型</small>
           </button>
+          <a id="runtime-connect-codex" href="/codex-connect.html" class="runtime-menu-item" role="option" aria-haspopup="dialog"><span>连接本地 Codex</span><small>连接这台电脑的 Codex 登录</small></a>
           <div class="runtime-divider"></div>
           <button id="runtime-local" class="runtime-menu-item" type="button" role="option">
             <span>本地运行</span><small>不接入 AI；仅使用本地处理</small>
@@ -42,15 +42,30 @@
             <section id="add-model-models-section" class="hidden"><p class="add-model-label">可用图文模型</p><div id="add-model-model-list" class="add-model-list"></div></section>
           </div>
         </div>
-        <footer class="add-model-footer"><button id="add-model-connect" class="add-model-connect" type="button" disabled><span class="add-model-connect-content"><svg class="add-model-connect-loader" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9" /></svg><svg class="add-model-connect-check" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="m8.5 12 2.3 2.3 4.8-5" /></svg><span class="add-model-connect-label">连接并读取可用模型</span><span id="add-model-status" class="sr-only" aria-live="polite"></span></span></button></footer>
+        <footer class="add-model-footer"><button id="add-model-connect" class="add-model-connect" type="button" disabled><span class="add-model-connect-content"><svg class="add-model-connect-loader" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9" /></svg><svg class="add-model-connect-check" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="m8.5 12 2.3 2.3 4.8-5" /></svg><span class="add-model-connect-label">连接并读取可用模型</span><span id="add-model-status" class="sr-only" aria-live="polite"></span></span></button><a id="add-model-codex-link" class="add-model-key-link" href="/codex-connect.html" aria-haspopup="dialog">连接本地 Codex</a></footer>
+      </section>
+    </div>
+    <div id="codex-connect-sheet" class="add-model-sheet hidden" aria-hidden="true">
+      <button id="codex-connect-backdrop" class="add-model-backdrop" type="button" aria-label="关闭连接本地 Codex"></button>
+      <section id="codex-connect-panel" class="add-model-panel" role="dialog" aria-modal="true" aria-labelledby="codex-connect-title">
+        <header class="add-model-header"><button id="codex-connect-close" class="sheet-icon-button" type="button" aria-label="关闭"></button><h2 id="codex-connect-title">连接本地 Codex</h2></header>
+        <div class="add-model-scroll-area">
+          <form id="codex-connect-form" class="add-model-body">
+            <section><p class="add-model-label">使用这台电脑的 Codex 登录</p><p class="add-model-hint">先在本机登录 Codex，再从 Ariadne 项目目录运行下方命令。将终端显示的一次性配对码填入下方，五分钟内有效。</p><pre class="codex-connect-command">python3 scripts/run_codex_connector.py</pre></section>
+            <section><label class="add-model-label" for="codex-pairing-code">本机配对码</label><div class="add-model-key-row"><input id="codex-pairing-code" type="password" autocomplete="off" spellcheck="false" placeholder="输入终端中的配对码" required /></div><p class="add-model-hint">无需填写 API Key，Codex 登录凭据留在本机。</p></section>
+            <section><p class="add-model-hint">模型分析由本机 Codex 发送至 OpenAI，使用登录账号的额度。图片和 PDF 会按原图或完整逐页图片传送；发送材料仍需确认，结果仍由你保存。</p><p class="add-model-hint">如浏览器询问本地网络访问权限，请允许此站点连接本机。连接器需要保持运行；配对最长八小时，停止连接器即可撤销。</p></section>
+          </form>
+        </div>
+        <footer class="add-model-footer"><p id="codex-connect-message" class="add-model-hint" aria-live="polite"></p><button id="codex-connect" class="add-model-connect" type="submit" form="codex-connect-form" disabled>同意连接本地 Codex</button><a id="codex-disconnect" class="add-model-key-link hidden" href="#">断开本页连接</a></footer>
       </section>
     </div>
     <script src="/ascii-waves.js?v=runtime-ui-v48"></script>
     <script src="/floating-window.js?v=runtime-ui-v48"></script>
-    <script src="/add-model-sheet.js?v=runtime-ui-v48"></script>
+    <script src="/add-model-sheet.js?v=runtime-ui-v48&amp;ui=codex-modal-v1"></script>
     <script src="/local-connector.js"></script>
     <script src="/runtime-capabilities.js?v=runtime-routing-v1"></script>
     <script src="/runtime-capability-gate.js?v=runtime-routing-v1"></script>
-    <script src="/runtime-selection.js?v=runtime-routing-v1"></script>
+    <script src="/codex-connect.js?v=codex-modal-v1"></script>
+    <script src="/runtime-selection.js?v=runtime-routing-v1&amp;ui=codex-modal-v1"></script>
   </body>
 </html>

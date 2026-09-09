@@ -112,7 +112,9 @@ assert.match(css, /\.sheet-icon-button[^}]*align-items: center[^}]*justify-conte
 assert.match(css, /\.sheet-icon-button:active[^}]*scale\(\.82\)/s);
 assert.match(script, /const originRect = byId\("runtime-add-model"\)\.getBoundingClientRect\(\)/);
 assert.match(script, /addModelSheet\.open\(originRect, returnRect\)/);
-assert.match(script, /\}, \(\) => openMenu\(\)\)/);
+assert.match(script, /if \(codexLinkPending\)/);
+assert.match(script, /else openMenu\(\)/);
+assert.match(html, /id="add-model-codex-link"[^>]*aria-haspopup="dialog"/);
 assert.doesNotMatch(html, /runtime-menu-label|id="runtime-menu" class="runtime-menu hidden"/);
 console.log("runtime_selection_ui_contract=pass");
 

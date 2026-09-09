@@ -235,6 +235,7 @@ byId("runtime-local").addEventListener("click", () => {
   state.mode = "local"; state.provider = "local"; state.model = null; state.phase = "LOCAL_READY"; state.diagnostics = { purpose: "LOCAL_RUNTIME", career_data_sent: false, network_call_made: false };
   persistSelectedRuntime(); setMessage(""); render(); closeMenu();
 });
+let codexLinkPending = false;
 const addModelSheet = window.JobRadarAddModelSheet.mount({
   sheet: byId("add-model-sheet"), panel: byId("add-model-panel"), backdrop: byId("add-model-backdrop"), close: byId("add-model-close"),
   provider: byId("add-model-provider"), "provider-value": byId("add-model-provider-value"), "provider-menu": byId("add-model-provider-menu"),
@@ -245,7 +246,23 @@ const addModelSheet = window.JobRadarAddModelSheet.mount({
   state.addedModels = [connected, ...state.addedModels.filter((item) => !(item.provider_id === providerId && item.model_id === model.id))];
   writeLocalJson(ADDED_MODELS_STORAGE_KEY, state.addedModels);
   renderModels(); selectAddedMultimodalModel(connected);
-}, () => openMenu());
+}, () => {
+  if (codexLinkPending) { codexLinkPending = false; window.AriadneCodexConnect.open(byId("runtime-selector")); }
+  else openMenu();
+});
+byId("runtime-connect-codex").addEventListener("click", (event) => {
+  event.preventDefault();
+  window.AriadneCodexConnect.open(byId("runtime-selector"));
+  closeMenu();
+});
+byId("add-model-codex-link").addEventListener("click", (event) => {
+  event.preventDefault(); codexLinkPending = true; byId("add-model-close").click();
+});
+window.addEventListener("ariadne-codex-connected", (event) => {
+  state.models = event.detail.models;
+  renderModels();
+  selectVerifiedRuntimeModel("gpt-5.6-sol", "codex");
+});
 byId("runtime-add-model").addEventListener("click", () => {
   const originRect = byId("runtime-add-model").getBoundingClientRect();
   const returnRect = byId("runtime-selector").getBoundingClientRect();

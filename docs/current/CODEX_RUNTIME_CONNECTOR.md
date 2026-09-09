@@ -34,7 +34,7 @@
 python3 scripts/run_codex_connector.py
 ```
 
-默认只允许 `https://web.ariadne.kai-nex.com`。在该网页的运行方式页点击「连接本机 Codex」，输入本机终端显示的一次性配对码。开发环境可以通过 `--origin http://127.0.0.1:8017` 指定一个准确的 loopback origin；生产来源必须为 HTTPS，不能含路径、凭据或通配符。
+默认只允许 `https://web.ariadne.kai-nex.com`。在该网页的运行方式菜单点击「连接本地 Codex」，或使用「添加新的模型」弹窗底部的同名链接，在配对弹窗中输入本机终端显示的一次性配对码。成功后原页更新模型选择；关闭或取消不会产生迟到的选择。开发环境可以通过 `--origin http://127.0.0.1:8017` 指定一个准确的 loopback origin；生产来源必须为 HTTPS，不能含路径、凭据或通配符。
 
 - 配对码五分钟有效，只能兑换一次，五次错误后失效。兑换后的随机 token 仅放在网页 sessionStorage；连接器内存只保留其 hash，八小时过期。它不是 Codex/OpenAI 登录凭据。
 - 断开连接会请求撤销当前 token；停止本机连接器会撤销其内存中的所有访问授权。重启后重新配对。关闭标签页会丢弃本页连接信息。
