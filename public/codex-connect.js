@@ -81,12 +81,14 @@
       const response = await root.AriadneConnector.fetch("/api/runtime-options");
       const result = await response.json();
       if (attempt !== generation) { await root.AriadneConnector.disconnect(); return; }
-      if (!response.ok || !result.models?.some((model) => model.provider_id === "codex" && model.model_id === "gpt-5.6-sol"
-        && root.JobRadarRuntimeGate.isModelRuntimeEligible({ mode: "model", provider: model.provider_id, model: model.model_id }))) throw new Error("CODEX_UNAVAILABLE");
-      const selected = { mode: "ai", provider: "codex", model: "gpt-5.6-sol" };
+      const qualified = result.models?.filter(model => model.provider_id === "codex" && root.AriadneModelSettings?.descriptor(model.provider_id, model.model_id)
+        && root.JobRadarRuntimeGate.isModelRuntimeEligible({ mode: "model", provider: model.provider_id, model: model.model_id }));
+      const preferred = qualified?.find(model => model.model_id === result.local_preference?.model) || (qualified?.length === 1 ? qualified[0] : null);
+      if (!response.ok || !preferred) throw new Error("CODEX_UNAVAILABLE");
+      const selected = { mode: "ai", provider: preferred.provider_id, model: preferred.model_id };
       localStorage.setItem("job-radar-selected-runtime", JSON.stringify(selected));
       root.JobRadarRuntimeGate.recordOperationRuntimeSelection(selected);
-      if (sheet) { root.dispatchEvent(new CustomEvent("ariadne-codex-connected", { detail: result })); close(); }
+      if (sheet) { root.dispatchEvent(new CustomEvent("ariadne-codex-connected", { detail: { ...result, selected } })); close(); }
       else location.assign("/");
     } catch (_) {
       if (attempt === generation) message.textContent = "连接未完成。请检查连接器、配对码及浏览器的本地网络访问权限。没有调用模型。";

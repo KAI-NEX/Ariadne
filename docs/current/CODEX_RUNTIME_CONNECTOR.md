@@ -15,7 +15,7 @@
 
 当前实测组合为 macOS、`codex-cli 0.153.4`、ChatGPT 登录、`gpt-5.6-sol`、medium reasoning。没有更改开发任务使用的模型或用户 Codex 配置。其他 Codex 模型不会因出现在列表中而自动获得执行资格。
 
-2026-09-10 已确定后续采用「首页简洁模型名 + 对话内切换模型/推理强度」的[共用架构](MODEL_SELECTION_AND_TUNING_ARCHITECTURE.md)。目前仅完成架构整理；下列配置尚不支持自由修改模型或新增推理强度字段，修改 Codex 任务设置也不会同步到 Ariadne。后续版本化接入将保留登录/配对边界，不直接继承开发任务的模型、权限或工具配置。
+2026-09-10 已实现「首页简洁模型名 + 对话内切换模型/推理强度」的[共用架构](MODEL_SELECTION_AND_TUNING_ARCHITECTURE.md)：在对话左下点击 `Sol · 中`，可选择低/中/高，应用到此对话或显式设为默认。默认仍 medium；设置进入每轮快照并实际传给 Codex CLI。三档均通过虚构短文本真实执行检查，不代表已完成速度基准。下列本机配置仍仅管理启用/资格/初始偏好，不接受任意模型或推理字段；修改开发任务设置不会同步到 Ariadne。登录、配对、权限与工具隔离保持不变。
 
 1. 本机安装 Codex，执行 `codex login`，用 `codex login status` 确认登录。
 2. Python 能运行本项目，`pdftoppm` 在启动服务的 PATH 中；原有本地技术解析依赖仍适用。

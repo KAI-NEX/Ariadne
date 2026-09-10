@@ -909,6 +909,15 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/conversation-attachment-capabilities":
             self.send_json(HTTPStatus.OK, {"contract_id": ATTACHMENTS_CONTRACT, "max_files": 4, "max_total_bytes": MAX_FILE_BYTES, "network_call_made": False})
             return
+        if parsed.path == "/model-settings-catalog-data.js":
+            from src.model_settings import CATALOG
+            body = ("globalThis.AriadneModelSettingsCatalog = " + json.dumps(CATALOG) + ";").encode("utf-8")
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if parsed.path == "/job-overview-contract.js":
             body = ("window.AriadneJobOverviewContract = " + json.dumps(JOB_OVERVIEW_MANIFEST) + ";").encode("utf-8")
             self.send_response(HTTPStatus.OK)

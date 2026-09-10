@@ -106,11 +106,12 @@
   }
   async function refresh(db, { runtime_snapshot, consent, call = callRuntime, onProgress = () => {} }) {
     const snapshot = await snapshotFromDatabase(db);
-    if (snapshot.overview || !snapshot.records.length) return { snapshot, calls: 0, usage: {}, cached: true };
+    const runtimeIdentity = JSON.stringify([runtime_snapshot.provider, runtime_snapshot.model, runtime_snapshot.protocol, runtime_snapshot.execution_settings?.connection_id, runtime_snapshot.execution_settings?.descriptor_revision, runtime_snapshot.execution_settings?.settings_schema_version, runtime_snapshot.execution_settings?.effective_settings]);
+    if (snapshot.overview?.runtime_identity === runtimeIdentity || !snapshot.records.length) return { snapshot, calls: 0, usage: {}, cached: true };
     const fragments = [];
     for (const record of snapshot.records) {
       const parts = Context.splitText(JSON.stringify(record.semantic), Contract.limits.fragment_bytes);
-      for (let index = 0; index < parts.length; index++) fragments.push({ fragment_id: await fingerprint({ identity: record.identity, hash: record.semantic_hash, index, prompt: Contract.prompt_version }), identity: record.identity, title: record.semantic.title, text: parts[index], part: index + 1, total_parts: parts.length });
+      for (let index = 0; index < parts.length; index++) fragments.push({ fragment_id: await fingerprint({ identity: record.identity, hash: record.semantic_hash, index, prompt: Contract.prompt_version, runtime_identity: runtimeIdentity }), identity: record.identity, title: record.semantic.title, text: parts[index], part: index + 1, total_parts: parts.length });
     }
     const cache = new Map((await getAll(db, "job_overview_fragments")).filter((entry) => entry.authority === "NON_AUTHORITATIVE_JOB_DIGEST" && entry.prompt_version === Contract.prompt_version).map((entry) => [entry.fragment_id, entry]));
     const missing = fragments.filter((entry) => !cache.has(entry.fragment_id)), usage = {}; let calls = 0;
@@ -128,7 +129,7 @@
     let previous = null; const groupsToSynthesize = batches(digests, 10000, 30);
     for (let index = 0; index < groupsToSynthesize.length; index++) { onProgress(`正在汇总全部职位（${index + 1}/${groupsToSynthesize.length}）…`); previous = await run("SYNTHESIZE", { evidence: groupsToSynthesize[index], previous, traversal: { part: index + 1, total_parts: groupsToSynthesize.length } }); }
     const fresh = await snapshotFromDatabase(db); if (fresh.fingerprint !== snapshot.fingerprint) throw new Error("JOB_OVERVIEW_CONTEXT_CHANGED");
-    const overview = { overview_id: id("job-overview"), fingerprint: snapshot.fingerprint, prompt_version: Contract.prompt_version, authority: "NON_AUTHORITATIVE_JOB_OVERVIEW", created_at: now(), summary: previous.summary,
+    const overview = { runtime_identity: runtimeIdentity, overview_id: id("job-overview"), fingerprint: snapshot.fingerprint, prompt_version: Contract.prompt_version, authority: "NON_AUTHORITATIVE_JOB_OVERVIEW", created_at: now(), summary: previous.summary,
       insights: previous.insights.map((entry) => ({ text: entry.text, identities: [...new Set(entry.evidence_refs.map((ref) => fragments[digests.findIndex((item) => item.ref === ref)].identity))] })),
       uncertainties: previous.uncertainties, covered_jobs: snapshot.records.length, refreshed_fragments: missing.length, reused_fragments: fragments.length - missing.length, calls, usage };
     await write(db, "job_overview_snapshots", overview); return { snapshot: { ...fresh, overview }, calls, usage, cached: false };
@@ -156,7 +157,7 @@
       const request = requestFor("DISCUSS", context, message, options.runtime_snapshot, options.consent), result = await (options.call || callRuntime)(request), output = validateResult(result, request);
       if ((await snapshotFromDatabase(db)).fingerprint !== snapshot.fingerprint) throw new Error("JOB_OVERVIEW_CONTEXT_CHANGED");
       const insights = output.insights.map((entry) => ({ text: entry.text, identities: entry.evidence_refs.map((ref) => snapshot.records.find((record) => record.ref === ref).identity) }));
-      const completed = { ...turn, status: "SUCCEEDED", fingerprint: snapshot.fingerprint, output: { message: output.summary, insights, uncertainties: output.uncertainties }, context_coverage: context.coverage, context_bytes: Context.bytes(context), calls: refreshed.calls + 1, usage: result.usage || {}, refresh_usage: refreshed.usage };
+      const completed = { ...turn, runtime_snapshot: clone(options.runtime_snapshot), status: "SUCCEEDED", fingerprint: snapshot.fingerprint, output: { message: output.summary, insights, uncertainties: output.uncertainties }, context_coverage: context.coverage, context_bytes: Context.bytes(context), calls: refreshed.calls + 1, usage: result.usage || {}, refresh_usage: refreshed.usage };
       await write(db, "job_overview_turns", completed, true); return completed;
     } catch (error) { await write(db, "job_overview_turns", { ...turn, status: "FAILED", error_code: String(error.message).slice(0, 100) }, true); throw error; }
   }

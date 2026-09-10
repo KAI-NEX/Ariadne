@@ -51,12 +51,12 @@
       || result.network_call_made !== true || result.persistence !== "not_written" || result.authority !== "NON_AUTHORITATIVE_PERSONAL_UNDERSTANDING" || !result.output) throw new Error("PERSONAL_RESULT_INVALID");
     return result.output;
   }
-  async function fragmentsFor(snapshot) {
+  async function fragmentsFor(snapshot, runtimeIdentity) {
     const fragments = [];
     for (const entry of Context.records(snapshot)) {
       const parts = Context.splitText(JSON.stringify(entry.semantic), Contract.limits.fragment_bytes);
       for (let index = 0; index < parts.length; index++) fragments.push({
-        fragment_id: `personal-fragment-${(await Candidate.fingerprint({ identity: entry.identity, semantic_hash: entry.semantic_hash, part: index, prompt: Contract.prompt_version })).slice(7)}`,
+        fragment_id: `personal-fragment-${(await Candidate.fingerprint({ identity: entry.identity, semantic_hash: entry.semantic_hash, part: index, prompt: Contract.prompt_version, runtime_identity: runtimeIdentity })).slice(7)}`,
         identity: entry.identity, semantic_hash: entry.semantic_hash, title: entry.semantic.title,
         part_index: index, part_count: parts.length, text: parts[index], source_availability: entry.semantic.source_availability,
       });
@@ -82,8 +82,9 @@
   }
   async function refresh(database, { runtime_snapshot, consent, call = callRuntime, onProgress = () => {} } = {}) {
     const snapshot = await Candidate.buildSnapshotFromDatabase(database);
-    if (snapshot.personal_understanding) return { snapshot, calls: 0, usage: {}, cached: true };
-    const fragments = await fragmentsFor(snapshot);
+    const runtimeIdentity = JSON.stringify([runtime_snapshot.provider, runtime_snapshot.model, runtime_snapshot.protocol, runtime_snapshot.execution_settings?.connection_id, runtime_snapshot.execution_settings?.descriptor_revision, runtime_snapshot.execution_settings?.settings_schema_version, runtime_snapshot.execution_settings?.effective_settings]);
+    if (snapshot.personal_understanding?.runtime_identity === runtimeIdentity) return { snapshot, calls: 0, usage: {}, cached: true };
+    const fragments = await fragmentsFor(snapshot, runtimeIdentity);
     if (!fragments.length) return { snapshot, calls: 0, usage: {}, cached: true };
     const stored = await Memory.getAll(database, "personal_understanding_fragments");
     const cache = new Map(stored.filter((entry) => entry.prompt_version === Contract.prompt_version && entry.authority === "NON_AUTHORITATIVE_PERSONAL_DIGEST").map((entry) => [entry.fragment_id, entry]));
@@ -139,7 +140,7 @@
         return { identity: item.identity, semantic_hash: item.semantic_hash, title: item.title };
       }) })), uncertainties: understanding.uncertainties, covered_records: Context.records(snapshot).length,
       covered_fragments: fragments.length, refreshed_fragments: missing.length, reused_fragments: fragments.length - missing.length,
-      provider: runtime_snapshot.provider, model: runtime_snapshot.model, calls, usage,
+      provider: runtime_snapshot.provider, model: runtime_snapshot.model, runtime_identity: runtimeIdentity, calls, usage,
     };
     await Memory.write(database, "personal_understanding_snapshots", record);
     return { snapshot: { ...fresh, personal_understanding: record }, calls, usage, cached: false };
@@ -180,7 +181,7 @@
         // Provider excerpts are bounded, but Save must bind the complete local
         // evidence version, not compare an excerpt to the full source later.
         evidence: Context.records(snapshot).filter((item) => selectedRefs.has(item.ref) && item.semantic.item_type !== "PERSONAL_MEMORY") }));
-      const completed = { ...turn, status: "SUCCEEDED", output: { message: output.message }, source_fingerprint: snapshot.aggregate_fingerprint,
+      const completed = { ...turn, runtime_snapshot: clone(runtime_snapshot), status: "SUCCEEDED", output: { message: output.message }, source_fingerprint: snapshot.aggregate_fingerprint,
         context_coverage: compiled.selected.context_coverage, context_bytes: Context.bytes(compiled.context),
         calls: refreshed.calls + 1, refresh_usage: refreshed.usage, usage: result.usage || {}, proposal_ids: proposals.map((entry) => entry.proposal_id) };
       await new Promise((resolve, reject) => {

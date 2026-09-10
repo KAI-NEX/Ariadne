@@ -1268,6 +1268,7 @@
       const session = await CandidateWorkspaceConversationRuntime.resolveSession(database, sourceId);
       const restored = await CandidateConversationPersistence.restoreConversation(database, session.conversation_id);
       activeCandidateConversationSession = restored.session;
+      window.AriadneRuntimeSelection?.bind("candidate-workspace-composer", "candidate_conversation", restored.session.conversation_id);
       candidateWorkspaceConversation = restored.messages;
       renderCandidateWorkspaceConversation();
       const hasActiveTurn = restored.turns.some((turn) => CandidateConversationPersistence.ACTIVE_STATES.includes(turn.state));
@@ -1485,6 +1486,7 @@
       : Object.freeze({ type: "ITEM", item_id: activeCandidateWorkspaceItemId }));
     let terminalCopy = "";
     let database = null;
+    const modelSelectionVersion = window.AriadneRuntimeSelection?.version();
     candidateConversationTurnActive = true;
     setCandidateConversationExecutionState("正在理解…", true);
     await ConversationUI.waitForIndicatorPaint();
@@ -1494,7 +1496,8 @@
         ? activeCandidateConversationSession
         : await CandidateWorkspaceConversationRuntime.resolveSession(database, sourceId);
       activeCandidateConversationSession = session;
-      const snapshot = CandidateWorkspaceConversationRuntime.createRuntimeSnapshot();
+      if (window.AriadneRuntimeSelection?.version() !== modelSelectionVersion) throw new Error("RUNTIME_SELECTION_CHANGED");
+      const snapshot = CandidateWorkspaceConversationRuntime.createRuntimeSnapshot({ scope: session.conversation_id });
       const outcome = await CandidateWorkspaceConversationRuntime.executeListTurn({
         database,
         session,
@@ -1526,7 +1529,7 @@
       return outcome;
     } catch (error) {
       const failureCode = String(error?.code || error?.message);
-      terminalCopy = failureCode === "STALE_WORKING_OBSERVATION"
+      terminalCopy = window.AriadneRuntimeSelection?.errorCopy(error) || (failureCode === "STALE_WORKING_OBSERVATION"
         ? "候选人信息已发生变化，请基于最新内容重试。"
         : failureCode === "FOCUS_VIOLATION"
           ? "这个请求超出了当前卡片范围；候选人信息未修改。"
@@ -1534,7 +1537,7 @@
             ? "服务版本已更新，请刷新页面后重试。"
             : failureCode === "EMPTY_RESPONSE"
               ? "模型这次没有返回可用内容，请重试。"
-          : "这次没有完成，请重试。";
+          : "这次没有完成，请重试。");
       if (database && activeCandidateConversationSession?.conversation_id) {
         try {
           const restored = await CandidateConversationPersistence.restoreConversation(database, activeCandidateConversationSession.conversation_id);
@@ -1598,6 +1601,7 @@
     if (!CandidateWorkspaceConversationRuntime || !CandidateConversationPersistence) throw new Error("candidate_conversation_runtime_dependencies_unavailable");
     let terminalCopy = "";
     let database = null;
+    const modelSelectionVersion = window.AriadneRuntimeSelection?.version();
     candidateDetailConversationTurnActive = true;
     setCandidateDetailConversationExecutionState("正在理解…", true);
     await ConversationUI.waitForIndicatorPaint();
@@ -1607,7 +1611,8 @@
       const session = await CandidateWorkspaceConversationRuntime.resolveSession(database, sourceId);
       activeCandidateConversationSession = session;
       activeCandidateWorkingModel = workingModel;
-      const snapshot = CandidateWorkspaceConversationRuntime.createRuntimeSnapshot();
+      if (window.AriadneRuntimeSelection?.version() !== modelSelectionVersion) throw new Error("RUNTIME_SELECTION_CHANGED");
+      const snapshot = CandidateWorkspaceConversationRuntime.createRuntimeSnapshot({ scope: session.conversation_id });
       const outcome = await CandidateWorkspaceConversationRuntime.executeListTurn({
         database,
         session,
@@ -1637,11 +1642,11 @@
       return outcome;
     } catch (error) {
       const code = String(error?.code || error?.message || "");
-      terminalCopy = code === "RUNTIME_CONTRACT_VERSION_MISMATCH"
+      terminalCopy = window.AriadneRuntimeSelection?.errorCopy(error) || (code === "RUNTIME_CONTRACT_VERSION_MISMATCH"
         ? "服务版本已更新，请刷新页面后重试。"
         : code === "EMPTY_RESPONSE"
           ? "模型这次没有返回可用内容，请重试。"
-          : "这次没有完成，请重试。";
+          : "这次没有完成，请重试。");
       if (database && activeCandidateConversationSession?.conversation_id) {
         try {
           const restored = await CandidateConversationPersistence.restoreConversation(database, activeCandidateConversationSession.conversation_id);
@@ -2511,8 +2516,8 @@
       const input = byId("candidate-workspace-message");
       const content = input.value.trim();
       if (!content || candidateConversationTurnActive) return;
-      input.value = "";
-      submitCandidateWorkspaceConversation(content);
+      const draft = ConversationUI.takeDraft(input);
+      submitCandidateWorkspaceConversation(content).then(outcome => draft.finish(outcome?.status !== "SUCCEEDED")).catch(() => draft.finish(true));
     });
     byId("candidate-workspace-save").addEventListener("click", () => saveCandidateWorkspaceToProfile().catch(showPersonalError));
     byId("candidate-workspace-continue-editing").addEventListener("click", () => byId("candidate-workspace-close-dialog").close());
@@ -2743,6 +2748,7 @@
           activeCandidateWorkingModel = await candidateWorkingModelForDetail(database, candidateDetailSourceId, itemId, canonicalRevision);
           showCandidateDetailWorkingProposal(activeCandidate, activeCandidateWorkingModel.payload.items.find((item) => item.item_id === itemId));
           activeCandidateConversationSession = await CandidateWorkspaceConversationRuntime.resolveSession(database, candidateDetailSourceId);
+          window.AriadneRuntimeSelection?.bind("candidate-conversation-form", "candidate_conversation", activeCandidateConversationSession.conversation_id);
           const restored = await restoreCandidateDetailConversation(database, activeCandidateConversationSession.conversation_id);
           renderCandidateDetailConversation(restored.messages);
           const hasActiveTurn = restored.turns.some((turn) => CandidateConversationPersistence.ACTIVE_STATES.includes(turn.state));
@@ -3335,7 +3341,7 @@
     const source = sources[0];
     const sourceBundle = jobModelConsentBundle;
     if (!source || !sourceBundle || JSON.stringify(sourceBundle.source_document_ids) !== JSON.stringify(sources.map((entry) => entry.source_document_id))) throw new Error("job_model_source_bundle_invalid");
-    const runtimeSnapshot = JobModel.createRuntimeSnapshot({ operation: gate.operation });
+    const runtimeSnapshot = JobModel.createRuntimeSnapshot({ operation: gate.operation, runtime: gate.authority.runtime });
     const consent = JobModel.consentFor(sourceBundle, runtimeSnapshot, confirmedAt, consentId);
     const operationIdentity = await JobModel.operationIdentityFor(sourceBundle, runtimeSnapshot, consent);
     const attemptGeneration = ++jobModelAttemptGeneration;
@@ -3620,8 +3626,8 @@
       const input = byId("job-workspace-message");
       const content = input.value.trim();
       if (!content) return;
-      input.value = "";
-      submitJobConversation(content).catch(showJobError);
+      const draft = ConversationUI.takeDraft(input);
+      submitJobConversation(content).then(ok => draft.finish(ok !== true)).catch(error => { draft.finish(true); showJobError(error); });
     });
     byId("job-review-list").addEventListener("click", (event) => {
       const button = event.target.closest("[data-job-review-action]");
@@ -3691,6 +3697,7 @@
   async function restoreJobConversation(database, jobContextId) {
     const session = JobConversation.createSession(jobContextId);
     activeJobConversationSession = await JobConversationPersistence.ensureSession(database, session);
+    window.AriadneRuntimeSelection?.bind(byId("job-workspace-composer") ? "job-workspace-composer" : "job-conversation-form", "job_conversation", activeJobConversationSession.conversation_id);
     const [messages, proposals, decisions] = await Promise.all([
       JobConversationPersistence.messages(database, session.conversation_id),
       JobConversationPersistence.getAll(database, "job_change_proposals"),
@@ -3796,6 +3803,7 @@
     const content = String(humanMessage || "").trim();
     const jobSubject = currentJobConversationSubject();
     if (!content || !jobSubject || jobConversationTurnActive) return;
+    const modelSelectionVersion = window.AriadneRuntimeSelection?.version();
     jobConversationTurnActive = true;
     const form = byId("job-workspace-composer") || byId("job-conversation-form");
     const status = byId("job-workspace-conversation-status") || byId("job-conversation-status");
@@ -3816,7 +3824,8 @@
         JobConversationPersistence.latestAnalysis(database, jobSubject.context_id),
       ]);
       const candidateDelta = JobCandidateContext.candidateDelta(previousCandidateSnapshot(previousAnalysis), candidateSnapshot);
-      const runtimeSnapshot = JobConversation.createRuntimeSnapshot();
+      if (window.AriadneRuntimeSelection?.version() !== modelSelectionVersion) throw new Error("RUNTIME_SELECTION_CHANGED");
+      const runtimeSnapshot = JobConversation.createRuntimeSnapshot({ scope: session.conversation_id });
       await Truth.persistRecord(database, "runtime_snapshots", runtimeSnapshot);
       const sourceManifest = await retrieveJobTurnSources(database, content, runtimeSnapshot, candidateSnapshot, previousAnalysis, jobSubject);
       const compiledContext = JobConversation.compileContext({ job_subject: jobSubject, candidate_snapshot: candidateSnapshot, candidate_delta: candidateDelta, source_excerpt_manifest: sourceManifest, human_message: content, messages: restored.messages });
@@ -3852,12 +3861,13 @@
       }
       renderJobConversationMessages(await JobConversationPersistence.messages(database, session.conversation_id));
       if (pageMessage) pageMessage.textContent = sourceManifest.status === "SOURCE_UNAVAILABLE" ? "分析已保存；所请求的原始来源不可用，结论已按缺失来源处理。" : "分析已保存；任何职位修改仍需你确认。";
+      return true;
     } catch (error) {
       if (execution) {
         try { await JobConversationPersistence.persistExecution(database, JobConversationPersistence.transitionExecution(execution, "HARD_FAILED", String(error?.code || error?.message).slice(0, 160))); }
         catch (_persistenceError) { /* Preserve the original failure. */ }
       }
-      const copy = error?.code === "RUNTIME_CONTRACT_VERSION_MISMATCH" ? "服务版本已更新，请刷新页面后重试。" : "这次模型分析失败；没有使用本地替代结果，也没有修改职位或个人资料。";
+      const copy = window.AriadneRuntimeSelection?.errorCopy(error) || (error?.code === "RUNTIME_CONTRACT_VERSION_MISMATCH" ? "服务版本已更新，请刷新页面后重试。" : "这次模型分析失败；没有使用本地替代结果，也没有修改职位或个人资料。");
       if (pageMessage) { pageMessage.textContent = copy; pageMessage.classList.add("error"); }
       else status.textContent = copy;
       if (activeJobConversationSession) {

@@ -101,8 +101,8 @@
     return Persistence.ensureSession(database, candidate);
   }
 
-  function createRuntimeSnapshot({ snapshot_id: snapshotId, captured_at: capturedAt = new Date() } = {}) {
-    const currentRuntime = RuntimeGate.runtimeForSnapshot("candidate_conversation");
+  function createRuntimeSnapshot({ snapshot_id: snapshotId, captured_at: capturedAt = new Date(), scope = null } = {}) {
+    const currentRuntime = RuntimeGate.runtimeForSnapshot("candidate_conversation", null, scope);
     const descriptor = RuntimeGate.modelDescriptorForRuntime(currentRuntime, "candidate_conversation");
     return Runtime.createRuntimeSnapshot(currentRuntime, {
       modelDescriptor: descriptor,
@@ -447,8 +447,8 @@
         conversation_id: session.conversation_id,
         turn_id: execution.execution_id,
         text: appliedAction.action === "ASK_CLARIFICATION" ? appliedAction.clarification : appliedAction.message,
-        provider: PROVIDER,
-        model: MODEL,
+        provider: snapshot.provider,
+        model: snapshot.model,
         runtime_snapshot_id: snapshot.snapshot_id,
         candidate_action_id: actionRecord.action_id,
         created_at: nowIso(now),

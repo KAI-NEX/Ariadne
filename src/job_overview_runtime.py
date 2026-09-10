@@ -1,5 +1,7 @@
 """Read-only reasoning over a current Job collection; no Candidate or mutation actions."""
 from __future__ import annotations
+
+from src.model_settings import apply_execution_settings
 from src.conversation_semantics import HUMAN_CONVERSATION_PRINCIPLES
 from src.conversation_attachments import validate_attachments, augment_payload
 
@@ -115,7 +117,7 @@ def execute(payload, credential_reader, provider_call):
     except ProviderRuntimeError as error:
         raise JobOverviewError(error.code, error.failure_layer) from error
     try:
-        status, response = provider_call(key, build_payload(request))
+        status, response = provider_call(key, apply_execution_settings(build_payload(request), request["runtime_snapshot"]))
     except (ValueError, UnicodeDecodeError) as error:
         raise JobOverviewError("JOB_OVERVIEW_PROVIDER_RESPONSE_INVALID", "provider", True) from error
     if status != 200: raise JobOverviewError("JOB_OVERVIEW_PROVIDER_HTTP_ERROR", "provider", True)

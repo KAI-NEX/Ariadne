@@ -21,6 +21,8 @@ def fixture(file):
 def convert(request):
     value=copy.deepcopy(request);runtime=value['runtime_snapshot']
     runtime.update(provider='codex',model=CODEX_MODEL,protocol=CODEX_PROTOCOL,credential_ref=CODEX_CREDENTIAL,adapter_version=adapter_for('codex',runtime['adapter_version']))
+    from src.model_settings import envelope
+    runtime['execution_settings'] = envelope('codex', CODEX_MODEL)
     if 'consent' in value:value['consent'].update(provider='codex',model=CODEX_MODEL)
     identity=value.get('operation_identity')
     if identity:
@@ -53,6 +55,38 @@ with patch.dict(os.environ,{'ARIADNE_CODEX_ENABLED':'1'}):
             except ValueError:pass
             else:raise AssertionError((name,key,'unsafe runtime accepted'))
     assert resolve_runtime_credential(CODEX_CREDENTIAL,'unused',lambda:(_ for _ in ()).throw(AssertionError('credential read')))==CODEX_CREDENTIAL
+# Every domain transports each accepted effort, before response handling.
+from src.candidate_model_runtime import execute_candidate_model_request
+from src.job_model_runtime import execute_job_model_request
+from src.candidate_conversation_runtime import execute_candidate_conversation_request
+from src.job_conversation_runtime import execute_job_conversation_request
+from src.personal_understanding_runtime import execute as execute_personal
+from src.job_overview_runtime import execute as execute_overview
+class Captured(Exception): pass
+executors = [execute_candidate_model_request, execute_job_model_request, execute_candidate_conversation_request, execute_job_conversation_request, execute_personal, execute_overview]
+with patch.dict(os.environ,{'ARIADNE_CODEX_ENABLED':'1'}):
+    for (name, original, validate), execute in zip(cases, executors):
+        for effort in ('low', 'medium', 'high'):
+            value = copy.deepcopy(original)
+            value['runtime_snapshot']['execution_settings']['effective_settings']['reasoning_effort'] = effort
+            identity = value.get('operation_identity')
+            if identity:
+                fp = runtime_fingerprint(value['runtime_snapshot']); identity['runtime_fingerprint'] = fp
+                fn = candidate_model_operation_id if identity['operation_type'] == 'CANDIDATE_MODEL_STRUCTURING' else job_model_operation_id
+                identity['operation_id'] = fn(identity['source_document_id'], fp, identity['consent_id']); value['processing_run_id'] = 'run-' + identity['operation_id']
+            def provider(credential, payload):
+                assert credential == CODEX_CREDENTIAL and payload['reasoning_effort'] == effort and payload['model'] == CODEX_MODEL
+                raise Captured()
+            try:
+                if execute is execute_candidate_model_request:
+                    execute(value, lambda: None, lambda _: [('1', b'synthetic-image')], provider)
+                else: execute(value, lambda: None, provider)
+            except Captured: pass
+            else: raise AssertionError((name, effort, 'provider boundary not reached'))
+        old = copy.deepcopy(original); old['runtime_snapshot'].pop('execution_settings')
+        try: validate(old)
+        except ValueError: pass
+        else: raise AssertionError((name, 'legacy request executed'))
 with patch.dict(os.environ,{'ARIADNE_CODEX_ENABLED':'0'}):
     for name,value,validate in cases:
         try:validate(value)

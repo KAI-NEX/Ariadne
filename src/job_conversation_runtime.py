@@ -7,6 +7,8 @@ Candidate, source and storage identities remain local.
 
 from __future__ import annotations
 
+from src.model_settings import apply_execution_settings
+
 import json
 import re
 from dataclasses import dataclass
@@ -484,7 +486,7 @@ def execute_job_conversation_request(
     except ProviderRuntimeError as error:
         raise JobConversationRuntimeError(error.code, error.failure_layer) from error
     provider_payload = augment_payload(build_job_conversation_payload(request), payload, JobConversationRuntimeError)
-    status, response = provider_call(credential, provider_payload)
+    status, response = provider_call(credential, apply_execution_settings(provider_payload, request.runtime_snapshot))
     output, usage = normalize_job_conversation_response(response, request, status)
     print(
         "job_conversation_acceptance submit_event=fired domain=job "

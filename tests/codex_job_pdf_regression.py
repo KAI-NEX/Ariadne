@@ -15,6 +15,8 @@ def pdf_request(blob=b'%PDF-1.4\nsynthetic only\n%%EOF',provider='codex'):
     value.update(source_documents=[source],source_preparations=[prep],source_bundle={'contract_id':SOURCE_BUNDLE_CONTRACT,'source_bundle_id':'job-source-bundle-'+h[7:],'source_document_ids':[sid],'source_count':1,'ordering':'USER_SUPPLIED'},source_inputs=[{'source_document_id':sid,'document_data_url':'data:application/pdf;base64,'+base64.b64encode(blob).decode()}])
     snapshot=value['runtime_snapshot']
     if provider=='codex':snapshot.update(provider=provider,model=CODEX_MODEL,protocol=CODEX_PROTOCOL,credential_ref=CODEX_CREDENTIAL,adapter_version=adapter_for(provider,snapshot['adapter_version']))
+    from src.model_settings import envelope
+    snapshot['execution_settings'] = envelope(snapshot['provider'], snapshot['model'])
     identity=value['source_bundle']['source_bundle_id'];consent=value['consent'];consent.update(source_document_id=identity,provider=snapshot['provider'],model=snapshot['model'])
     fp=runtime_fingerprint(snapshot);op=job_model_operation_id(identity,fp,consent['consent_id']);value['operation_identity'].update(source_document_id=identity,runtime_fingerprint=fp,operation_id=op);value['processing_run_id']='run-'+op
     return value

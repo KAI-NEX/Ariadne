@@ -6,6 +6,8 @@ Local Job semantic structuring and performs no persistence.
 
 from __future__ import annotations
 
+from src.model_settings import apply_execution_settings
+
 import base64
 import binascii
 import hashlib
@@ -448,7 +450,7 @@ def execute_job_model_request(payload: Any, credential_reader: Callable[[], str 
     except ProviderRuntimeError as error:
         raise JobModelRuntimeError(error.code, error.failure_layer) from error
     provider_payload = build_job_model_payload(request)
-    status, response = provider_call(credential, provider_payload)
+    status, response = provider_call(credential, apply_execution_settings(provider_payload, request.runtime_snapshot))
     proposal, usage = normalize_job_model_response(response, request, status)
     return {
         "contract_id": RESULT_CONTRACT,

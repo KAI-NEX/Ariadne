@@ -41,11 +41,13 @@ def isolated_environment():
             if (not k.startswith(("CODEX_", "OPENAI_", "MCP_")) or k == "CODEX_HOME")}
 
 
-def command(directory, images, schema_path=None):
+def command(directory, images, schema_path=None, reasoning_effort="medium"):
+    if reasoning_effort not in {"low", "medium", "high"}:
+        raise ValueError("CODEX_REASONING_EFFORT_INVALID")
     args = [codex_binary(), "exec", "--ignore-user-config", "--ignore-rules",
             "--ephemeral", "--skip-git-repo-check", "-C", str(directory),
             "-s", "read-only", "-m", CODEX_MODEL, "--json",
-            "-c", 'model_reasoning_effort="medium"',
+            "-c", f'model_reasoning_effort="{reasoning_effort}"',
             "-c", 'web_search="disabled"', "-c", "tools.view_image=false",
             "-c", "project_doc_max_bytes=0",
             "-c", 'model_provider="ariadne-openai"',
@@ -169,6 +171,8 @@ def parse_events(raw, function_name, output_schema=None):
 def call_codex(credential, payload, *, timeout=180):
     if not codex_enabled() or credential != CODEX_CREDENTIAL or payload.get("model") != CODEX_MODEL:
         raise ValueError("CODEX_RUNTIME_NOT_ELIGIBLE")
+    if payload.get("reasoning_effort") not in {"low", "medium", "high"}:
+        raise ValueError("CODEX_REASONING_EFFORT_INVALID")
     if not EXECUTION_SLOTS.acquire(blocking=False):
         raise ValueError("CODEX_BUSY")
     try:
@@ -184,7 +188,7 @@ def _execute(payload, timeout):
         prompt, images, schema, function_name = prepare_input(payload, directory)
         with (directory / "input.txt").open("w+b") as stdin, (directory / "events.jsonl").open("w+b") as stdout:
             stdin.write(prompt.encode("utf-8")); stdin.seek(0)
-            process = subprocess.Popen(command(directory, images, schema), stdin=stdin, stdout=stdout,
+            process = subprocess.Popen(command(directory, images, schema, payload.get("reasoning_effort")), stdin=stdin, stdout=stdout,
                 stderr=subprocess.DEVNULL, cwd=directory, env=isolated_environment(), start_new_session=True)
             deadline = time.monotonic() + timeout
             try:

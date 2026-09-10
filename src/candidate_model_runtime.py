@@ -6,6 +6,8 @@ It performs no persistence and never invokes local semantic extraction.
 
 from __future__ import annotations
 
+from src.model_settings import apply_execution_settings
+
 import base64
 import binascii
 import hashlib
@@ -211,6 +213,9 @@ def runtime_fingerprint(snapshot: dict[str, Any]) -> str:
         key: snapshot.get(key)
         for key in ("mode", "provider", "model", "protocol", "adapter_version", "prompt_version", "schema_version", "delivery_method")
     }
+    from src.model_settings import fingerprint_settings
+    if snapshot.get("execution_settings") is not None:
+        fields["execution_settings"] = fingerprint_settings(snapshot)
     encoded = json.dumps(fields, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode("utf-8")
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
@@ -339,7 +344,7 @@ def execute_candidate_model_request(
             request.source_document["source_document_id"], request.runtime_snapshot["model"], rendered_pages, media_type,
         )
         outbound_images = len(rendered_pages)
-    http_status, provider_response = provider_call(credential, provider_payload)
+    http_status, provider_response = provider_call(credential, apply_execution_settings(provider_payload, request.runtime_snapshot))
     diagnostics = response_diagnostics(provider_response, http_status)
     diagnostics["rendered_page_count"] = len(rendered_pages)
     diagnostics["request_max_tokens"] = provider_payload.get("max_tokens")

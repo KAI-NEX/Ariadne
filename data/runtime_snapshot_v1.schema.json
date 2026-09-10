@@ -20,6 +20,7 @@
     "credential_ref"
   ],
   "properties": {
+    "execution_settings": {"type": "object", "description": "Optional versioned settings envelope; required for new qualified Model execution, absent in legacy history."},
     "snapshot_id": {
       "type": "string",
       "minLength": 1,

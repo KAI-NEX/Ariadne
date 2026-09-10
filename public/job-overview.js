@@ -29,7 +29,7 @@
     el("job-overview-insights").innerHTML = insightsMarkup(overview?.insights);
     el("job-overview-unknowns").innerHTML = overview?.uncertainties?.length ? `<div class="personal-unknowns"><h3>还需要确认</h3>${unknownMarkup(overview.uncertainties)}</div>` : "";
     el("job-overview-directory").innerHTML = snapshot.records.map((record) => `<div class="job-overview-directory-item">${links([record.identity])}<div>${esc(record.semantic.location || "地点未明确")} · ${record.version ? `当前版本 ${record.version}` : "尚未保存为正式职位"}</div></div>`).join("") || "暂无职位描述。";
-    const messages = turns.slice(-visible).flatMap((turn) => [{ id: `${turn.turn_id}:user`, role: "USER", text: turn.human_message }, ...(turn.status === "SUCCEEDED" ? [{ id: `${turn.turn_id}:assistant`, role: "ASSISTANT", text: `${turn.fingerprint !== snapshot.fingerprint ? "（基于当时职位版本的历史回答）\n" : ""}${turn.output.message}`, result: turn.output }] : [])]);
+    const messages = turns.slice(-visible).flatMap((turn) => [{ id: `${turn.turn_id}:user`, role: "USER", text: turn.human_message }, ...(turn.status === "SUCCEEDED" ? [{ id: `${turn.turn_id}:assistant`, role: "ASSISTANT", runtime_snapshot: turn.runtime_snapshot, text: `${turn.fingerprint !== snapshot.fingerprint ? "（基于当时职位版本的历史回答）\n" : ""}${turn.output.message}`, result: turn.output }] : [])]);
     if (pendingMessage) messages.push({ role: "USER", text: pendingMessage });
     const target = el("job-overview-messages");
     UI.renderMessages(target, messages, { empty_text: "从整体概况、岗位共性或某几份职位描述的差异开始。这里不读取个人资料。" });
@@ -47,12 +47,12 @@
     pendingMessage = draft?.text.trim() || null;
     busy = true; if (state) render(); runtime(); status(""); UI.setExecutionState({ form: el("job-overview-form"), status: el("job-overview-processing"), active: true, copy: "正在读取当前职位…" }); let db;
     try {
-      db = await Truth.openDatabase(); const captured = Domain.runtimeSnapshot();
+      const captured = Domain.runtimeSnapshot(); db = await Truth.openDatabase();
       const call = async (request) => { const current = Gate.operationGate("job_overview"); if (!current.allowed || current.authority.runtime.provider !== captured.provider || current.authority.runtime.model !== captured.model || !el("job-overview-consent").checked) throw new Error("JOB_OVERVIEW_RUNTIME_CHANGED"); return Domain.callRuntime(request); };
       await task(db, { runtime_snapshot: captured, consent: true, call, onProgress: (copy) => UI.setExecutionState({ form: el("job-overview-form"), status: el("job-overview-processing"), active: true, copy }) });
     } catch (error) {
       draft?.finish(true);
-      status(/CONTEXT_CHANGED/.test(error.message) ? "职位已经变化，本次结果未保存。请基于最新职位描述重试。" : /RUNTIME|CONSENT|capability/.test(error.message) ? "运行方式或资料传输确认已变化，请核对后重试。" : "本次处理未完成，没有生成替代回答或修改任何职位描述。原始资料与历史保留，可以重试。", true);
+      status(window.AriadneRuntimeSelection?.errorCopy(error) || (/CONTEXT_CHANGED/.test(error.message) ? "职位已经变化，本次结果未保存。请基于最新职位描述重试。" : /RUNTIME|CONSENT|capability/.test(error.message) ? "运行方式或资料传输确认已变化，请核对后重试。" : "本次处理未完成，没有生成替代回答或修改任何职位描述。原始资料与历史保留，可以重试。"), true);
     } finally {
       db?.close(); draft?.finish(); pendingMessage = null;
       try { await load(); }

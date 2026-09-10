@@ -1,12 +1,25 @@
 # 统一模型选择与对话内调节架构
 
-日期：2026-09-10。状态：**产品方向已确认，工程方案已记录；尚未实现/验收**。
+日期：2026-09-10。状态：**当前已验证模型的选择与参数链路已实现**。原架构约束保留，落地字段与验收范围见下方。
 
-用户确认：首页简化模型名称，例如「GPT Sol」；对话框左下提供轻量切换入口，模型和推理强度在内部调整；后续其他模型复用同一架构。本文落实该方向，不表示切换控件、可调参数或新 Provider 已上线，也不授权自动更换当前模型。
+用户确认：首页简化模型名称，例如「GPT Sol」；对话框左下提供轻量切换入口，模型和推理强度在内部调整；后续其他模型复用同一架构。不自动更换当前模型，不因新增目录记录而授予执行资格。
+
+## 2026-09-10 实施记录
+
+- 单一参数/简称目录是 `public/model-settings-catalog.json`；Python `src/model_settings.py` 直接读取，浏览器通过同源 `model-settings-catalog-data.js` 使用同一数据。资格仍由原 Runtime capability authority 和领域 adapter 决定，菜单取服务返回目录与已验证能力的交集。当前只有 GPT Sol 与 DeepSeek Vision；Codex 配对页从实际已验证返回选择，不再把 UI 选择写死为 Sol。
+- 首页显示简称。六个 composer 共用 `conversation-model-selector.js/css`，在 plus 旁显示 sliders 图标与实际模型/强度，菜单提供模型、支持的参数、连接详情、应用到此对话、设为默认、使用默认设置。Sol 默认仍 medium，支持 low/medium/high；DeepSeek 固定参数，无伪造强度选项。Local 保持全局门禁。
+- `runtime-selection-state.js` 使用 origin 内 `ariadne-model-selection-v2` 保存默认、完整对话覆盖和修订号；Candidate 工作区/详情共享已存在的同源 conversation ID，Job 使用现有 conversation ID，个人理解/职位概况使用独立稳定 scope。Web Locks + 修订比较负责跨标签保存冲突；浏览器不支持安全锁则明确拒绝保存偏好。显式设为默认也清除当前覆盖，其他对话覆盖保留。旧的不同操作偏好先保留并提示；选择使用默认仅迁移当前 scope，设为默认才统一旧操作偏好。
+- 现有快照外壳保持历史兼容，新增可选 `execution_settings`，内部版本为 `model-settings-v1`，包含 connection、descriptor/schema revision、effective_settings、selection_revision 与 scope。新 Model 执行必须携带并通过后端校验；旧快照只读，不补写历史强度。六条领域链路共用参数映射，Codex 实际 CLI 接收 reasoning effort；不支持的字段、未知强度、缺失设置拒绝执行。
+- 发送前冻结并复核选择，准备阶段设置变化会拒绝发送，正在执行时本页菜单禁用；已发出的请求不会改派。连接层对实际发送的 bounded context、相关历史、来源摘录和已确认附件请求知情确认，确认绑定到组合与选择修订；切换后再确认。草稿/附件失败保留，逐条回答沿用同源选择且不带走主输入附件。
+- 导入指纹和个人/职位摘要缓存包含模型与有效设置，不包含显示名、scope 或选择修订。新历史保存当轮快照或快照引用，消息显示当时模型/强度；缺少设置的旧快照明确标记未记录。修复 Candidate 新消息之前使用固定 Provider/model 元数据的问题，不改写旧消息。
+- 验证包括选择/默认/迁移/CAS/旧快照/无效参数/指纹隔离、六领域各三档参数到 Provider 边界、既有 Node/Python 回归与 VI 检查。真实本地 Codex 对三档均执行了虚构短文本 smoke；这是参数传输验证，不是速度基准、真实简历质量或新的视觉资格认证。原图片与完整视觉 PDF 资格/传输路径继续保留，无新增模型。
+- egolite 实际菜单读取与截图；隔离 Chrome 使用合成资料验证六入口挂载、同源 Candidate scope、跨标签默认/独立覆盖/冲突、刷新、参数隐藏、附件确认失效、失败保留、陈旧请求零 POST、忙态、1280/390 px 与 Escape。QA 保留 `.cache/model-selection-20260910/`，未修改用户确认资料。
+
+新增模型流程：先建立准确型号、连接及参数目录记录，再补现有 capability authority 与对应协议/领域 adapter，验证图片、完整视觉 PDF、每项参数及领域契约后开放。共用选择/快照/菜单无需复制；新增 OpenAI API、Gemini 或其他模型不属于本次实施。
 
 ## 1. 现状与目标
 
-当前本机 Codex 的 `gpt-5.6-sol` 身份固定在 [runtime_binding.py](../../src/runtime_binding.py)，调用参数固定为 `medium`，且忽略 Codex 用户配置，见 [codex_runtime.py](../../src/codex_runtime.py)。前端选择、能力门禁和配对回调也有同名特判。[RuntimeSnapshot](../../src/execution_contract.py) 与[浏览器快照](../../public/runtime-capabilities.js)尚未记录可调推理参数；[导入指纹](../../public/model-import-lifecycle-domain.js)同样未包含它们。只增加一个图标、改 CLI 参数或改模型字符串，都不能形成可靠的完整切换。
+架构整理时本机 Codex 的 `gpt-5.6-sol` 身份固定在 [runtime_binding.py](../../src/runtime_binding.py)，调用参数固定为 `medium`，且忽略 Codex 用户配置，见 [codex_runtime.py](../../src/codex_runtime.py)。前端选择、能力门禁和配对回调也有同名特判。[RuntimeSnapshot](../../src/execution_contract.py) 与[浏览器快照](../../public/runtime-capabilities.js)尚未记录可调推理参数；[导入指纹](../../public/model-import-lifecycle-domain.js)同样未包含它们。只增加一个图标、改 CLI 参数或改模型字符串，都不能形成可靠的完整切换。
 
 目标是**共用选择组件 + 共用选择解析 + 已验证模型目录 + 按 Provider/协议执行**，而不是给 Codex 单独做一套设置。复用当前 Runtime capability authority，不建立能绕过它的第二份“可执行模型列表”。
 
@@ -26,7 +39,7 @@
 
 ## 3. 四层职责与数据
 
-下列字段为目标契约草案，尚未写入生产 schema。最终实现需统一版本化，不直接把示例当作已支持的 API。
+下表保留职责设计；实际字段以本页实施记录、参数目录与 execution_settings 校验为准。尚无独立多账号连接管理或任意模型接入 API。
 
 | 层 | 关键数据/接口 | 唯一职责 |
 | --- | --- | --- |
@@ -120,4 +133,4 @@ A–C 是把当前已接入模型变成完整可调体验的依赖顺序；未�
 
 本文补充 [Runtime 主契约](ARIADNE_RUNTIME_EXECUTION_CONTRACT.md)的模型选择与设置层；其“不静默 fallback、快照不可变、全操作多模态、来源完整性、领域隔离及 Human Save”继续有效。旧文中“每次读取全局 Current Runtime”在目标架构中细化为“先受全局模式约束，再读取当前 scope 的有效选择”；旧版跨标签全局模型同步规则不再覆盖显式对话偏好。
 
-本阶段只交付架构/迁移/验收说明及文档交叉链接，不修改 UI、Runtime schema、模型默认值、凭据、服务进程或用户数据，不调用模型，不宣称已完成速度优化。
+原架构文档阶段未修改运行代码；本次按用户后续“实现这个功能”完成当前两模型的选择/设置链路。没有新增 Provider/型号，不修改用户已选默认和确认资料，不继承开发任务设置，不宣称已完成速度优化。

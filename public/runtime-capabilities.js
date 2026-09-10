@@ -1,10 +1,11 @@
 "use strict";
 
 (function attachRuntimeExecutionContract(root, factory) {
-  const api = factory();
+  const settings = root.AriadneModelSettings || (typeof require === "function" ? require("./model-settings.js") : null);
+  const api = factory(settings);
   if (typeof module === "object" && module.exports) module.exports = api;
   root.AriadneRuntimeExecution = api;
-}(typeof globalThis !== "undefined" ? globalThis : this, function createRuntimeExecutionContract() {
+}(typeof globalThis !== "undefined" ? globalThis : this, function createRuntimeExecutionContract(Settings) {
   const CAPABILITY_NAMES = Object.freeze([
     "local_extraction",
     "local_ocr",
@@ -31,7 +32,7 @@
     "delivery_method",
     "credential_ref",
   ]);
-  const SNAPSHOT_OPTIONAL_FIELDS = Object.freeze(["operation", "capability_basis", "action_schema_version", "request_config_version"]);
+  const SNAPSHOT_OPTIONAL_FIELDS = Object.freeze(["operation", "capability_basis", "action_schema_version", "request_config_version", "execution_settings"]);
   const LOCAL_CAPABILITY_NAMES = Object.freeze(["local_extraction", "local_ocr", "deterministic_structuring"]);
   const MODEL_CAPABILITY_NAMES = Object.freeze(CAPABILITY_NAMES.filter((name) => !LOCAL_CAPABILITY_NAMES.includes(name)));
   const SUPPORTED = "supported";
@@ -257,6 +258,7 @@
       throw new ExecutionContractError("local_runtime_credential_ref_forbidden");
     }
     return validateRuntimeSnapshot({
+      ...(runtime.mode === "model" && Settings?.envelope(runtime) ? { execution_settings: Object.hasOwn(currentRuntime, "execution_settings") ? currentRuntime.execution_settings : Settings.envelope(runtime) } : {}),
       snapshot_id: options.snapshotId || defaultSnapshotId(),
       captured_at: options.capturedAt || new Date().toISOString(),
       mode: runtime.mode,
@@ -326,6 +328,10 @@
       delivery_method: optionalString(payload.delivery_method, "runtime_snapshot_delivery_method_invalid"),
       credential_ref: credentialRef,
     };
+    if (payload.execution_settings !== undefined) {
+      if (payload.mode !== "model" || !Settings) throw new ExecutionContractError("runtime_execution_settings_invalid");
+      validated.execution_settings = Settings.validate(payload.execution_settings, provider, model);
+    }
     assertNoSecretLike(validated);
     return Object.freeze(validated);
   }

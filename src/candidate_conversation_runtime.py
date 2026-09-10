@@ -7,6 +7,8 @@ PDF, create a ProcessingRun, persist messages, or apply a Working Model patch.
 
 from __future__ import annotations
 
+from src.model_settings import apply_execution_settings
+
 import json
 import hashlib
 import re
@@ -1274,7 +1276,7 @@ def execute_candidate_conversation_request(
     except ProviderRuntimeError as error:
         raise CandidateConversationRuntimeError(error.code, error.failure_layer) from error
     provider_payload = augment_payload(build_candidate_conversation_payload(request), payload, CandidateConversationRuntimeError)
-    http_status, provider_response = provider_call(credential, provider_payload)
+    http_status, provider_response = provider_call(credential, apply_execution_settings(provider_payload, request.runtime_snapshot))
     action, _resolution_verifications, usage = _normalize_candidate_conversation_response_with_verifications(provider_response, request, http_status)
     print(
         "candidate_conversation_acceptance submit_event=fired domain=candidate "

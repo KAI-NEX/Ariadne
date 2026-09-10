@@ -1,5 +1,12 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-10 — 首页简称与对话内模型/强度切换（COMPLETE）
+
+- 首页使用 GPT Sol / DeepSeek Vision 简称；六个对话入口共用左下 sliders + 模型/强度菜单，支持当前对话覆盖、设为默认、恢复默认、刷新与跨标签同步/修订冲突提示。当前默认保持 Sol/medium，提供 low/medium/high；DeepSeek 使用已验证固定参数，没有新增型号/Provider 或自动继承开发任务配置。
+- 单一参数目录、版本化 execution_settings、前后端校验与六领域实际参数贯通；旧历史可读但新请求缺设置拒绝执行。选择只影响下一轮，准备中变更拒绝发送、运行中本页不可切换；绑定当前对话的资料/历史/来源摘录/附件重新确认，失败保留输入与附件。导入指纹及个人/职位摘要缓存按真实有效设置隔离，历史标签使用当轮快照，确认资料与旧记录不重写。实际字段、旧偏好迁移与未来模型接入步骤见[架构实施记录](docs/current/MODEL_SELECTION_AND_TUNING_ARCHITECTURE.md)。
+- 验证：53 项 Node suite、11 项相关 Python suite、VI 静态/负向与 diff 检查通过；六领域各三档参数到 Provider 边界共 18 种组合通过。真实本机 Codex 对 low/medium/high 各执行虚构短文本 smoke 并成功返回；不冒充真实资料/视觉质量或速度基准验收，不承诺加速倍数。
+- egolite 检查实际菜单与服务；隔离 Chrome 验证六入口挂载、同源 Candidate scope、两对话默认隔离、同对话跨页恢复/冲突、DeepSeek 隐藏不支持参数、切换附件确认失效、失败输入/附件保留、旧请求零 POST、忙态、1280/390 px 菜单与 Escape；无页面脚本错误。证据保留 `.cache/model-selection-20260910/`。核对 8000 服务身份与空闲状态后重启，原 origin 与资料保留；仅本次文件/共享文件相关段落本地提交，不 push，其他任务改动原地保留。
+
 ## 2026-09-10 — 对话回复文件导出与耗时显示（EXPORT COMPLETE / TRUE STREAMING PENDING）
 
 - 六个对话入口共用本地 PDF／分页 PNG 导出、图片预览及下载；输出来自单条回复，不额外调用模型、不写入确认资料。PDF 为保留中文排版的图片式 PDF，文字暂不可选取；尚未实现模型主动文件提案、语义图表或 AI 创作图片。

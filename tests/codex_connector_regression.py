@@ -70,7 +70,7 @@ except ValueError:pass
 else:raise AssertionError('expired pairing accepted')
 p=Pairing(origin,'abc',clock=lambda:clock[0]);token=p.pair('abc');clock[0]+=28801;assert not p.authorized(token)
 with tempfile.TemporaryDirectory() as d:
-    payload={'model':CODEX_MODEL,'messages':[{'role':'user','content':[{'type':'text','text':'page 1'},{'type':'image_url','image_url':{'url':'data:image/jpeg;base64,'+base64.b64encode(b'image1').decode()}},{'type':'text','text':'page 2'},{'type':'image_url','image_url':{'url':'data:image/jpeg;base64,'+base64.b64encode(b'image2').decode()}}]}]}
+    payload={'model':CODEX_MODEL,'reasoning_effort':'medium','messages':[{'role':'user','content':[{'type':'text','text':'page 1'},{'type':'image_url','image_url':{'url':'data:image/jpeg;base64,'+base64.b64encode(b'image1').decode()}},{'type':'text','text':'page 2'},{'type':'image_url','image_url':{'url':'data:image/jpeg;base64,'+base64.b64encode(b'image2').decode()}}]}]}
     prompt,images,schema,name=prepare_input(payload,Path(d));assert [p.read_bytes() for p in images]==[b'image1',b'image2'];assert prompt.index('page 1')<prompt.index('page 2')
     args=command(d,images);assert args.count('--image')==2 and '--ignore-user-config' in args and '--ephemeral' in args and 'read-only' in args
     assert 'features.shell_tool=false' in args and 'tools.view_image=false' in args and 'features.plugins=false' in args
@@ -96,7 +96,7 @@ print(json.dumps({'pairing_origin_host_expiry_revoke':'pass','route_and_provider
 
 # Actual child-process failures and timeout cleanup, with no provider involved.
 with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ,{'ARIADNE_CODEX_ENABLED':'1'}):
-    script=Path(directory)/'fake.py';payload={'model':CODEX_MODEL,'messages':[{'role':'user','content':'synthetic'}]}
+    script=Path(directory)/'fake.py';payload={'model':CODEX_MODEL,'reasoning_effort':'medium','messages':[{'role':'user','content':'synthetic'}]}
     script.write_text('import time\ntime.sleep(30)\n')
     with patch('src.codex_runtime.command',return_value=[sys.executable,str(script)]):
         try:call_codex(CODEX_CREDENTIAL,payload,timeout=0.05)

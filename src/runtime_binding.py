@@ -47,6 +47,11 @@ def valid_binding(snapshot, domain_adapter):
         identity = (CODEX_MODEL, CODEX_PROTOCOL, CODEX_CREDENTIAL)
     else:
         return False
+    from src.model_settings import validate
+    try:
+        validate(snapshot.execution_settings, snapshot.provider, snapshot.model)
+    except ValueError:
+        return False
     return (snapshot.model, snapshot.protocol, snapshot.credential_ref) == identity and snapshot.adapter_version == adapter_for(snapshot.provider, domain_adapter)
 
 

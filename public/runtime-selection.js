@@ -52,6 +52,8 @@ function setMessage(message = "", failed = false) {
 }
 
 function labelFor(model) {
+  const known = typeof model === "string" ? window.AriadneModelSettings?.descriptor(state.provider, model) : window.AriadneModelSettings?.descriptor(model.provider_id, model.model_id);
+  if (known) return known.short_label;
   if (typeof model === "string") return `${({ deepseek: "DeepSeek", gemini: "Gemini", qwen: "Qwen" }[state.provider] || "模型")} · ${model}`;
   return model.display_name;
 }
@@ -172,8 +174,10 @@ function renderModels() {
 }
 
 function applyLocalPreference(preference) {
-  if (!["127.0.0.1", "localhost"].includes(location.hostname) || preference?.id !== "local-codex-v1"
-    || preference.provider !== "codex" || preference.model !== "gpt-5.6-sol") return;
+  const descriptor = window.AriadneModelSettings?.descriptor(preference?.provider, preference?.model);
+  if (!["127.0.0.1", "localhost"].includes(location.hostname) || !descriptor || preference?.id !== descriptor.connection_id) return;
+  // An explicit in-app default takes precedence over a first-visit machine hint.
+  if (readLocalJson("ariadne-model-selection-v2", null)) return;
   const key = "ariadne-applied-local-runtime-preference";
   if (readLocalJson(key, null) === preference.id) return;
   const model = selectableModels().find((item) => item.provider_id === preference.provider && item.model_id === preference.model);
@@ -216,7 +220,7 @@ function restoreAddedModels() {
 
 function restoreSelectedRuntime() {
   const saved = readLocalJson(SELECTED_RUNTIME_STORAGE_KEY, null);
-  if (!saved || !["ai", "local"].includes(saved.mode)) return;
+  if (!saved || !["ai", "model", "local"].includes(saved.mode)) return;
   if (saved.mode === "local") {
     state.mode = "local"; state.provider = "local"; state.model = null; state.phase = "LOCAL_READY";
     state.diagnostics = { purpose: "LOCAL_RUNTIME", career_data_sent: false, network_call_made: false };
@@ -261,7 +265,8 @@ byId("add-model-codex-link").addEventListener("click", (event) => {
 window.addEventListener("ariadne-codex-connected", (event) => {
   state.models = event.detail.models;
   renderModels();
-  selectVerifiedRuntimeModel("gpt-5.6-sol", "codex");
+  const selected = event.detail.selected;
+  if (selected) selectVerifiedRuntimeModel(selected.model, selected.provider);
 });
 byId("runtime-add-model").addEventListener("click", () => {
   const originRect = byId("runtime-add-model").getBoundingClientRect();

@@ -89,10 +89,13 @@ class RuntimeSnapshot:
     request_config_version: str | None
     delivery_method: str | None
     credential_ref: str | None
+    execution_settings: dict | None = None
 
     def to_dict(self) -> dict[str, Any]:
         result = asdict(self)
         result["capabilities"] = self.capabilities.to_dict()
+        if self.execution_settings is None:
+            result.pop("execution_settings")
         return result
 
 
@@ -340,6 +343,10 @@ def create_runtime_snapshot(
         "delivery_method": delivery_method if delivery_method is not None else _descriptor_optional(descriptor, "delivery_method", "document_delivery"),
         "credential_ref": credential_ref,
     }
+    from src.model_settings import envelope
+    settings = current_runtime["execution_settings"] if "execution_settings" in current_runtime else envelope(runtime["provider"], runtime["model"])
+    if runtime["mode"] == MODEL and settings is not None:
+        payload["execution_settings"] = settings
     return validate_runtime_snapshot(payload)
 
 
@@ -390,7 +397,17 @@ def validate_runtime_snapshot(snapshot: RuntimeSnapshot | Mapping[str, Any]) -> 
             raise ExecutionContractError("model_runtime_model_invalid")
         _validate_model_capability_consistency(capability)
 
+    execution_settings = payload.get("execution_settings")
+    if execution_settings is not None:
+        from src.model_settings import validate
+        try:
+            if mode != MODEL:
+                raise ValueError("local_runtime_settings_forbidden")
+            execution_settings = validate(execution_settings, provider, model)
+        except ValueError as error:
+            raise ExecutionContractError(str(error)) from error
     normalized = RuntimeSnapshot(
+        execution_settings=execution_settings,
         snapshot_id=snapshot_id,
         captured_at=captured_at,
         mode=mode,

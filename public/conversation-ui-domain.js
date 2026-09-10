@@ -186,6 +186,25 @@
     target.innerHTML = messages.length
       ? messages.map((message, index) => `<p class="v1-conversation-message ${message.role === "USER" ? "user" : "assistant"}${previousCount > 0 && index >= previousCount ? " is-entering" : ""}">${escapeHtml(textFor(message))}</p>`).join("")
       : `<p class="v1-conversation-empty">${escapeHtml(emptyText || "")}</p>`;
+    const bubbles = target.querySelectorAll?.(".v1-conversation-message");
+    if (globalThis.AriadneModelSettings && target.ownerDocument) {
+      const attach = (node, snapshot) => {
+        if (!node?.isConnected || !snapshot) return;
+        const meta = target.ownerDocument.createElement("small"); meta.className = "v1-message-runtime";
+        meta.textContent = globalThis.AriadneModelSettings.label(snapshot, true) + (snapshot.execution_settings ? "" : " · 历史未记录强度");
+        meta.title = `${snapshot.provider} / ${snapshot.model}`; node.append(meta);
+      };
+      messages.forEach((message, index) => { if (message.role === "ASSISTANT" && message.runtime_snapshot) attach(bubbles[index], message.runtime_snapshot); });
+      const pending = messages.map((message, index) => ({ message, node: bubbles[index] })).filter(({ message }) => message.role === "ASSISTANT" && !message.runtime_snapshot && message.runtime_snapshot_id);
+      if (pending.length && globalThis.AriadneTruthPersistence) {
+        globalThis.AriadneTruthPersistence.openDatabase().then(async database => {
+          try { await Promise.all(pending.map(({ message, node }) => new Promise(resolve => {
+            const request = database.transaction("runtime_snapshots", "readonly").objectStore("runtime_snapshots").get(message.runtime_snapshot_id);
+            request.onsuccess = () => { attach(node, request.result); resolve(); }; request.onerror = resolve;
+          }))); } finally { database.close(); }
+        }).catch(() => {});
+      }
+    }
     renderedCounts.set(target, messages.length);
     renderedEnds.set(target, { first, last });
     renderedKeys.set(target, keys);
@@ -210,6 +229,7 @@
 
   function setExecutionState({ form, status = null, active, copy = "" }) {
     withOutput(api => api.execution({ form, active }));
+    form?.setAttribute?.("aria-busy", String(Boolean(active)));
     const submit = form?.querySelector?.('button[type="submit"]');
     const textarea = form?.querySelector?.("textarea");
     const target = form?.closest?.(".v1-conversation-pane, .v1-ariadne-pane")?.querySelector(".v1-conversation-messages");

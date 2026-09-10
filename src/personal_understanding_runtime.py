@@ -5,6 +5,8 @@ transaction owns that boundary, with source and target version checks.
 """
 from __future__ import annotations
 
+from src.model_settings import apply_execution_settings
+
 import json
 import re
 from pathlib import Path
@@ -208,7 +210,7 @@ def execute(payload: Any, credential_reader: Callable, provider_call: Callable) 
     except ProviderRuntimeError as error:
         raise PersonalUnderstandingError(error.code, error.failure_layer) from error
     try:
-        status, response = provider_call(credential, build_payload(request))
+        status, response = provider_call(credential, apply_execution_settings(build_payload(request), request["runtime_snapshot"]))
     except (ValueError, UnicodeDecodeError) as error:
         raise PersonalUnderstandingError("PERSONAL_PROVIDER_RESPONSE_INVALID", "provider", True) from error
     if status != 200:

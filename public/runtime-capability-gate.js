@@ -121,7 +121,7 @@
 
   function authorityFrom(currentRuntime, operation = null) {
     let runtime;
-    try { runtime = Contract.normalizeCurrentRuntime(currentRuntime); }
+    try { runtime = { ...Contract.normalizeCurrentRuntime(currentRuntime), ...(currentRuntime.execution_settings ? { execution_settings: currentRuntime.execution_settings } : {}) }; }
     catch (_error) { throw new RuntimeGateError("current_runtime_invalid"); }
     const descriptor = runtime.mode === "model" ? modelDescriptorForRuntime(runtime, operation) : null;
     const capabilities = runtime.mode === "local"
@@ -161,8 +161,9 @@
     return runtime?.provider === "codex" ? "local-codex://authenticated-session" : "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision";
   }
 
-  function runtimeForSnapshot(operation, supplied) {
-    if (supplied) return Contract.normalizeCurrentRuntime(supplied);
+  function runtimeForSnapshot(operation, supplied, scope = null) {
+    if (supplied) return { ...Contract.normalizeCurrentRuntime(supplied), ...(supplied.execution_settings ? { execution_settings: supplied.execution_settings } : {}) };
+    if (globalThis.AriadneRuntimeSelection && globalThis.localStorage) return globalThis.AriadneRuntimeSelection.resolve(operation, scope ?? globalThis.AriadneRuntimeSelection.scopeFor(operation));
     // Node contract tests have no browser selection; browser execution always
     // resolves the actual operation authority, including an explicit Local.
     if (typeof globalThis.localStorage === "undefined") return { mode: "model", provider: "deepseek", model: "deepseek-v4-flash-vision-exp" };
@@ -218,6 +219,7 @@
 
   function runtimeForOperation(operation, storage = globalThis.localStorage) {
     if (!Object.hasOwn(OPERATION_CAPABILITIES, operation)) throw new RuntimeGateError("runtime_operation_unknown");
+    if (globalThis.AriadneRuntimeSelection && storage) return globalThis.AriadneRuntimeSelection.resolve(operation, globalThis.AriadneRuntimeSelection.scopeFor(operation), storage);
     const selected = Contract.normalizeCurrentRuntime(readStoredRuntime(storage));
     if (selected.mode === "local") return selected;
     if (!isModelRuntimeEligible(selected)) return selected;
@@ -269,10 +271,11 @@
   function subscribe(listener, eventTarget = globalThis) {
     if (!eventTarget || typeof eventTarget.addEventListener !== "function") return () => {};
     const handler = (event) => {
-      if (event.key === CURRENT_RUNTIME_STORAGE_KEY || event.key === null) listener(currentAuthority());
+      if (event.type === "ariadne-runtime-selection" || [CURRENT_RUNTIME_STORAGE_KEY, OPERATION_RUNTIME_STORAGE_KEY, "ariadne-model-selection-v2", null].includes(event.key)) listener(currentAuthority());
     };
     eventTarget.addEventListener("storage", handler);
-    return () => eventTarget.removeEventListener("storage", handler);
+    eventTarget.addEventListener("ariadne-runtime-selection", handler);
+    return () => { eventTarget.removeEventListener("storage", handler); eventTarget.removeEventListener("ariadne-runtime-selection", handler); };
   }
 
   return Object.freeze({

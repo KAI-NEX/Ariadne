@@ -113,8 +113,12 @@
       const available = typeof activeAdapter?.isAvailable === "function" ? activeAdapter.isAvailable() : true;
       const target = typeof activeAdapter?.resolveTarget === "function" ? activeAdapter.resolveTarget() : Object.freeze({});
       if (!content || !available || !target) return;
-      input.value = "";
-      await activeAdapter.submit(Object.freeze({ content, target, binding }));
+      const draft = globalThis.AriadneConversationUI?.takeDraft(input);
+      if (!draft) input.value = "";
+      try {
+        const outcome = await activeAdapter.submit(Object.freeze({ content, target, binding }));
+        draft?.finish(outcome !== true && outcome?.status !== "SUCCEEDED");
+      } catch (error) { draft?.finish(true); throw error; }
     });
     return binding;
   }

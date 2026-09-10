@@ -13,6 +13,17 @@
     const connection = session();
     const url = new URL(input, root.location.href);
     if (url.origin !== root.location.origin || !url.pathname.startsWith("/api/")) return nativeFetch(input, options);
+    const operations = { "/api/candidate-conversation-turn": "candidate_conversation", "/api/job-conversation-turn": "job_conversation",
+      "/api/personal-understanding-turn": "personal_understanding", "/api/job-overview-turn": "job_overview",
+      "/api/candidate-model-structure": "candidate_import", "/api/job-model-structure": "job_model_import" };
+    if (options.method === "POST" && operations[url.pathname] && root.AriadneRuntimeSelection) {
+      const request = JSON.parse(options.body);
+      if (request.runtime_snapshot?.mode === "model") {
+        const declared = request.runtime_snapshot.operation?.toLowerCase();
+        const operation = url.pathname.endsWith("model-structure") && root.JobRadarRuntimeGate?.OPERATION_CAPABILITIES[declared] ? declared : operations[url.pathname];
+        await root.AriadneRuntimeSelection.beforeDispatch(request.runtime_snapshot, operation);
+      }
+    }
     if (!connection) {
       // Closing a tab discards its pairing session but retains its selected
       // runtime. Never post a Codex request to a hosted server in that state.

@@ -225,7 +225,7 @@
   }
 
   function createRuntimeSnapshot(options = {}) {
-    const currentRuntime = RuntimeGate.runtimeForSnapshot("job_conversation", options.runtime);
+    const currentRuntime = RuntimeGate.runtimeForSnapshot("job_conversation", options.runtime, options.scope);
     const descriptor = RuntimeGate.modelDescriptorForRuntime(currentRuntime, "job_conversation");
     return Runtime.createRuntimeSnapshot(currentRuntime, {
       modelDescriptor: descriptor,

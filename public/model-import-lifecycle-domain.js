@@ -65,6 +65,7 @@
 
   async function runtimeFingerprint(snapshot) {
     const fields = Object.fromEntries(["mode", "provider", "model", "protocol", "adapter_version", "prompt_version", "schema_version", "delivery_method"].map((key) => [key, snapshot[key]]));
+    if (snapshot.execution_settings) fields.execution_settings = Object.fromEntries(["contract_version", "connection_id", "descriptor_revision", "settings_schema_version", "effective_settings"].map(key => [key, snapshot.execution_settings[key]]));
     return `sha256:${await sha256(canonicalJson(fields))}`;
   }
 

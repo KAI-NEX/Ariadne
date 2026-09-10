@@ -55,9 +55,11 @@
     form.append(feedback);
     const input = feedback.querySelector('input[type="file"]'), consent = feedback.querySelector('input[type="checkbox"]'), list = panel.querySelector("ul"), status = feedback.querySelector('[role="status"]');
     const state = { form, domain, panel, files: [], consent, status, busy: false, urls: new Map(), runtime: null };
+    state.identityFor = (r) => root.AriadneModelSettings ? root.AriadneModelSettings.identity(r) : `${r?.mode}/${r?.provider}/${r?.model}`;
     controllers.set(form.id, state);
     const runtime = () => root.JobRadarRuntimeGate?.authority?.()?.runtime || root.JobRadarRuntimeGate?.operationGate?.(domain === "PERSONAL" ? "personal_understanding" : domain === "JOB_OVERVIEW" ? "job_overview" : domain === "JOB" ? "job_conversation" : "candidate_conversation")?.authority?.runtime;
-    const identity = () => { const r = runtime(); return `${r?.mode}/${r?.provider}/${r?.model}`; };
+    const runtimeIdentity = (r) => root.AriadneModelSettings ? root.AriadneModelSettings.identity(r) : `${r?.mode}/${r?.provider}/${r?.model}`;
+    const identity = () => runtimeIdentity(runtime());
     const render = () => {
       const r = runtime();
       panel.classList.toggle("hidden", !state.files.length);
@@ -122,7 +124,7 @@
     if (!state) return request;
     if (state.busy || !state.consent.checked) throw Error("attachment_consent_required");
     const runtime = request.runtime_snapshot;
-    if (state.runtime !== `${runtime.mode}/${runtime.provider}/${runtime.model}`) throw Error("attachment_runtime_invalid");
+    if (state.runtime !== state.identityFor(runtime)) throw Error("attachment_runtime_invalid");
     state.busy = true;
     state.render();
     try {
@@ -132,7 +134,7 @@
       if (new Set(records.map(r => r.content_hash)).size !== records.length) throw Error("attachment_duplicate_content");
       if (!state.consent.checked) throw Error("attachment_consent_required");
       await persist(request, files, records, domain);
-      if (!state.consent.checked || state.runtime !== `${runtime.mode}/${runtime.provider}/${runtime.model}`) throw Error("attachment_consent_required");
+      if (!state.consent.checked || state.runtime !== state.identityFor(runtime)) throw Error("attachment_consent_required");
       pending.set(requestId(request), { state, files });
       return { ...request, attachments: { contract_id: CONTRACT, request_id: requestId(request), files: records,
         consent: { confirmed: true, provider: runtime.provider, model: runtime.model, purpose: "CURRENT_CONVERSATION_TURN" } } };
