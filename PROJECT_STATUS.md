@@ -1,5 +1,12 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-10 — 对话回复文件导出与耗时显示（EXPORT COMPLETE / TRUE STREAMING PENDING）
+
+- 六个对话入口共用本地 PDF／分页 PNG 导出、图片预览及下载；输出来自单条回复，不额外调用模型、不写入确认资料。PDF 为保留中文排版的图片式 PDF，文字暂不可选取；尚未实现模型主动文件提案、语义图表或 AI 创作图片。
+- 显示真实等待／处理耗时，移除发送前默认 800 ms 固定停顿。当前仍由 Provider 完成后交付整包，既有逐字动画不是真正流式；没有降低推理强度或移除最终内容校验。
+- App Server 仅作本机协议/config 只读探测，发现继承 MCP 配置；新连接尚未证明与原隔离 exec 路径等价，因此没有切换生产传输、开启工具或发起模型请求。剩余架构与验收条件记录于[对话输出与流式边界](docs/current/CONVERSATION_OUTPUT_AND_STREAMING.md)。整体需求仍未全部完成。
+- 新增输出回归及原 reply/scroll/draft 回归、VI/diff 检查通过；egolite 点击接口超时后隔离 Chrome 完成六入口控件、实际下载、中文三页 PDF/PNG、1280/390 px 和计时检查，零 POST。修复实际发现的导出区并排错位。PDF 读取/逐页渲染与 QA 原件保留 `.cache/conversation-output-20260910/`。本阶段仅本地提交相关改动，并行模型设置及 App 启动器等改动原样保留，不 push。
+
 ## 2026-09-10 — 首页简化与对话内模型调节架构（ARCHITECTURE DOCUMENTED / IMPLEMENTATION PENDING）
 
 - 按用户确认方向整理[统一模型选择与对话内调节架构](docs/current/MODEL_SELECTION_AND_TUNING_ARCHITECTURE.md)：首页使用 `GPT Sol` 等目录简称，对话左下显示模型/强度；共用选择组件覆盖六入口和 Candidate 逐条回答，模型与连接身份分离，不为 Codex 单独建控制链。

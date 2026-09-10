@@ -13,6 +13,18 @@
   const awaitingReplies = new WeakSet();
   const renderedKeys = new WeakMap();
   const reveals = new WeakMap();
+  let outputModule;
+  function withOutput(callback) {
+    if (!globalThis.document?.createElement) return;
+    if (!outputModule) outputModule = new Promise(resolve => {
+      const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "/conversation-output.css?v=1"; document.head.append(css);
+      const script = document.createElement("script"); script.src = "/conversation-output.js?v=1";
+      script.onload = () => resolve(globalThis.AriadneConversationOutput);
+      script.onerror = () => resolve(null);
+      document.head.append(script);
+    });
+    outputModule.then(api => { if (api) callback(api); });
+  }
 
   function takeDraft(input) {
     const text = input.value;
@@ -191,9 +203,13 @@
       awaitingReplies.delete(target);
       revealReply(target, target.lastElementChild, lastKey, continuing ? previousReveal : null);
     }
+    withOutput(api => {
+      if (renderedKeys.get(target) === keys) api.decorate(target, messages, textFor);
+    });
   }
 
   function setExecutionState({ form, status = null, active, copy = "" }) {
+    withOutput(api => api.execution({ form, active }));
     const submit = form?.querySelector?.('button[type="submit"]');
     const textarea = form?.querySelector?.("textarea");
     const target = form?.closest?.(".v1-conversation-pane, .v1-ariadne-pane")?.querySelector(".v1-conversation-messages");
@@ -213,7 +229,7 @@
     if (focus) form?.querySelector?.("textarea")?.focus?.({ preventScroll: true });
   }
 
-  function waitForIndicatorPaint(milliseconds = 800) {
+  function waitForIndicatorPaint(milliseconds = 0) {
     const scheduleFrame = globalThis.requestAnimationFrame || ((callback) => globalThis.setTimeout(callback, 0));
     return new Promise((resolve) => scheduleFrame(() => scheduleFrame(() => globalThis.setTimeout(resolve, milliseconds))));
   }
