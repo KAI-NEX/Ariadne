@@ -24,16 +24,35 @@
     if (form) form.dataset.modelScope = scope || "";
     notify();
   }
-  function resolve(operation, scope = null, storage = root.localStorage) {
+  function homepage(storage = root.localStorage) {
     const stored = read(CURRENT, storage) || { mode: "local" };
-    const raw = root.AriadneRuntimeExecution?.normalizeCurrentRuntime(stored) || stored;
+    return root.AriadneRuntimeExecution?.normalizeCurrentRuntime(stored) || stored;
+  }
+  function eligibleModels(entries, operation, storage = root.localStorage) {
+    const selected = homepage(storage);
+    if (selected.mode !== "model" || !Array.isArray(entries)) return [];
+    const seen = new Set();
+    return entries.filter(item => {
+      if (item?.provider_id !== selected.provider || !Settings.descriptor(item.provider_id, item.model_id)) return false;
+      const key = `${item.provider_id}/${item.model_id}`;
+      const runtime = { mode: "model", provider: item.provider_id, model: item.model_id };
+      if (seen.has(key) || !root.JobRadarRuntimeGate?.operationGate(operation, root.JobRadarRuntimeGate.authorityFrom(runtime, operation)).allowed) return false;
+      seen.add(key); return true;
+    });
+  }
+  function resolve(operation, scope = null, storage = root.localStorage) {
+    const raw = homepage(storage);
     if (raw.mode === "local") return { mode: "local", provider: null, model: null };
     const state = read(KEY, storage);
     // A homepage change is an explicit new app default. Do not resurrect an older identity.
     const matches = state?.default?.provider === raw.provider && state?.default?.model === raw.model;
     const legacy = read(LEGACY, storage)?.[operation];
     const differingLegacy = !state?.inherit?.[scope] && legacy && (legacy.provider !== raw.provider || legacy.model !== raw.model);
-    const chosen = (scope && state?.overrides?.[scope]) || (differingLegacy && legacy) || (matches && state.default) || (!state?.inherit?.[scope] && legacy) || raw;
+    // Provider is owned by the homepage. Preserve incompatible stored preferences
+    // for history/revisiting, but never let them route a turn to another service.
+    const chosen = [(scope && state?.overrides?.[scope]), (differingLegacy && legacy),
+      (matches && state.default), (!state?.inherit?.[scope] && legacy), raw]
+      .find(value => value && value.provider === raw.provider);
     const runtime = { mode: "model", provider: chosen.provider, model: chosen.model };
     const rev = chosen.revision || `legacy:${runtime.provider}:${runtime.model}`;
     return { ...runtime, execution_settings: Settings.envelope(runtime, chosen.settings, rev, scope) };
@@ -46,6 +65,8 @@
       const state = before || { default: null, overrides: {}, revision: "legacy" };
       const next = revision();
       if (!clear) {
+        const selected = homepage(storage);
+        if (selected.mode !== "model" || runtime?.mode !== "model" || runtime?.provider !== selected.provider) throw Error("切换模型服务请回到首页；对话内只能选择当前服务的模型。");
         if (!Settings.descriptor(runtime.provider, runtime.model) || !root.JobRadarRuntimeGate?.isModelRuntimeEligible(runtime)) throw Error("此模型尚未通过当前操作的能力验证。");
         Settings.validate(runtime.execution_settings, runtime.provider, runtime.model);
       }
@@ -95,10 +116,10 @@
     }
     assertCurrent(snapshot, operation);
   }
-  function hasOverride(scope) { return Boolean(read(KEY)?.overrides?.[scope]); }
+  function hasOverride(scope) { return read(KEY)?.overrides?.[scope]?.provider === homepage().provider && homepage().mode === "model"; }
   function legacyDifference(operation) {
     const raw = read(CURRENT), old = read(LEGACY)?.[operation];
-    return old && (old.provider !== raw?.provider || old.model !== raw?.model);
+    return old && old.provider === homepage().provider && old.model !== raw?.model;
   }
-  return Object.freeze({ KEY, errorCopy, bind, bindings, scopeFor, resolve, version, update, assertCurrent, beforeDispatch, hasOverride, legacyDifference });
+  return Object.freeze({ KEY, errorCopy, bind, bindings, scopeFor, homepage, eligibleModels, resolve, version, update, assertCurrent, beforeDispatch, hasOverride, legacyDifference });
 }));

@@ -224,7 +224,7 @@
     if (selected.mode === "local") return selected;
     if (!isModelRuntimeEligible(selected)) return selected;
     const assigned = readOperationRuntimes(storage)[operation];
-    if (assigned && operationCompatible(operation, assigned)) return assigned;
+    if (assigned?.provider === selected.provider && operationCompatible(operation, assigned)) return assigned;
     return selected;
   }
 

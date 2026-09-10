@@ -16,6 +16,7 @@ async function open(p){await trigger(p).click();await p.locator('[data-model-cho
 async function configure(p,options={}){await p.evaluate(async options=>{
   const operation=document.querySelector('form').id==='job-overview-form'?'job_overview':'personal_understanding';
   const runtime={mode:'model',provider:options.provider||'codex',model:options.model||'gpt-5.6-sol'};
+  if(options.homepage){localStorage.setItem('job-radar-selected-runtime',JSON.stringify(runtime));dispatchEvent(new Event('ariadne-runtime-selection'));}
   runtime.execution_settings=AriadneModelSettings.envelope(runtime,runtime.provider==='codex'?{reasoning_effort:options.effort||'medium'}:{});
   await AriadneRuntimeSelection.update({scope:AriadneRuntimeSelection.scopeFor(operation),runtime,expectedRevision:AriadneRuntimeSelection.version(),...options});
 },options);}
@@ -29,14 +30,16 @@ try {
   const other=await context.newPage();await other.goto(base+'/job-overview.html');
   assert.equal(await trigger(other).textContent(),'Sol · 中');
   const same=await context.newPage();await same.goto(base+'/personal-understanding.html');assert.equal(await trigger(same).textContent(),'Sol · 低');
-  await open(page);await configure(other,{effort:'high',makeDefault:true});
-  await page.locator('[data-model-choice][data-effort="medium"]').click();await page.locator('[data-model-error]').filter({hasText:'另一页面'}).waitFor();
+  await open(page);const oldRevision=await page.evaluate(()=>AriadneRuntimeSelection.version());await configure(other,{effort:'high',makeDefault:true});
+  await page.waitForFunction(()=>!document.querySelector('.v1-model-panel').matches(':popover-open'));
+  const conflict=await page.evaluate(async expectedRevision=>{try{await AriadneRuntimeSelection.update({scope:'personal_understanding',runtime:AriadneRuntimeSelection.resolve('personal_understanding'),expectedRevision});return 'saved';}catch(error){return error.message;}},oldRevision);
+  assert.match(conflict,/另一页面/);
   assert.equal(await trigger(page).textContent(),'Sol · 低');
   await page.keyboard.press('Escape');
   await configure(page,{clear:true});await trigger(page).filter({hasText:'Sol · 高'}).waitFor();
   await choose(page,'low');await same.waitForFunction(()=>document.querySelector('.v1-model-trigger').textContent==='Sol · 低');
-  await open(page);assert.equal(await page.locator('[data-model-choice^="deepseek/"]').count(),1);
-  assert.equal(await page.locator('[data-model-choice^="deepseek/"]').getAttribute('data-effort'),'');
+  await open(page);assert.equal(await page.locator('[data-model-choice^="deepseek/"]').count(),0);
+  assert.equal(await page.locator('[data-model-choice^="codex/"]').count(),3);
   await page.keyboard.press('Escape');
   await page.locator('textarea').fill('Synthetic settings QA input');
   await page.locator('input[type=file]').setInputFiles({name:'synthetic.txt',mimeType:'text/plain',buffer:Buffer.from('Synthetic attachment only')});
@@ -110,7 +113,9 @@ try {
   const home=await context.newPage();await home.goto(base+'/index.html');await home.waitForFunction(()=>document.getElementById('runtime-selected').textContent.includes('GPT Sol'));
   await home.screenshot({path:`${out}/home.png`,fullPage:true});
   // A machine's initial hint must not overwrite an explicit in-app default.
-  await configure(page,{provider:'deepseek',model:'deepseek-v4-flash-vision-exp',makeDefault:true});
+  await configure(page,{provider:'deepseek',model:'deepseek-v4-flash-vision-exp',makeDefault:true,homepage:true});
+  await open(page);assert.equal(await page.locator('[data-model-choice^="codex/"]').count(),0);
+  assert.equal(await page.locator('[data-model-choice^="deepseek/"]').getAttribute('data-effort'),'');await page.keyboard.press('Escape');
   const hint=await context.newPage();await hint.route('**/api/runtime-options',async route=>{const response=await route.fetch(),data=await response.json();data.local_preference={id:'local-codex-v1',provider:'codex',model:'gpt-5.6-sol'};await route.fulfill({json:data});});
   await hint.goto(base+'/index.html');await hint.waitForFunction(()=>document.getElementById('runtime-selected').textContent.includes('DeepSeek Vision'));
   assert.deepEqual(errors,[]);

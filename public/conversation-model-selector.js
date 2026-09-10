@@ -4,15 +4,11 @@
   const FORMS = { "candidate-workspace-composer": "candidate_conversation", "candidate-conversation-form": "candidate_conversation",
     "job-workspace-composer": "job_conversation", "job-conversation-form": "job_conversation",
     "personal-conversation-form": "personal_understanding", "job-overview-form": "job_overview" };
-  let available = null;
   async function models(operation) {
-    if (!available) {
-      const response = await (root.AriadneConnector || root).fetch("/api/runtime-options", { cache: "no-store" });
-      if (!response.ok) throw Error("无法读取可用模型，请检查本地服务或连接。");
-      available = (await response.json()).models;
-    }
-    return available.filter(item => Settings.descriptor(item.provider_id, item.model_id)
-      && Gate.operationGate(operation, Gate.authorityFrom({ mode: "model", provider: item.provider_id, model: item.model_id }, operation)).allowed);
+    // Re-read on each open so newly qualified models (and removals) are reflected.
+    const response = await (root.AriadneConnector || root).fetch("/api/runtime-options", { cache: "no-store" });
+    if (!response.ok) throw Error("无法读取可用模型，请检查本地服务或连接。");
+    return Selection.eligibleModels((await response.json()).models, operation);
   }
   function mount(form, operation) {
     const field = form.querySelector(".v1-composer-field");
@@ -29,7 +25,7 @@
     const prefix = form.id + "-model";
     panel.id = prefix;
     trigger.setAttribute("aria-controls", prefix);
-    panel.innerHTML = `<h3>选择模型</h3><div data-model-options role="group"></div><p data-model-error role="status"></p>`;
+    panel.innerHTML = `<h3>选择模型</h3><div data-model-options role="group"></div><p>切换模型服务请回到首页。</p><p data-model-error role="status"></p>`;
     document.body.append(panel);
     const choices = panel.querySelector("[data-model-options]"), error = panel.querySelector("[data-model-error]");
     let openedRevision, openedScope, original, saving = false, opening = 0;
@@ -41,7 +37,7 @@
       trigger.setAttribute("aria-label", `选择模型与推理强度：${Settings.label(runtime, true)}`);
       trigger.title = `${Settings.label(runtime)} · ${Selection.hasOverride(scope()) ? "此对话设置" : "继承默认设置"}`;
       trigger.disabled = busy();
-      if (busy() && panel.matches(":popover-open")) panel.hidePopover();
+      if (panel.matches(":popover-open") && (busy() || openedRevision !== Selection.version() || openedScope !== scope())) panel.hidePopover();
     };
     const position = () => {
       if (!panel.matches(":popover-open")) return;
