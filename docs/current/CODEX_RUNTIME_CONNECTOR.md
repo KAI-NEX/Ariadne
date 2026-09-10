@@ -15,6 +15,8 @@
 
 当前实测组合为 macOS、`codex-cli 0.153.4`、ChatGPT 登录、`gpt-5.6-sol`、medium reasoning。没有更改开发任务使用的模型或用户 Codex 配置。其他 Codex 模型不会因出现在列表中而自动获得执行资格。
 
+2026-09-10 已确定后续采用「首页简洁模型名 + 对话内切换模型/推理强度」的[共用架构](MODEL_SELECTION_AND_TUNING_ARCHITECTURE.md)。目前仅完成架构整理；下列配置尚不支持自由修改模型或新增推理强度字段，修改 Codex 任务设置也不会同步到 Ariadne。后续版本化接入将保留登录/配对边界，不直接继承开发任务的模型、权限或工具配置。
+
 1. 本机安装 Codex，执行 `codex login`，用 `codex login status` 确认登录。
 2. Python 能运行本项目，`pdftoppm` 在启动服务的 PATH 中；原有本地技术解析依赖仍适用。
 3. 本机直连可执行 `ARIADNE_CODEX_ENABLED=1 python3 app.py`，然后在运行方式页选择 Codex。
