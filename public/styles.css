@@ -497,6 +497,27 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 @keyframes v1-card-return-cover { from { opacity: 0; } to { opacity: 1; } }
 .v1-inline-message { color: var(--vi-focus); font-size: 12px; min-height: 20px; }
 .v1-inline-message.error { background: transparent; color: var(--vi-error); padding: 0; }
+.v1-consent-hint {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100vw - var(--vi-space-24));
+  padding: var(--vi-space-8) var(--vi-space-12);
+  border: 1px solid var(--vi-line);
+  border-radius: var(--vi-radius-small);
+  background: var(--vi-surface);
+  color: var(--vi-text-secondary);
+  box-shadow: var(--vi-shadow-card);
+  font-family: var(--vi-font-ui);
+  font-size: var(--vi-text-caption);
+  font-weight: 400;
+  line-height: 1.65;
+  letter-spacing: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
 .v1-import-shell { max-width: 980px; }
 .v1-import-intro { margin: clamp(72px, 12vh, 132px) auto 28px; max-width: 720px; }
 .v1-import-intro h2 { font-size: clamp(38px, 5vw, 64px); font-weight: 530; letter-spacing: -.06em; line-height: 1; margin: 0 0 16px; }

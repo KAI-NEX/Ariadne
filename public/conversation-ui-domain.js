@@ -39,11 +39,48 @@
     return Object.freeze({ update });
   }
 
+  const consentHints = new WeakMap();
   function requireTransferConsent(checkbox) {
-    if (checkbox.checked) { checkbox.setCustomValidity(""); return true; }
-    checkbox.setCustomValidity("请先勾选底部的资料传输与费用说明，再点击发送。");
+    // Browser validation bubbles have an unstyleable warning icon. Use the
+    // shared VI popover instead; this changes presentation, not authorization.
+    checkbox.setCustomValidity("");
+    let hint = consentHints.get(checkbox);
+    if (checkbox.checked) { hint?.dismiss(); return true; }
+    if (!hint) {
+      const doc = checkbox.ownerDocument, view = doc.defaultView;
+      const panel = doc.createElement("div");
+      panel.id = `${checkbox.id}-transfer-hint`;
+      panel.className = "v1-consent-hint";
+      panel.setAttribute("popover", "auto");
+      panel.setAttribute("role", "alert");
+      panel.textContent = "请先勾选底部的资料传输与费用说明，再点击发送。";
+      doc.body.append(panel);
+      const dismiss = () => { if (panel.matches(":popover-open")) panel.hidePopover(); };
+      const position = () => {
+        if (!panel.matches(":popover-open")) return;
+        const styles = view.getComputedStyle(panel);
+        const gap = parseFloat(styles.getPropertyValue("--vi-space-8"));
+        const edge = parseFloat(styles.getPropertyValue("--vi-space-12"));
+        const rect = checkbox.getBoundingClientRect();
+        panel.style.left = `${Math.max(edge, Math.min(rect.left, view.innerWidth - panel.offsetWidth - edge))}px`;
+        panel.style.top = `${Math.max(edge, Math.min(rect.top - panel.offsetHeight - gap, view.innerHeight - panel.offsetHeight - edge))}px`;
+      };
+      panel.addEventListener("toggle", event => {
+        if (event.newState !== "closed") return;
+        checkbox.removeAttribute("aria-invalid");
+      });
+      const describedBy = new Set((checkbox.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean));
+      describedBy.add(panel.id); checkbox.setAttribute("aria-describedby", [...describedBy].join(" "));
+      checkbox.addEventListener("change", dismiss);
+      checkbox.addEventListener("blur", dismiss);
+      view.addEventListener("resize", position);
+      view.addEventListener("scroll", position, true);
+      hint = { panel, dismiss, position }; consentHints.set(checkbox, hint);
+    }
     checkbox.focus();
-    checkbox.reportValidity();
+    checkbox.setAttribute("aria-invalid", "true");
+    if (!hint.panel.matches(":popover-open")) hint.panel.showPopover();
+    hint.position();
     return false;
   }
 
