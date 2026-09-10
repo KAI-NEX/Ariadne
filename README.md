@@ -34,6 +34,26 @@ Codex is excellent at general software work: it can inspect a workspace, use too
 
 Codex can be an Ariadne model provider, but it is deliberately not given open workspace-agent authority over a person's career data. Ariadne limits each request by domain, operation, source, version, runtime capability, and save permission. A failed Model request fails visibly; it never pretends to have succeeded or silently becomes a Local result.
 
+## How Ariadne differs from related projects
+
+These are complementary projects, not inferior versions of Ariadne. Choose the tool whose boundary matches the problem.
+
+| Project | Best for | Different from Ariadne |
+| --- | --- | --- |
+| [Reactive Resume](https://github.com/AmruthPillai/Reactive-Resume) | Building, customizing, exporting, and self-hosting résumés | A résumé builder. Ariadne focuses on the source, inference, review, and versioning lifecycle before a résumé is produced. |
+| [OpenResume](https://github.com/xitanggg/open-resume) | Browser-local résumé creation and ATS-oriented PDF parsing | A lightweight local résumé tool. Ariadne keeps a separate Job domain and makes model proposals reviewable rather than treating parsed data as a complete career judgment. |
+| [AI Job Search](https://github.com/MadsLorentzen/ai-job-search) | An agent-driven, forkable workflow for evaluating roles, tailoring CVs, letters, interviews, and job portals | A full job-application framework. Ariadne deliberately stops before automatic application execution and treats personal truth, source provenance, and human save as the core product. |
+| [jobsearch-mcp](https://github.com/TadMSTR/jobsearch-mcp) | Self-hosted multi-board search, semantic fit scoring, tracking, and alerts through MCP | An MCP service for an end-to-end job-search pipeline. Ariadne is the evidence-aware reasoning workspace that resists score-as-truth and keeps external execution outside its core. |
+
+### Recommendations
+
+- Choose **Reactive Resume** or **OpenResume** when the immediate goal is designing and exporting a résumé.
+- Choose **AI Job Search** when you want a forkable agent workflow that actively searches, tailors, and helps execute applications.
+- Choose **jobsearch-mcp** when you want a self-hosted MCP backend for job discovery, tracking, and alerts.
+- Choose **Ariadne** when the question comes first: *what can I truthfully say about my experience, what does this job actually require, what supports the relationship, and what should remain unknown until I clarify it?*
+
+Ariadne can sit before any of these workflows: it prepares a reviewed, source-grounded understanding that a résumé builder, search system, or human can use without mistaking model inference for personal fact.
+
 ## What works today
 
 - Import Candidate and Job materials from PDF, DOCX, images, text, and Markdown; retain the original source and restore it later.
@@ -74,7 +94,7 @@ The model is allowed to interpret. The person remains the authority on what beco
 
 The project began as **Job Radar**, a small local-first job-record and document-understanding experiment. It became Ariadne when the problem was reframed: not “how can an agent automate job search?” but “how can AI help a person make sound, evidence-aware career judgments?”
 
-From 2026-08-24 through 2026-09-10, the repository records **83 dated milestones, fixes, and decisions**. The current Git history contains **79 traceable commits**. These are not 83 feature releases; they cover architecture, document understanding, privacy boundaries, runtime safety, model integration, UI work, and verification.
+From 2026-08-24 through 2026-09-10, the repository records **83 dated milestones, fixes, and decisions**. The current Git history contains **80 traceable commits**. These are not 83 feature releases; they cover architecture, document understanding, privacy boundaries, runtime safety, model integration, UI work, and verification.
 
 Key transitions:
 

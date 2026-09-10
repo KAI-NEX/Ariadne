@@ -7,7 +7,7 @@ This document is the readable history behind Ariadne's present product boundary.
 | Measure | Recorded value | Meaning |
 | --- | ---: | --- |
 | Dated status entries | 83 | Milestones, fixes, validation records, decisions, and historical checkpoints from 2026-08-24 to 2026-09-10 |
-| Git commits | 79 | Traceable commits in the current repository history |
+| Git commits | 80 | Traceable commits in the current repository history |
 | First public release | `v0.1.0`, 2026-09-09 | MIT open-source preview, not a hosted public web product |
 
 Neither count is a feature count. A small visual correction, an architecture gate, a privacy audit, and a document-understanding implementation are all different kinds of work. The figures are included to make the project legible, not to imply that every record is a user-visible release.
