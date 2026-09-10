@@ -35,7 +35,8 @@
 .personal-proposal label { display: block; font-size: 12px; color: #5e687a; }
 .personal-proposal textarea { display: block; width: 100%; box-sizing: border-box; min-height: 90px; resize: vertical; border: 1px solid #d5dce7; border-radius: 9px; background: white; font: inherit; font-size: 13px; line-height: 1.75; color: var(--ink); padding: 10px; margin-top: 7px; }
 .personal-proposal-actions { display: flex; gap: 12px; margin-top: 12px; }
-.personal-proposal-actions button { padding: 9px 14px; font-size: 12px; }
+.personal-proposal-actions .v1-edit-text-action { padding: 9px 14px; font-size: var(--vi-text-caption); }
+.personal-proposal-actions [data-memory-reject] { color: var(--vi-muted); }
 .personal-consent { display: flex; align-items: flex-start; gap: 8px; color: #727a88; font-size: 11px; line-height: 1.65; margin-top: 15px; }
 .personal-consent input { margin-top: 3px; flex-shrink: 0; }
 .personal-memory-bridge { display: block; margin-top: 9px; border: 0; padding: 0; color: #536581; background: transparent; font: inherit; font-size: 11px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
