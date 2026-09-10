@@ -39,6 +39,14 @@
     return Object.freeze({ update });
   }
 
+  function requireTransferConsent(checkbox) {
+    if (checkbox.checked) { checkbox.setCustomValidity(""); return true; }
+    checkbox.setCustomValidity("请先勾选底部的资料传输与费用说明，再点击发送。");
+    checkbox.focus();
+    checkbox.reportValidity();
+    return false;
+  }
+
   function takeDraft(input) {
     const text = input.value;
     let edited = false, finished = false;
@@ -274,5 +282,5 @@
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => enhanceComposers(), { once: true });
     else enhanceComposers();
   }
-  return Object.freeze({ createIntro, renderMessages, humanSafeText, setExecutionState, settle, waitForIndicatorPaint, enhanceComposers, takeDraft, ProcessingIndicator });
+  return Object.freeze({ createIntro, renderMessages, humanSafeText, setExecutionState, settle, waitForIndicatorPaint, enhanceComposers, takeDraft, requireTransferConsent, ProcessingIndicator });
 }));

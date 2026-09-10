@@ -17,7 +17,7 @@
     byId("personal-runtime").textContent = runtime.mode === "local" ? "Local · 查看已保存内容" : `${runtime.provider === "codex" ? "Codex / OpenAI" : runtime.provider} · ${runtime.model}`;
     byId("personal-consent-copy").textContent = runtime.mode === "local" ? "当前为 Local。切换到已验证的模型后，可以综合资料与对话。" : `问题、相关个人资料及对话历史将发送至 ${runtime.provider === "codex" ? "Codex / OpenAI" : runtime.provider} · ${runtime.model}；更新理解可能分批调用并产生 API 费用。`;
     byId("personal-model-consent").disabled = !gate.allowed || busy;
-    const allowed = gate.allowed && byId("personal-model-consent").checked && !busy;
+    const allowed = gate.allowed && !busy;
     byId("personal-conversation-form").querySelector('button[type="submit"]').disabled = !allowed;
     byId("refresh-understanding").disabled = !allowed;
     return gate;
@@ -88,7 +88,8 @@
   async function run(task, input = null) {
     if (busy) return;
     const gate = runtimeMode();
-    if (!gate.allowed || !byId("personal-model-consent").checked) { status("请先选择可用模型，并确认本次资料传输与费用。", true); return; }
+    if (!gate.allowed) { status("请先在首页选择可用模型。", true); return; }
+    if (!UI.requireTransferConsent(byId("personal-model-consent"))) return;
     const draft = input ? UI.takeDraft(input) : null;
     pendingMessage = draft?.text.trim() || null;
     busy = true; status(""); if (state) render(); runtimeMode();
@@ -112,7 +113,9 @@
     }
   }
   byId("personal-conversation-form").addEventListener("submit", (event) => {
-    event.preventDefault(); const humanMessage = byId("personal-message").value.trim(); if (!humanMessage) return;
+    event.preventDefault();
+    if (!busy && runtimeMode().allowed && !UI.requireTransferConsent(byId("personal-model-consent"))) return;
+    const humanMessage = byId("personal-message").value.trim(); if (!humanMessage) return;
     run(async (db, options) => {
       await Understanding.discuss(db, { ...options, human_message: humanMessage, origin });
       byId("personal-origin").classList.add("hidden"); origin = { type: "PERSONAL" };
@@ -122,6 +125,7 @@
     const result = await Understanding.refresh(db, options);
     status(!result.snapshot.personal_understanding ? "尚无可综合的个人资料，可以先添加资料或补充信息。" : result.cached ? "当前理解已与资料一致，无需重复调用模型。" : `理解已更新：复用 ${result.snapshot.personal_understanding.reused_fragments} 段摘要，重新理解 ${result.snapshot.personal_understanding.refreshed_fragments} 段。`);
   }));
+  window.AriadneRuntimeSelection.bindTransferConsent("personal_understanding", byId("personal-model-consent"));
   byId("personal-model-consent").addEventListener("change", runtimeMode);
   byId("personal-older-messages").addEventListener("click", () => { visibleTurns += 20; render(); });
   document.querySelectorAll("[data-personal-prompt]").forEach((button) => button.addEventListener("click", () => { byId("personal-message").value = button.dataset.personalPrompt; byId("personal-message").focus(); }));

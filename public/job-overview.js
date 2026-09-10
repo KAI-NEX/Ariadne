@@ -8,9 +8,9 @@
   function runtime() {
     const gate = Gate.operationGate("job_overview"), current = gate.authority.runtime;
     el("job-overview-runtime").textContent = current.mode === "local" ? "Local · 查看已保存概况" : `${current.provider} · ${current.model}`;
-    el("job-overview-consent-copy").textContent = current.mode === "local" ? "当前为 Local。选择可用模型后，可以汇总与讨论职位。" : `对话不会发送个人资料，但问题及当前职位描述内容会发送至 ${current.provider} · ${current.model}；更新概况可能分批调用并产生 API 费用。`;
+    el("job-overview-consent-copy").textContent = current.mode === "local" ? "当前为 Local。选择可用模型后，可以汇总与讨论职位。" : `对话不会发送个人资料，但问题、当前职位描述及相关对话历史会发送至 ${current.provider === "codex" ? "Codex / OpenAI" : current.provider} · ${current.model}；更新概况可能分批调用并产生 API 费用。`;
     el("job-overview-consent").disabled = busy || !gate.allowed;
-    const disabled = busy || !gate.allowed || !el("job-overview-consent").checked;
+    const disabled = busy || !gate.allowed;
     el("refresh-job-overview").disabled = disabled; el("job-overview-form").querySelector('button[type="submit"]').disabled = disabled; return gate;
   }
   function links(identities) {
@@ -44,7 +44,9 @@
   }
   async function load() { const db = await Truth.openDatabase(); try { state = { snapshot: await Domain.snapshotFromDatabase(db), turns: (await Domain.getAll(db, "job_overview_turns")).sort((a, b) => a.created_at.localeCompare(b.created_at)) }; render(); } finally { db.close(); } }
   async function run(task, input = null) {
-    if (busy || !runtime().allowed || !el("job-overview-consent").checked) return;
+    if (busy) return;
+    if (!runtime().allowed) { status("请先在首页选择可用模型。", true); return; }
+    if (!UI.requireTransferConsent(el("job-overview-consent"))) return;
     const draft = input ? UI.takeDraft(input) : null;
     pendingMessage = draft?.text.trim() || null;
     busy = true; if (state) render(); runtime(); status(""); UI.setExecutionState({ form: el("job-overview-form"), status: el("job-overview-processing"), active: true, copy: "正在读取当前职位…" }); let db;
@@ -61,8 +63,9 @@
       finally { busy = false; UI.setExecutionState({ form: el("job-overview-form"), status: el("job-overview-processing"), active: false }); runtime(); }
     }
   }
-  el("job-overview-form").addEventListener("submit", (event) => { event.preventDefault(); const message = el("job-overview-message").value.trim(); if (message) run(async (db, options) => { await Domain.discuss(db, { ...options, human_message: message }); }, el("job-overview-message")); });
+  el("job-overview-form").addEventListener("submit", (event) => { event.preventDefault(); if (!busy && runtime().allowed && !UI.requireTransferConsent(el("job-overview-consent"))) return; const message = el("job-overview-message").value.trim(); if (message) run(async (db, options) => { await Domain.discuss(db, { ...options, human_message: message }); }, el("job-overview-message")); });
   el("refresh-job-overview").addEventListener("click", () => run(async (db, options) => { const result = await Domain.refresh(db, options); status(!result.snapshot.records.length ? "请先添加真实职位描述。" : result.cached ? "当前职位没有变化，无需重复调用模型。" : `概况已更新：复用 ${result.snapshot.overview.reused_fragments} 段摘要，新理解 ${result.snapshot.overview.refreshed_fragments} 段。`); }));
+  window.AriadneRuntimeSelection.bindTransferConsent("job_overview", el("job-overview-consent"));
   el("job-overview-consent").addEventListener("change", runtime);
   el("job-overview-older").addEventListener("click", () => { visible += 20; render(); });
   document.querySelectorAll("[data-job-overview-prompt]").forEach((button) => button.addEventListener("click", () => { el("job-overview-message").value = button.dataset.jobOverviewPrompt; el("job-overview-message").focus(); }));

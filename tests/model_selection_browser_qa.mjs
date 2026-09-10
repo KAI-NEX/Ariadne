@@ -52,7 +52,7 @@ try {
   await page.locator('button[type=submit]').click();
   await page.waitForFunction(()=>document.querySelector('form').getAttribute('aria-busy')==='false');
   assert.equal(posts.length,1);assert.equal(posts[0].runtime_snapshot.execution_settings.effective_settings.reasoning_effort,'medium');
-  assert.equal(posts[0].attachments.files.length,1);assert.ok(dialogs>0);
+  assert.equal(posts[0].attachments.files.length,1);assert.equal(dialogs,0,'checked page consent replaces duplicate Provider confirmation');
   assert.equal(await page.locator('textarea').inputValue(),'Synthetic settings QA input');assert.equal(await page.locator('.v1-attachment-name').textContent(),'synthetic.txt');
   // An old frozen request must not reach the network after a setting change.
   await choose(page,'low');

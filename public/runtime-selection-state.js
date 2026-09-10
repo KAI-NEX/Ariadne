@@ -7,10 +7,11 @@
 }(globalThis, function (root, Settings) {
   const KEY = "ariadne-model-selection-v2", CURRENT = "job-radar-selected-runtime", LEGACY = "ariadne-operation-runtimes-v1";
   const bindings = new Map();
+  const transferConsents = new Map();
   const read = (key, storage = root.localStorage) => { const raw = storage?.getItem(key); return raw ? JSON.parse(raw) : null; };
   const revision = () => root.crypto.randomUUID();
   const notify = () => root.dispatchEvent?.(new Event("ariadne-runtime-selection"));
-  const COPIES = { RUNTIME_SELECTION_CHANGED: "模型设置已变化，本轮尚未发送；请确认当前设置后重试。", RUNTIME_SELECTION_UPGRADE: "运行设置已升级，请刷新页面后重试。", RUNTIME_SELECTION_DECLINED: "本轮未发送，输入和附件已保留。" };
+  const COPIES = { RUNTIME_SELECTION_CHANGED: "模型设置已变化，本轮尚未发送；请确认当前设置后重试。", RUNTIME_SELECTION_UPGRADE: "运行设置已升级，请刷新页面后重试。", RUNTIME_SELECTION_DECLINED: "本轮未发送，输入和附件已保留。", RUNTIME_CONSENT_REQUIRED: "请先勾选底部的资料传输与费用说明，再点击发送。" };
   const errorCopy = error => COPIES[error?.code || error?.message] || "";
   const fail = code => { const error = new Error(code); error.code = code; throw error; };
   function scopeFor(operation) {
@@ -104,8 +105,25 @@
       fail("RUNTIME_SELECTION_CHANGED");
     }
   }
+  const consentFingerprint = snapshot => JSON.stringify([Settings.identity(snapshot), snapshot.execution_settings?.selection_revision]);
+  function bindTransferConsent(operation, checkbox) {
+    // A visible, explicit checkbox replaces the generic confirmation for this
+    // scope only. Keep consent in page memory, tied to the chosen model/settings.
+    const scope = scopeFor(operation), entry = { checkbox, fingerprint: null };
+    transferConsents.set(`${operation}:${scope}`, entry);
+    checkbox.checked = false;
+    checkbox.addEventListener("change", () => {
+      checkbox.setCustomValidity("");
+      entry.fingerprint = checkbox.checked ? consentFingerprint(resolve(operation, scope)) : null;
+    });
+  }
   async function beforeDispatch(snapshot, operation) {
     assertCurrent(snapshot, operation);
+    const explicit = transferConsents.get(`${operation}:${snapshot.execution_settings.scope}`);
+    if (explicit) {
+      if (!explicit.checkbox.checked || explicit.fingerprint !== consentFingerprint(snapshot)) fail("RUNTIME_CONSENT_REQUIRED");
+      return;
+    }
     if (!snapshot.execution_settings.scope) return;
     const key = `ariadne-model-consent:${snapshot.execution_settings.scope}`;
     const fingerprint = JSON.stringify([Settings.identity(snapshot), snapshot.execution_settings.selection_revision]);
@@ -121,5 +139,5 @@
     const raw = read(CURRENT), old = read(LEGACY)?.[operation];
     return old && old.provider === homepage().provider && old.model !== raw?.model;
   }
-  return Object.freeze({ KEY, errorCopy, bind, bindings, scopeFor, homepage, eligibleModels, resolve, version, update, assertCurrent, beforeDispatch, hasOverride, legacyDifference });
+  return Object.freeze({ KEY, errorCopy, bind, bindings, scopeFor, homepage, eligibleModels, resolve, version, update, assertCurrent, beforeDispatch, bindTransferConsent, hasOverride, legacyDifference });
 }));
