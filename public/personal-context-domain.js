@@ -32,7 +32,9 @@
     // model receives explicit coverage and must not infer absent capability.
     const ranked = all.map((entry) => {
       const body = JSON.stringify(entry.semantic).toLowerCase();
+      const title = String(entry.semantic.title || "").toLowerCase();
       return { ...entry, score: tokens.reduce((sum, token) => sum + (body.includes(token) ? 1 : 0), 0)
+        + tokens.reduce((sum, token) => sum + (title.includes(token) ? 4 : 0), 0)
         + (entry.semantic.item_type === "PERSONAL_MEMORY" ? 6 : 0) };
     }).sort((a, b) => b.score - a.score || a.identity.localeCompare(b.identity));
     const ordered = [], remainder = [];
@@ -73,15 +75,36 @@
         complete: all.length === entries.length && !truncated.size },
     };
   }
-  function boundedHistory(turns, budget = 6000) {
-    const kept = []; let used = 0;
-    for (const turn of [...turns].reverse()) {
-      if (!turn.human_message || !turn.output?.message || turn.status !== "SUCCEEDED") continue;
-      const item = { human: turn.human_message, assistant: turn.output.message };
-      if (kept.length === 4 || used + bytes(item) > budget) break;
-      kept.unshift(item); used += bytes(item);
+  function boundedHistory(turns, budget = 10000, { assistantCurrent = () => true } = {}) {
+    // Conversation continuity is not confirmed memory. Reserve most space for
+    // Human words; one verbose answer must never evict all earlier statements.
+    const kept = []; let used = 2;
+    const eligible = turns.filter(turn => turn.human_message && ["SUCCEEDED", "FAILED"].includes(turn.status)).slice(-48);
+    for (const turn of [...eligible].reverse()) {
+      const available = Math.min(3000, Math.floor(budget * .75) - used - 180);
+      if (available < 100) break;
+      const human = splitText(turn.human_message, available)[0];
+      const item = { human, human_truncated: human !== turn.human_message, authority: "CONVERSATION_SELF_REPORT_NOT_SAVED" };
+      kept.unshift({ item, turn }); used += bytes(item) + 1;
     }
-    return kept;
+    for (const entry of kept.slice(-4).reverse()) {
+      if (entry.turn.status !== "SUCCEEDED" || !entry.turn.output?.message || !assistantCurrent(entry.turn)) continue;
+      const assistant = splitText(entry.turn.output.message, Math.min(1200, Math.max(1, budget - used - 100)))[0];
+      const additions = { assistant, assistant_truncated: assistant !== entry.turn.output.message, assistant_authority: "NON_AUTHORITATIVE_PRIOR_REPLY" };
+      if (used + bytes(additions) + 1 > budget) continue;
+      Object.assign(entry.item, additions); used += bytes(additions) + 1;
+    }
+    return kept.map(entry => entry.item);
+  }
+  function catalog(snapshot, budget = 8000) {
+    const all = records(snapshot), entries = []; let used = 200;
+    for (const entry of all) {
+      const item = { ref: entry.ref, title: String(entry.semantic.title || "").slice(0, 240), type: entry.semantic.item_type, layer: entry.layer };
+      if (used + bytes(item) + 1 > budget) continue;
+      entries.push(item); used += bytes(item) + 1;
+    }
+    return { records: entries, total_records: all.length, included_records: entries.length, complete: all.length === entries.length,
+      policy: "INDEX_ONLY_NOT_FULL_EVIDENCE. Missing detail is not proof a record does not exist." };
   }
   function splitText(value, budget = 6000) {
     const chunks = []; let part = "", size = 0;
@@ -93,5 +116,5 @@
     if (part) chunks.push(part);
     return chunks;
   }
-  return Object.freeze({ bytes, terms, records, limited, select, boundedHistory, splitText });
+  return Object.freeze({ bytes, terms, records, limited, select, boundedHistory, catalog, splitText });
 }));

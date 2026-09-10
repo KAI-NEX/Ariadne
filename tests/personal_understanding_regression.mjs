@@ -62,6 +62,24 @@ async function stub(request) {
 }
 const db = databaseFor({ candidate_context_revisions: [revision(1), revision(2)] });
 const options = { runtime_snapshot: runtime, consent: true, call: stub };
+const uncached = databaseFor({ candidate_context_revisions: [revision(90)] });
+const beforeDirect = calls.length;
+const direct = await Understanding.discuss(uncached, { ...options, human_message: "请根据当前资料回答，不需要先重建画像。" });
+assert.equal(direct.turn.calls, 1);
+assert.deepEqual(calls.slice(beforeDirect).map(item => item.phase), ["DISCUSS"], "uncached discussion must not wait for DISTILL/SYNTHESIZE");
+assert.equal(uncached.data.get("personal_understanding_snapshots").size, 0);
+assert.equal(uncached.data.get("candidate_context_revisions").size, 1);
+const continuity = [
+  { status: "SUCCEEDED", human_message: "星桥是我自己发起并独立负责的项目。", output: { message: "请补充细节。" }, source_fingerprint: "old" },
+  ...Array.from({ length: 6 }, (_, index) => ({ status: "SUCCEEDED", human_message: `继续讨论 ${index}`, output: { message: "长回复。".repeat(1500) }, source_fingerprint: "old" })),
+];
+const history = Context.boundedHistory(continuity, 10000, { assistantCurrent: () => false });
+assert(history.some(item => item.human === continuity[0].human_message), "long answers and more than four turns cannot erase earlier Human statements");
+assert(history.every(item => !item.assistant));
+assert(Context.bytes(history) <= 10000);
+assert.equal(Context.boundedHistory([{status:"FAILED",human_message:"之前提交的自述",output:null}])[0].human,"之前提交的自述");
+const extreme = Context.boundedHistory(Array.from({length:60},()=>({status:"SUCCEEDED",human_message:"中文".repeat(3000),output:{message:"回复".repeat(3000)}})));
+assert(Context.bytes(extreme)<=10000);assert(extreme.every(item=>item.human_truncated));
 const first = await Understanding.refresh(db, options);
 assert.equal(first.calls, 2);
 assert.equal(first.snapshot.personal_understanding.covered_records, 2);
@@ -86,7 +104,9 @@ const acceptedOriginal = structuredClone(accepted.revision);
 const savedSnapshot = await Candidate.buildSnapshotFromDatabase(db);
 assert(savedSnapshot.provider_view.confirmed.some((entry) => entry.item_type === "PERSONAL_MEMORY" && entry.summary === statement), "new JD/candidate snapshot must include saved preference");
 assert.equal(savedSnapshot.personal_understanding, null);
-assert.equal(Understanding.discussionContext(savedSnapshot, "偏好", [accepted.revision], [discussed.turn]).context.history.length, 0, "source changes exclude obsolete reasoning from model history without deleting the visible turn");
+const changedHistory = Understanding.discussionContext(savedSnapshot, "偏好", [accepted.revision], [discussed.turn]).context.history;
+assert.equal(changedHistory[0].human, statement, "source changes preserve actual Human utterances for continuity");
+assert.equal(changedHistory[0].assistant, undefined, "source changes exclude obsolete assistant reasoning");
 assert.equal((await Understanding.refresh(db, options)).snapshot.personal_understanding.refreshed_fragments, 1);
 await assert.rejects(Memory.decide(db, discussed.proposals[0].proposal_id, "SAVE"), /already_decided/);
 
@@ -133,6 +153,10 @@ assert(selected.context_coverage.omitted_records > 0);
 assert(selected.context_coverage.truncated_records > 0);
 assert(Context.bytes(selected.provider_view) < 26000);
 assert.equal(selected.context_coverage.complete, false);
+const directory = Context.catalog(large);
+assert(directory.records.length > 0);
+assert.equal(directory.total_records,90);
+assert(Context.bytes(directory) <= 8000);
 const parts = Context.splitText("中文😀".repeat(6000));
 assert.equal(parts.join(""), "中文😀".repeat(6000));
 assert(parts.every((part) => Context.bytes(part) <= 6000));
@@ -150,6 +174,7 @@ await Memory.decide(longDb, retractLong.proposal_id, "SAVE");
 const afterLongRetraction = await Candidate.buildSnapshotFromDatabase(longDb);
 assert.deepEqual(afterLongRetraction.provider_view, beforeLongMemory.provider_view);
 assert.notEqual(afterLongRetraction.aggregate_fingerprint, beforeLongMemory.aggregate_fingerprint, "returning to an old active evidence set must not reactivate old portraits or conversations after retraction");
+assert.equal(Understanding.discussionContext(afterLongRetraction, "继续", await Memory.getAll(longDb,"personal_memory_revisions"),[longTurn.turn]).context.history.length,0,"retracted memory must not resurrect through its origin chat turn");
 
 const staleDb = databaseFor({ candidate_context_revisions: [revision(10)] });
 await assert.rejects(Understanding.refresh(staleDb, { ...options, call: async (request) => {
@@ -159,4 +184,16 @@ await assert.rejects(Understanding.refresh(staleDb, { ...options, call: async (r
 } }), /PERSONAL_CONTEXT_CHANGED/);
 assert.equal(staleDb.data.get("personal_understanding_snapshots").size, 0);
 assert.equal(staleDb.data.get("candidate_context_revisions").size, 1);
+const racing = databaseFor({ candidate_context_revisions: [revision(12)] });
+await assert.rejects(Understanding.discuss(racing,{...options,human_message:"继续解释",call:async request=>{
+  const result=await stub(request);
+  racing.data.get("candidate_context_lifecycle").set("removed",{context_id:"context-12",item_id:"item-12",state:"REMOVED",authority:Truth.AUTHORITY.lifecycle});
+  return result;
+}}),/PERSONAL_CONTEXT_CHANGED/);
+assert.equal(racing.data.get("personal_memory_proposals").size,0);
+assert.equal([...racing.data.get("personal_conversation_turns").values()][0].status,"FAILED");
+const unavailable=databaseFor();
+await assert.rejects(Understanding.discuss(unavailable,{...options,human_message:"我独立做了一个项目",call:async()=>{throw new Error("synthetic_offline");}}),/synthetic_offline/);
+assert.equal(unavailable.data.get("personal_memory_revisions").size,0);
+assert.equal([...unavailable.data.get("personal_conversation_turns").values()][0].status,"FAILED");
 console.log(JSON.stringify({ cache_and_invalidation: "pass", human_save_version_boundary: "pass", source_grounding: "pass", bounded_context: "pass", immutable_history: "pass", live_provider_calls: 0 }));

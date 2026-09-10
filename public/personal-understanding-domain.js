@@ -146,14 +146,26 @@
     return { snapshot: { ...fresh, personal_understanding: record }, calls, usage, cached: false };
   }
   function discussionContext(snapshot, humanMessage, memories, turns) {
-    let budget = 18000, selected, context, localMemories;
+    const memoryHeads = new Map(Memory.latest(memories).map(entry => [entry.memory_id, entry]));
+    const activeIds = new Set(Context.records(snapshot).map(entry => entry.identity));
+    const obsolete = memories.filter(entry => {
+      const head = memoryHeads.get(entry.memory_id);
+      return head && (entry.revision_id !== head.revision_id || head.status === "RETRACTED" || !activeIds.has(`memory:${entry.memory_id}`));
+    });
+    // Retraction/replacement/source invalidation must not resurrect the same
+    // claim through its original chat turn. Visible history is not deleted.
+    const conversationalTurns = turns.filter(turn => !obsolete.some(entry => entry.origin?.turn_id === turn.turn_id
+      || (entry.human_quote && turn.created_at <= memoryHeads.get(entry.memory_id).created_at && turn.human_message?.includes(entry.human_quote))));
+    let budget = Contract.limits.evidence_bytes, selected, context, localMemories;
     do {
       selected = Context.select(snapshot, humanMessage, budget);
       const refs = new Set(Context.records(selected).map((entry) => entry.identity));
       localMemories = Memory.active(memories).filter((entry) => refs.has(`memory:${entry.memory_id}`)).map((entry, index) => ({ ...entry, ref: `memory-${index + 1}` }));
       context = { candidate: selected.provider_view, overview: overviewFor(snapshot), coverage: selected.context_coverage,
+        catalog: Context.catalog(snapshot),
         memories: localMemories.map((entry) => ({ ref: entry.ref, kind: entry.kind, text: entry.text })),
-        history: Context.boundedHistory(turns.filter((turn) => turn.source_fingerprint === snapshot.aggregate_fingerprint), 4000) };
+        history: Context.boundedHistory(conversationalTurns, 10000, { assistantCurrent: turn => turn.source_fingerprint === snapshot.aggregate_fingerprint }),
+        history_policy: "Human words are conversational self-reports, not saved facts. Older assistant conclusions are omitted when evidence changes. Current corrections take precedence; do not treat omission as denial." };
       budget -= 2000;
     } while (Context.bytes(context) > Contract.limits.context_bytes && budget >= 2000);
     if (Context.bytes(context) > Contract.limits.context_bytes) throw new Error("PERSONAL_CONTEXT_LIMIT");
@@ -164,10 +176,14 @@
     const turn = { turn_id: Memory.id("personal-turn"), kind: "DISCUSSION", created_at: Memory.now(), human_message: humanMessage, origin: clone(origin), status: "SENDING", output: null };
     await Memory.write(database, "personal_conversation_turns", turn);
     try {
-      const refreshed = await refresh(database, { runtime_snapshot, consent, call, onProgress });
-      const snapshot = refreshed.snapshot;
+      // Ordinary discussion reads current evidence directly. Rebuilding the
+      // entire derived portrait is an explicit refresh operation, not a toll
+      // charged before every question after a source/settings change.
+      onProgress("正在读取当前资料与对话…");
+      const snapshot = await Candidate.buildSnapshotFromDatabase(database);
+      const runtimeIdentity = JSON.stringify([runtime_snapshot.provider, runtime_snapshot.model, runtime_snapshot.protocol, runtime_snapshot.execution_settings?.connection_id, runtime_snapshot.execution_settings?.descriptor_revision, runtime_snapshot.execution_settings?.settings_schema_version, runtime_snapshot.execution_settings?.effective_settings]);
       const [memories, turns] = await Promise.all([Memory.getAll(database, "personal_memory_revisions"), Memory.getAll(database, "personal_conversation_turns")]);
-      const compiled = discussionContext(snapshot, humanMessage, memories, turns.sort((a, b) => a.created_at.localeCompare(b.created_at)));
+      const compiled = discussionContext({ ...snapshot, personal_understanding: snapshot.personal_understanding?.runtime_identity === runtimeIdentity ? snapshot.personal_understanding : null }, humanMessage, memories, turns.sort((a, b) => a.created_at.localeCompare(b.created_at)));
       onProgress("正在结合个人资料回应…");
       const request = requestFor("DISCUSS", compiled.context, humanMessage, runtime_snapshot, consent);
       const result = await call(request); const output = validateResult(result, request);
@@ -183,7 +199,7 @@
         evidence: Context.records(snapshot).filter((item) => selectedRefs.has(item.ref) && item.semantic.item_type !== "PERSONAL_MEMORY") }));
       const completed = { ...turn, runtime_snapshot: clone(runtime_snapshot), status: "SUCCEEDED", output: { message: output.message }, source_fingerprint: snapshot.aggregate_fingerprint,
         context_coverage: compiled.selected.context_coverage, context_bytes: Context.bytes(compiled.context),
-        calls: refreshed.calls + 1, refresh_usage: refreshed.usage, usage: result.usage || {}, proposal_ids: proposals.map((entry) => entry.proposal_id) };
+        calls: 1, refresh_usage: {}, usage: result.usage || {}, proposal_ids: proposals.map((entry) => entry.proposal_id) };
       await new Promise((resolve, reject) => {
         const tx = database.transaction(["personal_conversation_turns", "personal_memory_proposals"], "readwrite");
         tx.objectStore("personal_conversation_turns").put(completed);

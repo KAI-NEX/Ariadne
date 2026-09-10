@@ -14,7 +14,7 @@
     const gate = Gate.operationGate("personal_understanding");
     const runtime = gate.authority.runtime;
     byId("personal-runtime").textContent = runtime.mode === "local" ? "Local · 查看已保存内容" : `${runtime.provider === "codex" ? "Codex / OpenAI" : runtime.provider} · ${runtime.model}`;
-    byId("personal-consent-copy").textContent = runtime.mode === "local" ? "当前为 Local。切换到已验证的模型后，可以综合资料与对话。" : `允许将问题和个人资料发送至 ${runtime.provider === "codex" ? "Codex / OpenAI" : runtime.provider} · ${runtime.model}；新资料将分批理解，可能产生多次 API 调用费用。资料不会自动成为确认事实。`;
+    byId("personal-consent-copy").textContent = runtime.mode === "local" ? "当前为 Local。切换到已验证的模型后，可以综合资料与对话。" : `允许将问题、相关个人资料及对话历史发送至 ${runtime.provider === "codex" ? "Codex / OpenAI" : runtime.provider} · ${runtime.model}。普通对话直接读取当前资料；单独更新整体理解时可能分批调用并产生费用。资料不会自动成为确认事实。`;
     byId("personal-model-consent").disabled = !gate.allowed || busy;
     const allowed = gate.allowed && byId("personal-model-consent").checked && !busy;
     byId("personal-conversation-form").querySelector('button[type="submit"]').disabled = !allowed;
@@ -44,7 +44,7 @@
     const records = Context.records(state.snapshot);
     byId("understanding-state").textContent = overview
       ? `已综合当前 ${overview.covered_records} 条资料与补充 · 模型推断，可继续校准`
-      : records.length ? `已有 ${records.length} 条资料与补充 · 当前理解待更新；发送问题时也会更新` : "尚无个人资料。可以添加文件，也可以从对话中补充。";
+      : records.length ? `已有 ${records.length} 条资料与补充 · 整体理解待更新；可直接根据当前资料对话` : "尚无个人资料。可以添加文件，也可以从对话中补充。";
     byId("understanding-summary").textContent = overview?.summary || "从你做过的项目开始，聊聊当时负责什么、怎么做、为什么这样做。你的补充会帮助我逐步了解你。";
     byId("understanding-insights").innerHTML = (overview?.insights || []).map((entry) => `<article class="personal-insight"><p>${esc(entry.text)}</p><div class="personal-evidence">${entry.evidence.map(sourceMarkup).join("")}</div></article>`).join("");
     byId("understanding-unknowns").innerHTML = overview?.uncertainties?.length ? `<div class="personal-unknowns"><h3>还需要澄清</h3><ul>${overview.uncertainties.map((entry) => `<li>${esc(entry)}</li>`).join("")}</ul></div>` : "";
@@ -62,7 +62,7 @@
     const pending = state.proposals.filter((entry) => !decided.has(entry.proposal_id));
     byId("personal-proposals").innerHTML = pending.map((entry) => `<article class="personal-proposal" data-proposal="${esc(entry.proposal_id)}"><h3>${entry.operation === "RETRACT" ? "确认停止使用这条补充" : "待确认的个人补充"} · ${esc(labels[entry.kind])}</h3><p class="personal-meta">${esc(entry.reason)}</p><blockquote>你的原话：${esc(entry.human_quote)}</blockquote>${entry.before_text ? `<p class="personal-meta">原有内容：${esc(entry.before_text)}</p>` : ""}<label for="proposal-${esc(entry.proposal_id)}">${entry.operation === "RETRACT" ? "将停止用于之后的分析；历史仍保留" : "确认内容，可在保存前修改"}</label><textarea id="proposal-${esc(entry.proposal_id)}" maxlength="1200" ${entry.operation === "RETRACT" ? "readonly" : ""}>${esc(entry.text)}</textarea><div class="personal-proposal-actions"><button type="button" class="v1-primary-button" data-memory-save="${esc(entry.proposal_id)}">${entry.operation === "RETRACT" ? "确认停止使用" : "确认保存"}</button><button type="button" class="v1-tertiary-button" data-memory-reject="${esc(entry.proposal_id)}">暂不采纳</button></div></article>`).join("");
     const last = turns.filter((entry) => entry.status === "SUCCEEDED").at(-1);
-    byId("personal-context-usage").textContent = last ? `最近一轮：选取 ${last.context_coverage.included_records}/${last.context_coverage.total_records} 条详细证据，${last.context_coverage.truncated_records} 条节选；另使用当前个人理解。对话上下文 ${Math.round(last.context_bytes / 1024)} KB；${last.calls} 次模型调用${Number.isInteger(last.usage?.prompt_tokens) ? `，对话输入 ${last.usage.prompt_tokens} tokens` : ""}。` : "原始资料长期保留；每轮只加载当前理解、相关证据和有限的近期对话。";
+    byId("personal-context-usage").textContent = last ? `最近一轮：选取 ${last.context_coverage.included_records}/${last.context_coverage.total_records} 条详细证据，${last.context_coverage.truncated_records} 条节选。对话上下文 ${Math.round(last.context_bytes / 1024)} KB；${last.calls} 次模型调用${Number.isInteger(last.usage?.prompt_tokens) ? `，对话输入 ${last.usage.prompt_tokens} tokens` : ""}。` : "原始资料长期保留；每轮加载当前证据、资料目录与预算内的对话原话，有有效整体理解时复用。";
     runtimeMode();
   }
   async function load() {

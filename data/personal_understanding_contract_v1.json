@@ -4,7 +4,7 @@
   "result_contract": "ariadne-personal-understanding-result-v1",
   "operation": "PERSONAL_UNDERSTANDING_TURN",
   "adapter_version": "deepseek-personal-understanding-v1",
-  "prompt_version": "ariadne-personal-understanding-prompt-v4",
+  "prompt_version": "ariadne-personal-understanding-prompt-v5",
   "request_config_version": "deepseek-personal-understanding-request-v2",
   "phases": ["DISTILL", "SYNTHESIZE", "DISCUSS"],
   "memory_kinds": ["FACT", "PREFERENCE", "GOAL", "CORRECTION"],
@@ -14,7 +14,7 @@
     "evidence_bytes": 24000,
     "fragment_bytes": 6000,
     "human_message": 6000,
-    "history_turns": 4,
+    "history_turns": 48,
     "summary_characters": 2400,
     "memory_characters": 1200,
     "proposals_per_turn": 4
