@@ -758,4 +758,14 @@ const beforeStale = answerCalls;
 await assert.rejects(answerTurn(r => noPatches(r, "EXPLAIN", "Should not run")), /STALE_WORKING_OBSERVATION/);
 assert.equal(answerCalls, beforeStale, "stale or already answered question never calls Provider");
 assert.equal(Clarifications.entriesFor(await Integration.latestWorkingModel(answerDb, answerWorking.source_document_id)).length, 3);
+const fileDb = memoryDatabase();
+fileDb.records.get("candidate_working_models").set(initialWorking.working_model_id, structuredClone(initialWorking));
+fileDb.records.get("source_documents").set(initialWorking.source_document_id, { source_document_id: initialWorking.source_document_id });
+const fileSession = await Integration.resolveSession(fileDb, initialWorking.source_document_id, now());
+const delivered = {kind:"PDF",title:"合成项目介绍",body:"项目介绍草稿。",nodes:[],edges:[]};
+const fileOutcome = await Integration.executeListTurn({database:fileDb,session:fileSession,human_message:"生成介绍文件",runtime_snapshot:snapshot(),id_factory:idFactory,now,
+  call_runtime:async r=>({...noPatches(r,"EXPLAIN","文件如下。"),deliverable:delivered,delivery_version:"ariadne-conversation-delivery-v1"})});
+assert.deepEqual(fileOutcome.assistant_message.deliverable,delivered);
+assert.deepEqual((await Persistence.restoreConversation(fileDb,fileSession.conversation_id)).messages.at(-1).deliverable,delivered);
+assert.equal(fileDb.records.get("candidate_working_models").size,1,"file delivery cannot create a Working revision");
 console.log("candidate_workspace_conversation_integration=pass");

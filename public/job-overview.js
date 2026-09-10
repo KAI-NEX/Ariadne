@@ -30,7 +30,7 @@
     el("job-overview-insights").innerHTML = insightsMarkup(overview?.insights);
     el("job-overview-unknowns").innerHTML = overview?.uncertainties?.length ? `<div class="personal-unknowns"><h3>还需要确认</h3>${unknownMarkup(overview.uncertainties)}</div>` : "";
     el("job-overview-directory").innerHTML = snapshot.records.map((record) => `<div class="job-overview-directory-item">${links([record.identity])}<div>${esc(record.semantic.location || "地点未明确")} · ${record.version ? `当前版本 ${record.version}` : "尚未保存为正式职位"}</div></div>`).join("") || "暂无职位描述。";
-    const messages = turns.slice(-visible).flatMap((turn) => [{ id: `${turn.turn_id}:user`, role: "USER", text: turn.human_message }, ...(turn.status === "SUCCEEDED" ? [{ id: `${turn.turn_id}:assistant`, role: "ASSISTANT", runtime_snapshot: turn.runtime_snapshot, text: `${turn.fingerprint !== snapshot.fingerprint ? "（基于当时职位版本的历史回答）\n" : ""}${turn.output.message}`, result: turn.output }] : [])]);
+    const messages = turns.slice(-visible).flatMap((turn) => [{ id: `${turn.turn_id}:user`, role: "USER", text: turn.human_message }, ...(turn.status === "SUCCEEDED" ? [{ id: `${turn.turn_id}:assistant`, role: "ASSISTANT", runtime_snapshot: turn.runtime_snapshot, text: `${turn.fingerprint !== snapshot.fingerprint ? "（基于当时职位版本的历史回答）\n" : ""}${turn.output.message}`, deliverable: turn.output.deliverable, result: turn.output }] : [])]);
     if (pendingMessage) messages.push({ role: "USER", text: pendingMessage });
     const target = el("job-overview-messages");
     intro.update(messages.length > 0);

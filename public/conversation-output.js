@@ -8,6 +8,39 @@
   const MAX_TEXT = 40000, MAX_PAGES = 32;
   const clocks = new WeakMap(), labels = new WeakMap(), exports = new WeakMap();
   const utf8 = text => new TextEncoder().encode(text);
+  const VERSION = "ariadne-conversation-delivery-v1";
+  function validate(value) {
+    if (value == null) return null;
+    const exact = (v, keys) => v && !Array.isArray(v) && Object.keys(v).sort().join() === keys.sort().join();
+    const fail = () => { throw new Error("文件内容不符合输出契约，请重新生成"); };
+    const text = (v, max, empty = false) => { if (typeof v !== "string" || v.length > max || (!empty && !v.trim())) fail(); };
+    if (!exact(value, ["kind", "title", "body", "nodes", "edges"]) || !["PDF", "DIAGRAM", "UNSUPPORTED"].includes(value.kind)) fail();
+    text(value.title, 100); text(value.body, { PDF: 20000, DIAGRAM: 1200, UNSUPPORTED: 400 }[value.kind]);
+    if (!Array.isArray(value.nodes) || !Array.isArray(value.edges)) fail();
+    if (value.kind !== "DIAGRAM") { if (value.nodes.length || value.edges.length) fail(); }
+    else {
+      if (!value.nodes.length || value.nodes.length > 8 || value.edges.length > 12) fail();
+      value.nodes.forEach(node => text(node, 70));
+      const pairs = new Set();
+      value.edges.forEach(edge => {
+        if (!exact(edge, ["from", "to", "label"])) fail();
+        const pair = `${edge.from}:${edge.to}`;
+        if (![edge.from, edge.to].every(i => Number.isInteger(i) && i >= 0 && i < value.nodes.length) || edge.from === edge.to || pairs.has(pair)) fail();
+        text(edge.label, 28, true); pairs.add(pair);
+      });
+    }
+    return JSON.parse(JSON.stringify(value));
+  }
+  function fromResult(result) {
+    if (result.deliverable == null) return null;
+    if (result.delivery_version !== VERSION) throw new Error("文件输出版本不兼容，请刷新后重试");
+    return validate(result.deliverable);
+  }
+  function documentText(value) {
+    // Avoid adding a second title when the model already included it verbatim.
+    const body = value.body.trim();
+    return body.split(/\r?\n/, 1)[0].trim() === value.title.trim() ? body : `${value.title}\n\n${body}`;
+  }
   function concatenate(parts) {
     const output = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
     let offset = 0;
@@ -76,7 +109,7 @@
       ctx.fillStyle = token("--vi-ink"); ctx.font = `550 38px ${font}`;
       ctx.fillText("Ariadne · 衡", 94, 115);
       ctx.fillStyle = token("--vi-text-secondary"); ctx.font = `23px ${font}`;
-      ctx.fillText("对话回复 · 非确认资料 · 未经外部事实核验", 94, 162);
+      ctx.fillText("生成文件 · 非确认资料 · 未经外部事实核验", 94, 162);
       ctx.fillStyle = token("--vi-ink"); ctx.font = `29px ${font}`;
       lines.slice(page * perPage, (page + 1) * perPage).forEach((line, index) => ctx.fillText(line, 94, 244 + index * 44));
       ctx.fillStyle = token("--vi-text-secondary"); ctx.font = `23px ${font}`;
@@ -89,6 +122,65 @@
     return pages;
   }
 
+  async function renderDiagram(raw, doc = root.document) {
+    const value = validate(raw);
+    if (value.kind !== "DIAGRAM") throw new Error("图解类型无效");
+    await doc.fonts?.ready;
+    const style = doc.defaultView.getComputedStyle(doc.documentElement);
+    const token = name => style.getPropertyValue(name).trim(), font = token("--vi-font-ui");
+    if (!font || !token("--vi-ink") || !token("--vi-surface")) throw new Error("排版资源未加载，请刷新后重试");
+    const canvas = doc.createElement("canvas"); canvas.width = 1240;
+    const ctx = canvas.getContext("2d"); if (!ctx) throw new Error("浏览器不支持图解生成");
+    ctx.font = `550 38px ${font}`;
+    const titleLines = wrapText(value.title, text => ctx.measureText(text).width, 1080);
+    const top = 130 + titleLines.length * 46;
+    canvas.height = top + 110 + value.nodes.length * 230 + value.edges.length * 110;
+    ctx.fillStyle = token("--vi-surface"); ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = token("--vi-ink"); ctx.font = `550 38px ${font}`;
+    titleLines.forEach((line, i) => ctx.fillText(line, 80, 80 + i * 46));
+    const x = 80, width = 580, height = 140, y = index => top + index * 230;
+    ctx.lineWidth = 3; ctx.strokeStyle = token("--vi-text-secondary");
+    const arrow = (points) => {
+      ctx.beginPath(); points.forEach(([a, b], i) => i ? ctx.lineTo(a, b) : ctx.moveTo(a, b)); ctx.stroke();
+      const end = points.at(-1), prev = points.at(-2), angle = Math.atan2(end[1] - prev[1], end[0] - prev[0]);
+      ctx.beginPath(); ctx.moveTo(end[0], end[1]);
+      ctx.lineTo(end[0] - 15 * Math.cos(angle - .5), end[1] - 15 * Math.sin(angle - .5));
+      ctx.moveTo(end[0], end[1]); ctx.lineTo(end[0] - 15 * Math.cos(angle + .5), end[1] - 15 * Math.sin(angle + .5)); ctx.stroke();
+    };
+    value.edges.forEach((edge, index) => {
+      let labelX, labelY;
+      if (edge.to === edge.from + 1) {
+        arrow([[x + width / 2, y(edge.from) + height], [x + width / 2, y(edge.to)]]);
+        labelX = x + width / 2 + 20; labelY = y(edge.to) - 42;
+      } else {
+        const lane = 720 + index * 32;
+        arrow([[x + width, y(edge.from) + height / 2], [lane, y(edge.from) + height / 2], [lane, y(edge.to) + height / 2], [x + width, y(edge.to) + height / 2]]);
+        // Edge legend avoids overlapping long labels in the narrow routing lanes.
+        labelX = lane + 6; labelY = (y(edge.from) + y(edge.to)) / 2 + height / 2;
+      }
+      ctx.fillStyle = token("--vi-ink"); ctx.font = `22px ${font}`;
+      const label = String(index + 1);
+      wrapText(label, text => ctx.measureText(text).width, 260).forEach((line, i) => ctx.fillText(line, labelX, labelY + i * 26));
+    });
+    ctx.fillStyle = token("--vi-ink"); ctx.font = `23px ${font}`;
+    value.edges.forEach((edge, index) => {
+      const legend = `${index + 1}. ${edge.label || `${value.nodes[edge.from]} → ${value.nodes[edge.to]}`}`;
+      wrapText(legend, text => ctx.measureText(text).width, 1080).forEach((line, row) => ctx.fillText(line, 80, top + value.nodes.length * 230 + index * 110 + row * 28));
+    });
+    value.nodes.forEach((node, index) => {
+      ctx.fillStyle = token("--vi-surface"); ctx.fillRect(x, y(index), width, height);
+      ctx.strokeRect(x, y(index), width, height);
+      ctx.fillStyle = token("--vi-ink"); ctx.font = `28px ${font}`;
+      const lines = wrapText(node, text => ctx.measureText(text).width, width - 48);
+      lines.forEach((line, i) => ctx.fillText(line, x + 24, y(index) + (height - lines.length * 32) / 2 + 26 + i * 32));
+    });
+    ctx.fillStyle = token("--vi-text-secondary"); ctx.font = `21px ${font}`;
+    ctx.fillText("Ariadne · 衡 / 模型图解 · 非确认资料", 80, canvas.height - 45);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+    if (!blob) throw new Error("图解生成失败");
+    return blob;
+  }
+
   function release(state) { state.urls.forEach(url => root.URL.revokeObjectURL(url)); state.urls.length = 0; }
   function decorate(target, messages, textFor) {
     if (!target?.isConnected) return;
@@ -97,42 +189,55 @@
     const old = exports.get(target);
     if (old && old.bubbles.length === bubbles.length && bubbles.every((node, i) => old.bubbles[i] === node)) return;
     if (old) { release(old); old.observer?.disconnect(); }
-    const state = { urls: [], bubbles, observer: null }; exports.set(target, state);
+    const state = { urls: [], bubbles, observer: null, queue: Promise.resolve() }; exports.set(target, state);
     state.observer = new doc.defaultView.MutationObserver(() => {
       if (!target.isConnected) { release(state); state.observer.disconnect(); exports.delete(target); }
     });
     state.observer.observe(doc.body, { childList: true, subtree: true });
     messages.forEach((message, index) => {
-      if (message.role !== "ASSISTANT" || !String(textFor(message) || "").trim()) return;
+      if (message.role !== "ASSISTANT" || !message.deliverable) return;
       const bubble = bubbles[index]; if (!bubble || bubble.querySelector(".v1-reply-exports")) return;
       const area = doc.createElement("span"); area.className = "v1-reply-exports";
       const actions = doc.createElement("span"); actions.className = "v1-reply-export-actions";
       const status = doc.createElement("span"); status.className = "v1-reply-export-status"; status.setAttribute("role", "status");
       const files = doc.createElement("span"); files.className = "v1-reply-export-files";
       area.append(actions, status, files); bubble.append(area);
-      for (const format of ["PDF", "图片"]) {
-        const button = doc.createElement("button"); button.type = "button"; button.textContent = `导出${format}`;
-        button.title = format === "PDF" ? "本地生成排版 PDF（文字不可选取）" : "本地生成回复排版图片，不是 AI 创作图片";
-        actions.append(button);
-        button.addEventListener("click", async () => {
-          [...actions.children].forEach(node => { node.disabled = true; }); status.textContent = "正在本地排版…";
+      const generate = async () => {
+          actions.replaceChildren(); files.replaceChildren(); status.textContent = "正在生成文件…";
           try {
-            const pages = await renderPages(String(textFor(message)), doc);
+            const value = validate(message.deliverable);
+            if (value.kind === "UNSUPPORTED") { status.textContent = value.body; return; }
+            const format = value.kind;
+            const name = value.title.replace(/[\\/:*?"<>|\u0000-\u001f]/g, "-").slice(0, 80);
+            const pages = format === "PDF" ? await renderPages(documentText(value), doc) : null;
+            const blob = format === "PDF" ? new Blob([pdfFromJpegs(pages)], { type: "application/pdf" }) : await renderDiagram(value, doc);
             if (!bubble.isConnected || exports.get(target) !== state) return;
-            files.querySelectorAll(`[data-format="${format}"]`).forEach(node => { const url = node.querySelector("a").href; root.URL.revokeObjectURL(url); state.urls = state.urls.filter(item => item !== url); node.remove(); });
-            const entries = format === "PDF" ? [{ blob: new Blob([pdfFromJpegs(pages)], { type: "application/pdf" }), name: "Ariadne-回复.pdf" }]
-              : pages.map((page, i) => ({ blob: page.png, name: `Ariadne-回复-${i + 1}.png` }));
+            const entries = [{ blob, name: `${name}.${format === "PDF" ? "pdf" : "png"}` }];
             entries.forEach(entry => {
               const item = doc.createElement("span"); item.dataset.format = format;
               const url = root.URL.createObjectURL(entry.blob); state.urls.push(url);
-              if (format === "图片") { const image = doc.createElement("img"); image.src = url; image.alt = entry.name; item.append(image); }
+              if (format === "DIAGRAM") {
+                const image = doc.createElement("img"); image.src = url; image.alt = value.body;
+                const preview = doc.createElement("a"); preview.href = url; preview.target = "_blank"; preview.rel = "noopener";
+                preview.setAttribute("aria-label", `查看${value.title}`); preview.append(image); item.append(preview);
+                const description = doc.createElement("span");
+                description.textContent = [value.body, ...value.edges.map((edge, i) => `${i + 1}. ${value.nodes[edge.from]} → ${value.nodes[edge.to]}${edge.label ? `：${edge.label}` : ""}`)].join("\n");
+                item.append(description);
+              }
               const link = doc.createElement("a"); link.href = url; link.download = entry.name; link.textContent = `下载 ${entry.name}`; item.append(link); files.append(item);
             });
-            status.textContent = format === "PDF" ? `已生成 ${pages.length} 页 PDF · 文字不可选取` : `已生成 ${pages.length} 张排版图片`;
-          } catch (error) { status.textContent = error.message || "生成失败，请重试"; }
-          finally { [...actions.children].forEach(node => { node.disabled = false; }); }
-        });
-      }
+            status.textContent = format === "PDF" ? `已生成 ${pages.length} 页 PDF · 文字不可选取` : "图解已生成";
+          } catch (error) {
+            if (!bubble.isConnected || exports.get(target) !== state) return;
+            status.textContent = error.message || "生成失败，请重试";
+            const retry = doc.createElement("button"); retry.type = "button"; retry.textContent = "重试生成文件";
+            retry.addEventListener("click", generate); actions.append(retry);
+          }
+      };
+      // Serialize historical file rendering; do not allocate many canvases at once.
+      state.queue = state.queue.then(() => {
+        if (bubble.isConnected && exports.get(target) === state) return generate();
+      });
     });
   }
 
@@ -154,5 +259,13 @@
       state.label.textContent = `本轮处理耗时 ${Math.max(.1, (root.performance.now() - state.start) / 1000).toFixed(1)} 秒`;
     }
   }
-  return Object.freeze({ pdfFromJpegs, wrapText, renderPages, decorate, execution });
+  function historyText(message, limit = 1200) {
+    const text = message.content ?? message.text ?? message.message ?? "";
+    if (!message.deliverable) return text;
+    try {
+      const value = validate(message.deliverable);
+      return `${text}\n[历史生成文件，非确认资料，内容可能截断]\n${JSON.stringify(value).slice(0, limit)}`;
+    } catch (_) { return text; }
+  }
+  return Object.freeze({ VERSION, validate, fromResult, documentText, historyText, pdfFromJpegs, wrapText, renderPages, renderDiagram, decorate, execution });
 }));

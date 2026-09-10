@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from src.model_settings import apply_execution_settings
+from src.conversation_delivery import conversation_delivery
 from src.conversation_semantics import HUMAN_CONVERSATION_PRINCIPLES
 from src.conversation_attachments import validate_attachments, augment_payload
 
@@ -110,6 +111,7 @@ def validate_output(output, request):
     except PersonalUnderstandingError as error:
         raise JobOverviewError(error.code.replace("PERSONAL_", "JOB_OVERVIEW_"), "model_output", True) from error
 
+@conversation_delivery(JobOverviewError)
 def execute(payload, credential_reader, provider_call):
     request = validate_request(payload)
     try:

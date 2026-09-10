@@ -6,6 +6,7 @@
 .v1-reply-export-status { display: block; }
 .v1-reply-export-files { display: grid; gap: var(--vi-space-12); margin-top: var(--vi-space-8); }
 .v1-reply-export-files > span { display: grid; gap: var(--vi-space-8); }
+.v1-reply-export-files > span > span { white-space: pre-line; }
 .v1-reply-export-files a { color: inherit; overflow-wrap: anywhere; }
 .v1-reply-export-files img { max-width: 100%; width: calc(var(--vi-space-64) * 4); height: auto; border-radius: var(--vi-radius-small); }
 .v1-conversation-elapsed { display: block; margin-top: var(--vi-space-8); font: var(--vi-text-caption)/1.65 var(--vi-font-ui); color: var(--vi-text-secondary); }

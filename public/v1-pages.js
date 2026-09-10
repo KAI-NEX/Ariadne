@@ -3852,7 +3852,7 @@
         return;
       }
       const analysis = JobConversationPersistence.createAnalysis({ session, execution, job_subject: jobSubject, candidate_snapshot: candidateSnapshot, candidate_delta: candidateDelta, source_excerpt_manifest: sourceManifest, runtime_snapshot: runtimeSnapshot, output: result.output, previous_analysis_id: previousAnalysis?.analysis_id || null });
-      const assistantMessage = JobConversation.createMessage(session, "ASSISTANT", result.output.message);
+      const assistantMessage = { ...JobConversation.createMessage(session, "ASSISTANT", result.output.message), deliverable: globalThis.AriadneConversationOutput.fromResult(result) };
       await JobConversationPersistence.persistSuccessfulTurn(database, { execution, analysis, assistant_message: assistantMessage });
       if (result.output.job_edit && activeJobRevision) {
         const proposal = JobContext.createChangeProposal({ current_revision: activeJobRevision, field: result.output.job_edit.field, desired_value: result.output.job_edit.desired_value, reason: result.output.job_edit.reason, source_analysis_id: analysis.analysis_id });

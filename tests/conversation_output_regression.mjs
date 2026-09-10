@@ -24,4 +24,19 @@ for (const match of offsets) {
 }
 assert.equal(index, 12);
 assert.throws(() => Output.pdfFromJpegs(Array(33).fill(pages[0])));
+const document = { kind: 'PDF', title: '项目介绍', body: '合成项目介绍。', nodes: [], edges: [] };
+assert.deepEqual(Output.fromResult({ deliverable: document, delivery_version: Output.VERSION }), document);
+assert.equal(Output.fromResult({ output: {message:'普通文字'} }), null);
+assert.throws(() => Output.fromResult({ deliverable: document, delivery_version: 'unknown' }));
+assert.throws(() => Output.validate({ ...document, url: 'file:///private' }));
+assert.throws(() => Output.validate({ ...document, body: 'x'.repeat(20001) }));
+const diagram = {kind:'DIAGRAM',title:'流程图',body:'两个步骤',nodes:['理解','核对'],edges:[{from:0,to:1,label:'下一步'}]};
+assert.deepEqual(Output.validate(diagram), diagram);
+assert.throws(() => Output.validate({...diagram,edges:[{from:0,to:2,label:''}]}));
+assert.throws(() => Output.validate({...diagram,edges:[{from:true,to:0,label:''}]}));
+assert.throws(() => Output.validate({...diagram,edges:[...diagram.edges,...diagram.edges]}));
+assert.match(Output.historyText({message:'文件如下',deliverable:document}), /非确认资料/);
+assert.equal(Output.historyText({text:'普通文字'}), '普通文字');
+assert.equal(Output.documentText({...document,body:'项目介绍\n\n正文'}),'项目介绍\n\n正文');
+assert.equal(Output.documentText(document),'项目介绍\n\n合成项目介绍。');
 console.log('conversation output: wrapping, Unicode, bounds, inert text, multipage PDF byte offsets PASS');

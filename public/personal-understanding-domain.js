@@ -9,6 +9,7 @@
   else root.AriadnePersonalUnderstanding = api;
 }(typeof globalThis !== "undefined" ? globalThis : this, function create(Contract, Memory, Context, Candidate, Runtime, Gate) {
   const clone = (value) => structuredClone(value);
+  const Delivery = globalThis.AriadneConversationOutput || (typeof module === "object" ? require("./conversation-output.js") : null);
   function signature() {
     return Object.fromEntries(["contract_id", "request_contract", "result_contract", "operation", "adapter_version", "prompt_version", "request_config_version"].map((key) => [key, Contract[key]]));
   }
@@ -197,7 +198,7 @@
         // Provider excerpts are bounded, but Save must bind the complete local
         // evidence version, not compare an excerpt to the full source later.
         evidence: Context.records(snapshot).filter((item) => selectedRefs.has(item.ref) && item.semantic.item_type !== "PERSONAL_MEMORY") }));
-      const completed = { ...turn, runtime_snapshot: clone(runtime_snapshot), status: "SUCCEEDED", output: { message: output.message }, source_fingerprint: snapshot.aggregate_fingerprint,
+      const completed = { ...turn, runtime_snapshot: clone(runtime_snapshot), status: "SUCCEEDED", output: { message: output.message, deliverable: Delivery.fromResult(result) }, source_fingerprint: snapshot.aggregate_fingerprint,
         context_coverage: compiled.selected.context_coverage, context_bytes: Context.bytes(compiled.context),
         calls: 1, refresh_usage: {}, usage: result.usage || {}, proposal_ids: proposals.map((entry) => entry.proposal_id) };
       await new Promise((resolve, reject) => {

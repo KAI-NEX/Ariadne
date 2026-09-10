@@ -152,6 +152,7 @@
   }
 
   function completeHistory(messages, actions, currentMessage, focus, observation) {
+    const Delivery = globalThis.AriadneConversationOutput || (typeof module === "object" ? require("./conversation-output.js") : null);
     const relevantActions = (actions || []).filter((entry) => entry?.conversation_id === currentMessage.conversation_id && actionMatchesFocus(entry, focus, observation));
     const actionsByTurn = new Map(relevantActions.map((entry) => [entry.turn_id, entry]));
     const byTurn = new Map();
@@ -168,7 +169,7 @@
       && (focus.type === "CANDIDATE" || actionsByTurn.has(turnId))).map(([turnId, pair]) => ({
       turn_id: turnId,
       user: { message_id: pair.user.message_id, text: pair.user.text, created_at: pair.user.created_at },
-      assistant: { message_id: pair.assistant.message_id, text: pair.assistant.text, created_at: pair.assistant.created_at },
+      assistant: { message_id: pair.assistant.message_id, text: Delivery ? Delivery.historyText(pair.assistant).slice(0, 8000) : pair.assistant.text, created_at: pair.assistant.created_at },
       action_result: actionsByTurn.get(turnId)?.normalized_action ? {
         status: actionsByTurn.get(turnId).application_result.status,
         action: actionsByTurn.get(turnId).normalized_action.action,

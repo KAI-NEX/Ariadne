@@ -10,6 +10,7 @@
   const INPUT_STORES = ["job_context_revisions", "context_proposals", "context_review_decisions", "source_documents"];
   const id = (prefix) => `${prefix}-${crypto.randomUUID()}`, now = () => new Date().toISOString();
   const clone = (value) => structuredClone(value);
+  const Delivery = globalThis.AriadneConversationOutput || (typeof module === "object" ? require("./conversation-output.js") : null);
   const canonical = (value) => Array.isArray(value) ? value.map(canonical) : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])])) : value;
   const same = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
   async function fingerprint(value) { return [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(canonical(value)))))].map((x) => x.toString(16).padStart(2, "0")).join(""); }
@@ -144,7 +145,7 @@
     }
     const context = { scope: Contract.scope, evidence, overview: snapshot.overview ? { authority: snapshot.overview.authority, summary: snapshot.overview.summary, uncertainties: snapshot.overview.uncertainties, covered_jobs: snapshot.overview.covered_jobs } : null,
       coverage: { total_jobs: snapshot.records.length, included_jobs: evidence.length, omitted_jobs: snapshot.records.length - evidence.length, truncated_jobs: truncated, strategy: "LEXICAL_WITH_BOUNDED_DETAIL", evidence_bytes: bytes },
-      history: Context.boundedHistory(turns.filter((entry) => entry.fingerprint === snapshot.fingerprint).map((entry) => ({ ...entry, output: entry.output ? { message: [entry.output.message, ...(entry.output.insights || []).map((item) => item.text), ...(entry.output.uncertainties || [])].join("\n") } : null })), 4000) };
+      history: Context.boundedHistory(turns.filter((entry) => entry.fingerprint === snapshot.fingerprint).map((entry) => ({ ...entry, output: entry.output ? { ...entry.output, message: [entry.output.message, ...(entry.output.insights || []).map((item) => item.text), ...(entry.output.uncertainties || [])].join("\n") } : null })), 4000) };
     if (Context.bytes(context) > Contract.limits.context_bytes) throw new Error("JOB_OVERVIEW_CONTEXT_LIMIT"); return context;
   }
   async function discuss(db, { human_message, ...options }) {
@@ -157,7 +158,7 @@
       const request = requestFor("DISCUSS", context, message, options.runtime_snapshot, options.consent), result = await (options.call || callRuntime)(request), output = validateResult(result, request);
       if ((await snapshotFromDatabase(db)).fingerprint !== snapshot.fingerprint) throw new Error("JOB_OVERVIEW_CONTEXT_CHANGED");
       const insights = output.insights.map((entry) => ({ text: entry.text, identities: entry.evidence_refs.map((ref) => snapshot.records.find((record) => record.ref === ref).identity) }));
-      const completed = { ...turn, runtime_snapshot: clone(options.runtime_snapshot), status: "SUCCEEDED", fingerprint: snapshot.fingerprint, output: { message: output.summary, insights, uncertainties: output.uncertainties }, context_coverage: context.coverage, context_bytes: Context.bytes(context), calls: refreshed.calls + 1, usage: result.usage || {}, refresh_usage: refreshed.usage };
+      const completed = { ...turn, runtime_snapshot: clone(options.runtime_snapshot), status: "SUCCEEDED", fingerprint: snapshot.fingerprint, output: { message: output.summary, insights, uncertainties: output.uncertainties, deliverable: Delivery.fromResult(result) }, context_coverage: context.coverage, context_bytes: Context.bytes(context), calls: refreshed.calls + 1, usage: result.usage || {}, refresh_usage: refreshed.usage };
       await write(db, "job_overview_turns", completed, true); return completed;
     } catch (error) { await write(db, "job_overview_turns", { ...turn, status: "FAILED", error_code: String(error.message).slice(0, 100) }, true); throw error; }
   }

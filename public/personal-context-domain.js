@@ -76,6 +76,7 @@
     };
   }
   function boundedHistory(turns, budget = 10000, { assistantCurrent = () => true } = {}) {
+    const Delivery = globalThis.AriadneConversationOutput || (typeof module === "object" ? require("./conversation-output.js") : null);
     // Conversation continuity is not confirmed memory. Reserve most space for
     // Human words; one verbose answer must never evict all earlier statements.
     const kept = []; let used = 2;
@@ -89,8 +90,9 @@
     }
     for (const entry of kept.slice(-4).reverse()) {
       if (entry.turn.status !== "SUCCEEDED" || !entry.turn.output?.message || !assistantCurrent(entry.turn)) continue;
-      const assistant = splitText(entry.turn.output.message, Math.min(1200, Math.max(1, budget - used - 100)))[0];
-      const additions = { assistant, assistant_truncated: assistant !== entry.turn.output.message, assistant_authority: "NON_AUTHORITATIVE_PRIOR_REPLY" };
+      const prior = Delivery ? Delivery.historyText(entry.turn.output) : entry.turn.output.message;
+      const assistant = splitText(prior, Math.min(2400, Math.max(1, budget - used - 100)))[0];
+      const additions = { assistant, assistant_truncated: assistant !== prior, assistant_authority: "NON_AUTHORITATIVE_PRIOR_REPLY" };
       if (used + bytes(additions) + 1 > budget) continue;
       Object.assign(entry.item, additions); used += bytes(additions) + 1;
     }

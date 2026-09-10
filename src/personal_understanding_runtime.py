@@ -6,6 +6,7 @@ transaction owns that boundary, with source and target version checks.
 from __future__ import annotations
 
 from src.model_settings import apply_execution_settings
+from src.conversation_delivery import conversation_delivery
 
 import json
 import re
@@ -208,6 +209,7 @@ def validate_output(output: Any, request: dict) -> dict:
     return output
 
 
+@conversation_delivery(PersonalUnderstandingError)
 def execute(payload: Any, credential_reader: Callable, provider_call: Callable) -> dict:
     request = validate_request(payload)
     try:

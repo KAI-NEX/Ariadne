@@ -81,4 +81,10 @@ const bad=await stub(invalid);bad.output.insights[0].evidence_refs=["unknown"];a
 assert(readFileSync(new URL('../public/personal-understanding.html',import.meta.url),'utf8').includes('围绕过去的项目、你的职责与做事方式'));
 assert(readFileSync(new URL('../public/jd.html',import.meta.url),'utf8').includes('了解职位概况'));
 assert.equal(Personal.Contract.prompt_version,"ariadne-personal-understanding-prompt-v5");
+const delivered={kind:"PDF",title:"职位介绍文件",body:"合成职位概要。",nodes:[],edges:[]};
+const beforeDelivery=JSON.stringify([...db.data.get("job_context_revisions").values()]);
+const fileTurn=await Domain.discuss(db,{...options,human_message:"制作介绍文件",call:async request=>({...await stub(request),...(request.phase==="DISCUSS"?{deliverable:delivered,delivery_version:"ariadne-conversation-delivery-v1"}:{})})});
+assert.deepEqual(fileTurn.output.deliverable,delivered);
+assert.deepEqual(db.data.get("job_overview_turns").get(fileTurn.turn_id).output.deliverable,delivered);
+assert.equal(JSON.stringify([...db.data.get("job_context_revisions").values()]),beforeDelivery);
 console.log(JSON.stringify({job_only_scope:"pass",versions_and_review:"pass",incremental_cache:"pass",read_only_and_failure:"pass",bounded_context:"pass",provider_calls:0}));

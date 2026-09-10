@@ -17,8 +17,9 @@
   function withOutput(callback) {
     if (!globalThis.document?.createElement) return;
     if (!outputModule) outputModule = new Promise(resolve => {
-      const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "/conversation-output.css?v=1"; document.head.append(css);
-      const script = document.createElement("script"); script.src = "/conversation-output.js?v=1";
+      const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "/conversation-output.css?v=2"; document.head.append(css);
+      if (globalThis.AriadneConversationOutput) { resolve(globalThis.AriadneConversationOutput); return; }
+      const script = document.createElement("script"); script.src = "/conversation-output.js?v=2";
       script.onload = () => resolve(globalThis.AriadneConversationOutput);
       script.onerror = () => resolve(null);
       document.head.append(script);

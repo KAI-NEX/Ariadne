@@ -8,6 +8,7 @@ PDF, create a ProcessingRun, persist messages, or apply a Working Model patch.
 from __future__ import annotations
 
 from src.model_settings import apply_execution_settings
+from src.conversation_delivery import conversation_delivery
 
 import json
 import hashlib
@@ -1262,6 +1263,7 @@ def normalize_candidate_conversation_response(provider_response: Any, request: C
     return action, usage
 
 
+@conversation_delivery(CandidateConversationRuntimeError)
 def execute_candidate_conversation_request(
     payload: Any,
     credential_reader: Callable[[], str | None],

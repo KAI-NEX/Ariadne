@@ -10,6 +10,7 @@
   else root.AriadneCandidateConversationPersistence = api;
 }(typeof globalThis !== "undefined" ? globalThis : this, function createCandidateConversationPersistence(Truth, Conversation) {
   if (!Truth || !Conversation) throw new Error("candidate_conversation_persistence_dependency_required");
+  const Delivery = globalThis.AriadneConversationOutput || (typeof module === "object" ? require("./conversation-output.js") : null);
 
   const SESSION_CONTRACT = Conversation.CONTRACT_ID;
   const MESSAGE_CONTRACT = `${Conversation.CONTRACT_ID}-message-v1`;
@@ -122,7 +123,7 @@
     });
   }
 
-  function createAssistantMessage({ message_id: messageId, conversation_id: conversationId, turn_id: turnId, text, provider, model, runtime_snapshot_id: runtimeSnapshotId, candidate_action_id: candidateActionId, created_at: createdAt = new Date() }) {
+  function createAssistantMessage({ message_id: messageId, conversation_id: conversationId, turn_id: turnId, text, provider, model, runtime_snapshot_id: runtimeSnapshotId, candidate_action_id: candidateActionId, deliverable = null, created_at: createdAt = new Date() }) {
     return validateMessage({
       contract_id: MESSAGE_CONTRACT,
       message_id: messageId,
@@ -135,11 +136,16 @@
       model,
       runtime_snapshot_id: runtimeSnapshotId,
       candidate_action_id: candidateActionId,
+      ...(deliverable ? { deliverable: Delivery.validate(deliverable) } : {}),
     });
   }
 
   function validateMessage(value) {
-    const message = exact(value, ["contract_id", "message_id", "conversation_id", "turn_id", "role", "text", "created_at", "provider", "model", "runtime_snapshot_id", "candidate_action_id"], "MESSAGE_SHAPE_INVALID");
+    const message = exact(value, ["contract_id", "message_id", "conversation_id", "turn_id", "role", "text", "created_at", "provider", "model", "runtime_snapshot_id", "candidate_action_id", ...(Object.hasOwn(value || {}, "deliverable") ? ["deliverable"] : [])], "MESSAGE_SHAPE_INVALID");
+    if (Object.hasOwn(message, "deliverable")) {
+      if (message.role !== "ASSISTANT") throw new CandidateConversationPersistenceError("USER_MESSAGE_METADATA_FORBIDDEN");
+      Delivery.validate(message.deliverable);
+    }
     if (message.contract_id !== MESSAGE_CONTRACT || !MESSAGE_ROLES.includes(message.role)) throw new CandidateConversationPersistenceError("MESSAGE_CONTRACT_INVALID");
     ["message_id", "conversation_id", "turn_id"].forEach((key) => requiredString(message[key], "MESSAGE_IDENTITY_INVALID", 256));
     requiredString(message.text, "MESSAGE_TEXT_INVALID", 8000);

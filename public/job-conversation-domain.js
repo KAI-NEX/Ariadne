@@ -153,6 +153,7 @@
   }
 
   function compileContext({ job_revision: jobRevision, job_subject: jobSubject, candidate_snapshot: candidateSnapshot, candidate_delta: candidateDelta, source_excerpt_manifest: sourceManifest, human_message: humanMessage, messages = [] }) {
+    const Delivery = globalThis.AriadneConversationOutput || (typeof module === "object" ? require("./conversation-output.js") : null);
     const subject = normalizedJobSubject(jobSubject || jobRevision);
     const payload = subject.payload;
     if (candidateSnapshot?.contract_id !== Manifest.candidate_snapshot_version || candidateDelta?.contract_id !== Manifest.candidate_delta_version) throw new JobConversationError("candidate_context_invalid");
@@ -168,7 +169,7 @@
       // removed or corrected memory through conversation history.
       if ((candidateSnapshot.memory_revision_count > 0 || assistant.candidate_fingerprint)
         && assistant.candidate_fingerprint !== candidateSnapshot.aggregate_fingerprint) continue;
-      const pair = recent.slice(index, index + 2).map((entry) => ({ role: entry.role, content: entry.content }));
+      const pair = recent.slice(index, index + 2).map((entry) => ({ role: entry.role, content: entry.role === "ASSISTANT" && Delivery ? Delivery.historyText(entry) : entry.content }));
       const size = PersonalContext.bytes(pair);
       if (historyBytes + size > 8000) break;
       history.unshift(...pair); historyBytes += size;

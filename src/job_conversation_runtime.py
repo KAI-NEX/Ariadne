@@ -8,6 +8,7 @@ Candidate, source and storage identities remain local.
 from __future__ import annotations
 
 from src.model_settings import apply_execution_settings
+from src.conversation_delivery import conversation_delivery
 
 import json
 import re
@@ -465,6 +466,7 @@ def normalize_job_conversation_response(provider_response: Any, request: JobConv
     return output, dict(usage)
 
 
+@conversation_delivery(JobConversationRuntimeError)
 def execute_job_conversation_request(
     payload: Any,
     credential_reader: Callable[[], str | None],
