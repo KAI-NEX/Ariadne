@@ -13,4 +13,3 @@
 .v1-model-panel [aria-checked="true"]::after { content: ""; flex: 0 0 var(--vi-space-16); height: var(--vi-space-16); background: currentColor; mask: url('/vi/icons/check.svg') center / contain no-repeat; -webkit-mask: url('/vi/icons/check.svg') center / contain no-repeat; }
 .v1-model-panel button:disabled { opacity: .5; cursor: wait; }
 .v1-model-panel button:focus-visible { outline: 2px solid var(--vi-focus); outline-offset: -2px; }
-.v1-message-runtime { display: block; margin-top: var(--vi-space-8); color: var(--vi-text-secondary); font-size: var(--vi-text-caption); font-family: var(--vi-font-ui); }
