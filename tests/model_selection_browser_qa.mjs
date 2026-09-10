@@ -67,7 +67,7 @@ try {
     const composer=await page.evaluate(()=>{
       const form=document.querySelector('form'),field=form.querySelector('.v1-composer-field'),input=form.querySelector('textarea'),send=form.querySelector('button[type=submit]');
       const f=field.getBoundingClientRect(),t=input.getBoundingClientRect(),b=send.getBoundingClientRect(),m=document.querySelector('.v1-model-panel').getBoundingClientRect(),trigger=form.querySelector('.v1-model-trigger').getBoundingClientRect();
-      return {inside:field.contains(send)&&b.right<=f.right&&b.bottom<=f.bottom&&b.top>=t.bottom,large:t.height>=96,width:Math.abs(form.getBoundingClientRect().width-f.width)<2,up:m.bottom<=trigger.top,focused:document.activeElement.getAttribute('role')==='menuitemradio'};
+      return {inside:field.contains(send)&&b.right<=f.right&&b.bottom<=f.bottom&&b.top>=t.bottom,large:t.height===64,width:Math.abs(form.getBoundingClientRect().width-f.width)<2,up:m.bottom<=trigger.top,focused:document.activeElement.getAttribute('role')==='menuitemradio'};
     });assert.deepEqual(composer,{inside:true,large:true,width:true,up:true,focused:true});
     assert.equal(await page.locator('.v1-model-panel select,.v1-model-panel details,[data-model-apply]').count(),0);
     await page.keyboard.press('Home');assert.equal(await page.locator('[data-model-choice]').first().evaluate(el=>el===document.activeElement),true);
@@ -86,7 +86,7 @@ try {
     assert.equal(await p.locator('.v1-model-trigger').count(),1,path);
     assert.equal(await p.locator('.v1-composer-field > button[type=submit]').count(),1,path);
     assert.equal(await p.locator('form > button[type=submit]').count(),0,path);
-    assert.ok(await p.locator('.v1-conversation-form textarea').evaluate(el=>parseFloat(getComputedStyle(el).minHeight)>=96),path);
+    assert.equal(await p.locator('.v1-conversation-form textarea').evaluate(el=>parseFloat(getComputedStyle(el).minHeight)),64,path);
     await p.close();
   }
   // A real synthetic Candidate source restores its stable shared conversation scope.
