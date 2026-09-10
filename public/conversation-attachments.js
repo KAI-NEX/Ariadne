@@ -49,7 +49,7 @@
     addButton.setAttribute("data-attachment-add", "");
     addButton.setAttribute("aria-label", "添加图片或文件");
     addButton.title = "添加图片或文件，也可直接粘贴图片或拖入文件";
-    field.append(addButton);
+    field.insertBefore(addButton, field.querySelector('.v1-model-trigger, button[type="submit"]'));
     const feedback = document.createElement("div"); feedback.className = "v1-attachment-feedback";
     feedback.innerHTML = '<input type="file" hidden multiple accept=".pdf,.docx,.png,.jpg,.jpeg,.txt,.md,.markdown"><label class="v1-attachment-consent hidden"><input type="checkbox"><span></span></label><p class="v1-attachment-status" role="status"></p>';
     form.append(feedback);

@@ -12,8 +12,14 @@ const errors=[],posts=[];let dialogs=0;
 context.on('page',page=>{page.on('pageerror',error=>errors.push(error.message));page.on('dialog',async dialog=>{dialogs++;await dialog.accept();});});
 const page=await context.newPage();
 const trigger=p=>p.locator('.v1-model-trigger');
-async function open(p){await trigger(p).click();await p.locator('[data-model-choice] option').first().waitFor({state:'attached'});}
-async function choose(p,effort,action='apply'){await open(p);await p.locator('[data-parameter="reasoning_effort"]').selectOption(effort);await p.locator(`[data-model-${action}]`).click();await p.waitForFunction(()=>!document.querySelector('.v1-model-panel').matches(':popover-open'));}
+async function open(p){await trigger(p).click();await p.locator('[data-model-choice]').first().waitFor({state:'visible'});}
+async function configure(p,options={}){await p.evaluate(async options=>{
+  const operation=document.querySelector('form').id==='job-overview-form'?'job_overview':'personal_understanding';
+  const runtime={mode:'model',provider:options.provider||'codex',model:options.model||'gpt-5.6-sol'};
+  runtime.execution_settings=AriadneModelSettings.envelope(runtime,runtime.provider==='codex'?{reasoning_effort:options.effort||'medium'}:{});
+  await AriadneRuntimeSelection.update({scope:AriadneRuntimeSelection.scopeFor(operation),runtime,expectedRevision:AriadneRuntimeSelection.version(),...options});
+},options);}
+async function choose(p,effort){await open(p);await p.locator(`[data-model-choice][data-effort="${effort}"]`).click();await p.waitForFunction(()=>!document.querySelector('.v1-model-panel').matches(':popover-open'));}
 try {
   await page.goto(base+'/personal-understanding.html');
   await page.evaluate(()=>localStorage.setItem('job-radar-selected-runtime',JSON.stringify({mode:'model',provider:'codex',model:'gpt-5.6-sol'})));
@@ -23,15 +29,15 @@ try {
   const other=await context.newPage();await other.goto(base+'/job-overview.html');
   assert.equal(await trigger(other).textContent(),'Sol · 中');
   const same=await context.newPage();await same.goto(base+'/personal-understanding.html');assert.equal(await trigger(same).textContent(),'Sol · 低');
-  await open(page);await choose(other,'high','default');
-  await page.locator('[data-model-apply]').click();await page.locator('[data-model-error]').filter({hasText:'另一页面'}).waitFor();
+  await open(page);await configure(other,{effort:'high',makeDefault:true});
+  await page.locator('[data-model-choice][data-effort="medium"]').click();await page.locator('[data-model-error]').filter({hasText:'另一页面'}).waitFor();
   assert.equal(await trigger(page).textContent(),'Sol · 低');
-  await page.locator('[data-model-close]').click();
-  await open(page);await page.locator('[data-model-inherit]').click();await trigger(page).filter({hasText:'Sol · 高'}).waitFor();
+  await page.keyboard.press('Escape');
+  await configure(page,{clear:true});await trigger(page).filter({hasText:'Sol · 高'}).waitFor();
   await choose(page,'low');await same.waitForFunction(()=>document.querySelector('.v1-model-trigger').textContent==='Sol · 低');
-  await open(page);await page.locator('[data-model-choice]').selectOption('deepseek/deepseek-v4-flash-vision-exp');
-  assert.equal(await page.locator('[data-model-parameters] select').count(),0);
-  await page.locator('[data-model-close]').click();
+  await open(page);assert.equal(await page.locator('[data-model-choice^="deepseek/"]').count(),1);
+  assert.equal(await page.locator('[data-model-choice^="deepseek/"]').getAttribute('data-effort'),'');
+  await page.keyboard.press('Escape');
   await page.locator('textarea').fill('Synthetic settings QA input');
   await page.locator('input[type=file]').setInputFiles({name:'synthetic.txt',mimeType:'text/plain',buffer:Buffer.from('Synthetic attachment only')});
   await page.locator('.v1-attachment-consent input').check();
@@ -58,13 +64,30 @@ try {
     await page.setViewportSize({width,height:900});await open(page);
     const geometry=await page.evaluate(()=>{const p=document.querySelector('.v1-model-panel').getBoundingClientRect(),t=document.querySelector('.v1-model-trigger').getBoundingClientRect();return {left:p.left,right:p.right,top:p.top,bottom:p.bottom,viewport:innerWidth,overflow:document.documentElement.scrollWidth>innerWidth,triggerHeight:t.height,bg:getComputedStyle(document.querySelector('.v1-model-trigger')).backgroundColor};});
     assert.ok(geometry.left>=0&&geometry.right<=width&&geometry.top>=0&&geometry.bottom<=900,JSON.stringify(geometry));assert.equal(geometry.overflow,false);assert.equal(geometry.bg,'rgba(0, 0, 0, 0)');
+    const composer=await page.evaluate(()=>{
+      const form=document.querySelector('form'),field=form.querySelector('.v1-composer-field'),input=form.querySelector('textarea'),send=form.querySelector('button[type=submit]');
+      const f=field.getBoundingClientRect(),t=input.getBoundingClientRect(),b=send.getBoundingClientRect(),m=document.querySelector('.v1-model-panel').getBoundingClientRect(),trigger=form.querySelector('.v1-model-trigger').getBoundingClientRect();
+      return {inside:field.contains(send)&&b.right<=f.right&&b.bottom<=f.bottom&&b.top>=t.bottom,large:t.height>=96,width:Math.abs(form.getBoundingClientRect().width-f.width)<2,up:m.bottom<=trigger.top,focused:document.activeElement.getAttribute('role')==='menuitemradio'};
+    });assert.deepEqual(composer,{inside:true,large:true,width:true,up:true,focused:true});
+    assert.equal(await page.locator('.v1-model-panel select,.v1-model-panel details,[data-model-apply]').count(),0);
+    await page.keyboard.press('Home');assert.equal(await page.locator('[data-model-choice]').first().evaluate(el=>el===document.activeElement),true);
+    await page.keyboard.press('End');assert.equal(await page.locator('[data-model-choice]').last().evaluate(el=>el===document.activeElement),true);
     await page.screenshot({path:`${out}/personal-${width}.png`,fullPage:true});
     await page.keyboard.press('Escape');await page.waitForFunction(()=>document.querySelector('.v1-model-trigger').getAttribute('aria-expanded')==='false');
+    await open(page);await page.keyboard.press('Tab');
+    await page.waitForFunction(()=>document.activeElement===document.querySelector('form button[type=submit]'));
+    await open(page);const inputBox=await page.locator('textarea').boundingBox();
+    await page.locator('textarea').click({position:{x:inputBox.width-8,y:24}});
+    await page.waitForFunction(()=>document.activeElement===document.querySelector('textarea')&&!document.querySelector('.v1-model-panel').matches(':popover-open'));
   }
   // All six physical composers use the same control. Empty/demo domain data is not rewritten.
   for(const path of ['personal-import.html','candidate-detail.html','jd-import.html','job-detail.html','personal-understanding.html','job-overview.html']){
     const p=await context.newPage();await p.goto(base+'/'+path);await p.locator('.v1-model-trigger').waitFor({state:'attached'});
-    assert.equal(await p.locator('.v1-model-trigger').count(),1,path);await p.close();
+    assert.equal(await p.locator('.v1-model-trigger').count(),1,path);
+    assert.equal(await p.locator('.v1-composer-field > button[type=submit]').count(),1,path);
+    assert.equal(await p.locator('form > button[type=submit]').count(),0,path);
+    assert.ok(await p.locator('.v1-conversation-form textarea').evaluate(el=>parseFloat(getComputedStyle(el).minHeight)>=96),path);
+    await p.close();
   }
   // A real synthetic Candidate source restores its stable shared conversation scope.
   const candidate=await context.newPage();await candidate.goto(base+'/personal-import.html');
@@ -87,7 +110,7 @@ try {
   const home=await context.newPage();await home.goto(base+'/index.html');await home.waitForFunction(()=>document.getElementById('runtime-selected').textContent.includes('GPT Sol'));
   await home.screenshot({path:`${out}/home.png`,fullPage:true});
   // A machine's initial hint must not overwrite an explicit in-app default.
-  await open(page);await page.locator('[data-model-choice]').selectOption('deepseek/deepseek-v4-flash-vision-exp');await page.locator('[data-model-default]').click();
+  await configure(page,{provider:'deepseek',model:'deepseek-v4-flash-vision-exp',makeDefault:true});
   const hint=await context.newPage();await hint.route('**/api/runtime-options',async route=>{const response=await route.fetch(),data=await response.json();data.local_preference={id:'local-codex-v1',provider:'codex',model:'gpt-5.6-sol'};await route.fulfill({json:data});});
   await hint.goto(base+'/index.html');await hint.waitForFunction(()=>document.getElementById('runtime-selected').textContent.includes('DeepSeek Vision'));
   assert.deepEqual(errors,[]);

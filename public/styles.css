@@ -781,6 +781,10 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-conversation-form { align-items: center; background: transparent; border: 0; border-radius: 0; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) 42px; margin-top: auto; padding: 0; }
 .v1-composer-field { align-items: center; background: var(--vi-surface); background-clip: padding-box; border: 1px solid #d8deea; border-radius: var(--vi-radius-field); display: flex; min-height: var(--vi-composer-field); position: relative; transition: border-color 180ms ease, box-shadow 180ms ease; }
 .v1-composer-field:focus-within { border-color: var(--vi-focus); box-shadow: var(--vi-focus-ring); }
+.v1-conversation-form.has-integrated-composer { grid-template-columns: minmax(0, 1fr); }
+.v1-conversation-form.has-integrated-composer .v1-composer-field { display: grid; grid-template-columns: var(--vi-composer-input) minmax(0, 1fr) var(--vi-composer-send); padding: 0 var(--vi-space-8) var(--vi-space-8); }
+.has-integrated-composer .v1-composer-field > textarea { grid-column: 1 / -1; grid-row: 2; min-height: calc(var(--vi-space-48) * 2); }
+.has-integrated-composer .v1-composer-field > button[type="submit"] { grid-column: 3; grid-row: 3; justify-self: end; }
 .v1-conversation-form textarea { background: transparent; border: 0; box-shadow: none; color: var(--ink); display: block; height: var(--vi-composer-input); line-height: 20px; min-height: var(--vi-composer-input); outline: 0; overflow-y: auto; padding: 12px 13px; resize: none; width: 100%; }
 .v1-conversation-form textarea:focus-visible { outline: 0; }
 .v1-body .v1-conversation-form .v1-composer-field textarea:focus-visible { outline: 0; outline-offset: 0; }

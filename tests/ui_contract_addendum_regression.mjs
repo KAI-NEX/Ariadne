@@ -53,7 +53,9 @@ for (const html of productSurfaces) {
 for (const html of [candidateImport, jobImport]) assert.match(html, /product-shell-domain\.js\?v=shared-product-shell-v4/);
 for (const html of [candidateDetail, jobDetail]) assert.match(html, /product-shell-domain\.js\?v=detail-behavior-v1/);
 for (const html of [candidateDetail, jobDetail]) assert.match(html, /v1-pages\.js\?v=computer-use-e2e-v3/);
-assert.equal((styles.match(/\.v1-composer-field \{/g) || []).length, 1);
+assert.equal((styles.match(/^\.v1-composer-field \{/gm) || []).length, 1);
+assert.match(styles, /\.has-integrated-composer \.v1-composer-field > textarea \{[^}]*min-height: calc\(48px \* 2\)/);
+assert.match(styles, /\.has-integrated-composer \.v1-composer-field > button\[type="submit"\] \{[^}]*grid-column: 3;[^}]*grid-row: 3/);
 assert.match(styles, /\.v1-composer-field \{[^}]*border-radius: 16px;[^}]*min-height: 46px/);
 assert.match(styles, /\.v1-conversation-form textarea \{[^}]*height: 44px;[^}]*min-height: 44px/);
 assert.match(styles, /\.v1-conversation-form button\[type="submit"\] \{[^}]*align-self: center;[^}]*height: 42px/);

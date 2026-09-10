@@ -86,6 +86,9 @@
       const input = form.querySelector("textarea"), field = form.querySelector(".v1-composer-field");
       if (!input || !field) return;
       enhancedForms.add(form);
+      const send = form.querySelector('button[type="submit"]');
+      if (send) field.append(send);
+      form.classList.add("has-integrated-composer");
       const doc = form.ownerDocument, view = doc.defaultView;
       const pane = form.parentElement;
       if (pane.matches(".v1-conversation-pane, .v1-ariadne-pane")) {
