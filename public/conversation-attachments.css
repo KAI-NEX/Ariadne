@@ -1,10 +1,27 @@
-.v1-conversation-attachments { color: var(--vi-text-secondary); font-family: var(--vi-font-ui); font-size: var(--vi-text-caption); margin-block: var(--vi-space-8); min-width: 0; }
-.v1-conversation-attachments summary { cursor: pointer; }
-.v1-conversation-attachments[open] { max-height: 40vh; overflow-y: auto; }
-.v1-conversation-attachments ul { list-style: none; padding: 0; margin: 0; max-height: 20vh; overflow-y: auto; }
-.v1-conversation-attachments li { display: flex; align-items: center; gap: var(--vi-space-8); }
-.v1-conversation-attachments li span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.v1-conversation-attachments img { width: var(--vi-space-48); height: var(--vi-space-48); object-fit: contain; }
-.v1-attachment-consent { display: flex; gap: var(--vi-space-8); align-items: flex-start; }
-.v1-attachment-consent input { flex: 0 0 auto; }
-.v1-attachment-status { overflow-wrap: anywhere; }
+.v1-composer-field.has-attachment-input { display: grid; grid-template-columns: var(--vi-composer-input) minmax(0, 1fr); min-width: 0; }
+.has-attachment-input > textarea { grid-column: 2; grid-row: 2; min-width: 0; }
+.v1-conversation-attachments { grid-column: 1 / -1; grid-row: 1; min-width: 0; color: var(--vi-text-secondary); font-family: var(--vi-font-ui); font-size: var(--vi-text-caption); }
+.v1-conversation-attachments.hidden, .v1-attachment-consent.hidden { display: none; }
+.v1-conversation-attachments ul { display: flex; gap: var(--vi-space-8); list-style: none; padding: var(--vi-space-12); margin: 0; overflow-x: auto; overscroll-behavior-inline: contain; }
+.v1-conversation-attachments li { position: relative; flex: 0 0 auto; width: calc(var(--vi-space-48) * 2); display: grid; gap: var(--vi-space-4); border: 1px solid var(--vi-line); border-radius: var(--vi-radius-small); padding: var(--vi-space-8); background: var(--vi-canvas); }
+.v1-conversation-attachments img { width: 100%; height: var(--vi-space-64); object-fit: contain; border-radius: var(--vi-space-4); }
+.v1-attachment-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.v1-attachment-file-type { height: var(--vi-space-64); display: flex; align-items: center; font-weight: 600; color: var(--vi-ink); }
+.v1-conversation-form .v1-attachment-add, .v1-conversation-form .v1-attachment-remove { display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: var(--vi-radius-circle); font-size: 0; background: transparent; color: var(--vi-text-secondary); cursor: pointer; }
+.v1-conversation-form .v1-attachment-add::before, .v1-conversation-form .v1-attachment-remove::before { content: ""; background: currentColor; width: var(--vi-space-20); height: var(--vi-space-20); mask: center / var(--vi-space-20) var(--vi-space-20) no-repeat; -webkit-mask: center / var(--vi-space-20) var(--vi-space-20) no-repeat; }
+.v1-conversation-form .v1-attachment-add { grid-column: 1; grid-row: 2; align-self: end; width: var(--vi-composer-input); height: var(--vi-composer-input); }
+.v1-conversation-form .v1-attachment-add::before { mask-image: url('/vi/icons/plus.svg'); -webkit-mask-image: url('/vi/icons/plus.svg'); }
+.v1-conversation-form .v1-attachment-remove { position: absolute; top: 0; right: 0; width: var(--vi-space-32); height: var(--vi-space-32); background: var(--vi-surface); border: 1px solid var(--vi-line); }
+.v1-conversation-form .v1-attachment-remove::before { width: var(--vi-space-16); height: var(--vi-space-16); mask-image: url('/vi/icons/close.svg'); -webkit-mask-image: url('/vi/icons/close.svg'); mask-size: var(--vi-space-16); -webkit-mask-size: var(--vi-space-16); }
+.v1-conversation-form .v1-attachment-add:hover, .v1-conversation-form .v1-attachment-remove:hover { background: var(--vi-canvas); color: var(--vi-ink); }
+.v1-conversation-form .v1-attachment-add:hover { background: transparent; }
+.v1-conversation-form:has(.has-attachment-input) > button[type="submit"] { align-self: end; }
+.v1-conversation-form .v1-attachment-add:focus-visible, .v1-conversation-form .v1-attachment-remove:focus-visible { outline: 2px solid var(--vi-focus); outline-offset: -2px; }
+.v1-conversation-form .v1-attachment-add:disabled, .v1-conversation-form .v1-attachment-remove:disabled { cursor: wait; opacity: .5; }
+.v1-composer-field.is-file-dragover { border-color: var(--vi-focus); box-shadow: var(--vi-focus-ring); }
+.v1-attachment-feedback { grid-column: 1 / -1; min-width: 0; color: var(--vi-text-secondary); font-size: var(--vi-text-caption); }
+.v1-attachment-feedback:not(:has(.v1-attachment-consent:not(.hidden))):has(.v1-attachment-status:empty) { display: none; }
+.v1-attachment-consent { display: flex; gap: var(--vi-space-8); align-items: flex-start; font-weight: 400; }
+.v1-attachment-consent input { flex: 0 0 auto; width: auto; }
+.v1-attachment-status { overflow-wrap: anywhere; margin: var(--vi-space-4) 0 0; }
+.v1-attachment-status:empty { display: none; }

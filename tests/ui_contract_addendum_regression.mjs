@@ -56,7 +56,7 @@ for (const html of [candidateDetail, jobDetail]) assert.match(html, /v1-pages\.j
 assert.equal((styles.match(/\.v1-composer-field \{/g) || []).length, 1);
 assert.match(styles, /\.v1-composer-field \{[^}]*border-radius: 16px;[^}]*min-height: 46px/);
 assert.match(styles, /\.v1-conversation-form textarea \{[^}]*height: 44px;[^}]*min-height: 44px/);
-assert.match(styles, /\.v1-conversation-form button \{[^}]*align-self: center;[^}]*height: 42px/);
+assert.match(styles, /\.v1-conversation-form button\[type="submit"\] \{[^}]*align-self: center;[^}]*height: 42px/);
 
 assert.doesNotMatch(styles, /\.v1-back:hover \{[^}]*translateX/);
 assert.match(styles, /\.v1-back:hover \{[^}]*scale: 1\.04;[^}]*transform: none/);

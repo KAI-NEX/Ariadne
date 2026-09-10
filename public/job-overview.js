@@ -10,7 +10,7 @@
     el("job-overview-consent-copy").textContent = current.mode === "local" ? "当前为 Local。选择可用模型后，可以汇总与讨论职位。" : `允许将问题及当前职位描述内容发送至 ${current.provider} · ${current.model}；更新概况可能分批调用并产生 API 费用。不发送个人资料。`;
     el("job-overview-consent").disabled = busy || !gate.allowed;
     const disabled = busy || !gate.allowed || !el("job-overview-consent").checked;
-    el("refresh-job-overview").disabled = disabled; el("job-overview-form").querySelector("button").disabled = disabled; return gate;
+    el("refresh-job-overview").disabled = disabled; el("job-overview-form").querySelector('button[type="submit"]').disabled = disabled; return gate;
   }
   function links(identities) {
     return [...new Set(identities || [])].map((identity) => {

@@ -17,7 +17,7 @@
     byId("personal-consent-copy").textContent = runtime.mode === "local" ? "当前为 Local。切换到已验证的模型后，可以综合资料与对话。" : `允许将问题和个人资料发送至 ${runtime.provider === "codex" ? "Codex / OpenAI" : runtime.provider} · ${runtime.model}；新资料将分批理解，可能产生多次 API 调用费用。资料不会自动成为确认事实。`;
     byId("personal-model-consent").disabled = !gate.allowed || busy;
     const allowed = gate.allowed && byId("personal-model-consent").checked && !busy;
-    byId("personal-conversation-form").querySelector("button").disabled = !allowed;
+    byId("personal-conversation-form").querySelector('button[type="submit"]').disabled = !allowed;
     byId("refresh-understanding").disabled = !allowed;
     return gate;
   }

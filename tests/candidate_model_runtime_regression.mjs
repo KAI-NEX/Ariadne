@@ -376,7 +376,7 @@ assert.match(styles, /\.v1-workspace-content-footer \{[^}]*justify-content: flex
 assert.doesNotMatch(styles, /\.v1-workspace-content-footer \{[^}]*border-top:/);
 assert.match(styles, /\.v1-composer-field:focus-within \{[^}]*border-color: #526fda;[^}]*box-shadow:/);
 assert.match(styles, /\.v1-conversation-form textarea \{[^}]*background: transparent;[^}]*border: 0;[^}]*height: 44px;[^}]*outline: 0;/);
-assert.match(styles, /\.v1-conversation-form button \{[^}]*align-self: center;/);
+assert.match(styles, /\.v1-conversation-form button\[type="submit"\] \{[^}]*align-self: center;/);
 assert.match(styles, /\.v1-conversation-form textarea \{[^}]*line-height: 20px;[^}]*padding: 12px 13px;/);
 assert.match(styles, /#candidate-card-detail \.v1-workspace-back-icon::before \{[^}]*display: block;[^}]*position: static;/);
 assert.match(styles, /#candidate-card-detail-facts > div \{[^}]*grid-template-columns: 64px minmax\(0,1fr\);/);

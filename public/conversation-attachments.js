@@ -38,20 +38,39 @@
     } finally { db.close(); }
   }
   function mount(form, domain) {
-    const panel = document.createElement("details"); panel.className = "v1-conversation-attachments";
-    panel.innerHTML = '<summary>附件 · 可粘贴图片</summary><button type="button" class="v1-tertiary-button" data-attachment-add>选择文件</button><input type="file" hidden multiple accept=".pdf,.docx,.png,.jpg,.jpeg,.txt,.md,.markdown"><ul data-attachment-list></ul><label class="v1-attachment-consent hidden"><input type="checkbox"><span></span></label><p class="v1-attachment-status" role="status"></p>';
-    form.before(panel);
-    const input = panel.querySelector('input[type="file"]'), consent = panel.querySelector('input[type="checkbox"]'), list = panel.querySelector("ul"), status = panel.querySelector('[role="status"]');
-    const state = { form, domain, panel, files: [], consent, status, busy: false, urls: [], runtime: null };
+    const field = form.querySelector(".v1-composer-field"), text = form.querySelector("textarea");
+    if (!field || !text) return;
+    field.classList.add("has-attachment-input");
+    const panel = document.createElement("div"); panel.className = "v1-conversation-attachments hidden";
+    panel.innerHTML = '<ul data-attachment-list aria-label="本轮待发送附件"></ul>';
+    field.prepend(panel);
+    const addButton = document.createElement("button");
+    addButton.type = "button"; addButton.className = "v1-attachment-add";
+    addButton.setAttribute("data-attachment-add", "");
+    addButton.setAttribute("aria-label", "添加图片或文件");
+    addButton.title = "添加图片或文件，也可直接粘贴图片或拖入文件";
+    field.append(addButton);
+    const feedback = document.createElement("div"); feedback.className = "v1-attachment-feedback";
+    feedback.innerHTML = '<input type="file" hidden multiple accept=".pdf,.docx,.png,.jpg,.jpeg,.txt,.md,.markdown"><label class="v1-attachment-consent hidden"><input type="checkbox"><span></span></label><p class="v1-attachment-status" role="status"></p>';
+    form.append(feedback);
+    const input = feedback.querySelector('input[type="file"]'), consent = feedback.querySelector('input[type="checkbox"]'), list = panel.querySelector("ul"), status = feedback.querySelector('[role="status"]');
+    const state = { form, domain, panel, files: [], consent, status, busy: false, urls: new Map(), runtime: null };
     controllers.set(form.id, state);
     const runtime = () => root.JobRadarRuntimeGate?.authority?.()?.runtime || root.JobRadarRuntimeGate?.operationGate?.(domain === "PERSONAL" ? "personal_understanding" : domain === "JOB_OVERVIEW" ? "job_overview" : domain === "JOB" ? "job_conversation" : "candidate_conversation")?.authority?.runtime;
     const identity = () => { const r = runtime(); return `${r?.mode}/${r?.provider}/${r?.model}`; };
     const render = () => {
-      state.urls.forEach(URL.revokeObjectURL); state.urls = [];
       const r = runtime();
-      panel.querySelector("summary").textContent = state.files.length ? `附件（${state.files.length}）· 仅用于本轮` : "附件 · 可粘贴图片";
-      list.innerHTML = state.files.map((file, i) => { let preview = ""; if (/\.(png|jpe?g)$/i.test(file.name)) { const url = URL.createObjectURL(file); state.urls.push(url); preview = `<img src="${url}" alt="所选图片预览">`; }
-        return `<li>${preview}<span>${esc(file.name)} · ${(file.size / 1000000).toFixed(2)} MB</span><button type="button" class="v1-tertiary-button" data-attachment-remove="${i}" aria-label="移除 ${esc(file.name)}">移除</button></li>`; }).join("");
+      panel.classList.toggle("hidden", !state.files.length);
+      field.setAttribute("aria-busy", String(state.busy));
+      addButton.disabled = state.busy;
+      list.innerHTML = state.files.map((file, i) => {
+        const isImage = /\.(png|jpe?g)$/i.test(file.name);
+        let preview = `<span class="v1-attachment-file-type">${esc(file.name.split('.').pop().toUpperCase())}</span>`;
+        if (isImage) { const url = state.urls.get(file) || URL.createObjectURL(file); state.urls.set(file, url); preview = `<img src="${url}" alt="${esc(file.name)} 的缩略图">`; }
+        return `<li class="${isImage ? "is-image" : "is-document"}" title="${esc(file.name)} · ${(file.size / 1000000).toFixed(2)} MB">${preview}<span class="v1-attachment-name">${esc(file.name)}</span><button type="button" class="v1-attachment-remove" data-attachment-remove="${i}" aria-label="移除 ${esc(file.name)}" ${state.busy ? "disabled" : ""}></button></li>`;
+      }).join("");
+      // Busy/consent updates reuse previews; revoke only removed files, after detaching their images.
+      for (const [file, url] of state.urls) if (!state.files.includes(file)) { URL.revokeObjectURL(url); state.urls.delete(file); }
       consent.parentElement.classList.toggle("hidden", !state.files.length);
       consent.nextElementSibling.textContent = `同意将所选附件发送给 ${r?.provider === "codex" ? "Codex / OpenAI" : r?.provider || "当前模型"} / ${r?.model || "未选择"} 用于本轮对话，可能消耗额度。附件不会自动保存到个人资料或职位。`;
     };
@@ -60,23 +79,38 @@
       try {
         const seen = new Set(state.files.map(f => `${f.name}:${f.size}:${f.lastModified}`));
         const merged = [...state.files]; for (const file of files) { const k = `${file.name}:${file.size}:${file.lastModified}`; if (!seen.has(k)) { seen.add(k); merged.push(file); } }
-        state.files = validateFiles(merged); consent.checked = false; state.runtime = identity(); panel.open = true; status.textContent = "每轮最多 4 个，合计 30 MB。PDF 完整逐页读取；DOCX 读取文字和内嵌图片。后续追问需要查看原附件时，请再次添加。"; render();
-      } catch (error) { panel.open = true; status.textContent = error.message; }
+        state.files = validateFiles(merged); consent.checked = false; state.runtime = identity(); status.textContent = ""; render();
+      } catch (error) { status.textContent = error.message; }
     };
-    panel.querySelector('[data-attachment-add]').onclick = () => { if (!state.busy) { input.value = ""; input.click(); } };
+    addButton.onclick = () => { if (!state.busy) { input.value = ""; input.click(); } };
     input.onchange = () => add(Array.from(input.files));
-    list.onclick = (event) => { const b = event.target.closest('[data-attachment-remove]'); if (b && !state.busy) { state.files.splice(Number(b.dataset.attachmentRemove), 1); consent.checked = false; render(); } };
+    list.onclick = (event) => { const b = event.target.closest('[data-attachment-remove]'); if (b && !state.busy) { state.files.splice(Number(b.dataset.attachmentRemove), 1); consent.checked = false; status.textContent = ""; render(); text.focus({ preventScroll: true }); } };
     form.addEventListener("paste", (event) => {
       const images = [...(event.clipboardData?.items || [])].filter(x => x.kind === "file" && ["image/png", "image/jpeg"].includes(x.type)).map(x => x.getAsFile()).filter(Boolean);
-      if (images.length) { event.preventDefault(); add(images.map((blob, i) => new File([blob], `粘贴图片-${Date.now()}-${i + 1}.${blob.type === "image/png" ? "png" : "jpg"}`, { type: blob.type }))); }
+      if (images.length) {
+        event.preventDefault();
+        add(images.map((blob, i) => new File([blob], `粘贴图片-${Date.now()}-${i + 1}.${blob.type === "image/png" ? "png" : "jpg"}`, { type: blob.type })));
+        const pastedText = event.clipboardData.getData("text/plain");
+        if (pastedText && event.target === text) {
+          text.setRangeText(pastedText, text.selectionStart, text.selectionEnd, "end");
+          text.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+      }
     });
-    for (const target of [form, panel]) {
-      target.addEventListener("dragover", event => { if (event.dataTransfer?.types.includes("Files")) event.preventDefault(); });
-      target.addEventListener("drop", event => { if (event.dataTransfer?.files.length) { event.preventDefault(); add([...event.dataTransfer.files]); } });
-    }
+    form.addEventListener("dragover", event => {
+      if (!Array.from(event.dataTransfer?.types || []).includes("Files")) return;
+      event.preventDefault(); event.stopPropagation();
+      event.dataTransfer.dropEffect = state.busy ? "none" : "copy";
+      field.classList.toggle("is-file-dragover", !state.busy);
+    });
+    form.addEventListener("dragleave", event => { if (!form.contains(event.relatedTarget)) field.classList.remove("is-file-dragover"); });
+    form.addEventListener("drop", event => {
+      field.classList.remove("is-file-dragover");
+      if (event.dataTransfer?.files.length) { event.preventDefault(); event.stopPropagation(); add([...event.dataTransfer.files]); }
+    });
     form.addEventListener("submit", event => {
       if (!state.files.length) return;
-      if (!consent.checked || state.runtime !== identity() || runtime()?.mode !== "model") { event.preventDefault(); event.stopImmediatePropagation(); panel.open = true; status.textContent = "请先选择模型，并勾选本轮附件的传输确认。"; return; }
+      if (state.busy || !consent.checked || state.runtime !== identity() || runtime()?.mode !== "model") { event.preventDefault(); event.stopImmediatePropagation(); status.textContent = state.busy ? "附件正在发送，请稍候。" : "请先选择模型，并勾选本轮附件的传输确认。"; return; }
       const text = form.querySelector("textarea"); if (!text.value.trim()) text.value = "请解读本轮附件。";
     }, true);
     root.JobRadarRuntimeGate?.subscribe?.(() => { consent.checked = false; state.runtime = identity(); render(); });
@@ -90,6 +124,7 @@
     const runtime = request.runtime_snapshot;
     if (state.runtime !== `${runtime.mode}/${runtime.provider}/${runtime.model}`) throw Error("attachment_runtime_invalid");
     state.busy = true;
+    state.render();
     try {
       const check = await (root.AriadneConnector || root).fetch("/api/conversation-attachment-capabilities", { cache: "no-store" });
       if (!check.ok || (await check.json()).contract_id !== CONTRACT) throw Error("attachment_contract_invalid");
@@ -101,7 +136,7 @@
       pending.set(requestId(request), { state, files });
       return { ...request, attachments: { contract_id: CONTRACT, request_id: requestId(request), files: records,
         consent: { confirmed: true, provider: runtime.provider, model: runtime.model, purpose: "CURRENT_CONVERSATION_TURN" } } };
-    } catch (error) { state.busy = false; state.status.textContent = errorCopy(error) || error.message; throw error; }
+    } catch (error) { state.busy = false; state.status.textContent = errorCopy(error) || error.message; state.render(); throw error; }
   }
   function finish(request, ok, error = null) {
     const active = pending.get(requestId(request)); if (!active) return;
@@ -113,7 +148,7 @@
   root.AriadneConversationAttachments = { prepare, finish, errorCopy, validateFiles, recordFor, CONTRACT };
   if (typeof module === "object") module.exports = root.AriadneConversationAttachments;
   if (root.document) document.addEventListener("DOMContentLoaded", () => {
-    const link = document.createElement("link"); link.rel = "stylesheet"; link.href = "/conversation-attachments.css"; document.head.append(link);
+    const link = document.createElement("link"); link.rel = "stylesheet"; link.href = "/conversation-attachments.css?v=inline-composer-3"; document.head.append(link);
     Object.entries(FORMS).forEach(([id, domain]) => { const form = document.getElementById(id); if (form) mount(form, domain); });
   }, { once: true });
 }(typeof globalThis === "undefined" ? this : globalThis));
