@@ -16,6 +16,10 @@ const jobImport = read("public/jd-import.html");
 const candidateDetail = read("public/candidate-detail.html");
 const jobDetail = read("public/job-detail.html");
 
+// Long source filenames must not inflate the left pane's implicit grid column.
+assert.match(styles, /\.v1-workspace-content-pane \{[^}]*grid-template-columns: minmax\(0,1fr\);/);
+assert.match(styles, /\.v1-workspace-scroll-region:has\(> \.v1-workspace-processing:not\(\.hidden\)\) \{[^}]*display: grid;[^}]*place-items: center;[^}]*padding: 24px;[^}]*scrollbar-gutter: auto;/);
+
 assert.match(candidateImport, /placeholder="直接说想了解什么，或哪里需要修改"/);
 assert.match(candidateDetail, /placeholder="询问这份材料，或直接说明要修改什么"/);
 assert.match(pages, /修改先保留在草稿，核对后由你保存/);
