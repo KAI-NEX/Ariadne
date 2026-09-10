@@ -1,0 +1,68 @@
+/* Physics and proportions follow the supplied WavePhysicsLoader reference. */
+.v1-conversation-status.v1-processing-indicator.v1-wave-wait {
+  align-items: flex-start;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  flex-direction: column;
+  gap: var(--vi-space-8);
+  min-height: 0;
+  padding: 0;
+  width: 100%;
+}
+.v1-wave-wait .v1-processing-copy strong {
+  color: var(--vi-text-secondary);
+  font-weight: 400;
+  white-space: normal;
+}
+.v1-wave-wait .v1-processing-copy small { color: var(--vi-text-secondary); }
+.v1-wave-loader {
+  --wave-scale: .6;
+  --wave-rest: var(--vi-wave-light);
+  --wave-crest: var(--vi-wave-dark);
+  --wave-ball: var(--vi-wave-ball);
+  display: block;
+  flex: none;
+  height: calc(192px * var(--wave-scale));
+  position: relative;
+  width: calc(292px * var(--wave-scale));
+}
+.v1-wave-loader[data-theme="dark"] {
+  --wave-rest: var(--vi-wave-dark);
+  --wave-crest: var(--vi-wave-light);
+  --wave-ball: var(--vi-surface);
+}
+.v1-wave-stage {
+  align-items: flex-end;
+  bottom: 0;
+  display: flex;
+  gap: var(--vi-space-8);
+  height: 192px;
+  left: 0;
+  position: absolute;
+  transform: scale(var(--wave-scale));
+  transform-origin: bottom left;
+  width: 292px;
+}
+.v1-wave-bar {
+  background: var(--wave-rest);
+  border-radius: var(--vi-radius-pill);
+  display: block;
+  flex: 0 0 12px;
+  height: 16px;
+  transform-origin: bottom;
+}
+.v1-wave-ball {
+  background: var(--wave-ball);
+  border-radius: var(--vi-radius-circle);
+  bottom: 0;
+  height: 12px;
+  left: 0;
+  position: absolute;
+  transform-origin: bottom center;
+  width: 12px;
+}
+.v1-wave-wait.is-terminal .v1-wave-loader { display: none; }
+@media (min-width: 640px) { .v1-wave-loader { --wave-scale: .75; } }
+@media (min-width: 768px) { .v1-wave-loader { --wave-scale: 1; } }

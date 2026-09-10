@@ -160,7 +160,9 @@ VI 页面提供 `vi-resume-sheet/row/label/content/heading` 的**合成排版样
 
 ## 7. 动效与层级
 
-常规缓动 `cubic-bezier(.22,.78,.24,1)`；展开缓动 `cubic-bezier(.16,1,.3,1)`。控件反馈 180–190 ms；加载 820 ms；详情展开/缩回 540/480 ms。JS 的 540/480 目前是既有代码契约，不声称已自动读取 CSS token；变更时须同时更新 JS 验证与 manifest。
+常规缓动 `cubic-bezier(.22,.78,.24,1)`；展开缓动 `cubic-bezier(.16,1,.3,1)`。控件反馈 180–190 ms；发送按钮/非对话处理旋转 820 ms，对话等待波浪 4000 ms；详情展开/缩回 540/480 ms。JS 的 540/480 目前是既有代码契约，不声称已自动读取 CSS token；变更时须同时更新 JS 验证与 manifest。
+
+AI 对话等待使用用户提供的 WavePhysicsLoader 轨迹，由 `wave-physics-loader.js/css` 以原生 Web Animations 实现：15 根 12 px 柱条、8 px 间隔、201 个采样帧、4 秒线性往返，小球四次抛物线弹跳/单程与落地压缩同步驱动波峰及下压。使用 manifest 的 wave-light/dark/ball 颜色端点，支持 light/dark；窄屏按 .6 / .75 / 1 比例缩放。六个对话 status 共用，进度更新不重播、离屏/后台暂停，减少动态效果时静态呈现，完成/失败/离页清理动画；状态文案和辅助阅读保留。发送按钮与非对话导入加载的既有旋转动画不改。
 
 工作空间 Ariadne 介绍浮窗单独使用 900 ms 展开 / 800 ms 缩回及 `cubic-bezier(.4,0,.2,1)`，由 JS 读取 `--vi-motion-about-open/close` 与 `--vi-ease-about`。完整内容从展开第一帧参与呈现，没有标题预览或延迟切换；固定终态排版，用等比 transform 展开，避免逐帧宽高重排。缩回从当前帧续接，英文文字回归入口，纸面在接近标题尺寸前淡出，防止小方框残影。返回图标、外侧点击、Esc、焦点恢复与减少动态效果保持；其他详情窗口时长不变。
 

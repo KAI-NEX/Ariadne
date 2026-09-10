@@ -1,16 +1,20 @@
 "use strict";
 
 (function attachProcessingIndicator(root, factory) {
-  const api = factory();
+  const wave = root.AriadneWavePhysics || (typeof module === "object" && module.exports ? require("./wave-physics-loader.js") : null);
+  const api = factory(wave);
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.AriadneProcessingIndicator = api;
-}(typeof globalThis !== "undefined" ? globalThis : this, function createProcessingIndicator() {
+}(typeof globalThis !== "undefined" ? globalThis : this, function createProcessingIndicator(Wave) {
   function ensure(host) {
     if (!host) return null;
     host.classList.add("v1-processing-indicator");
+    const conversation = Boolean(Wave) && host.classList.contains("v1-conversation-status");
+    host.classList.toggle("v1-wave-wait", conversation);
     if (!host.querySelector("[data-processing-orb]")) {
       const previous = host.textContent.trim();
       host.innerHTML = `<span class="v1-processing-loop" data-processing-orb aria-hidden="true"></span><span class="v1-processing-copy"><strong data-processing-copy></strong><small data-processing-boundary></small></span>`;
+      if (conversation) host.querySelector("[data-processing-orb]").className = "v1-wave-loader";
       if (previous) host.querySelector("[data-processing-copy]").textContent = previous;
     }
     return host;
@@ -32,9 +36,13 @@
   }
 
   function set(host, { active = true, copy = "", boundary = "", state = active ? "ACTIVE" : "IDLE" } = {}) {
+    const scroll = host?.closest?.(".v1-conversation-scroll, .v1-workspace-history");
+    const follow = scroll && scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 32;
     const target = ensure(host);
     if (!target) return;
     apply(target, { active: Boolean(active), copy, boundary, state });
+    if (target.classList.contains("v1-wave-wait")) Wave?.set(target.querySelector("[data-processing-orb]"), Boolean(active));
+    if (active && follow) scroll.scrollTop = scroll.scrollHeight;
   }
 
   function clear(host) { set(host, { active: false, copy: "" }); }

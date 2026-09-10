@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "updated": "2026-09-09",
+  "updated": "2026-09-10",
   "brand": {
     "en": "Ariadne",
     "zh": "衡"
@@ -65,6 +65,24 @@
       "value": "#8ea6ff",
       "group": "color",
       "label": "深色背景上的等待蓝"
+    },
+    {
+      "name": "--vi-wave-light",
+      "value": "#e4e4e7",
+      "group": "color",
+      "label": "等待波浪浅色端点"
+    },
+    {
+      "name": "--vi-wave-dark",
+      "value": "#27272a",
+      "group": "color",
+      "label": "等待波浪深色端点"
+    },
+    {
+      "name": "--vi-wave-ball",
+      "value": "#18181b",
+      "group": "color",
+      "label": "浅色主题弹跳小球"
     },
     {
       "name": "--vi-conversation",
