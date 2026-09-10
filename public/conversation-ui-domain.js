@@ -26,6 +26,18 @@
     outputModule.then(api => { if (api) callback(api); });
   }
 
+  function createIntro(element) {
+    let dismissed = false;
+    const update = (hasMessages = false) => {
+      dismissed ||= hasMessages;
+      element.hidden = dismissed;
+    };
+    element.addEventListener("click", (event) => {
+      if (event.target.closest("button, a[href]")) update(true);
+    });
+    return Object.freeze({ update });
+  }
+
   function takeDraft(input) {
     const text = input.value;
     let edited = false, finished = false;
@@ -261,5 +273,5 @@
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => enhanceComposers(), { once: true });
     else enhanceComposers();
   }
-  return Object.freeze({ renderMessages, humanSafeText, setExecutionState, settle, waitForIndicatorPaint, enhanceComposers, takeDraft, ProcessingIndicator });
+  return Object.freeze({ createIntro, renderMessages, humanSafeText, setExecutionState, settle, waitForIndicatorPaint, enhanceComposers, takeDraft, ProcessingIndicator });
 }));

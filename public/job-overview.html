@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/personal-understanding.css?v=job-overview-v1&amp;vi=1">
   <link rel="stylesheet" href="/vi/layout.css?v=1">
   <link rel="stylesheet" href="/job-overview.css?v=1">
-  <link rel="stylesheet" href="/understanding-chat.css?v=1&amp;composer=2">
+  <link rel="stylesheet" href="/understanding-chat.css?v=2&amp;composer=3">
 </head>
 <body class="v1-body" data-v1-page="job-overview">
 <main class="v1-page-shell vi-container personal-understanding-shell">
@@ -27,13 +27,16 @@
       <div id="job-overview-unknowns"></div>
       <details class="personal-history"><summary>查看本次范围内的全部职位描述</summary><div id="job-overview-directory"></div></details>
     </section>
-    <section class="vi-span-6 personal-dialogue v1-conversation-pane" aria-labelledby="job-overview-dialogue-heading">
-      <div class="personal-heading-row"><h2 id="job-overview-dialogue-heading">了解职位概况</h2><span id="job-overview-runtime" class="personal-meta"></span></div>
+    <section class="vi-span-6 personal-dialogue v1-conversation-pane" aria-label="了解职位概况对话">
+      <span id="job-overview-runtime" class="personal-meta hidden"></span>
       <p class="personal-meta">可以对比多个职位描述、讨论岗位类型与要求差异。概况和讨论不会改写原职位描述，也不会读取或修改个人资料。</p>
-      <div class="personal-prompts" aria-label="开始讨论">
-        <button type="button" data-job-overview-prompt="请总结我添加的全部职位描述，分别说明它们是什么类型的岗位。">总结全部职位描述</button>
-        <button type="button" data-job-overview-prompt="这些职位描述有哪些共同要求和重要差异？请注明各自的来源。">共性与差异</button>
-        <button type="button" data-job-overview-prompt="哪些职位要求或团队背景还不明确，需要向招聘方进一步确认？">需要确认什么</button>
+      <div id="job-overview-intro" class="understanding-intro" hidden>
+        <p id="job-overview-dialogue-heading" class="understanding-intro-copy">关于这些信息或许你想问</p>
+        <div class="personal-prompts" aria-label="开始讨论">
+          <button type="button" data-job-overview-prompt="请总结我添加的全部职位描述，分别说明它们是什么类型的岗位。">总结全部职位描述</button>
+          <button type="button" data-job-overview-prompt="这些职位描述有哪些共同要求和重要差异？请注明各自的来源。">共性与差异</button>
+          <a href="/personal-understanding.html">回顾我的项目与经历</a>
+        </div>
       </div>
       <button id="job-overview-older" class="personal-text-button hidden" type="button">查看更早对话</button>
       <div id="job-overview-messages" class="v1-conversation-messages v1-conversation-thread" aria-live="polite"></div>
@@ -46,7 +49,6 @@
       <label class="personal-consent"><input id="job-overview-consent" type="checkbox"><span id="job-overview-consent-copy"></span></label>
       <p id="job-overview-usage" class="personal-meta"></p>
       <p id="job-overview-status" class="v1-inline-message" aria-live="polite"></p>
-      <a href="/personal-understanding.html" class="job-overview-scope-link">回顾我的项目与经历 <span class="vi-icon" data-icon="chevron-right" aria-hidden="true"></span></a>
     </section>
   </div>
 </main>
@@ -55,8 +57,8 @@
     <script src="/runtime-capabilities.js"></script><script src="/runtime-capability-gate.js"></script>
 <script src="/truth-persistence-domain.js"></script><script src="/job-intelligence-contract-manifest.js"></script><script src="/job-context-domain.js"></script>
 <script src="/personal-context-domain.js"></script><script src="/job-overview-contract.js"></script><script src="/job-overview-domain.js"></script>
-<script src="/processing-indicator-domain.js"></script><script src="/conversation-ui-domain.js?composer=3"></script>
-<script src="/v1-demo-domain.js"></script><script src="/v1-pages.js"></script><script src="/job-overview.js?v=inline-composer-3"></script>
+<script src="/processing-indicator-domain.js"></script><script src="/conversation-ui-domain.js?composer=3&amp;intro=1"></script>
+<script src="/v1-demo-domain.js"></script><script src="/v1-pages.js"></script><script src="/job-overview.js?v=chat-intro-1"></script>
   <script src="/conversation-model-selector.js?v=compact-menu-1"></script>
     <script src="/conversation-attachments.js?v=inline-composer-3&amp;composer=3"></script>
 </body>

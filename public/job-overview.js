@@ -2,12 +2,13 @@
 (async function jobOverviewPage() {
   const Domain = window.AriadneJobOverview, Truth = window.AriadneTruthPersistence, Gate = window.JobRadarRuntimeGate, UI = window.AriadneConversationUI;
   const el = (id) => document.getElementById(id), esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const intro = UI.createIntro(el("job-overview-intro"));
   let busy = false, state, visible = 15, pendingMessage = null;
   const status = (copy, error = false) => { el("job-overview-status").textContent = copy; el("job-overview-status").classList.toggle("error", error); };
   function runtime() {
     const gate = Gate.operationGate("job_overview"), current = gate.authority.runtime;
     el("job-overview-runtime").textContent = current.mode === "local" ? "Local · 查看已保存概况" : `${current.provider} · ${current.model}`;
-    el("job-overview-consent-copy").textContent = current.mode === "local" ? "当前为 Local。选择可用模型后，可以汇总与讨论职位。" : `允许将问题及当前职位描述内容发送至 ${current.provider} · ${current.model}；更新概况可能分批调用并产生 API 费用。不发送个人资料。`;
+    el("job-overview-consent-copy").textContent = current.mode === "local" ? "当前为 Local。选择可用模型后，可以汇总与讨论职位。" : `对话不会发送个人资料，但问题及当前职位描述内容会发送至 ${current.provider} · ${current.model}；更新概况可能分批调用并产生 API 费用。`;
     el("job-overview-consent").disabled = busy || !gate.allowed;
     const disabled = busy || !gate.allowed || !el("job-overview-consent").checked;
     el("refresh-job-overview").disabled = disabled; el("job-overview-form").querySelector('button[type="submit"]').disabled = disabled; return gate;
@@ -32,6 +33,7 @@
     const messages = turns.slice(-visible).flatMap((turn) => [{ id: `${turn.turn_id}:user`, role: "USER", text: turn.human_message }, ...(turn.status === "SUCCEEDED" ? [{ id: `${turn.turn_id}:assistant`, role: "ASSISTANT", runtime_snapshot: turn.runtime_snapshot, text: `${turn.fingerprint !== snapshot.fingerprint ? "（基于当时职位版本的历史回答）\n" : ""}${turn.output.message}`, result: turn.output }] : [])]);
     if (pendingMessage) messages.push({ role: "USER", text: pendingMessage });
     const target = el("job-overview-messages");
+    intro.update(messages.length > 0);
     UI.renderMessages(target, messages, { empty_text: "从整体概况、岗位共性或某几份职位描述的差异开始。这里不读取个人资料。" });
     const bubbles = target.querySelectorAll(".v1-conversation-message");
     messages.forEach((message, index) => { if (message.result) { const details = document.createElement("span"); details.innerHTML = `${insightsMarkup(message.result.insights)}${unknownMarkup(message.result.uncertainties)}`; bubbles[index].append(details); } });

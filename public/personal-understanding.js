@@ -7,6 +7,7 @@
   const byId = (name) => document.getElementById(name);
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const labels = { FACT: "经历与背景", PREFERENCE: "个人偏好", GOAL: "已确认目标", CORRECTION: "理解修正" };
+  const intro = UI.createIntro(byId("personal-intro"));
   let pendingMessage = null;
   let busy = false, state, origin = { type: "PERSONAL" }, visibleTurns = 15, draftLoaded = false;
   const status = (value, error = false) => { byId("personal-message-status").textContent = value; byId("personal-message-status").classList.toggle("error", error); };
@@ -14,7 +15,7 @@
     const gate = Gate.operationGate("personal_understanding");
     const runtime = gate.authority.runtime;
     byId("personal-runtime").textContent = runtime.mode === "local" ? "Local · 查看已保存内容" : `${runtime.provider === "codex" ? "Codex / OpenAI" : runtime.provider} · ${runtime.model}`;
-    byId("personal-consent-copy").textContent = runtime.mode === "local" ? "当前为 Local。切换到已验证的模型后，可以综合资料与对话。" : `允许将问题、相关个人资料及对话历史发送至 ${runtime.provider === "codex" ? "Codex / OpenAI" : runtime.provider} · ${runtime.model}。普通对话直接读取当前资料；单独更新整体理解时可能分批调用并产生费用。资料不会自动成为确认事实。`;
+    byId("personal-consent-copy").textContent = runtime.mode === "local" ? "当前为 Local。切换到已验证的模型后，可以综合资料与对话。" : `问题、相关个人资料及对话历史将发送至 ${runtime.provider === "codex" ? "Codex / OpenAI" : runtime.provider} · ${runtime.model}；更新理解可能分批调用并产生 API 费用。`;
     byId("personal-model-consent").disabled = !gate.allowed || busy;
     const allowed = gate.allowed && byId("personal-model-consent").checked && !busy;
     byId("personal-conversation-form").querySelector('button[type="submit"]').disabled = !allowed;
@@ -56,6 +57,7 @@
     const turns = state.turns.filter((entry) => entry.kind === "DISCUSSION").sort((a, b) => a.created_at.localeCompare(b.created_at));
     const messages = turns.slice(-visibleTurns).flatMap((turn) => [{ id: `${turn.turn_id}:user`, role: "USER", text: turn.human_message }, ...(turn.status === "SUCCEEDED" ? [{ id: `${turn.turn_id}:assistant`, role: "ASSISTANT", runtime_snapshot: turn.runtime_snapshot, text: turn.output.message }] : [])]);
     if (pendingMessage) messages.push({ role: "USER", text: pendingMessage });
+    intro.update(messages.length > 0);
     UI.renderMessages(byId("personal-conversation-messages"), messages, { empty_text: "这里的对话围绕你已添加的资料展开，可以跨文件讨论，也可以直接补充新的个人信息。" });
     byId("personal-older-messages").classList.toggle("hidden", turns.length <= visibleTurns);
     const decided = new Set(state.decisions.map((entry) => entry.proposal_id));

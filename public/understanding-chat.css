@@ -1,4 +1,4 @@
-/* Library title entries share the Workspace wordmark; chat titles keep UI type. */
+/* Library title entries share the Workspace wordmark; chat starts with suggestions. */
 .v1-library-topbar:has(.understanding-title-entry) {
   grid-template-columns: minmax(36px, 1fr) auto minmax(36px, 1fr);
 }
@@ -23,8 +23,7 @@
 .personal-dialogue > .personal-meta,
 .personal-dialogue .v1-composer-dock > .personal-meta,
 .personal-dialogue > .personal-heading-row > .personal-meta,
-.personal-dialogue .v1-conversation-empty,
-.personal-dialogue > .job-overview-scope-link {
+.personal-dialogue .v1-conversation-empty {
   display: none;
 }
 
@@ -33,14 +32,45 @@
   max-width: 800px;
   margin: var(--vi-space-24) auto 0;
 }
-.personal-understanding-shell .personal-dialogue.v1-conversation-pane {
+.v1-body .personal-understanding-shell .personal-dialogue.v1-conversation-pane {
   background: transparent;
   border: 0;
   padding: 0;
-  height: calc(100dvh - 128px);
+  height: 100%;
+  position: relative;
+  top: 0;
   min-height: 0;
 }
-.personal-understanding-shell { padding-bottom: 16px; }
+.v1-body .personal-understanding-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
+  padding-bottom: max(var(--vi-space-8), env(safe-area-inset-bottom));
+}
+.personal-understanding-shell > .v1-topbar { flex: none; }
+.personal-understanding-shell :is(.personal-understanding-layout, .job-overview-layout) {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+.understanding-intro { flex: none; }
+.understanding-intro[hidden] { display: none; }
+.understanding-intro-copy { color: var(--vi-text-secondary); margin: 0; font-size: var(--vi-text-body); }
+.personal-dialogue .personal-prompts :is(button, a) {
+  background: var(--vi-conversation);
+  border: 1px solid var(--vi-line);
+  border-radius: var(--vi-radius-pill);
+  color: var(--vi-text-secondary);
+  padding: var(--vi-space-8) var(--vi-space-12);
+  font: inherit;
+  font-size: 11px;
+  text-decoration: none;
+}
+.personal-dialogue .personal-prompts a:focus-visible { outline: 2px solid var(--vi-focus); outline-offset: 2px; }
+.personal-dialogue .v1-composer-dock { padding-top: var(--vi-space-12); }
+.personal-dialogue .personal-consent { margin-top: var(--vi-space-8); }
+
 .personal-understanding-shell .personal-dialogue > .personal-heading-row {
   display: block;
 }
@@ -69,9 +99,6 @@
   .v1-library-topbar:has(.understanding-title-entry) { gap: var(--vi-space-8); }
   .personal-understanding-shell :is(.personal-understanding-layout, .job-overview-layout) {
     margin-top: var(--vi-space-16);
-  }
-  .personal-understanding-shell .personal-dialogue.v1-conversation-pane {
-    height: calc(100dvh - 112px);
   }
   .personal-dialogue .personal-prompts { gap: var(--vi-space-8); }
 }
