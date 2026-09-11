@@ -1,11 +1,11 @@
 // Optional browser QA. Use the available Playwright runtime; start an isolated app
-// server on 8027 first. A fresh browser context contains synthetic records only.
+// server on 8028 first. A fresh browser context contains synthetic records only.
 const {chromium}=require('playwright');
 const assert=require('node:assert/strict');
 const fs=require('node:fs/promises');
 const path=require('node:path');
 (async()=>{
-  const output=path.resolve('.cache/job-stage-chip-20260911');await fs.mkdir(output,{recursive:true});
+  const output=path.resolve('.cache/job-stage-menu-20260912');await fs.mkdir(output,{recursive:true});
   const browser=await chromium.launch({channel:'chrome',headless:true});
   try {
     const context=await browser.newContext({viewport:{width:1280,height:900}}),page=await context.newPage();
@@ -13,7 +13,8 @@ const path=require('node:path');
     page.on('pageerror',error=>errors.push(error.message));
     context.on('page',p=>p.on('pageerror',error=>errors.push(error.message)));
     context.on('request',request=>{if(request.method()==='POST')posts.push(request.url());});
-    const base='http://127.0.0.1:8027',jobId='qa-chip-ai-pm',select=`[data-job-stage="${jobId}"]`;
+    const base='http://127.0.0.1:8028',jobId='qa-chip-ai-pm',select=`[data-job-stage="${jobId}"]`;
+    const choose=async(stage)=>{await page.click(select);await page.click(`[data-stage-option="${stage}"]`);};
     const shot=async(p,name,options={})=>{
       await p.evaluate(()=>Promise.all(document.getAnimations().filter(animation=>animation.effect?.getComputedTiming().iterations!==Infinity).map(animation=>animation.finished.catch(()=>{}))));
       await p.screenshot({path:output+'/'+name,...options});
@@ -25,16 +26,21 @@ const path=require('node:path');
     const original=await source();await page.reload();await page.waitForSelector(select);
     assert.equal(await page.locator('#job-stage-dialog').count(),0);
     assert.equal(await page.locator('[data-job-filter="NOT_APPLIED"]').count(),0);
-    assert.deepEqual(await page.locator(select+' option').allTextContents(),['未投递','已投递','推进中','已结束']);
+    assert.deepEqual(await page.locator('[data-stage-option]').allTextContents(),['未投递','已投递','推进中','已结束']);
+    await page.click(select);await shot(page,'menu-desktop.png');
+    assert.equal(await page.locator(select).getAttribute('aria-expanded'),'true');
+    assert.match(await page.locator(select+' .runtime-chevron').evaluate(node=>getComputedStyle(node).transform),/matrix\(-1, 0, 0, -1/);
+    await page.keyboard.press('End');assert.equal(await page.evaluate(()=>document.activeElement.dataset.stageOption),'CLOSED');
+    await page.keyboard.press('Escape');assert.equal(await page.locator(select).getAttribute('aria-expanded'),'false');
     assert.equal(await page.locator(select).evaluate(node=>node.closest('a')),null);
     const switchStage=async(stage)=>{
-      await page.selectOption(select,stage);
-      await page.waitForFunction(({id,stage})=>document.querySelector(`[data-job-stage="${id}"]`)?.value===stage&&!document.querySelector(`[data-job-stage="${id}"]`).disabled,{id:jobId,stage});
+      await choose(stage);
+      await page.waitForFunction(({id,stage})=>document.querySelector(`[data-job-stage="${id}"]`)?.dataset.stage===stage&&!document.querySelector(`[data-job-stage="${id}"]`).disabled,{id:jobId,stage});
       assert.equal((await record()).stage,stage);
       assert.equal(await page.locator('.v1-detail-overlay:not(.hidden)').count(),0);
     };
     await switchStage('APPLIED');await switchStage('IN_PROGRESS');
-    await page.selectOption(select,'CLOSED');await page.waitForSelector(select,{state:'hidden'});
+    await choose('CLOSED');await page.waitForSelector(select,{state:'hidden'});
     await page.reload();await page.waitForSelector('[data-job-filter="CLOSED"]');assert.equal(await page.locator(select).count(),0);
     await page.click('[data-job-filter="CLOSED"]');await page.waitForSelector(select);assert.equal((await record()).stage,'CLOSED');
     await shot(page,'closed-desktop.png');
@@ -60,9 +66,9 @@ const path=require('node:path');
     assert.ok((await record()).history.some(item=>item.outcome==='RESUME_REJECTED'));
     // Simulate a transaction abort in the card path; selected value rolls back.
     await page.evaluate(()=>{window.qaTransaction=IDBDatabase.prototype.transaction;IDBDatabase.prototype.transaction=function(...args){const tx=qaTransaction.apply(this,args);if(this.name===AriadneJobApplications.DB_NAME&&args[1]==='readwrite')queueMicrotask(()=>tx.abort());return tx;};});
-    await page.selectOption(select,'APPLIED');await page.waitForFunction(()=>document.getElementById('job-page-message').classList.contains('error'));
+    await choose('APPLIED');await page.waitForFunction(()=>document.getElementById('job-page-message').classList.contains('error'));
     await page.evaluate(()=>{IDBDatabase.prototype.transaction=qaTransaction;});
-    assert.equal((await record()).stage,'IN_PROGRESS');assert.equal(await page.locator(select).inputValue(),'IN_PROGRESS');
+    assert.equal((await record()).stage,'IN_PROGRESS');assert.equal(await page.locator(select).getAttribute('data-stage'),'IN_PROGRESS');
     // Independent detail page: explicit save, concurrent update, failed save and retry.
     const second=await context.newPage();await second.goto(base+`/job-detail.html?job=${jobId}`);await second.waitForSelector('#job-application-note:not([disabled])');
     await second.fill('#job-application-note','保留我的未保存输入');
@@ -76,14 +82,17 @@ const path=require('node:path');
     await second.reload();await second.waitForSelector('#job-application-note:not([disabled])');assert.equal(await second.locator('#job-application-note').inputValue(),'已确认最新进度');
     assert.deepEqual(await source(),original);assert.equal(await page.evaluate(async()=> (await AriadneJobApplications.all()).has('qa-chip-design')),false);
     await page.reload();await page.waitForSelector(select);await shot(page,'active-desktop.png');
-    const alignment=await page.locator(select).evaluate(node=>{const a=node.getBoundingClientRect(),b=node.parentElement.querySelector('.v1-card-top').getBoundingClientRect();return {left:Math.abs(a.left-b.left),top:Math.abs(a.top-b.top)};});
-    assert.ok(alignment.left<=2&&alignment.top<=2);
+    const alignment=await page.locator(select).evaluate(node=>{const a=node.getBoundingClientRect(),b=node.parentElement.getBoundingClientRect();return {left:a.left-b.left,top:a.top-b.top,width:a.width,gap:getComputedStyle(node).gap};});
+    assert.equal(alignment.left,22);assert.equal(alignment.top,24);assert.ok(alignment.width<90);assert.equal(alignment.gap,'8px');
+    assert.equal(await page.locator(select).evaluate(node=>getComputedStyle(node).borderRadius),'999px','retain the original card label silhouette');
     await page.setViewportSize({width:390,height:844});await shot(page,'active-mobile.png',{fullPage:true});
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    await page.click(select);await shot(page,'menu-mobile.png');await page.keyboard.press('Escape');
+    await page.emulateMedia({reducedMotion:'reduce'});await page.click(select);assert.equal(await page.locator(select+' .runtime-chevron').evaluate(node=>getComputedStyle(node).transitionDuration),'0s');await page.keyboard.press('Escape');
     await second.setViewportSize({width:390,height:844});await second.locator('#job-application-form').scrollIntoViewIfNeeded();await shot(second,'notes-mobile.png');
     assert.equal(await second.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     assert.deepEqual(errors,[]);assert.deepEqual(posts,[]);
-    const result={checks:['native four-option chip','same-page filters','one-step save','no detail opened by stage','closed/reload/filter','embedded notes save/cancel','source card return','reopen preserves notes/history','storage abort rollback','cross-page dirty conflict and retry','standalone detail reload','source records unchanged','desktop/mobile alignment'],alignment,record:await record(),errors,posts};
+    const result={checks:['animated four-option chip','arrow rotation','keyboard End/Escape','reduced motion','same-page filters','one-step save','no detail opened by stage','closed/reload/filter','embedded notes save/cancel','source card return','reopen preserves notes/history','storage abort rollback','cross-page dirty conflict and retry','standalone detail reload','source records unchanged','desktop/mobile alignment'],alignment,record:await record(),errors,posts};
     await fs.writeFile(output+'/browser-result.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));
   }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

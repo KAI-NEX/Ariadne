@@ -5,9 +5,16 @@
 .v1-job-tracked-card { position: relative; display: flex; min-width: 0; }
 .v1-job-tracked-card > .v1-candidate-card { flex: 1; height: auto; }
 .v1-job-tracked-card > .v1-candidate-card:hover { transform: none; }
-.v1-job-stage-placeholder { min-height: var(--vi-target-comfort); min-width: 108px; font-size: var(--vi-text-caption); }
+.v1-job-stage-placeholder { min-height: var(--vi-target-comfort); min-width: 84px; font-size: var(--vi-text-caption); }
 .v1-job-tracked-card > .v1-candidate-card .v1-job-stage-placeholder { visibility: hidden; }
-.v1-job-stage-select { position: absolute; top: var(--vi-space-24); left: var(--vi-space-24); width: 108px; appearance: none; padding-right: var(--vi-space-32); background-image: url('/vi/icons/chevron-down.svg'); background-repeat: no-repeat; background-position: right var(--vi-space-8) center; background-size: 14px; }
+.v1-job-stage-select.runtime-selector { position: absolute; top: var(--vi-space-24); left: calc(var(--vi-space-24) - 2px); width: auto; height: var(--vi-target-comfort); justify-content: flex-start; gap: var(--vi-space-8); padding: var(--vi-space-8) var(--vi-space-12); border-radius: var(--vi-radius-pill); corner-shape: round; }
+.v1-job-stage-select .runtime-chevron { flex-basis: 14px; height: 14px; width: 14px; }
+.v1-job-stage-menu.runtime-menu { position: fixed; width: 144px; overflow-y: auto; }
+.v1-job-stage-menu .runtime-menu-item { height: var(--vi-target-comfort); min-height: var(--vi-target-comfort); font: var(--vi-text-caption)/1.65 var(--vi-font-ui); }
+.v1-job-stage-menu .runtime-existing-model[aria-selected="true"]::after { top: var(--vi-space-12); }
+@media (prefers-reduced-motion: reduce) {
+  .v1-job-stage-select.runtime-selector, .v1-job-stage-select .runtime-chevron, .v1-job-stage-menu.runtime-menu, .v1-job-stage-menu .runtime-menu-item { transition: none; }
+}
 .v1-job-stage-select:disabled { cursor: wait; opacity: .6; }
 .v1-job-application-form { margin-top: var(--vi-space-16); }
 .v1-job-application-form .v1-edit-field { margin-top: var(--vi-space-16); }

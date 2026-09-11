@@ -29,7 +29,8 @@ assert.doesNotMatch(library,/job-stage-dialog|job-stage-note/,'no separate stage
 assert.match(detail,/id="job-application-form"/);
 assert.match(detail,/job-application-domain\.js/);
 assert.match(pages,/const filters = \{ ACTIVE: "关注中", CLOSED: "已结束", ALL: "全部" \}/);
-assert.match(pages,/\$\{card\}<select class="v1-job-stage-select"/,'interactive dropdown is outside the card link');
+assert.match(pages,/\$\{card\}<button type="button" class="runtime-selector v1-job-stage-select"/,'interactive dropdown is outside the card link');
+assert.match(library,/job-stage-menu\.js/);
 assert.match(pages,/Number\(select\.dataset\.revision\)/,'one-click save still checks the observed revision');
 const notesOnly=Applications.next(state,{stage:state.stage,outcome:'INTERVIEW_REJECTED',note:'更新反馈'},state.revision);
 assert.equal(notesOnly.stage,state.stage);
