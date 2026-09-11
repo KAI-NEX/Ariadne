@@ -1,0 +1,133 @@
+{
+  "diagram_type": "architecture",
+  "specification": {
+    "sha256": "1f5336657835038d2ef362b51f540062220225948ebc55c6bbe8721bd8293c89",
+    "bytes": 5580
+  },
+  "artifact": {
+    "sha256": "5da6e3904ea1a8e6037c08bfba402e55ef935794a824b491f13b62829d3c392f",
+    "bytes": 814353
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  },
+  "browser_evidence": "passed",
+  "visual_review": "passed",
+  "correction_rounds": 1,
+  "reviewer": "Codex image-capable inspection of all four endpoint screenshots",
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 900,
+      "overflowX": false,
+      "overflowY": false,
+      "ok": true
+    },
+    {
+      "width": 1600,
+      "height": 1000,
+      "overflowX": false,
+      "overflowY": false,
+      "ok": true
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "overflowX": false,
+      "overflowY": false,
+      "ok": true
+    },
+    {
+      "width": 2048,
+      "height": 1320,
+      "overflowX": false,
+      "overflowY": false,
+      "ok": true
+    }
+  ],
+  "egolite": {
+    "space_id": 4,
+    "page": "p1",
+    "checks": [
+      "local HTML opens",
+      "node search filters Working",
+      "focus passport shows 1 outbound and 2 inbound relationships",
+      "passport closes",
+      "export menu opens",
+      "SVG downloaded and parsed; core nodes retained; no script or foreignObject"
+    ],
+    "svg_export": {
+      "path": ".cache/archify-20260911/export.svg",
+      "bytes": 156374,
+      "sha256": "0f2be0e9f06c4ebce61b642cb9b37ac5dfeaa1f0289050337d9e1643e96e6652"
+    }
+  },
+  "regressions": [
+    {
+      "test": "truth_persistence_regression.mjs",
+      "exit_code": 0,
+      "elapsed_seconds": 0.05
+    },
+    {
+      "test": "truth_persistence_regression.py",
+      "exit_code": 0,
+      "elapsed_seconds": 0.06
+    },
+    {
+      "test": "runtime_capability_gating_regression.mjs",
+      "exit_code": 0,
+      "elapsed_seconds": 0.04
+    },
+    {
+      "test": "runtime_capability_gating_regression.py",
+      "exit_code": 0,
+      "elapsed_seconds": 0.15
+    },
+    {
+      "test": "multimodal_runtime_policy_regression.mjs",
+      "exit_code": 0,
+      "elapsed_seconds": 0.03
+    },
+    {
+      "test": "multimodal_runtime_policy_regression.py",
+      "exit_code": 0,
+      "elapsed_seconds": 0.1
+    },
+    {
+      "test": "raw_source_persistence_regression.mjs",
+      "exit_code": 0,
+      "elapsed_seconds": 0.04
+    },
+    {
+      "test": "job_overview_regression.mjs",
+      "exit_code": 0,
+      "elapsed_seconds": 0.1
+    },
+    {
+      "test": "personal_understanding_regression.mjs",
+      "exit_code": 0,
+      "elapsed_seconds": 0.12
+    },
+    {
+      "test": "codex_connector_regression.py",
+      "exit_code": 0,
+      "elapsed_seconds": 0.75
+    },
+    {
+      "test": "job_model_import_regression.mjs",
+      "exit_code": 0,
+      "elapsed_seconds": 0.05
+    }
+  ],
+  "scope": "Offline architectural checks; no live provider calls; not full application or security audit",
+  "repository_checks": {
+    "vi": "passed",
+    "report_links": "passed",
+    "delivery_hashes": "passed"
+  }
+}

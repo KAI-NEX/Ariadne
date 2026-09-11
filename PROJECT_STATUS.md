@@ -1,5 +1,13 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-11 — Archify 安装与 Ariadne 架构分析（COMPLETE）
+
+- 按用户要求安装 `tt-a1i/archify` 的 Archify Skill（本机 `~/.codex/skills/archify`，包标识 `2.17.0-dev.1`），doctor 通过。基于 `1b39747` 实际代码生成[分析报告与交互架构图](docs/architecture/archify/2026-09-11/README.md)，保留 typed JSON、交付哈希、来源文件指纹与上游 MIT 许可；未把 Skill 源码或依赖加入产品运行时。
+- 图示来源、Candidate/Job、范围上下文、Runtime 门禁、本机服务、Local/Model、Working 与 Human Save。报告区分逻辑关系和网络路径，指出页面/HTTP 编排集中、跨语言契约同步、真正流式与公开 HTTPS 验收边界；本次没有改应用、Provider、模型选择或用户资料，没有发起真实模型调用。
+- Archify showcase 校验与交付 9/9、0 errors、0 warnings；自带 visual-check 在四种桌面尺寸通过，四张浅/深色截图经目视检查。egolite 实际验证搜索、节点详情关闭、导出菜单和 SVG 下载，导出结构/核心节点检查通过。11/11 相关离线 suite、VI、文档链接和交付字节校验通过。
+- 当前 `1b39747` 已修正此前 Job Model 导入的 `createMessage` 断言，本次 suite 重跑通过；此前失败条目作为历史保留。当前已跟踪默认回归文件为 58 JS + 34 Python，本次只运行所列 11 项，不声称全量或模型语义质量验收。
+- QA 截图/浏览器回执原地保留在图表目录，其他中间证据与 SVG 样本保留 `.cache/archify-20260911/`；仅本次交付文档/图源/HTML/摘要本地 commit，不 push。原有 Mac App 和公开入口未提交改动保持原样。
+
 ## 2026-09-11 — DeepSeek V4.1 Flash 迁移与单次确认更新（COMPLETE）
 
 - 按用户授权将当前 DeepSeek 多模态执行统一迁移到官方 `deepseek-flash`；保留协议与领域权限，更新 descriptor 指纹，旧实验型号仅做当前偏好映射与历史元数据兼容。Codex/Local、旧快照/消息、资料与确认数据不批量重写。当前服务已重启，8000 返回新型号及新目录。

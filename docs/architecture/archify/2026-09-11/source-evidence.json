@@ -1,0 +1,161 @@
+{
+  "baseline_commit": "1b397470b9bb3ff57adedea14da5286e87a0477c",
+  "method": "Selected repository code inspection; not exhaustive dependency extraction",
+  "files": [
+    {
+      "path": "app.py",
+      "lines": 2423,
+      "sha256": "ea92ddf587b1b10952a0bb414143ec40ca7817dad3e4c893e5b1da53fffa811f"
+    },
+    {
+      "path": "public/v1-pages.js",
+      "lines": 4075,
+      "sha256": "d611806ab61c16540fec5fb2fb77f6e918a4406c6254ff071b2b33f957b3d47e"
+    },
+    {
+      "path": "public/product-shell-domain.js",
+      "lines": 286,
+      "sha256": "970054926f3ac73bdefd0bd442402b07c7410ef32f7bf7e32c604ab2d4d0ed59"
+    },
+    {
+      "path": "public/source-input-domain.js",
+      "lines": 143,
+      "sha256": "f2d5bd0afed7d8722cf2e99bf8962580536c72f8ccfac9002b1df6d715101a9b"
+    },
+    {
+      "path": "public/raw-source-storage-domain.js",
+      "lines": 257,
+      "sha256": "079546000127766f27e1cdbde01fb6a6273d3f041b13ef066ae0b4a57544707d"
+    },
+    {
+      "path": "public/truth-persistence-domain.js",
+      "lines": 951,
+      "sha256": "879a4dd0788f0a25d4ddba8c7f91aa11914d9184a71811fd7510bb9a7403351e"
+    },
+    {
+      "path": "public/runtime-capability-gate.js",
+      "lines": 310,
+      "sha256": "0815a875838d652be21b12aff09fad428bb8dc71f5b00e71e73884eeaa3e14b0"
+    },
+    {
+      "path": "public/model-settings.js",
+      "lines": 40,
+      "sha256": "d435b2ed106be64a8a46e043ea820363a9aa6cf1a64cc17e91ac6d1d46dfc2a7"
+    },
+    {
+      "path": "public/candidate-model-runtime-domain.js",
+      "lines": 482,
+      "sha256": "186b407920fd7617fa1a909bf03d1af9a4f513984c529a43f2a17615c23626f9"
+    },
+    {
+      "path": "public/job-model-runtime-domain.js",
+      "lines": 318,
+      "sha256": "9e9941b03276f832925dcfb8119d83643415869cd0459ed8ec7b4799662f13b7"
+    },
+    {
+      "path": "public/candidate-workspace-conversation-runtime.js",
+      "lines": 529,
+      "sha256": "cfba111e8f2bc5eb679df3de853d598b42f2ba6c1bc5a2b94c130bdb6d7d0950"
+    },
+    {
+      "path": "public/job-candidate-context-domain.js",
+      "lines": 357,
+      "sha256": "c9cf300750fcb6b95bd733f7bc4d8b5b0f3e33a4d8f801c1c9b040c6c5c34744"
+    },
+    {
+      "path": "public/job-overview-domain.js",
+      "lines": 166,
+      "sha256": "111ac6cdb61b7018dadc1fa0af5f00202a6289fc33e076be472d752587c6a038"
+    },
+    {
+      "path": "public/personal-context-domain.js",
+      "lines": 122,
+      "sha256": "da194b4d2482c2e2f65dbd7a898e9a4037551a10d6702b2625e7db5ace3a6396"
+    },
+    {
+      "path": "src/truth_persistence.py",
+      "lines": 744,
+      "sha256": "987501111be05a30778257c71ba583c6d6cd0c3f175e5967be3c6ea3c6f3f2aa"
+    },
+    {
+      "path": "src/execution_contract.py",
+      "lines": 445,
+      "sha256": "02231df2fd8ada7404be776c64d25d2d59baec3c19fc8d744b1f982982ca0d4b"
+    },
+    {
+      "path": "src/model_settings.py",
+      "lines": 57,
+      "sha256": "b62aa304d70b9ccc38a1ca570e2e49bc936006135e1596332a59ffda22bdf558"
+    },
+    {
+      "path": "src/runtime_binding.py",
+      "lines": 66,
+      "sha256": "1d2a753d35981c8da11c1766cd0bfbf4c3997c87fe695f29627a0368e1278907"
+    },
+    {
+      "path": "src/provider_runtime.py",
+      "lines": 264,
+      "sha256": "3798164ea2f01928e79a92ccf8ae6eadff7e1160e2cbec97fa774a1c20d99365"
+    },
+    {
+      "path": "src/codex_runtime.py",
+      "lines": 216,
+      "sha256": "74296047f9e72636ac32a631cfdebe231c5c29238d2dc71e32deb9fc4396d968"
+    },
+    {
+      "path": "src/local_connector.py",
+      "lines": 167,
+      "sha256": "26fbd4919cfea319a8ff012f8672c3f8d85d78cd1d371b3e8d88ec4659fd1a0d"
+    },
+    {
+      "path": "src/career_evidence.py",
+      "lines": 1621,
+      "sha256": "bc55eaab606d10493e5188da0fe2582693d3a946567ebffe82d3a98520572e79"
+    },
+    {
+      "path": "src/pdf_delivery.py",
+      "lines": 32,
+      "sha256": "438056cc530899f917f77a3b2b0c2b92c7dc561a85c945a8aff1a3cc8777574b"
+    },
+    {
+      "path": "src/material_delivery.py",
+      "lines": 103,
+      "sha256": "643ba61cec035812a81b3c9f6e32ae767b15cd14c845d3b9dcec16942e81ad7b"
+    },
+    {
+      "path": "src/candidate_model_runtime.py",
+      "lines": 397,
+      "sha256": "66f54557e9cb105dc0e6bdd399e6eec9b1c30f5ddedb29bd4fe72f2be46b905f"
+    },
+    {
+      "path": "src/job_model_runtime.py",
+      "lines": 471,
+      "sha256": "2f21645b7c78bf46444153a223492eaa99d7849d6321cc9f70c195f4641af139"
+    },
+    {
+      "path": "src/candidate_conversation_runtime.py",
+      "lines": 1306,
+      "sha256": "bf99717b3b808df9c62296e403b158531acb00be5ac55c4e9f9567088b6bcb18"
+    },
+    {
+      "path": "src/job_conversation_runtime.py",
+      "lines": 518,
+      "sha256": "78fe2be51a2bc8cbb7ee4e9a456275c20c1d48b0159ad46ae7d1a3856754329c"
+    },
+    {
+      "path": "src/personal_understanding_runtime.py",
+      "lines": 241,
+      "sha256": "91f98ef9c12db6a880920cb41298f19e0125bf37a30b10621669a429a2870061"
+    },
+    {
+      "path": "src/job_overview_runtime.py",
+      "lines": 138,
+      "sha256": "0014cafcbaf250a0e44d3a651f11824938529092fa226860fda11c4149f06458"
+    },
+    {
+      "path": "tests/job_model_import_regression.mjs",
+      "lines": 221,
+      "sha256": "c8e6aa01350e03e046b2ab5acb1d254a33a39ded2dca81998bb63f91775d80e6"
+    }
+  ]
+}

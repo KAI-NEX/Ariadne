@@ -1,0 +1,273 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Ariadne · 从来源到确认版本",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1220,
+      690
+    ]
+  },
+  "components": [
+    {
+      "id": "source",
+      "type": "database",
+      "label": "原始资料",
+      "sublabel": "有序来源 · hash · 原件留存",
+      "pos": [
+        60,
+        90
+      ],
+      "size": [
+        205,
+        82
+      ],
+      "tag": "浏览器 IndexedDB"
+    },
+    {
+      "id": "domains",
+      "type": "frontend",
+      "label": "Candidate / Job",
+      "sublabel": "独立语义 · 共用输入与对话",
+      "pos": [
+        360,
+        90
+      ],
+      "size": [
+        205,
+        82
+      ],
+      "tag": "浏览器"
+    },
+    {
+      "id": "gate",
+      "type": "security",
+      "label": "Runtime 门禁",
+      "sublabel": "模式 · 多模态资格 · 执行快照",
+      "pos": [
+        660,
+        90
+      ],
+      "size": [
+        205,
+        82
+      ],
+      "tag": "浏览器 + 后端复核"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "领域执行服务",
+      "sublabel": "app.py · 六类领域 Runtime",
+      "pos": [
+        960,
+        90
+      ],
+      "size": [
+        205,
+        82
+      ],
+      "tag": "本机 HTTP"
+    },
+    {
+      "id": "context",
+      "type": "frontend",
+      "label": "当前上下文",
+      "sublabel": "个人理解 / 职位概况 / 单 JD 关联",
+      "pos": [
+        60,
+        315
+      ],
+      "size": [
+        205,
+        82
+      ],
+      "tag": "浏览器 · 范围隔离"
+    },
+    {
+      "id": "local",
+      "type": "backend",
+      "label": "Local 技术处理",
+      "sublabel": "读取 / OCR / 确定性提取",
+      "pos": [
+        660,
+        315
+      ],
+      "size": [
+        205,
+        82
+      ],
+      "tag": "本机 · 零 Provider 调用"
+    },
+    {
+      "id": "truth",
+      "type": "database",
+      "label": "确认版本",
+      "sublabel": "独立 revision · 保留历史",
+      "pos": [
+        60,
+        540
+      ],
+      "size": [
+        205,
+        82
+      ],
+      "tag": "浏览器 IndexedDB"
+    },
+    {
+      "id": "save",
+      "type": "security",
+      "label": "用户明确保存",
+      "sublabel": "来源与版本检查 · 原子写入",
+      "pos": [
+        360,
+        540
+      ],
+      "size": [
+        205,
+        82
+      ],
+      "tag": "浏览器 · Human Save"
+    },
+    {
+      "id": "working",
+      "type": "frontend",
+      "label": "Working / Proposal",
+      "sublabel": "可审阅草稿 · 无确认写入权限",
+      "pos": [
+        660,
+        540
+      ],
+      "size": [
+        205,
+        82
+      ],
+      "tag": "浏览器"
+    },
+    {
+      "id": "models",
+      "type": "external",
+      "label": "外部语义推理",
+      "sublabel": "DeepSeek / OpenAI",
+      "pos": [
+        960,
+        540
+      ],
+      "size": [
+        205,
+        82
+      ],
+      "tag": "HTTPS / 本机 Codex CLI"
+    }
+  ],
+  "connections": [
+    {
+      "id": "source-to-domains",
+      "from": "source",
+      "to": "domains",
+      "label": "按来源读取",
+      "variant": "emphasis"
+    },
+    {
+      "id": "domains-to-gate",
+      "from": "domains",
+      "to": "gate",
+      "label": "捕获操作",
+      "variant": "emphasis"
+    },
+    {
+      "id": "gate-to-api",
+      "from": "gate",
+      "to": "api",
+      "label": "Model · 已确认传输",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-to-models",
+      "from": "api",
+      "to": "models",
+      "label": "领域请求",
+      "variant": "emphasis",
+      "labelDy": 195
+    },
+    {
+      "id": "models-to-working",
+      "from": "models",
+      "to": "working",
+      "label": "经后端校验返回",
+      "variant": "emphasis"
+    },
+    {
+      "id": "working-to-save",
+      "from": "working",
+      "to": "save",
+      "label": "审阅",
+      "variant": "emphasis"
+    },
+    {
+      "id": "save-to-truth",
+      "from": "save",
+      "to": "truth",
+      "label": "生成新 revision",
+      "variant": "security"
+    },
+    {
+      "id": "truth-to-context",
+      "from": "truth",
+      "to": "context",
+      "label": "读取有效版本",
+      "variant": "default"
+    },
+    {
+      "id": "context-to-domains",
+      "from": "context",
+      "to": "domains",
+      "label": "按范围编译",
+      "variant": "default"
+    },
+    {
+      "id": "gate-to-local",
+      "from": "gate",
+      "to": "local",
+      "label": "Local 路径",
+      "variant": "dashed",
+      "labelDy": 90
+    },
+    {
+      "id": "local-to-working",
+      "from": "local",
+      "to": "working",
+      "label": "非权威提取结果",
+      "variant": "dashed",
+      "labelDy": 90
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "浏览器是当前资料中心",
+      "items": [
+        "原件、草稿、确认版本与对话保存在本地。",
+        "个人 / 职位概况独立；关联发生在选定 JD。"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "本机处理与外部推理分开",
+      "items": [
+        "Local 仅技术处理；Model 失败明确报错。",
+        "Codex 经本机隔离 CLI 调用 OpenAI。"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "用户保存才推进确认版本",
+      "items": [
+        "箭头为逻辑依赖；模型回包经过后端校验。",
+        "基于 2026-09-11 代码；不代表线上部署验收。"
+      ]
+    }
+  ]
+}
