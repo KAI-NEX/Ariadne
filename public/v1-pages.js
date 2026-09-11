@@ -19,6 +19,7 @@
   const LocalJobLifecycle = window.AriadneLocalJobLifecycle;
   const LocalJob = window.AriadneLocalJobExtraction;
   const JobContext = window.AriadneJobContext;
+  const JobApplications = window.AriadneJobApplications;
   const JobModel = window.AriadneJobModelRuntime;
   const JobCandidateContext = window.AriadneJobCandidateContext;
   const SourceRetrieval = window.AriadneSourceRetrieval;
@@ -2934,10 +2935,15 @@
 
   }
 
+  let jobStageFilter = "ACTIVE", jobApplicationRecords = new Map(), jobLibraryRender = 0;
   function jobCardMarkup(job) {
     const canonical = job.data_class === "CANONICAL_CONFIRMED";
     const stateBadge = canonical ? "" : '<span class="v1-review-chip">演示数据</span>';
-    return `<a class="v1-candidate-card job" data-transition-key="job:${escapeHtml(job.job_context_id)}" href="/job-detail.html?job=${encodeURIComponent(job.job_context_id)}"><div class="v1-card-top"><span class="v1-type-chip">职位描述</span>${stateBadge}</div><h3>${escapeHtml(job.title)}</h3><p class="v1-card-subtitle">${escapeHtml(cardSubtitleText(job.company, job.location))}</p><p class="v1-card-summary">${escapeHtml(job.summary)}</p><ul>${(job.requirements || []).slice(0, 3).map((item) => `<li>${escapeHtml(item.label)}</li>`).join("")}</ul></a>`;
+    const card = `<a class="v1-candidate-card job" data-transition-key="job:${escapeHtml(job.job_context_id)}" href="/job-detail.html?job=${encodeURIComponent(job.job_context_id)}"><div class="v1-card-top"><span class="v1-type-chip">职位描述</span>${stateBadge}</div><h3>${escapeHtml(job.title)}</h3><p class="v1-card-subtitle">${escapeHtml(cardSubtitleText(job.company, job.location))}</p><p class="v1-card-summary">${escapeHtml(job.summary)}</p><ul>${(job.requirements || []).slice(0, 3).map((item) => `<li>${escapeHtml(item.label)}</li>`).join("")}</ul></a>`;
+    if (!JobApplications) return card;
+    const state = jobApplicationRecords.get(job.job_context_id) || JobApplications.initial(job.job_context_id);
+    const result = [state.outcome ? JobApplications.OUTCOMES[state.outcome] : "", state.note].filter(Boolean).join(" · ");
+    return `<article class="v1-job-tracked-card">${card}<div class="v1-job-stage-row"><button type="button" class="v1-job-stage-button" data-job-stage="${escapeHtml(job.job_context_id)}" data-job-title="${escapeHtml(job.title)}" aria-label="修改${escapeHtml(job.title)}的阶段，当前${JobApplications.STAGES[state.stage]}">${JobApplications.STAGES[state.stage]}<span class="vi-icon" data-icon="chevron-down" aria-hidden="true"></span></button><p>${escapeHtml(result)}</p></div></article>`;
   }
 
   function jobGuideCardMarkup() {
@@ -2973,13 +2979,24 @@
   }
 
   async function renderJobLibrary() {
-    const canonical = await canonicalJobRecords();
+    const rendering = ++jobLibraryRender;
     const records = await localizedJobRecords(await Demo.getAll(Demo.DEMO_STORES.jobs));
+    const canonical = await canonicalJobRecords();
     const legacy = LocalJobLifecycle ? LocalJobLifecycle.libraryJobs(records) : records;
     const canonicalIds = new Set(canonical.map((job) => job.job_context_id));
     const jobs = [...canonical, ...legacy.filter((job) => !canonicalIds.has(job.job_context_id))];
+    const applications = JobApplications ? await JobApplications.all() : new Map();
+    if (rendering !== jobLibraryRender) return;
+    jobApplicationRecords = applications;
+    const stateFor = job => applications.get(job.job_context_id) || JobApplications.initial(job.job_context_id);
+    const visible = JobApplications ? jobs.filter(job => JobApplications.matches(stateFor(job), jobStageFilter)) : jobs;
+    if (JobApplications) {
+      const filters = { ACTIVE: "关注中", ...JobApplications.STAGES, ALL: "全部" };
+      byId("job-stage-filters").innerHTML = Object.entries(filters).map(([key, label]) => `<button type="button" data-job-filter="${key}" aria-pressed="${key === jobStageFilter}">${label} · ${jobs.filter(job => JobApplications.matches(stateFor(job), key)).length}</button>`).join("");
+      byId("job-stage-empty").hidden = visible.length > 0;
+    }
     const grid = byId("job-card-grid");
-    grid.innerHTML = jobGuideCardMarkup() + jobs.map(jobCardMarkup).join("");
+    grid.innerHTML = jobGuideCardMarkup() + visible.map(jobCardMarkup).join("");
     window.requestAnimationFrame(playPendingCardReturn);
   }
 
@@ -3558,6 +3575,61 @@
 
   function initJobLibrary() {
     renderJobLibrary().catch(showJobError);
+    if (!JobApplications) return;
+    const dialog = byId("job-stage-dialog"), form = byId("job-stage-form"), stage = byId("job-stage-value"), outcome = byId("job-outcome-value"), note = byId("job-stage-note");
+    let editing = null, saving = false;
+    let channel = null;
+    const refresh = () => renderJobLibrary().catch(showJobError);
+    const connect = () => {
+      if (!channel && typeof BroadcastChannel === "function") {
+        channel = new BroadcastChannel("ariadne-job-applications");
+        channel.onmessage = refresh;
+      }
+    };
+    connect();
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pagehide", () => { channel?.close(); channel = null; });
+    window.addEventListener("pageshow", event => { connect(); if (event.persisted) refresh(); });
+    stage.innerHTML = Object.entries(JobApplications.STAGES).map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
+    outcome.innerHTML = Object.entries(JobApplications.OUTCOMES).map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
+    stage.addEventListener("change", () => { byId("job-outcome-field").hidden = stage.value !== "CLOSED"; });
+    byId("job-stage-filters").addEventListener("click", async event => {
+      const button = event.target.closest("[data-job-filter]");
+      if (!button) return;
+      jobStageFilter = button.dataset.jobFilter;
+      await refresh();
+      byId("job-stage-filters").querySelector('[aria-pressed="true"]')?.focus({ preventScroll: true });
+    });
+    byId("job-card-grid").addEventListener("click", event => {
+      const button = event.target.closest("[data-job-stage]");
+      if (!button) return;
+      const state = jobApplicationRecords.get(button.dataset.jobStage) || JobApplications.initial(button.dataset.jobStage);
+      editing = { id: state.job_context_id, revision: state.revision, title: button.dataset.jobTitle };
+      stage.value = state.stage; outcome.value = state.outcome; note.value = state.note;
+      byId("job-outcome-field").hidden = state.stage !== "CLOSED";
+      byId("job-stage-title").textContent = editing.title;
+      byId("job-stage-error").textContent = "";
+      dialog.showModal(); stage.focus();
+    });
+    byId("job-stage-cancel").addEventListener("click", () => dialog.close());
+    dialog.addEventListener("cancel", event => { if (saving) event.preventDefault(); });
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (!editing || saving) return;
+      saving = true;
+      const controls = [...form.querySelectorAll("button, select, textarea")];
+      controls.forEach(control => { control.disabled = true; });
+      try {
+        const result = await JobApplications.save(editing.id, { stage: stage.value, outcome: stage.value === "CLOSED" ? outcome.value : "", note: note.value }, editing.revision);
+        dialog.close();
+        channel?.postMessage({ changed: true });
+        await refresh();
+        byId("job-page-message").textContent = `“${editing.title}”已设为${JobApplications.STAGES[result.stage]}。${result.stage === "CLOSED" ? "可在“已结束”中查看或重新开启。" : ""}`;
+        byId("job-page-message").classList.remove("error");
+        (document.querySelector(`[data-job-stage="${CSS.escape(editing.id)}"]`) || byId("job-stage-filters").querySelector('[aria-pressed="true"]'))?.focus({ preventScroll: true });
+      } catch (error) { byId("job-stage-error").textContent = error.message || "阶段保存失败，请重试。"; }
+      finally { saving = false; controls.forEach(control => { control.disabled = false; }); }
+    });
   }
 
   function initJobImport() {
