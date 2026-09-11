@@ -183,7 +183,7 @@ assert.match(modelFailure, /打开运行方式/);
 assert.match(modelFailure, /id="job-ai-workspace" class="v1-workspace-layer hidden"/);
 assert.match(modelFailure, /NON_AUTHORITATIVE WORKING JOB/);
 assert.match(modelFailure, /id="job-workspace-save"[^>]*>保存职位</);
-assert.match(pages, /const assistantMessage = JobConversation\.createMessage\(session, "ASSISTANT", result\.output\.message\)/);
+assert.match(pages, /const assistantMessage = \{ \.\.\.JobConversation\.createMessage\(session, "ASSISTANT", result\.output\.message\), deliverable: globalThis\.AriadneConversationOutput\.fromResult\(result\) \};/);
 assert.match(pages, /const visible = JobConversation\.connectedHistory\(messages\)/);
 assert.match(pages, /include_pending_user: true/);
 assert.doesNotMatch(modelFailure, /确认并创建职位版本[^<]*<\/button>[\s\S]*model_generated_non_authoritative/);
