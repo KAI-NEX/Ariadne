@@ -6,7 +6,7 @@ const Settings=require('../public/model-settings.js'), Selection=require('../pub
 const Runtime=require('../public/runtime-capabilities.js'), Gate=require('../public/runtime-capability-gate.js');
 const data=new Map(), storage={getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v)};
 globalThis.localStorage=storage;
-const sol={mode:'model',provider:'codex',model:'gpt-5.6-sol'}, ds={mode:'model',provider:'deepseek',model:'deepseek-v4-flash-vision-exp'};
+const sol={mode:'model',provider:'codex',model:'gpt-5.6-sol'}, ds={mode:'model',provider:'deepseek',model:'deepseek-flash'};
 const selectHome=r=>storage.setItem(Gate.CURRENT_RUNTIME_STORAGE_KEY,JSON.stringify(r));
 const chosen=r=>({...r,execution_settings:Settings.envelope(r)});
 const listed=[sol,ds].map(r=>({provider_id:r.provider,model_id:r.model}));

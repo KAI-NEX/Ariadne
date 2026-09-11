@@ -7,7 +7,7 @@ const Job = require("../public/job-context-domain.js");
 const Domain = require("../public/job-overview-domain.js");
 const Personal = require("../public/personal-understanding-domain.js");
 const Candidate = require("../public/job-candidate-context-domain.js");
-const runtime = Domain.runtimeSnapshot({getItem:key=>key === "job-radar-selected-runtime" ? JSON.stringify({mode:"model",provider:"deepseek",model:"deepseek-v4-flash-vision-exp"}) : null});
+const runtime = Domain.runtimeSnapshot({getItem:key=>key === "job-radar-selected-runtime" ? JSON.stringify({mode:"model",provider:"deepseek",model:"deepseek-flash"}) : null});
 function databaseFor(input = {}) {
   const specs = new Map([...Truth.STORE_SPECS, { name: "career_entities", keyPath: "entity_id" }, { name: "career_evidence", keyPath: "evidence_id" }].map((entry) => [entry.name, entry.keyPath]));
   const data = new Map([...specs].map(([name]) => [name, new Map((input[name] || []).map((entry) => [entry[specs.get(name)], structuredClone(entry)]))]));

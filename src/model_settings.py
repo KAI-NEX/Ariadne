@@ -6,7 +6,7 @@ CATALOG = json.loads((Path(__file__).resolve().parents[1] / "public/model-settin
 
 
 def descriptor(provider, model):
-    return next((item for item in CATALOG["models"] if (item["provider"], item["model"]) == (provider, model)), None)
+    return next((item for item in CATALOG["models"] + CATALOG.get("retired_models", []) if (item["provider"], item["model"]) == (provider, model)), None)
 
 
 def envelope(provider, model, settings=None, revision="default", scope=None):

@@ -33,7 +33,7 @@ from src.material_delivery import DOCX, material_parts
 
 
 PROVIDER_ID = "deepseek"
-MODEL_ID = "deepseek-v4-flash-vision-exp"
+MODEL_ID = "deepseek-flash"
 ADAPTER_VERSION = "deepseek-candidate-multimodal-v2"
 DELIVERY_METHOD = "source_or_rendered_images"
 CREDENTIAL_REF = "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision"

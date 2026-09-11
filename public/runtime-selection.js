@@ -227,8 +227,8 @@ function restoreSelectedRuntime() {
     return;
   }
   if (typeof saved.provider !== "string" || typeof saved.model !== "string") return;
-  state.mode = "ai"; state.provider = saved.provider; state.model = saved.model;
-  const added = state.addedModels.find((model) => model.provider_id === saved.provider && model.model_id === saved.model);
+  state.mode = "ai"; state.provider = saved.provider; state.model = window.AriadneModelSettings?.currentModel(saved.provider, saved.model) || saved.model;
+  const added = state.addedModels.find((model) => model.provider_id === saved.provider && model.model_id === state.model);
   if (added) applyReadyModel(added, false);
 }
 

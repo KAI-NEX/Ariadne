@@ -30,7 +30,7 @@ from src.truth_persistence import TruthPersistenceError, validate_candidate_work
 
 
 PROVIDER_ID = "deepseek"
-MODEL_ID = "deepseek-v4-flash-vision-exp"
+MODEL_ID = "deepseek-flash"
 PROTOCOL = OPENAI_CHAT_COMPLETIONS
 CAPABILITY_BASIS = "adapter_verified"
 CREDENTIAL_REF = "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision"

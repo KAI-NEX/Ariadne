@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const Gate = require("../public/runtime-capability-gate.js");
 const Contract = require("../public/runtime-capabilities.js");
-const vision = { mode: "model", provider: "deepseek", model: "deepseek-v4-flash-vision-exp" };
+const vision = { mode: "model", provider: "deepseek", model: "deepseek-flash" };
 const pro = { mode: "ai", provider: "deepseek", model: "deepseek-v4-pro" };
 const descriptor = Gate.CANDIDATE_CONVERSATION_MODEL_ADAPTER;
 

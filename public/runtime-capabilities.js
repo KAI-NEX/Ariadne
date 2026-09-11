@@ -122,7 +122,8 @@
       return Object.freeze({ mode: "local", provider: null, model: null });
     }
     const provider = requiredString(runtime.provider, "model_runtime_provider_required", 64).toLowerCase();
-    const model = requiredString(runtime.model, "model_runtime_model_required", 200);
+    const requestedModel = requiredString(runtime.model, "model_runtime_model_required", 200);
+    const model = Settings?.currentModel(provider, requestedModel) || requestedModel;
     if (!PROVIDER_PATTERN.test(provider)) throw new ExecutionContractError("model_runtime_provider_invalid");
     if (!MODEL_PATTERN.test(model)) throw new ExecutionContractError("model_runtime_model_invalid");
     return Object.freeze({ mode: "model", provider, model });

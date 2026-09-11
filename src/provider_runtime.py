@@ -94,13 +94,12 @@ def deepseek_model_descriptors(model_ids: list[str]) -> list[ModelDescriptor]:
                 None,
                 None,
             ))
-        elif model_id == "deepseek-v4-flash-vision-exp":
-            # DeepSeek's 2026-08-21 official announcement names this exact model as
-            # its experimental multimodal vision API model.  Chat Completions is kept
-            # because it is the product's established PDF-page image route.
+        elif model_id == "deepseek-flash":
+            # Official 2026-09-10 V4.1 Flash vision contract; qualification evidence
+            # is recorded in the migration report. Keep the complete PDF-page route.
             descriptors.append(ModelDescriptor(
                 "deepseek", model_id, f"DeepSeek · {model_id}", OPENAI_CHAT_COMPLETIONS,
-                (TEXT, VISION), "qualification_2026-09-03", True, MULTIMODAL_VERIFIED,
+                (TEXT, VISION), "qualification_2026-09-11", True, MULTIMODAL_VERIFIED,
                 "adapter_verified",
                 {
                     "semantic_understanding": "supported",

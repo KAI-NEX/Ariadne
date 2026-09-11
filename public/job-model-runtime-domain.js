@@ -14,7 +14,7 @@
   if (!Runtime || !RuntimeGate || !Truth || !JobContext || !ModelImportLifecycle || !Manifest) throw new Error("job_model_runtime_dependencies_required");
 
   const PROVIDER_ID = "deepseek";
-  const MODEL_ID = "deepseek-v4-flash-vision-exp";
+  const MODEL_ID = "deepseek-flash";
   const PROTOCOL = "OPENAI_CHAT_COMPLETIONS";
   const OPERATION = "JOB_MODEL_IMPORT";
   const CREDENTIAL_REF = "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision";

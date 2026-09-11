@@ -5,7 +5,8 @@
   if (typeof module === "object") module.exports = api;
   root.AriadneModelSettings = api;
 }(globalThis, function (catalog) {
-  const descriptor = (provider, model) => catalog?.models.find(item => item.provider === provider && item.model === model);
+  const descriptor = (provider, model) => [...(catalog?.models || []), ...(catalog?.retired_models || [])].find(item => item.provider === provider && item.model === model);
+  const currentModel = (provider, model) => catalog?.migrations?.[provider]?.[model] || model;
   function envelope(runtime, settings, revision = "default", scope = null) {
     const item = descriptor(runtime.provider, runtime.model);
     if (!item || runtime.mode !== "model") return null;
@@ -35,5 +36,5 @@
     const suffix = item?.parameters.reasoning_effort?.options.find(option => option.value === effort)?.label;
     return `${item?.[compact ? "compact_label" : "short_label"] || runtime.model}${compact && suffix ? ` · ${suffix}` : ""}`;
   }
-  return Object.freeze({ catalog, descriptor, envelope, validate, identity, label });
+  return Object.freeze({ catalog, descriptor, currentModel, envelope, validate, identity, label });
 }));

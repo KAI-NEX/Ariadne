@@ -13,7 +13,7 @@
   const OPERATION_RUNTIME_STORAGE_KEY = "ariadne-operation-runtimes-v1";
   const CANDIDATE_MULTIMODAL_IMPORT_ADAPTER = Object.freeze({
     provider_id: "deepseek",
-    model_id: "deepseek-v4-flash-vision-exp",
+    model_id: "deepseek-flash",
     protocol: "OPENAI_CHAT_COMPLETIONS",
     capabilities: Object.freeze(["TEXT", "VISION"]),
     multimodal_readiness: "VERIFIED",
@@ -134,7 +134,7 @@
     const normalized = Contract.normalizeCurrentRuntime(runtime);
     if (normalized.mode !== "model") return null;
     if (normalized.provider === "codex" && normalized.model === "gpt-5.6-sol") {
-      const domain = modelDescriptorForRuntime({ mode: "model", provider: "deepseek", model: "deepseek-v4-flash-vision-exp" }, operation);
+      const domain = modelDescriptorForRuntime({ mode: "model", provider: "deepseek", model: "deepseek-flash" }, operation);
       return Object.freeze({ ...domain, provider_id: "codex", model_id: "gpt-5.6-sol", protocol: "CODEX_EXEC_JSONL",
         discovery_source: "ariadne_codex_qualification_2026-09-09", adapter_version: domain.adapter_version?.replace(/^deepseek-/, "codex-") ?? null });
     }
@@ -166,7 +166,7 @@
     if (globalThis.AriadneRuntimeSelection && globalThis.localStorage) return globalThis.AriadneRuntimeSelection.resolve(operation, scope ?? globalThis.AriadneRuntimeSelection.scopeFor(operation));
     // Node contract tests have no browser selection; browser execution always
     // resolves the actual operation authority, including an explicit Local.
-    if (typeof globalThis.localStorage === "undefined") return { mode: "model", provider: "deepseek", model: "deepseek-v4-flash-vision-exp" };
+    if (typeof globalThis.localStorage === "undefined") return { mode: "model", provider: "deepseek", model: "deepseek-flash" };
     return runtimeForOperation(operation);
   }
 

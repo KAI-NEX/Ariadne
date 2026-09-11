@@ -6,7 +6,7 @@
   root.JobRadarAddModelSheet = api;
 }(typeof globalThis !== "undefined" ? globalThis : this, function createAddModelSheet() {
   const PROVIDERS = Object.freeze([
-    { id: "deepseek", name: "DeepSeek", apiKeyUrl: "https://platform.deepseek.com/api_keys", models: [{ id: "deepseek-v4-flash-vision-exp", name: "deepseek-v4-flash-vision-exp" }] },
+    { id: "deepseek", name: "DeepSeek", apiKeyUrl: "https://platform.deepseek.com/api_keys", models: [{ id: "deepseek-flash", name: "deepseek-flash" }] },
     { id: "gemini", name: "Gemini", apiKeyUrl: "https://aistudio.google.com/app/apikey", models: [{ id: "gemini-3.7-flash", name: "gemini-3.7-flash" }] },
     { id: "qwen", name: "Qwen", apiKeyUrl: "https://bailian.console.aliyun.com/", models: [{ id: "qwen3.8-max", name: "qwen3.8-max" }] },
   ]);

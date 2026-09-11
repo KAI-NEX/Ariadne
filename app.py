@@ -26,6 +26,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 from src.career_evidence import CareerDocumentError, _document_blocks, extract_career_document, extract_career_document_only, extract_job_document_only, propose_entities
 from src.execution_contract import ExecutionContractError, validate_runtime_snapshot
+from src.model_updates import ModelUpdates
 from src.upload_limits import MAX_FILE_BYTES, MAX_FILE_REQUEST_BYTES, MAX_IMAGE_BATCH_BYTES, MAX_IMAGE_BATCH_REQUEST_BYTES
 from src.ai_career_ingestion import (
     AICareerIngestionError,
@@ -97,7 +98,8 @@ PDF_VISUAL_OCR_SCRIPT_PATH = PROJECT_ROOT / "src" / "extraction" / "extract_pdf_
 OCR_UPLOAD_PATH = PROJECT_ROOT / "data" / "local_ocr_uploads"
 RAW_CAPTURE_PATH = PROJECT_ROOT / "data" / "raw"
 DEEPSEEK_ENDPOINT = "https://api.deepseek.com/chat/completions"
-DEEPSEEK_VISION_MODEL = "deepseek-v4-flash-vision-exp"
+MODEL_UPDATES = ModelUpdates()
+DEEPSEEK_VISION_MODEL = "deepseek-flash"
 DEEPSEEK_CONVERSATION_MODEL = DEEPSEEK_VISION_MODEL
 QWEN_CHAT_COMPLETIONS_ENDPOINT = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
 QWEN_V1_MULTIMODAL_MODEL = "qwen3.8-max"
@@ -900,6 +902,9 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/runtime-options":
             self.runtime_options()
             return
+        if parsed.path == "/api/model-updates":
+            self.send_json(HTTPStatus.OK, MODEL_UPDATES.discover(deepseek_runtime_models))
+            return
         if parsed.path == "/api/candidate-conversation-runtime-signature":
             self.send_json(HTTPStatus.OK, {"runtime_signature": candidate_conversation_runtime_signature(), "network_call_made": False})
             return
@@ -1032,6 +1037,9 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/runtime-check":
             self.runtime_check()
             return
+        if parsed.path == "/api/model-updates/verify":
+            self.verify_model_update()
+            return
         if parsed.path == "/api/runtime-providers/qwen/connection-check":
             self.qwen_runtime_connection_check()
             return
@@ -1121,6 +1129,28 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             "local_preference": local_runtime_preference(),
             "career_data_sent": False,
         })
+
+    def verify_model_update(self) -> None:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= 4000:
+                raise ValueError("MODEL_UPDATE_REQUEST_INVALID")
+            value = json.loads(self.rfile.read(length))
+            if (not isinstance(value, dict) or set(value) != {"provider", "model", "revision", "confirmed"}
+                or value["provider"] != "deepseek" or value["confirmed"] is not True
+                or not isinstance(value["model"], str) or not isinstance(value["revision"], str)):
+                raise ValueError("MODEL_UPDATE_CONFIRMATION_REQUIRED")
+            result = MODEL_UPDATES.verify(value["model"], value["revision"], deepseek_runtime_models,
+                synthetic_multimodal_smoke_image_data_url(),
+                lambda payload: call_deepseek_chat_completions(read_deepseek_key(), payload, response_limit=100000, timeout=60))
+            self.send_json(HTTPStatus.OK, result)
+        except (ValueError, TypeError, UnicodeDecodeError) as error:
+            code = str(error)
+            allowed = {"MODEL_UPDATE_REQUEST_INVALID", "MODEL_UPDATE_CONFIRMATION_REQUIRED", "MODEL_ADAPTER_REQUIRED",
+                       "MODEL_VERIFICATION_BUSY", "MODEL_NO_LONGER_AVAILABLE", "MODEL_PDF_DELIVERY_FAILED", "MODEL_VERIFICATION_FAILED"}
+            self.send_json(HTTPStatus.UNPROCESSABLE_ENTITY, {"ok": False, "error": code if code in allowed else "MODEL_VERIFICATION_FAILED"})
+        except Exception:
+            self.send_json(HTTPStatus.BAD_GATEWAY, {"ok": False, "error": "MODEL_VERIFICATION_UNAVAILABLE"})
 
     def local_ocr_capability(self) -> None:
         """Probe the actual local Swift/Vision execution boundary once per caller batch."""

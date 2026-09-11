@@ -22,7 +22,7 @@ from src.provider_runtime import ProviderRuntimeError
 from src.job_conversation_runtime import _assert_provider_safe, JobConversationRuntimeError
 
 MANIFEST = json.loads((Path(__file__).resolve().parents[1] / "data/personal_understanding_contract_v1.json").read_text())
-MODEL = "deepseek-v4-flash-vision-exp"
+MODEL = "deepseek-flash"
 CREDENTIAL_REF = "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision"
 
 

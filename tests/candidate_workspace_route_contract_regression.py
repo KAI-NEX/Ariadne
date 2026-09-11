@@ -95,7 +95,7 @@ try:
     assert status == HTTPStatus.OK
     assert content_type.startswith("application/json")
     assert result["contract_id"] == RUNTIME_RESULT_CONTRACT_VERSION
-    assert result["model"] == "deepseek-v4-flash-vision-exp"
+    assert result["model"] == "deepseek-flash"
     assert result["operation"] == "CANDIDATE_CONVERSATION_TURN"
     assert result["action"]["action"] == "PATCH_ITEM"
     assert result["action"]["contract_id"] == ACTION_SCHEMA_VERSION

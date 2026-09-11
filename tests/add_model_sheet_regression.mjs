@@ -12,7 +12,7 @@ new Function("module", "exports", source)(module, module.exports);
 const Sheet = module.exports;
 
 assert.deepEqual(Sheet.PROVIDERS.map((provider) => provider.id), ["deepseek", "gemini", "qwen"]);
-assert.deepEqual(Sheet.compatibleModels("deepseek", ["deepseek-v4-flash", "deepseek-v4-flash-vision-exp"]).map((model) => model.id), ["deepseek-v4-flash-vision-exp"]);
+assert.deepEqual(Sheet.compatibleModels("deepseek", ["deepseek-v4-flash", "deepseek-flash"]).map((model) => model.id), ["deepseek-flash"]);
 assert.deepEqual(Sheet.compatibleModels("gemini", ["gemini-3.7-flash", "gemini-3.1-flash-lite"]).map((model) => model.id), ["gemini-3.7-flash"]);
 assert.deepEqual(Sheet.compatibleModels("qwen", ["qwen3.8-max", "qwen3.8-text"]).map((model) => model.id), ["qwen3.8-max"]);
 assert.deepEqual(Sheet.compatibleModels("unknown", ["anything"]), []);

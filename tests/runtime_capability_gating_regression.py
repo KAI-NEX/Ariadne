@@ -61,7 +61,7 @@ runtime_payload = calls[0][1]
 assert runtime_payload["provider"] == "deepseek"
 assert runtime_payload["models"]
 assert [model["model_id"] for model in runtime_payload["models"]] == [
-    "deepseek-v4-flash-vision-exp",
+    "deepseek-flash",
 ]
 job_conversation_option = runtime_payload["models"][0]
 assert job_conversation_option["runtime_capabilities"]["vision"] == "supported"

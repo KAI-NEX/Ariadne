@@ -77,7 +77,7 @@ except FrozenInstanceError:
 
 descriptor = {
     "provider_id": "deepseek",
-    "model_id": "deepseek-v4-flash-vision-exp",
+    "model_id": "deepseek-flash",
     "protocol": "OPENAI_CHAT_COMPLETIONS",
     "capabilities": ["TEXT", "VISION"],
     "multimodal_readiness": "VERIFIED",
@@ -94,7 +94,7 @@ descriptor = {
     },
 }
 model = create_runtime_snapshot(
-    {"mode": "ai", "provider": "DeepSeek", "model": "deepseek-v4-flash-vision-exp"},
+    {"mode": "ai", "provider": "DeepSeek", "model": "deepseek-flash"},
     model_descriptor=descriptor,
     snapshot_id="runtime-snapshot-model-test",
     captured_at="2026-09-01T12:01:00+00:00",
@@ -110,7 +110,7 @@ assert model.capabilities.local_ocr == "supported"
 assert model.capabilities.vision == "supported"
 assert model.credential_ref == "provider:deepseek:default"
 
-known_descriptor = deepseek_model_descriptors(["deepseek-v4-flash-vision-exp"])[0]
+known_descriptor = deepseek_model_descriptors(["deepseek-flash"])[0]
 verified_candidate_product = create_runtime_snapshot(
     {"mode": "model", "provider": "deepseek", "model": known_descriptor.model_id},
     model_descriptor=known_descriptor,

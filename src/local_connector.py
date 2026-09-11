@@ -13,12 +13,14 @@ import time
 from urllib.parse import urlparse
 
 GET_PATHS = frozenset({
+    "/api/model-updates",
     "/api/conversation-attachment-capabilities",
     "/api/runtime-options", "/api/candidate-conversation-runtime-signature",
     "/api/job-conversation-runtime-signature", "/api/job-model-import-runtime-signature",
     "/api/personal-understanding-signature", "/api/job-overview-signature",
 })
 POST_PATHS = frozenset({
+    "/api/model-updates/verify",
     "/api/candidate-model-structure", "/api/job-model-structure",
     "/api/candidate-conversation-turn", "/api/candidate-conversation-turn/cancel",
     "/api/job-conversation-turn", "/api/personal-understanding-turn", "/api/job-overview-turn",
@@ -118,7 +120,7 @@ def connector_handler(base_handler):
             # other configured providers and credentials are outside this grant.
             from src.runtime_binding import CODEX_MODEL, CODEX_PROTOCOL
             from src.provider_runtime import deepseek_model_descriptors
-            descriptor = deepseek_model_descriptors(["deepseek-v4-flash-vision-exp"])[0].to_public_dict()
+            descriptor = deepseek_model_descriptors(["deepseek-flash"])[0].to_public_dict()
             descriptor.update(provider_id="codex", model_id=CODEX_MODEL, display_name=f"Codex · {CODEX_MODEL}",
                 protocol=CODEX_PROTOCOL, adapter_version="codex-candidate-multimodal-v2",
                 discovery_source="ariadne_codex_qualification_2026-09-09")

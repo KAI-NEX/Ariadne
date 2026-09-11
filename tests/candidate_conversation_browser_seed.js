@@ -5,7 +5,7 @@
   const Raw = globalThis.AriadneRawSourceStorage;
   const Local = globalThis.AriadneLocalCandidateExtraction;
   if (!Truth || !Raw || !Local) throw new Error("synthetic_seed_dependencies_missing");
-  localStorage.setItem("job-radar-selected-runtime", JSON.stringify({ mode: "model", provider: "deepseek", model: "deepseek-v4-flash-vision-exp" }));
+  localStorage.setItem("job-radar-selected-runtime", JSON.stringify({ mode: "model", provider: "deepseek", model: "deepseek-flash" }));
   const database = await Truth.openDatabase();
   try {
     const readRecord = (storeName, key) => new Promise((resolve, reject) => {

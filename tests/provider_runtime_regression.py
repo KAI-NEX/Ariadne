@@ -12,7 +12,7 @@ from src.provider_runtime import (
 )
 
 descriptors = deepseek_model_descriptors([
-    "deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-flash-vision-exp", "account-other",
+    "deepseek-v4-flash", "deepseek-v4-pro", "deepseek-flash", "account-other",
 ])
 flash, pro, vision, unknown = descriptors
 assert flash.protocol == OPENAI_RESPONSES and flash.runtime_default
@@ -22,7 +22,7 @@ assert pro.runtime_capabilities["ai_conversation"] == "unsupported"
 assert pro.runtime_capabilities["candidate_model_structuring"] == "unsupported"
 assert pro.adapter_version is None and pro.delivery_method is None  # adapter identity is resolved by product operation
 assert vision.protocol == OPENAI_CHAT_COMPLETIONS and vision.capabilities == (TEXT, VISION)
-assert vision.multimodal_readiness == MULTIMODAL_VERIFIED and vision.discovery_source == "qualification_2026-09-03" and is_multimodal(vision)
+assert vision.multimodal_readiness == MULTIMODAL_VERIFIED and vision.discovery_source == "qualification_2026-09-11" and is_multimodal(vision)
 assert vision.runtime_capability_basis == "adapter_verified"
 assert vision.runtime_capabilities["candidate_model_structuring"] == "supported"
 assert vision.runtime_capabilities["job_model_structuring"] == "unsupported"

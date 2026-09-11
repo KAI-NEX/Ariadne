@@ -6,7 +6,7 @@ const Gate=require('../public/runtime-capability-gate.js'), Runtime=require('../
 const Lifecycle=require('../public/model-import-lifecycle-domain.js');
 const values=new Map(), storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value)};
 globalThis.localStorage=storage;
-const sol={mode:'model',provider:'codex',model:'gpt-5.6-sol'}, ds={mode:'model',provider:'deepseek',model:'deepseek-v4-flash-vision-exp'};
+const sol={mode:'model',provider:'codex',model:'gpt-5.6-sol'}, ds={mode:'model',provider:'deepseek',model:'deepseek-flash'};
 storage.setItem(Gate.CURRENT_RUNTIME_STORAGE_KEY,JSON.stringify(sol));
 const chosen=(runtime,effort)=>({...runtime,execution_settings:Settings.envelope(runtime,effort?{reasoning_effort:effort}:{})});
 assert.equal(Selection.resolve('candidate_conversation','a').execution_settings.effective_settings.reasoning_effort,'medium');

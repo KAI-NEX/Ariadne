@@ -23,7 +23,7 @@
 
   const PROVIDER = "deepseek";
   const Delivery = globalThis.AriadneConversationOutput || (typeof module === "object" ? require("./conversation-output.js") : null);
-  const MODEL = "deepseek-v4-flash-vision-exp";
+  const MODEL = "deepseek-flash";
   const PROTOCOL = "OPENAI_CHAT_COMPLETIONS";
   const RUNTIME_CONTRACTS = Conversation.CONTRACT_MANIFEST.runtime_contracts;
   const ADAPTER_VERSION = RUNTIME_CONTRACTS.adapter_version;

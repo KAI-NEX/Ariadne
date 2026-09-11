@@ -8,7 +8,7 @@ import runpy
 from src.provider_runtime import deepseek_model_descriptors, is_runtime_eligible
 
 ROOT = Path(__file__).resolve().parent.parent
-vision = deepseek_model_descriptors(["deepseek-v4-flash-vision-exp"])[0]
+vision = deepseek_model_descriptors(["deepseek-flash"])[0]
 for provider in ["deepseek", "gemini", "qwen", "future-provider"]:
     qualified = replace(vision, provider_id=provider)
     assert is_runtime_eligible(qualified)

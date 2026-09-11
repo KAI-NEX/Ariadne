@@ -30,7 +30,7 @@ MANIFEST_PATH = Path(__file__).resolve().parents[1] / "data" / "job_intelligence
 MANIFEST = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 RUNTIME = MANIFEST["job_model_import_runtime_contracts"]
 PROVIDER_ID = "deepseek"
-MODEL_ID = "deepseek-v4-flash-vision-exp"
+MODEL_ID = "deepseek-flash"
 PROTOCOL = OPENAI_CHAT_COMPLETIONS
 OPERATION = "JOB_TEXT_IMPORT"
 OPERATIONS = {"JOB_IMAGE_IMPORT", "JOB_TEXT_IMPORT"}

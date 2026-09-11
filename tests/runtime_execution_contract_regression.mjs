@@ -59,7 +59,7 @@ assert.equal(localOcrSupported.capabilities.vision, "unsupported");
 
 const descriptor = {
   provider_id: "deepseek",
-  model_id: "deepseek-v4-flash-vision-exp",
+  model_id: "deepseek-flash",
   protocol: "OPENAI_CHAT_COMPLETIONS",
   capabilities: ["TEXT", "VISION"],
   multimodal_readiness: "VERIFIED",
@@ -76,7 +76,7 @@ const descriptor = {
   },
 };
 const model = Runtime.createRuntimeSnapshot(
-  { mode: "ai", provider: "DeepSeek", model: "deepseek-v4-flash-vision-exp" },
+  { mode: "ai", provider: "DeepSeek", model: "deepseek-flash" },
   {
     modelDescriptor: descriptor,
     snapshotId: "runtime-snapshot-model-test",

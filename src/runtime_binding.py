@@ -42,7 +42,7 @@ def adapter_for(provider, domain_adapter):
 
 def valid_binding(snapshot, domain_adapter):
     if snapshot.provider == "deepseek":
-        identity = ("deepseek-v4-flash-vision-exp", "OPENAI_CHAT_COMPLETIONS", DEEPSEEK_CREDENTIAL)
+        identity = ("deepseek-flash", "OPENAI_CHAT_COMPLETIONS", DEEPSEEK_CREDENTIAL)
     elif snapshot.provider == "codex" and codex_enabled():
         identity = (CODEX_MODEL, CODEX_PROTOCOL, CODEX_CREDENTIAL)
     else:

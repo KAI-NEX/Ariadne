@@ -86,7 +86,7 @@ const jobText = [
 ].join("\n");
 const source = await LocalJob.preparePastedText(jobText, "job-batch-model-regression");
 const sourceDocument = LocalJob.sourceDocumentFor(source, "2026-09-04T04:00:00.000Z");
-const authority = Gate.authorityFrom({ mode: "model", provider: "deepseek", model: "deepseek-v4-flash-vision-exp" }, "job_text_import");
+const authority = Gate.authorityFrom({ mode: "model", provider: "deepseek", model: "deepseek-flash" }, "job_text_import");
 const gate = JobModel.assertEligibleGate(Gate.operationGate("job_text_import", authority));
 assert.equal(gate.allowed, true);
 assert.equal(Gate.DEEPSEEK_PRO_MODEL_DESCRIPTOR.runtime_capabilities.job_model_structuring, "unsupported");

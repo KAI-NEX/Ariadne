@@ -29,9 +29,9 @@ for (const operation of ["ai_conversation", "model_merge", "legacy_candidate_sem
   assert.equal(Gate.operationGate(operation, localAuthority).allowed, false);
 }
 
-const visionRuntime = { mode: "ai", provider: "DeepSeek", model: "deepseek-v4-flash-vision-exp" };
+const visionRuntime = { mode: "ai", provider: "DeepSeek", model: "deepseek-flash" };
 const modelAuthority = Gate.authorityFrom(visionRuntime, "candidate_image_import");
-assert.deepEqual(modelAuthority.runtime, { mode: "model", provider: "deepseek", model: "deepseek-v4-flash-vision-exp" });
+assert.deepEqual(modelAuthority.runtime, { mode: "model", provider: "deepseek", model: "deepseek-flash" });
 assert.equal(Gate.operationGate("candidate_image_import", modelAuthority).allowed, true);
 for (const operation of ["job_import", "ai_conversation", "model_merge"]) assert.equal(Gate.operationGate(operation, modelAuthority).allowed, false);
 assert.equal(Gate.requireOperation("candidate_image_import", modelAuthority).capability, "candidate_model_structuring");
@@ -58,10 +58,10 @@ assert.equal(Gate.operationGate("candidate_conversation").operation, "candidate_
 
 const routedStorage = memoryStorage(visionRuntime);
 Gate.recordOperationRuntimeSelection({ mode: "model", provider: "deepseek", model: "deepseek-v4-pro" }, routedStorage);
-Gate.recordOperationRuntimeSelection({ mode: "model", provider: "deepseek", model: "deepseek-v4-flash-vision-exp" }, routedStorage);
-assert.equal(Gate.runtimeForOperation("job_conversation", routedStorage).model, "deepseek-v4-flash-vision-exp");
-assert.equal(Gate.runtimeForOperation("candidate_image_import", routedStorage).model, "deepseek-v4-flash-vision-exp");
-assert.equal(Gate.runtimeForOperation("job_image_import", routedStorage).model, "deepseek-v4-flash-vision-exp");
+Gate.recordOperationRuntimeSelection({ mode: "model", provider: "deepseek", model: "deepseek-flash" }, routedStorage);
+assert.equal(Gate.runtimeForOperation("job_conversation", routedStorage).model, "deepseek-flash");
+assert.equal(Gate.runtimeForOperation("candidate_image_import", routedStorage).model, "deepseek-flash");
+assert.equal(Gate.runtimeForOperation("job_image_import", routedStorage).model, "deepseek-flash");
 const incompatibleStorage = memoryStorage({ mode: "ai", provider: "deepseek", model: "deepseek-v4-pro" });
 assert.equal(Gate.operationGate("job_image_import", Gate.operationAuthority("job_image_import", incompatibleStorage)).allowed, false);
 
@@ -70,7 +70,7 @@ assert.throws(() => Gate.currentAuthority(storageWith("{not-json")), (error) => 
 assert.throws(() => Gate.authorityFrom({ mode: "hybrid" }), (error) => error.code === "current_runtime_invalid");
 
 const exactLegacy = Gate.legacyProviderAction({
-  provider: "deepseek", model: "deepseek-v4-flash-vision-exp", capability: "candidate_model_structuring",
+  provider: "deepseek", model: "deepseek-flash", capability: "candidate_model_structuring",
 }, modelAuthority);
 assert.equal(exactLegacy.identity_matches, true);
 assert.equal(exactLegacy.allowed, true);

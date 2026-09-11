@@ -38,7 +38,7 @@ function revision(index, summary = `Synthetic research evidence ${index}`) {
     authority: Truth.AUTHORITY.revision, payload: { items: [{ item_id: `item-${index}`, item_type: "PROJECT", title: `Synthetic project ${index}`, summary,
       facts: [{ label: "Role", value: "Research and evaluation; deployment by colleagues" }], uncertainties: [], grounding_refs: [] }] } };
 }
-const runtime = Understanding.runtimeSnapshot({ getItem: (key) => key === "job-radar-selected-runtime" ? JSON.stringify({ mode: "model", provider: "deepseek", model: "deepseek-v4-flash-vision-exp" }) : null });
+const runtime = Understanding.runtimeSnapshot({ getItem: (key) => key === "job-radar-selected-runtime" ? JSON.stringify({ mode: "model", provider: "deepseek", model: "deepseek-flash" }) : null });
 if (process.argv.includes("--request")) {
   console.log(JSON.stringify(Understanding.requestFor("DISCUSS", {
     candidate: { confirmed: [], working: [], policy: "Human Save required" }, memories: [], history: [], overview: null,

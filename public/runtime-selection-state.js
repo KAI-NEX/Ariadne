@@ -8,6 +8,14 @@
   const KEY = "ariadne-model-selection-v2", CURRENT = "job-radar-selected-runtime", LEGACY = "ariadne-operation-runtimes-v1";
   const bindings = new Map();
   const transferConsents = new Map();
+  if (root.document?.createElement && root.document?.head) {
+    const attachUpdates = () => {
+      const script = root.document.createElement("script"); script.src = "/model-updates.js?v=1";
+      root.document.head.append(script);
+    };
+    if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", attachUpdates, { once: true });
+    else attachUpdates();
+  }
   const read = (key, storage = root.localStorage) => { const raw = storage?.getItem(key); return raw ? JSON.parse(raw) : null; };
   const revision = () => root.crypto.randomUUID();
   const notify = () => root.dispatchEvent?.(new Event("ariadne-runtime-selection"));
@@ -54,13 +62,14 @@
     const chosen = [(scope && state?.overrides?.[scope]), (differingLegacy && legacy),
       (matches && state.default), (!state?.inherit?.[scope] && legacy), raw]
       .find(value => value && value.provider === raw.provider);
-    const runtime = { mode: "model", provider: chosen.provider, model: chosen.model };
+    const runtime = { mode: "model", provider: chosen.provider, model: Settings.currentModel(chosen.provider, chosen.model) };
     const rev = chosen.revision || `legacy:${runtime.provider}:${runtime.model}`;
     return { ...runtime, execution_settings: Settings.envelope(runtime, chosen.settings, rev, scope) };
   }
   function version(storage = root.localStorage) { return JSON.stringify([read(KEY, storage)?.revision || "legacy", read(CURRENT, storage), read(LEGACY, storage)]); }
-  async function update({ scope, runtime, expectedRevision, clear = false, makeDefault = false }, storage = root.localStorage) {
+  async function update({ scope, runtime, expectedRevision, clear = false, makeDefault = false, isCurrent = () => true }, storage = root.localStorage) {
     const change = () => {
+      if (!isCurrent()) throw Error("对话状态已变化，请重新确认切换。");
       if (version(storage) !== expectedRevision) throw Error("模型设置已在另一页面变化，请重新打开菜单后选择。");
       const before = read(KEY, storage), raw = read(CURRENT, storage) || {};
       const state = before || { default: null, overrides: {}, revision: "legacy" };

@@ -140,6 +140,7 @@ VI 页面提供 `vi-resume-sheet/row/label/content/heading` 的**合成排版样
 
 共享组件的职责：
 
+- **模型更新提示**（2026-09-11）：首页提示区/六个 composer 上方共用 `model-updates.js/css` 轻提示。沿用 12 px/1.65 辅助文字、text-secondary、8 px 间距和 44 px 文字按钮；无新图标、卡片或重型弹窗，窄屏自然换行。「验证并切换」一次确认后显示验证进度，通过直接切换；「稍后」收起。失败明确保留原选择，不改变普通对话的资料传输确认。
 - **主/次/轻操作**：复用 `v1-primary-button / secondary / tertiary / consent-action`，禁止每个页面复制按钮尺寸。
 - **来源入口**：Candidate/Job 共用 source input、dropzone、预览与错误说明；不可用视觉提示替代材料传输确认。
 - **工作区加载定位**：Candidate/Job 左侧内容栏使用 `minmax(0,1fr)` 单列约束，多个长文件名不能撑大内部网格。加载时提示在标题与底部保存操作之间的内容区水平/垂直居中，使用对称留白且不预留单侧滚动条槽；加载结束恢复正常内容滚动，不移动标题或保存操作。

@@ -27,7 +27,7 @@ for invalid in (None, {}, {"reasoning_effort": "ultra"}, {"reasoning_effort": "l
     try: validate(value, "codex", CODEX_MODEL)
     except ValueError: pass
     else: raise AssertionError("invalid settings accepted")
-deepseek = {"provider": "deepseek", "model": "deepseek-v4-flash-vision-exp"}
+deepseek = {"provider": "deepseek", "model": "deepseek-flash"}
 deepseek["execution_settings"] = envelope(**deepseek)
 assert apply_execution_settings({"model": deepseek["model"]}, deepseek) == {"model": deepseek["model"]}
 with patch("src.codex_runtime.subprocess.Popen") as process, patch("src.codex_runtime.codex_enabled", return_value=True):

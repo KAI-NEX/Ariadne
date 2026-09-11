@@ -19,7 +19,7 @@ function storage(runtime) {
 }
 
 const pro = { mode: "model", provider: "deepseek", model: "deepseek-v4-pro" };
-const vision = { mode: "model", provider: "deepseek", model: "deepseek-v4-flash-vision-exp" };
+const vision = { mode: "model", provider: "deepseek", model: "deepseek-flash" };
 const incompatible = storage(pro);
 for (const operation of ["candidate_image_import", "job_image_import"]) {
   const gate = Gate.operationGate(operation, Gate.operationAuthority(operation, incompatible));
@@ -35,19 +35,19 @@ Gate.recordOperationRuntimeSelection(vision, routed);
 for (const operation of ["candidate_image_import", "job_image_import"]) {
   const gate = Gate.operationGate(operation, Gate.operationAuthority(operation, routed));
   assert.equal(gate.allowed, true);
-  assert.equal(gate.authority.runtime.model, "deepseek-v4-flash-vision-exp");
+  assert.equal(gate.authority.runtime.model, "deepseek-flash");
   assert.equal(gate.authority.capabilities.vision, "supported");
 }
 for (const operation of ["candidate_conversation", "job_conversation"]) {
   const gate = Gate.operationGate(operation, Gate.operationAuthority(operation, routed));
   assert.equal(gate.allowed, true);
-  assert.equal(gate.authority.runtime.model, "deepseek-v4-flash-vision-exp");
+  assert.equal(gate.authority.runtime.model, "deepseek-flash");
 }
 const preserved = storage(vision);
 Gate.recordOperationRuntimeSelection(vision, preserved);
 Gate.recordOperationRuntimeSelection(pro, preserved, { only_unassigned: true });
-assert.equal(Gate.runtimeForOperation("candidate_image_import", preserved).model, "deepseek-v4-flash-vision-exp");
-assert.equal(Gate.runtimeForOperation("job_conversation", preserved).model, "deepseek-v4-flash-vision-exp");
+assert.equal(Gate.runtimeForOperation("candidate_image_import", preserved).model, "deepseek-flash");
+assert.equal(Gate.runtimeForOperation("job_conversation", preserved).model, "deepseek-flash");
 
 const local = storage({ mode: "local", provider: null, model: null });
 for (const operation of ["candidate_import", "job_import"]) {

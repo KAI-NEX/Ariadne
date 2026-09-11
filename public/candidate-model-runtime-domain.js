@@ -11,7 +11,7 @@
   if (!Truth || !Candidate || !ModelImportLifecycle) throw new Error("candidate_model_runtime_dependencies_required");
 
   const PROVIDER_ID = "deepseek";
-  const MODEL_ID = "deepseek-v4-flash-vision-exp";
+  const MODEL_ID = "deepseek-flash";
   const PROTOCOL = "OPENAI_CHAT_COMPLETIONS";
   const ADAPTER_VERSION = "deepseek-candidate-multimodal-v2";
   const PROMPT_VERSION = "candidate_workspace_v3_atomic_awards";

@@ -1,0 +1,6 @@
+.v1-model-update { display: flex; flex-wrap: wrap; align-items: center; gap: var(--vi-space-8); margin: var(--vi-space-8) 0; color: var(--vi-text-secondary); font: var(--vi-text-caption)/1.65 var(--vi-font-ui); }
+.v1-model-update[hidden], .v1-model-update button[hidden] { display: none; }
+.v1-model-update button { min-height: var(--vi-target-comfort); padding: 0 var(--vi-space-8); border: 0; background: transparent; color: var(--vi-ink); font: inherit; cursor: pointer; }
+.v1-model-update button:hover { text-decoration: underline; }
+.v1-model-update button:focus-visible { outline: 2px solid var(--vi-focus); outline-offset: 2px; }
+.v1-model-update button:disabled { color: var(--vi-muted); cursor: wait; }

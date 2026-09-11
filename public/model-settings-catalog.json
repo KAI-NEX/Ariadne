@@ -10,9 +10,18 @@
       ] } }
     },
     {
-      "provider": "deepseek", "model": "deepseek-v4-flash-vision-exp", "protocol": "OPENAI_CHAT_COMPLETIONS",
-      "short_label": "DeepSeek Vision", "compact_label": "DeepSeek Vision", "connection_id": "deepseek-local-vision-v1",
-      "descriptor_revision": "deepseek-vision-20260910", "settings_schema_version": "deepseek-fixed-v1", "parameters": {}
+      "provider": "deepseek", "model": "deepseek-flash", "protocol": "OPENAI_CHAT_COMPLETIONS",
+      "short_label": "DeepSeek V4.1 Flash", "compact_label": "V4.1 Flash", "connection_id": "deepseek-local-vision-v1",
+      "descriptor_revision": "deepseek-v41-20260911", "settings_schema_version": "deepseek-fixed-v1", "parameters": {}
     }
-  ]
+  ],
+  "retired_models": [
+    {
+      "provider": "deepseek", "model": "deepseek-v4-flash-vision-exp", "protocol": "OPENAI_CHAT_COMPLETIONS",
+      "short_label": "DeepSeek Vision（旧记录）", "compact_label": "DeepSeek Vision",
+      "connection_id": "deepseek-local-vision-v1", "descriptor_revision": "deepseek-vision-20260910",
+      "settings_schema_version": "deepseek-fixed-v1", "parameters": {}
+    }
+  ],
+  "migrations": { "deepseek": { "deepseek-v4-flash-vision-exp": "deepseek-flash" } }
 }

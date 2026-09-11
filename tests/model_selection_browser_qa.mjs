@@ -113,11 +113,11 @@ try {
   const home=await context.newPage();await home.goto(base+'/index.html');await home.waitForFunction(()=>document.getElementById('runtime-selected').textContent.includes('GPT Sol'));
   await home.screenshot({path:`${out}/home.png`,fullPage:true});
   // A machine's initial hint must not overwrite an explicit in-app default.
-  await configure(page,{provider:'deepseek',model:'deepseek-v4-flash-vision-exp',makeDefault:true,homepage:true});
+  await configure(page,{provider:'deepseek',model:'deepseek-flash',makeDefault:true,homepage:true});
   await open(page);assert.equal(await page.locator('[data-model-choice^="codex/"]').count(),0);
   assert.equal(await page.locator('[data-model-choice^="deepseek/"]').getAttribute('data-effort'),'');await page.keyboard.press('Escape');
   const hint=await context.newPage();await hint.route('**/api/runtime-options',async route=>{const response=await route.fetch(),data=await response.json();data.local_preference={id:'local-codex-v1',provider:'codex',model:'gpt-5.6-sol'};await route.fulfill({json:data});});
-  await hint.goto(base+'/index.html');await hint.waitForFunction(()=>document.getElementById('runtime-selected').textContent.includes('DeepSeek Vision'));
+  await hint.goto(base+'/index.html');await hint.waitForFunction(()=>document.getElementById('runtime-selected').textContent.includes('DeepSeek V4.1 Flash'));
   assert.deepEqual(errors,[]);
   fs.writeFileSync(`${out}/results.json`,JSON.stringify({six_composers:true,scoped_refresh:true,multi_tab_conflict:true,default_isolation:true,unsupported_effort_hidden:true,consent_invalidated:true,failed_input_and_attachments_preserved:true,stale_request_zero_post:true,actual_scoped_candidate:true,desktop_mobile_keyboard:true,errors,provider_calls:0},null,2));
   console.log(out);
