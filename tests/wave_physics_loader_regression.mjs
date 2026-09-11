@@ -45,5 +45,9 @@ view.dispatch('pagehide', { persisted: true }); view.dispatch('pageshow'); asser
 Wave.set(host, false); assert.equal(cancelled, 32); assert.equal(doc.listeners.size, 0); assert.equal(media.listeners.size, 0); assert.equal(view.listeners.size, 0); assert.equal(observer.disconnected, true);
 media.matches = true; Wave.set(host, true); assert.equal(created, 32, 'reduced motion mounts a static pose'); Wave.set(host, false);
 const processing = fs.readFileSync(new URL('../public/processing-indicator-domain.js', import.meta.url), 'utf8');
+const styles = fs.readFileSync(new URL('../public/wave-physics-loader.css', import.meta.url), 'utf8');
 assert.match(processing, /classList\.contains\("v1-conversation-status"\)/);
+assert.match(styles, /\.v1-wave-loader \{[\s\S]*--wave-scale: \.3;/);
+assert.match(styles, /@media \(min-width: 640px\) \{ \.v1-wave-loader \{ --wave-scale: \.375; \} \}/);
+assert.match(styles, /@media \(min-width: 768px\) \{ \.v1-wave-loader \{ --wave-scale: \.5; \} \}/);
 console.log('Wave physics: reference geometry, smooth loop, memoization, progress continuity, reduced motion, offscreen/cache pause and disposal PASS');

@@ -1,5 +1,12 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-11 — AI 对话等待动画缩小 50%（COMPLETE）
+
+- 按用户反馈将 WavePhysicsLoader 的三档响应式比例由 `.6 / .75 / 1` 统一减半为 `.3 / .375 / .5`，因此动画容器、柱条、小球和运动幅度保持同一比例整体缩小 50%；15 柱、201 帧、4 秒循环、状态文案与轨迹不变。
+- 六个对话入口同步样式资源版本；发送按钮及其动画、非对话导入加载、模型调用和资料保存逻辑均未改动。
+- 波浪轨迹回归、VI 静态/负向门禁及 diff 检查通过；egolite 在桌面和 390 px 窄屏挂载等待状态，核对动画容器尺寸分别为 146 × 96 px、87.6 × 57.6 px，发送按钮仍使用原 0.82 秒旋转。未调用模型或改写资料。
+- 仅本阶段本地提交，不 push；Archify 图表、Mac 启动器与公开入口等其他改动原地保留。
+
 ## 2026-09-11 — Archify 安装与 Ariadne 架构分析（COMPLETE）
 
 - 按用户要求安装 `tt-a1i/archify` 的 Archify Skill（本机 `~/.codex/skills/archify`，包标识 `2.17.0-dev.1`），doctor 通过。基于 `1b39747` 实际代码生成[分析报告与交互架构图](docs/architecture/archify/2026-09-11/README.md)，保留 typed JSON、交付哈希、来源文件指纹与上游 MIT 许可；未把 Skill 源码或依赖加入产品运行时。

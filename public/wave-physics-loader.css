@@ -18,7 +18,7 @@
 }
 .v1-wave-wait .v1-processing-copy small { color: var(--vi-text-secondary); }
 .v1-wave-loader {
-  --wave-scale: .6;
+  --wave-scale: .3;
   --wave-rest: var(--vi-wave-light);
   --wave-crest: var(--vi-wave-dark);
   --wave-ball: var(--vi-wave-ball);
@@ -64,5 +64,5 @@
   width: 12px;
 }
 .v1-wave-wait.is-terminal .v1-wave-loader { display: none; }
-@media (min-width: 640px) { .v1-wave-loader { --wave-scale: .75; } }
-@media (min-width: 768px) { .v1-wave-loader { --wave-scale: 1; } }
+@media (min-width: 640px) { .v1-wave-loader { --wave-scale: .375; } }
+@media (min-width: 768px) { .v1-wave-loader { --wave-scale: .5; } }
