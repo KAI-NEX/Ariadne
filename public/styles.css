@@ -438,7 +438,7 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-library-intro { margin: clamp(90px, 15vh, 170px) 0 42px; }
 .v1-library-intro h2 { font-size: clamp(38px, 5vw, 68px); font-weight: 520; letter-spacing: -0.06em; margin: 0 0 16px; }
 .v1-library-intro p { color: var(--muted); line-height: 1.6; margin: 0; max-width: 650px; }
-.v1-library-shell > .v1-card-grid { margin-top: clamp(78px, 14vh, 148px); }
+.v1-library-shell > .v1-card-grid { margin-top: clamp(20px, 3.5vh, 36px); }
 .v1-empty-state { align-items: center; border: 1px dashed #c8ced8; border-radius: 24px; display: flex; flex-direction: column; min-height: 360px; padding: 68px 24px; text-align: center; }
 .v1-empty-mark { align-items: center; border: 1px solid var(--line); border-radius: 50%; color: #7b8392; display: inline-flex; font-size: 28px; height: 58px; justify-content: center; width: 58px; }
 .v1-empty-state h2 { font-size: 24px; font-weight: 560; margin: 25px 0 8px; }

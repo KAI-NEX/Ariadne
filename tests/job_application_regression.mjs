@@ -22,17 +22,29 @@ assert.equal(reopened.job_context_id,initial.job_context_id);
 assert.equal(Applications.matches(reopened,'ACTIVE'),true);
 assert.equal(Applications.initial('second-job').revision,0);
 assert.throws(()=>Applications.validate({...state,stage:'corrupt'}),/无法读取/);
+const ordered=Applications.orderJobs(
+  [{job_context_id:'active-a'},{job_context_id:'closed-a'},{job_context_id:'active-b'},{job_context_id:'closed-b'}],
+  new Map([
+    ['closed-a',Applications.next(Applications.initial('closed-a'),{stage:'CLOSED',outcome:'',note:''},0)],
+    ['closed-b',Applications.next(Applications.initial('closed-b'),{stage:'CLOSED',outcome:'',note:''},0)],
+  ]),
+);
+assert.deepEqual(ordered.map(job=>job.job_context_id),['active-a','active-b','closed-a','closed-b'],'closed jobs move to the end without disturbing order within either group');
 const library=readFileSync(new URL('../public/jd.html',import.meta.url),'utf8');
 const detail=readFileSync(new URL('../public/job-detail.html',import.meta.url),'utf8');
 const pages=readFileSync(new URL('../public/v1-pages.js',import.meta.url),'utf8');
+const styles=readFileSync(new URL('../public/styles.css',import.meta.url),'utf8');
 assert.doesNotMatch(library,/job-stage-dialog|job-stage-note/,'no separate stage dialog or notes editor in the library');
+assert.doesNotMatch(library,/job-stage-filters|job-stage-empty/,'the library no longer exposes stage filters');
 assert.match(detail,/id="job-application-form"/);
 assert.match(detail,/job-application-domain\.js/);
-assert.match(pages,/const filters = \{ ACTIVE: "关注中", CLOSED: "已结束", ALL: "全部" \}/);
+assert.doesNotMatch(pages,/jobStageFilter|data-job-filter/);
+assert.match(pages,/JobApplications\.orderJobs\(jobs, applications\)/);
 assert.match(pages,/\$\{card\}<button type="button" class="runtime-selector v1-job-stage-select"/,'interactive dropdown is outside the card link');
 assert.match(library,/job-stage-menu\.js/);
+assert.match(styles,/\.v1-library-shell > \.v1-card-grid \{ margin-top: clamp\(20px, 3\.5vh, 36px\); \}/,'both libraries use the compact title-to-grid spacing');
 assert.match(pages,/Number\(select\.dataset\.revision\)/,'one-click save still checks the observed revision');
 const notesOnly=Applications.next(state,{stage:state.stage,outcome:'INTERVIEW_REJECTED',note:'更新反馈'},state.revision);
 assert.equal(notesOnly.stage,state.stage);
 assert.equal(notesOnly.history.at(-2).outcome,'RESUME_REJECTED');
-console.log('job_application_transitions_history_filter_validation_conflicts=PASS');
+console.log('job_application_transitions_history_closed_last_validation_conflicts=PASS');

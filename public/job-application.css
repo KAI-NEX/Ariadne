@@ -1,7 +1,5 @@
-.v1-job-filters { display: flex; flex-wrap: wrap; gap: var(--vi-space-8); margin-bottom: var(--vi-space-24); }
-.v1-job-filters button, .v1-job-stage-select { min-height: var(--vi-target-comfort); border: 1px solid var(--vi-line); border-radius: var(--vi-radius-pill); background: var(--vi-surface); color: var(--vi-text-secondary); padding: var(--vi-space-8) var(--vi-space-16); font: var(--vi-text-caption)/1.65 var(--vi-font-ui); cursor: pointer; }
-.v1-job-filters button[aria-pressed="true"] { background: var(--vi-action); border-color: var(--vi-action); color: var(--vi-surface); }
-.v1-job-filters button:focus-visible, .v1-job-stage-select:focus-visible { outline: 2px solid var(--vi-focus); outline-offset: 2px; }
+.v1-job-stage-select { min-height: var(--vi-target-comfort); border: 1px solid var(--vi-line); border-radius: var(--vi-radius-pill); background: var(--vi-surface); color: var(--vi-text-secondary); padding: var(--vi-space-8) var(--vi-space-16); font: var(--vi-text-caption)/1.65 var(--vi-font-ui); cursor: pointer; }
+.v1-job-stage-select:focus-visible { outline: 2px solid var(--vi-focus); outline-offset: 2px; }
 .v1-job-tracked-card { position: relative; display: flex; min-width: 0; }
 .v1-job-tracked-card > .v1-candidate-card { flex: 1; height: auto; }
 .v1-job-tracked-card > .v1-candidate-card:hover { transform: none; }

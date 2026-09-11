@@ -28,6 +28,11 @@
     return validate({ ...previous, ...entry, revision: previous.revision + 1, updated_at: now, history: [...previous.history, entry] });
   }
   function matches(record, filter) { return filter === "ALL" || (filter === "ACTIVE" ? record.stage !== "CLOSED" : record.stage === filter); }
+  function orderJobs(records, applications) {
+    if (!Array.isArray(records) || !(applications instanceof Map)) throw Error("职位列表无法排序。");
+    const isClosed = job => (applications.get(job.job_context_id) || initial(job.job_context_id)).stage === "CLOSED";
+    return [...records.filter(job => !isClosed(job)), ...records.filter(isClosed)];
+  }
   function open(indexedDb = globalThis.indexedDB) {
     return new Promise((resolve, reject) => {
       if (!indexedDb) { reject(Error("浏览器无法保存职位阶段。")); return; }
@@ -61,5 +66,5 @@
       tx.onerror = tx.onabort = () => reject(failure || Error("阶段保存失败，原记录仍保留。请重试。"));
     }); } finally { db.close(); }
   }
-  return Object.freeze({ DB_NAME, STAGES, OUTCOMES, initial, validate, next, matches, all, save });
+  return Object.freeze({ DB_NAME, STAGES, OUTCOMES, initial, validate, next, matches, orderJobs, all, save });
 }));

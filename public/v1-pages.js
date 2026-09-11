@@ -2935,7 +2935,7 @@
 
   }
 
-  let jobStageFilter = "ACTIVE", jobApplicationRecords = new Map(), jobLibraryRender = 0, jobStageMenu = null;
+  let jobApplicationRecords = new Map(), jobLibraryRender = 0, jobStageMenu = null;
   function jobCardMarkup(job) {
     const canonical = job.data_class === "CANONICAL_CONFIRMED";
     const stateBadge = canonical ? "" : '<span class="v1-review-chip">演示数据</span>';
@@ -2989,13 +2989,7 @@
     const applications = JobApplications ? await JobApplications.all() : new Map();
     if (rendering !== jobLibraryRender) return;
     jobApplicationRecords = applications;
-    const stateFor = job => applications.get(job.job_context_id) || JobApplications.initial(job.job_context_id);
-    const visible = JobApplications ? jobs.filter(job => JobApplications.matches(stateFor(job), jobStageFilter)) : jobs;
-    if (JobApplications) {
-      const filters = { ACTIVE: "关注中", CLOSED: "已结束", ALL: "全部" };
-      byId("job-stage-filters").innerHTML = Object.entries(filters).map(([key, label]) => `<button type="button" data-job-filter="${key}" aria-pressed="${key === jobStageFilter}">${label} · ${jobs.filter(job => JobApplications.matches(stateFor(job), key)).length}</button>`).join("");
-      byId("job-stage-empty").hidden = visible.length > 0;
-    }
+    const visible = JobApplications ? JobApplications.orderJobs(jobs, applications) : jobs;
     const grid = byId("job-card-grid");
     jobStageMenu?.close();
     grid.innerHTML = jobGuideCardMarkup() + visible.map(jobCardMarkup).join("");
@@ -3601,13 +3595,6 @@
     window.addEventListener("focus", refresh);
     window.addEventListener("pagehide", () => { channel?.close(); channel = null; });
     window.addEventListener("pageshow", event => { connect(); if (event.persisted) refresh(); });
-    byId("job-stage-filters").addEventListener("click", async event => {
-      const button = event.target.closest("[data-job-filter]");
-      if (!button) return;
-      jobStageFilter = button.dataset.jobFilter;
-      await refresh();
-      byId("job-stage-filters").querySelector('[aria-pressed="true"]')?.focus({ preventScroll: true });
-    });
     jobStageMenu = window.AriadneJobStageMenu.bind({ grid: byId("job-card-grid"), onSelect: async (select, value) => {
       if (!select || saving) return;
       const state = jobApplicationRecords.get(select.dataset.jobStage) || JobApplications.initial(select.dataset.jobStage);
@@ -3620,12 +3607,12 @@
         const result = await JobApplications.save(state.job_context_id, { stage: value, outcome: value === "CLOSED" ? state.outcome : "", note: state.note }, Number(select.dataset.revision));
         channel?.postMessage({ changed: true });
         await refresh();
-        byId("job-page-message").textContent = `“${select.dataset.jobTitle}”已设为${JobApplications.STAGES[result.stage]}。${result.stage === "CLOSED" ? "可在“已结束”中查看，备注在详情中编辑。" : ""}`;
+        byId("job-page-message").textContent = `“${select.dataset.jobTitle}”已设为${JobApplications.STAGES[result.stage]}。${result.stage === "CLOSED" ? "卡片已移到列表末尾，备注可在详情中编辑。" : ""}`;
         byId("job-page-message").classList.remove("error");
       } catch (error) { await refresh(); showLibraryError(error); }
       finally {
         saving = false; controls.forEach(control => { control.disabled = false; }); select.removeAttribute("aria-busy");
-        (document.querySelector(`[data-job-stage="${CSS.escape(state.job_context_id)}"]`) || byId("job-stage-filters").querySelector('[aria-pressed="true"]'))?.focus({ preventScroll: true });
+        document.querySelector(`[data-job-stage="${CSS.escape(state.job_context_id)}"]`)?.focus({ preventScroll: true });
       }
     } });
   }
