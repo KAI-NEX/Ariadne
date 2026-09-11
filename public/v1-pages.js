@@ -2939,11 +2939,13 @@
   function jobCardMarkup(job) {
     const canonical = job.data_class === "CANONICAL_CONFIRMED";
     const stateBadge = canonical ? "" : '<span class="v1-review-chip">演示数据</span>';
-    const card = `<a class="v1-candidate-card job" data-transition-key="job:${escapeHtml(job.job_context_id)}" href="/job-detail.html?job=${encodeURIComponent(job.job_context_id)}"><div class="v1-card-top"><span class="v1-type-chip">职位描述</span>${stateBadge}</div><h3>${escapeHtml(job.title)}</h3><p class="v1-card-subtitle">${escapeHtml(cardSubtitleText(job.company, job.location))}</p><p class="v1-card-summary">${escapeHtml(job.summary)}</p><ul>${(job.requirements || []).slice(0, 3).map((item) => `<li>${escapeHtml(item.label)}</li>`).join("")}</ul></a>`;
+    const state = JobApplications ? jobApplicationRecords.get(job.job_context_id) || JobApplications.initial(job.job_context_id) : null;
+    const chip = state ? `<span class="v1-type-chip v1-job-stage-placeholder" aria-hidden="true">${JobApplications.STAGES[state.stage]}</span>` : '<span class="v1-type-chip">职位描述</span>';
+    const card = `<a class="v1-candidate-card job" data-transition-key="job:${escapeHtml(job.job_context_id)}" href="/job-detail.html?job=${encodeURIComponent(job.job_context_id)}"><div class="v1-card-top">${chip}${stateBadge}</div><h3>${escapeHtml(job.title)}</h3><p class="v1-card-subtitle">${escapeHtml(cardSubtitleText(job.company, job.location))}</p><p class="v1-card-summary">${escapeHtml(job.summary)}</p><ul>${(job.requirements || []).slice(0, 3).map((item) => `<li>${escapeHtml(item.label)}</li>`).join("")}</ul></a>`;
     if (!JobApplications) return card;
-    const state = jobApplicationRecords.get(job.job_context_id) || JobApplications.initial(job.job_context_id);
-    const result = [state.outcome ? JobApplications.OUTCOMES[state.outcome] : "", state.note].filter(Boolean).join(" · ");
-    return `<article class="v1-job-tracked-card">${card}<div class="v1-job-stage-row"><button type="button" class="v1-job-stage-button" data-job-stage="${escapeHtml(job.job_context_id)}" data-job-title="${escapeHtml(job.title)}" aria-label="修改${escapeHtml(job.title)}的阶段，当前${JobApplications.STAGES[state.stage]}">${JobApplications.STAGES[state.stage]}<span class="vi-icon" data-icon="chevron-down" aria-hidden="true"></span></button><p>${escapeHtml(result)}</p></div></article>`;
+    const options = Object.entries(JobApplications.STAGES).map(([value, label]) => `<option value="${value}"${value === state.stage ? " selected" : ""}>${label}</option>`).join("");
+    // Sibling of the link: the native dropdown never navigates or opens the detail overlay.
+    return `<article class="v1-job-tracked-card">${card}<select class="v1-job-stage-select" data-job-stage="${escapeHtml(job.job_context_id)}" data-job-title="${escapeHtml(job.title)}" data-revision="${state.revision}" aria-label="${escapeHtml(job.title)}的投递状态">${options}</select></article>`;
   }
 
   function jobGuideCardMarkup() {
@@ -2991,7 +2993,7 @@
     const stateFor = job => applications.get(job.job_context_id) || JobApplications.initial(job.job_context_id);
     const visible = JobApplications ? jobs.filter(job => JobApplications.matches(stateFor(job), jobStageFilter)) : jobs;
     if (JobApplications) {
-      const filters = { ACTIVE: "关注中", ...JobApplications.STAGES, ALL: "全部" };
+      const filters = { ACTIVE: "关注中", CLOSED: "已结束", ALL: "全部" };
       byId("job-stage-filters").innerHTML = Object.entries(filters).map(([key, label]) => `<button type="button" data-job-filter="${key}" aria-pressed="${key === jobStageFilter}">${label} · ${jobs.filter(job => JobApplications.matches(stateFor(job), key)).length}</button>`).join("");
       byId("job-stage-empty").hidden = visible.length > 0;
     }
@@ -3574,12 +3576,21 @@
   }
 
   function initJobLibrary() {
-    renderJobLibrary().catch(showJobError);
+    const showLibraryError = error => {
+      byId("job-page-message").textContent = error.message || "职位列表更新失败，请重试。";
+      byId("job-page-message").classList.add("error");
+    };
+    renderJobLibrary().catch(showLibraryError);
     if (!JobApplications) return;
-    const dialog = byId("job-stage-dialog"), form = byId("job-stage-form"), stage = byId("job-stage-value"), outcome = byId("job-outcome-value"), note = byId("job-stage-note");
-    let editing = null, saving = false;
+    let saving = false, pendingRefresh = false;
     let channel = null;
-    const refresh = () => renderJobLibrary().catch(showJobError);
+    const refresh = () => {
+      // Keep the source card mounted while its detail window animates back to it.
+      if (document.body.classList.contains("v1-detail-overlay-open")) { pendingRefresh = true; return Promise.resolve(); }
+      pendingRefresh = false;
+      return renderJobLibrary().catch(showLibraryError);
+    };
+    new MutationObserver(() => { if (pendingRefresh && !document.body.classList.contains("v1-detail-overlay-open")) refresh(); }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
     const connect = () => {
       if (!channel && typeof BroadcastChannel === "function") {
         channel = new BroadcastChannel("ariadne-job-applications");
@@ -3590,9 +3601,6 @@
     window.addEventListener("focus", refresh);
     window.addEventListener("pagehide", () => { channel?.close(); channel = null; });
     window.addEventListener("pageshow", event => { connect(); if (event.persisted) refresh(); });
-    stage.innerHTML = Object.entries(JobApplications.STAGES).map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
-    outcome.innerHTML = Object.entries(JobApplications.OUTCOMES).map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
-    stage.addEventListener("change", () => { byId("job-outcome-field").hidden = stage.value !== "CLOSED"; });
     byId("job-stage-filters").addEventListener("click", async event => {
       const button = event.target.closest("[data-job-filter]");
       if (!button) return;
@@ -3600,35 +3608,74 @@
       await refresh();
       byId("job-stage-filters").querySelector('[aria-pressed="true"]')?.focus({ preventScroll: true });
     });
-    byId("job-card-grid").addEventListener("click", event => {
-      const button = event.target.closest("[data-job-stage]");
-      if (!button) return;
-      const state = jobApplicationRecords.get(button.dataset.jobStage) || JobApplications.initial(button.dataset.jobStage);
-      editing = { id: state.job_context_id, revision: state.revision, title: button.dataset.jobTitle };
-      stage.value = state.stage; outcome.value = state.outcome; note.value = state.note;
-      byId("job-outcome-field").hidden = state.stage !== "CLOSED";
-      byId("job-stage-title").textContent = editing.title;
-      byId("job-stage-error").textContent = "";
-      dialog.showModal(); stage.focus();
-    });
-    byId("job-stage-cancel").addEventListener("click", () => dialog.close());
-    dialog.addEventListener("cancel", event => { if (saving) event.preventDefault(); });
-    form.addEventListener("submit", async event => {
-      event.preventDefault();
-      if (!editing || saving) return;
+    byId("job-card-grid").addEventListener("change", async event => {
+      const select = event.target.closest("[data-job-stage]");
+      if (!select || saving) return;
+      const state = jobApplicationRecords.get(select.dataset.jobStage) || JobApplications.initial(select.dataset.jobStage);
+      if (select.value === state.stage) return;
       saving = true;
-      const controls = [...form.querySelectorAll("button, select, textarea")];
+      const controls = [...byId("job-card-grid").querySelectorAll("[data-job-stage]")];
       controls.forEach(control => { control.disabled = true; });
+      select.setAttribute("aria-busy", "true");
       try {
-        const result = await JobApplications.save(editing.id, { stage: stage.value, outcome: stage.value === "CLOSED" ? outcome.value : "", note: note.value }, editing.revision);
-        dialog.close();
+        const result = await JobApplications.save(state.job_context_id, { stage: select.value, outcome: select.value === "CLOSED" ? state.outcome : "", note: state.note }, Number(select.dataset.revision));
         channel?.postMessage({ changed: true });
         await refresh();
-        byId("job-page-message").textContent = `“${editing.title}”已设为${JobApplications.STAGES[result.stage]}。${result.stage === "CLOSED" ? "可在“已结束”中查看或重新开启。" : ""}`;
+        byId("job-page-message").textContent = `“${select.dataset.jobTitle}”已设为${JobApplications.STAGES[result.stage]}。${result.stage === "CLOSED" ? "可在“已结束”中查看，备注在详情中编辑。" : ""}`;
         byId("job-page-message").classList.remove("error");
-        (document.querySelector(`[data-job-stage="${CSS.escape(editing.id)}"]`) || byId("job-stage-filters").querySelector('[aria-pressed="true"]'))?.focus({ preventScroll: true });
-      } catch (error) { byId("job-stage-error").textContent = error.message || "阶段保存失败，请重试。"; }
-      finally { saving = false; controls.forEach(control => { control.disabled = false; }); }
+      } catch (error) { select.value = state.stage; await refresh(); showLibraryError(error); }
+      finally {
+        saving = false; controls.forEach(control => { control.disabled = false; }); select.removeAttribute("aria-busy");
+        (document.querySelector(`[data-job-stage="${CSS.escape(state.job_context_id)}"]`) || byId("job-stage-filters").querySelector('[aria-pressed="true"]'))?.focus({ preventScroll: true });
+      }
+    });
+  }
+
+  function initJobApplicationNotes(jobId) {
+    if (!JobApplications || !byId("job-application-form")) return;
+    const form = byId("job-application-form"), note = byId("job-application-note"), outcome = byId("job-application-outcome"), message = byId("job-application-message");
+    const controls = [...form.querySelectorAll("button, textarea, select")];
+    let state = null, saving = false, channel = null, generation = 0;
+    outcome.innerHTML = Object.entries(JobApplications.OUTCOMES).map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
+    const dirty = () => state && (note.value !== state.note || outcome.value !== state.outcome);
+    const feedback = (text, error = false) => { message.textContent = text; message.classList.toggle("error", error); };
+    const load = async (reset = false) => {
+      const reading = ++generation;
+      try {
+        const latest = (await JobApplications.all()).get(jobId) || JobApplications.initial(jobId);
+        if (reading !== generation || saving) return;
+        if (!reset && dirty()) {
+          if (latest.revision !== state.revision) feedback("投递记录已在其他页面更新。你的输入仍保留，可复制后点击取消重新读取。", true);
+          return;
+        }
+        state = latest; note.value = state.note; outcome.value = state.outcome;
+        byId("job-application-stage").textContent = JobApplications.STAGES[state.stage];
+        byId("job-application-outcome-field").hidden = state.stage !== "CLOSED";
+        controls.forEach(control => { control.disabled = false; });
+        feedback("");
+      } catch (error) { feedback(error.message, true); }
+    };
+    controls.forEach(control => { control.disabled = true; });
+    const refresh = () => load();
+    const connect = () => {
+      if (!channel && typeof BroadcastChannel === "function") { channel = new BroadcastChannel("ariadne-job-applications"); channel.onmessage = refresh; }
+    };
+    connect(); load();
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pagehide", () => { channel?.close(); channel = null; });
+    window.addEventListener("pageshow", event => { connect(); if (event.persisted) refresh(); });
+    byId("job-application-cancel").addEventListener("click", () => load(true));
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (!state || saving) return;
+      saving = true; generation += 1; controls.forEach(control => { control.disabled = true; }); form.setAttribute("aria-busy", "true");
+      try {
+        state = await JobApplications.save(jobId, { stage: state.stage, outcome: state.stage === "CLOSED" ? outcome.value : "", note: note.value }, state.revision);
+        note.value = state.note; outcome.value = state.outcome;
+        channel?.postMessage({ changed: true });
+        feedback("投递备注已保存。");
+      } catch (error) { feedback(error.message, true); }
+      finally { saving = false; controls.forEach(control => { control.disabled = false; }); form.removeAttribute("aria-busy"); }
     });
   }
 
@@ -3985,6 +4032,7 @@
       byId("job-requirements").innerHTML = (record.requirements || []).map((requirement, index) => `<div><span>${String(index + 1).padStart(2, "0")}</span><p><b>${escapeHtml(requirement.label)}</b>${escapeHtml(requirement.detail)}</p></div>`).join("");
     };
     renderJob(job);
+    initJobApplicationNotes(jobId);
     const conversationAllowed = setDetailRuntimeMode(job, "job-ai-pane", "open-job-edit", "job-ai-runtime", "job_conversation") && Boolean(activeJobRevision);
     if (!activeJobRevision) {
       byId("job-ai-pane").classList.add("hidden");

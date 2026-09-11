@@ -92,7 +92,7 @@ assert.doesNotMatch(candidateRemove, /Promise\.all\(related\.map/);
 
 
 for (const detail of [candidateDetail, jobDetail]) {
-  const footer = detail.match(/<div class="v1-button-row v1-edit-actions"[^\n]+<\/div>/)[0];
+  const footer = detail.match(/<div class="v1-button-row v1-edit-actions" data-ariadne-edit-actions[^\n]+<\/div>/)[0];
   assert.match(footer, /data-edit-preview[^>]*>确认修改<[^]*data-edit-cancel[^>]*>取消<[^]*data-edit-destructive[^>]*>删除</);
   assert.doesNotMatch(footer, /v1-primary-button|v1-tertiary-button/);
 }

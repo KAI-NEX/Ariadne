@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/styles.css?v=candidate-job-parity-v1&amp;vi=1&amp;top-edit=1&amp;composer=4&amp;edit-footer=1&amp;wave=1">
     <link rel="stylesheet" href="/personal-understanding.css">
     <link rel="stylesheet" href="/wave-physics-loader.css?v=2">
+    <link rel="stylesheet" href="/job-application.css?v=2">
   </head>
   <body class="v1-body" data-v1-page="job-detail">
     <main class="v1-page-shell v1-detail-shell" data-ariadne-shell="detail">
@@ -29,6 +30,15 @@
           <section class="v1-detail-block"><p class="v1-section-label">摘要</p><p id="job-summary" class="v1-detail-summary"></p></section>
           <section class="v1-detail-block"><p class="v1-section-label">任职要求</p><div id="job-requirements" class="v1-requirement-list"></div></section>
           <section class="v1-detail-block"><p class="v1-section-label">来源</p><p id="job-source" class="v1-source-note"></p></section>
+          <section class="v1-detail-block" aria-labelledby="job-application-heading">
+            <p id="job-application-heading" class="v1-section-label">投递记录 · <span id="job-application-stage">正在读取…</span></p>
+            <form id="job-application-form" class="v1-job-application-form">
+              <label id="job-application-outcome-field" class="v1-edit-field" hidden>结束结果（可选）<select id="job-application-outcome" disabled></select></label>
+              <label class="v1-edit-field">备注（可选）<textarea id="job-application-note" rows="2" maxlength="300" placeholder="记录投递反馈或下一步安排" disabled></textarea></label>
+              <div class="v1-button-row v1-edit-actions"><button type="submit" class="v1-edit-text-action" disabled>保存备注</button><button id="job-application-cancel" type="button" class="v1-edit-text-action" data-edit-cancel disabled>取消</button></div>
+              <p id="job-application-message" class="v1-inline-message" aria-live="polite"></p>
+            </form>
+          </section>
           <form id="job-edit-form" class="v1-edit-form v1-detail-state-panel hidden" data-ariadne-edit-shell="detail" aria-hidden="true">
             <label class="v1-edit-field" data-ariadne-edit-field>职位名称<input id="job-edit-title"></label>
             <label class="v1-edit-field" data-ariadne-edit-field>公司<input id="job-edit-company"></label>
@@ -91,11 +101,12 @@
     <script src="/product-shell-domain.js?v=detail-behavior-v1"></script>
     <script src="/local-context-lifecycle-domain.js?v=lifecycle-final-v1"></script>
     <script src="/local-job-lifecycle-domain.js?v=lifecycle-final-v1"></script>
+    <script src="/job-application-domain.js?v=1"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
     <script src="/scoped-conversation-domain.js"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
     <script src="/personal-memory-bridge.js"></script>
-    <script src="/v1-pages.js?v=computer-use-e2e-v3"></script>
+    <script src="/v1-pages.js?v=computer-use-e2e-v3&amp;job-stage-chip=2"></script>
     <script src="/conversation-model-selector.js?v=compact-menu-1"></script>
     <script src="/conversation-attachments.js?v=inline-composer-3&amp;composer=3"></script>
   </body>

@@ -1,18 +1,17 @@
 .v1-job-filters { display: flex; flex-wrap: wrap; gap: var(--vi-space-8); margin-bottom: var(--vi-space-24); }
-.v1-job-filters button, .v1-job-stage-button { min-height: var(--vi-target-comfort); border: 1px solid var(--vi-line); border-radius: var(--vi-radius-pill); background: var(--vi-surface); color: var(--vi-text-secondary); padding: var(--vi-space-8) var(--vi-space-16); font: var(--vi-text-caption)/1.65 var(--vi-font-ui); cursor: pointer; }
+.v1-job-filters button, .v1-job-stage-select { min-height: var(--vi-target-comfort); border: 1px solid var(--vi-line); border-radius: var(--vi-radius-pill); background: var(--vi-surface); color: var(--vi-text-secondary); padding: var(--vi-space-8) var(--vi-space-16); font: var(--vi-text-caption)/1.65 var(--vi-font-ui); cursor: pointer; }
 .v1-job-filters button[aria-pressed="true"] { background: var(--vi-action); border-color: var(--vi-action); color: var(--vi-surface); }
-.v1-job-filters button:focus-visible, .v1-job-stage-button:focus-visible { outline: 2px solid var(--vi-focus); outline-offset: 2px; }
-.v1-job-tracked-card { display: flex; flex-direction: column; min-width: 0; }
+.v1-job-filters button:focus-visible, .v1-job-stage-select:focus-visible { outline: 2px solid var(--vi-focus); outline-offset: 2px; }
+.v1-job-tracked-card { position: relative; display: flex; min-width: 0; }
 .v1-job-tracked-card > .v1-candidate-card { flex: 1; height: auto; }
-.v1-job-stage-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--vi-space-8); padding: var(--vi-space-8) 0; color: var(--vi-text-secondary); font: var(--vi-text-caption)/1.65 var(--vi-font-ui); }
-.v1-job-stage-row p { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.v1-job-stage-button { display: inline-flex; align-items: center; gap: var(--vi-space-8); }
-.v1-job-stage-dialog { box-sizing: border-box; width: min(440px, calc(100vw - 36px)); padding: var(--vi-space-24); border: 1px solid var(--vi-line); border-radius: var(--vi-radius-surface); background: var(--vi-dialog); color: var(--vi-ink); font-family: var(--vi-font-ui); }
-.v1-job-stage-dialog::backdrop { background: var(--vi-ink); opacity: .25; }
-.v1-job-stage-dialog h2 { margin: 0 0 var(--vi-space-8); font-size: var(--vi-text-body); }
-.v1-job-stage-dialog p { color: var(--vi-text-secondary); overflow-wrap: anywhere; }
-.v1-job-stage-dialog label { display: grid; gap: var(--vi-space-8); margin-top: var(--vi-space-16); font-size: var(--vi-text-caption); }
-.v1-job-stage-dialog select, .v1-job-stage-dialog textarea { box-sizing: border-box; width: 100%; min-height: var(--vi-target-comfort); padding: var(--vi-space-8); border: 1px solid var(--vi-line); border-radius: var(--vi-radius-small); background: var(--vi-surface); color: var(--vi-ink); font: var(--vi-text-body)/1.65 var(--vi-font-ui); }
-.v1-job-stage-dialog textarea { resize: vertical; }
-.v1-job-stage-dialog [hidden] { display: none; }
-.v1-job-stage-dialog .v1-edit-actions { display: flex; justify-content: space-between; gap: var(--vi-space-24); margin-top: var(--vi-space-16); }
+.v1-job-tracked-card > .v1-candidate-card:hover { transform: none; }
+.v1-job-stage-placeholder { min-height: var(--vi-target-comfort); min-width: 108px; font-size: var(--vi-text-caption); }
+.v1-job-tracked-card > .v1-candidate-card .v1-job-stage-placeholder { visibility: hidden; }
+.v1-job-stage-select { position: absolute; top: var(--vi-space-24); left: var(--vi-space-24); width: 108px; appearance: none; padding-right: var(--vi-space-32); background-image: url('/vi/icons/chevron-down.svg'); background-repeat: no-repeat; background-position: right var(--vi-space-8) center; background-size: 14px; }
+.v1-job-stage-select:disabled { cursor: wait; opacity: .6; }
+.v1-job-application-form { margin-top: var(--vi-space-16); }
+.v1-job-application-form .v1-edit-field { margin-top: var(--vi-space-16); }
+.v1-job-application-form select, .v1-job-application-form textarea { box-sizing: border-box; width: 100%; min-height: var(--vi-target-comfort); padding: var(--vi-space-8); border: 1px solid var(--vi-line); border-radius: var(--vi-radius-small); background: var(--vi-surface); color: var(--vi-ink); font: var(--vi-text-body)/1.65 var(--vi-font-ui); }
+.v1-job-application-form textarea { resize: vertical; }
+.v1-job-application-form [hidden] { display: none; }
+#job-application-message { display: block; }

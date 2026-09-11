@@ -6,7 +6,7 @@
     <title>Ariadne · 职位描述</title>
     <link rel="stylesheet" href="/styles.css?v=lifecycle-final-v1&amp;vi=1&amp;top-edit=1">
     <link rel="stylesheet" href="/understanding-chat.css?v=1">
-    <link rel="stylesheet" href="/job-application.css?v=1">
+    <link rel="stylesheet" href="/job-application.css?v=2">
   </head>
   <body class="v1-body" data-v1-page="jd">
     <main class="v1-page-shell v1-library-shell">
@@ -31,17 +31,6 @@
       <p id="job-stage-empty" class="v1-inline-message" hidden>这个阶段还没有职位。</p>
       <p id="job-page-message" class="v1-inline-message" aria-live="polite"></p>
     </main>
-    <dialog id="job-stage-dialog" class="v1-job-stage-dialog" aria-labelledby="job-stage-heading" aria-describedby="job-stage-title">
-      <form id="job-stage-form">
-        <h2 id="job-stage-heading">职位进度</h2>
-        <p id="job-stage-title"></p>
-        <label>阶段<select id="job-stage-value"></select></label>
-        <label id="job-outcome-field" hidden>结束结果（可选）<select id="job-outcome-value"></select></label>
-        <label>备注（可选）<textarea id="job-stage-note" rows="2" maxlength="300" placeholder="例如：9 月 11 日收到简历未通过通知"></textarea></label>
-        <p id="job-stage-error" role="alert"></p>
-        <div class="v1-edit-actions"><button type="submit" class="v1-edit-text-action">保存</button><button id="job-stage-cancel" type="button" class="v1-edit-text-action cancel">取消</button></div>
-      </form>
-    </dialog>
     <script src="/local-connector.js"></script>
     <script src="/model-settings-catalog-data.js"></script><script src="/model-settings.js"></script><script src="/runtime-selection-state.js"></script>
     <script src="/runtime-capabilities.js?v=runtime-gate-v1"></script>
@@ -54,6 +43,6 @@
     <script src="/job-application-domain.js?v=1"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
-    <script src="/v1-pages.js?v=job-intelligence-v1"></script>
+    <script src="/v1-pages.js?v=job-intelligence-v1&amp;job-stage-chip=2"></script>
   </body>
 </html>
