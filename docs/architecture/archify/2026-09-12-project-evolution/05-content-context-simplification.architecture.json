@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "内容与上下文架构优化 · 从预处理链到完整资料优先",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1180, 650],
+    "views": [
+      {
+        "id": "before-path",
+        "label": "之前为什么复杂",
+        "focus": ["old_records", "old_truncate", "old_overview", "old_discuss"],
+        "note": "每条资料先排序截取，再生成概况，最后才回答问题。"
+      },
+      {
+        "id": "current-path",
+        "label": "现在怎样简化",
+        "focus": ["current_records", "complete_gate", "current_discuss", "current_answer"],
+        "note": "资料能放入预算时完整读取，并在一次 DISCUSS 中直接回答。"
+      },
+      {
+        "id": "large-collection",
+        "label": "大集合保护仍保留",
+        "focus": ["complete_gate", "large_synthesis", "current_discuss"],
+        "note": "只有超出预算或数量限制时，才启用全量分片综合与缓存。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "old_records",
+      "type": "database",
+      "label": "Candidate / Job 记录",
+      "sublabel": "IndexedDB 当前语义",
+      "pos": [70, 155],
+      "size": [170, 64]
+    },
+    {
+      "id": "old_truncate",
+      "type": "backend",
+      "label": "逐条排序与截取",
+      "sublabel": "关键词排序 / 单条 6 KB",
+      "pos": [310, 155],
+      "size": [170, 64]
+    },
+    {
+      "id": "old_overview",
+      "type": "backend",
+      "label": "预先生成概况",
+      "sublabel": "DISTILL / SYNTHESIZE",
+      "pos": [550, 155],
+      "size": [170, 64]
+    },
+    {
+      "id": "old_discuss",
+      "type": "cloud",
+      "label": "模型回答",
+      "sublabel": "再执行 DISCUSS",
+      "pos": [790, 155],
+      "size": [170, 64]
+    },
+    {
+      "id": "current_records",
+      "type": "database",
+      "label": "当前完整语义",
+      "sublabel": "存储 authority 未迁移",
+      "pos": [70, 390],
+      "size": [170, 64]
+    },
+    {
+      "id": "complete_gate",
+      "type": "security",
+      "label": "完整资料优先门禁",
+      "sublabel": "总预算 / 最多 60 条",
+      "pos": [310, 390],
+      "size": [170, 64]
+    },
+    {
+      "id": "current_discuss",
+      "type": "cloud",
+      "label": "一次 DISCUSS",
+      "sublabel": "不强制先做摘要",
+      "pos": [550, 390],
+      "size": [170, 64]
+    },
+    {
+      "id": "current_answer",
+      "type": "frontend",
+      "label": "直接回答与对话",
+      "sublabel": "人看卡片 / 当前内容",
+      "pos": [790, 390],
+      "size": [170, 64]
+    },
+    {
+      "id": "large_synthesis",
+      "type": "backend",
+      "label": "大集合分片综合",
+      "sublabel": "全量覆盖 / 可复用缓存",
+      "pos": [310, 520],
+      "size": [170, 64]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "之前 · 多层预处理",
+      "wraps": ["old_records", "old_truncate", "old_overview", "old_discuss"],
+      "pad": 34
+    },
+    {
+      "kind": "region",
+      "label": "现在 · 已落地运行简化",
+      "wraps": ["current_records", "complete_gate", "current_discuss", "current_answer", "large_synthesis"],
+      "pad": 34
+    }
+  ],
+  "connections": [
+    {
+      "id": "old-rank",
+      "from": "old_records",
+      "to": "old_truncate",
+      "label": "逐条预处理"
+    },
+    {
+      "id": "old-summary",
+      "from": "old_truncate",
+      "to": "old_overview",
+      "label": "先压缩语义"
+    },
+    {
+      "id": "old-answer",
+      "from": "old_overview",
+      "to": "old_discuss",
+      "label": "摘要后回答"
+    },
+    {
+      "id": "current-budget",
+      "from": "current_records",
+      "to": "complete_gate",
+      "label": "计算整体预算",
+      "variant": "emphasis"
+    },
+    {
+      "id": "current-direct",
+      "from": "complete_gate",
+      "to": "current_discuss",
+      "label": "预算内完整读取",
+      "labelAt": [600, 468],
+      "variant": "emphasis"
+    },
+    {
+      "id": "current-answer-edge",
+      "from": "current_discuss",
+      "to": "current_answer",
+      "label": "单次模型回答",
+      "variant": "emphasis"
+    },
+    {
+      "id": "large-branch",
+      "from": "complete_gate",
+      "to": "large_synthesis",
+      "label": "超限或过多",
+      "labelAt": [395, 468],
+      "variant": "security"
+    },
+    {
+      "id": "large-return",
+      "from": "large_synthesis",
+      "to": "current_discuss",
+      "label": "综合后回答",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "已经优化",
+      "items": [
+        "预算内不再按单条 6 KB 截取当前语义",
+        "小集合职位不再强制 DISTILL / SYNTHESIZE",
+        "个人与职位共用分批和模型配置身份函数"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "仍然保留",
+      "items": [
+        "原件、来源、版本冲突与 Human Save",
+        "Candidate / Job 范围和 Provider 能力门禁",
+        "大集合的全量分片综合、缓存与覆盖说明"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "尚未完成",
+      "items": [
+        "Markdown 还不是当前主存储",
+        "IndexedDB 领域记录仍是内容 authority",
+        "本轮不代表真实模型质量或存储迁移验收"
+      ]
+    }
+  ]
+}

@@ -57,6 +57,20 @@
       "browser_evidence": "passed",
       "visual_review": "passed",
       "correction_rounds": 1
+    },
+    {
+      "id": "05-content-context-simplification",
+      "diagram_type": "architecture",
+      "output": "/Users/kai/Documents/GitKaiNex/Ariadne/docs/architecture/archify/2026-09-12-project-evolution/05-content-context-simplification.html",
+      "final_specification": "05-content-context-simplification.architecture.json",
+      "specification_sha256": "e0f6549978656b1628970c53b2821aa14e34b37786a330aa53aab2b849404f6b",
+      "specification_bytes": 5443,
+      "artifact_sha256": "4c8172743e37cf3bdab1f293ef9d6795c41e801a658034a4372099490e115182",
+      "artifact_bytes": 809500,
+      "validation": "9/9 showcase, 0 errors, 0 warnings",
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 1
     }
   ],
   "automated_browser_viewports": [
@@ -71,7 +85,8 @@
     "status": "passed",
     "scope": [
       "1440x900 light screenshot for each artifact",
-      "2048x1320 dark screenshot for each artifact"
+      "2048x1320 dark screenshot for each artifact",
+      "05-content-context-simplification additionally inspected at both endpoint themes"
     ],
     "observations": [
       "No visible clipping or unreadable relationship label",

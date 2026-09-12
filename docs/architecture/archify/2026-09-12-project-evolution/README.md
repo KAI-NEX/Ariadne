@@ -1,6 +1,6 @@
 # Ariadne 项目发展图谱
 
-日期：2026-09-12。这个目录用四张连续图解释：一个简单的 Job Radar 为什么逐步成为 Ariadne，以及技术复杂度、产品约束和可减少的返工分别从哪里产生。
+日期：2026-09-12。这个目录用五张连续图解释：一个简单的 Job Radar 为什么逐步成为 Ariadne，以及技术复杂度、产品约束、运行优化和可减少的返工分别从哪里产生。
 
 这里的“五次边界扩张”是对证据的概念性分段，不是把历史改写成五个正式发布版本。图中保留产品名、契约名和关键技术名；较长的证据、数字与边界放在本说明中，避免把图变成难读的项目年表。
 
@@ -24,9 +24,13 @@
 
    这张图把 VI 静态一致与运行时动效分开。历史上的文字闪动、关闭突兀、卡片与页面过渡叠加，分别来自合成层、animation fill、双重 transition 和缓存版本。正确路径是同环境复现、定位故障层、原子修复、中间帧检查、跨页面回归与用户验收。
 
-5. [当前 Ariadne：从来源到确认版本](../2026-09-11/ariadne.html)（Architecture）
+5. [内容与上下文架构优化：从预处理链到完整资料优先](05-content-context-simplification.html)（Architecture）
 
-   前四张解释“为什么走到这里”；这张已有架构图解释“现在各部分怎样连接”。它覆盖 SourceDocument、Candidate/Job、Runtime 门禁、Local/Model、Working/Proposal、Human Save、确认 revision 与当前上下文。
+   这张图直接比较优化前后：以前每条资料先排序截取、小集合也先 DISTILL / SYNTHESIZE，再进入 DISCUSS；现在预算内完整读取并直接用一次 DISCUSS 回答，只有超限或数量过多时才走全量分片综合与缓存。图中同时标明原件、来源、版本、Human Save、领域范围和 Provider 门禁仍然保留；Markdown 主存储尚未迁移。
+
+6. [当前 Ariadne：从来源到确认版本](../2026-09-11/ariadne.html)（Architecture）
+
+   前五张解释“为什么走到这里、最近优化了什么”；这张已有架构图解释“各部分怎样连接”。它覆盖 SourceDocument、Candidate/Job、Runtime 门禁、Local/Model、Working/Proposal、Human Save、确认 revision 与当前上下文。
 
 ## 从头到尾的核心结论
 
@@ -51,11 +55,12 @@ VI、UI 与动效的返工说明另一类复杂度：静态设计、共享代码
 
 ## 交付与验证
 
-最终图源为 `01-*.v3.json` 与 `02–04-*.v2.json`。无版本后缀的 JSON 及 `01-*.v2.json` 是保留的失败/中间候选，不能用于重建当前 HTML。
+最终图源为 `01-*.v3.json`、`02–04-*.v2.json` 与 `05-content-context-simplification.architecture.json`。无版本后缀的旧 JSON、`01-*.v2.json` 及维护流程候选是保留的失败/中间产物，不能用于重建当前正式 HTML。
 
-- 四张最终图各自通过 Archify showcase：9/9 checks，0 errors，0 warnings。
-- 四张 HTML 均通过自动浏览器检查：1440×900、1600×1000、1920×1080、2048×1320 全部无横向或纵向溢出；浅色/深色截图均成功生成。
+- 五张最终图各自通过 Archify showcase：9/9 checks，0 errors，0 warnings。
+- 五张 HTML 均通过自动浏览器检查：1440×900、1600×1000、1920×1080、2048×1320 全部无横向或纵向溢出；浅色/深色截图均成功生成。
 - 人工视觉复核覆盖每张图的 1440×900 浅色与 2048×1320 深色截图：中文节点、关系标签、异常分支、说明卡片和大屏垂直平衡通过。
 - 第一批候选在真实浏览器中因窄画布被放大而纵向溢出；第二轮调整画布比例、缩短节点文案并扩大可读节点。总历程图再补入三个真实长期产物，消除空的 Outcomes 区域。失败候选保留用于说明 QA 确实改变了交付，而不是只报告最终成功。
+- 内容与上下文优化图的首轮浏览器检查在 1440×900 多出 16px 纵向滚动；收紧画布底部留白后，第一轮视觉修正通过全部尺寸与主题检查。
 
 完整 hash、字节数和每张图的 correction rounds 见 [receipts.json](receipts.json)。每个 HTML 旁的 `*.visual-check.json` 是与最终 artifact hash 绑定的自动浏览器回执。
