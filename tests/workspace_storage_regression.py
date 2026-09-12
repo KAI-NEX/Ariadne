@@ -22,6 +22,25 @@ with tempfile.TemporaryDirectory() as temporary:
     names = ["demo_candidate_items", "source_documents"]
     original = b"  source\x00\xff\n\n "
     record = {"source_document_id": "source-1", "filename": "resume.pdf", "file_blob": {"$blob": "base64", "data": base64.b64encode(original).decode(), "type": "application/pdf"}}
+    # Real historical source shape: bare SHA-256, original_filename, extraction
+    # fields and opaque unknown prose must survive alongside canonical sources.
+    legacy_workspace = "c" * 32
+    historical = {**record, "source_document_id": "legacy-source", "original_filename": "resume.pdf",
+                  "content_hash": digest(original), "document_type": "resume", "extracted_pages": [],
+                  "unknown_note": "  Historical wording\n\n ", "model_call_made": False}
+    mixed = [historical, {**record, "content_hash": "sha256:" + digest(original)},
+             {**historical, "source_document_id": "legacy-uppercase", "content_hash": digest(original).upper()}]
+    mixed_writes = [{"store": "source_documents", "operation": "add", "value": row} for row in mixed]
+    store.commit(legacy_workspace, database, {"source_documents": None}, mixed_writes, initialize=True)
+    restored = store.read(legacy_workspace, database, ["source_documents"])
+    assert {r["source_document_id"]: r for r in restored["stores"]["source_documents"]} == {r["source_document_id"]: r for r in mixed}
+    unchanged_head = (root / legacy_workspace / "HEAD.json").read_bytes()
+    staged_legacy = store.stage_blob(legacy_workspace, record["file_blob"], record["filename"])
+    for blob in (record["file_blob"], staged_legacy):
+        for invalid_hash in ("0" * 64, "sha256:" + "0" * 64, "sha256:wrong", "md5:" + digest(original), 123):
+            rejected("WORKSPACE_SOURCE_HASH_MISMATCH", lambda: store.commit(legacy_workspace, database, restored["versions"],
+                     [{"store": "source_documents", "operation": "put", "value": {**historical, "file_blob": blob, "content_hash": invalid_hash}}]))
+            assert (root / legacy_workspace / "HEAD.json").read_bytes() == unchanged_head
     markdown = '---\n' + json.dumps({"format": "ariadne-markdown-v1", "record": {"item_id": "card-1", "title": None}, "fields": [["title"]], "fence": "```"}) + '\n---\n\n## title\n\n```text\nSame title\n```\n'
     card = {"item_id": "card-1", "content_format": "ariadne-markdown-v1", "markdown": markdown}
     writes = [{"store": "demo_candidate_items", "operation": "add", "value": card}, {"store": "source_documents", "operation": "add", "value": record}]

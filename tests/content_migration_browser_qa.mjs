@@ -41,9 +41,18 @@ try {
   activePage = page;
   context.on("page", p => p.on("pageerror", error => evidence.errors.push(error.message)));
   page.on("pageerror", error => evidence.errors.push(error.message));
-  let failCommit = false;
-  await context.route("**/api/workspace", route => failCommit && route.request().method() === "POST" && route.request().postDataJSON()?.action === "commit"
-    ? route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"WORKSPACE_STORAGE_UNAVAILABLE"}' }) : route.continue());
+  let failCommit = false, corruptClaim = false;
+  await context.route("**/api/workspace", route => {
+    if (route.request().method() !== "POST" || route.request().postDataJSON()?.action !== "commit") return route.continue();
+    if (failCommit) return route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"WORKSPACE_STORAGE_UNAVAILABLE"}' });
+    if (corruptClaim) {
+      const payload = route.request().postDataJSON();
+      const write = payload.writes.find(row => row.value?.source_document_id === "legacy-learning-source");
+      if (write) write.value.content_hash = "0".repeat(64);
+      return route.continue({ postData: JSON.stringify(payload) });
+    }
+    return route.continue();
+  });
   context.on("request", request => { if (request.method() === "POST" && /(?:conversation-turn|understanding-turn|overview-turn|model-structure)$/.test(new URL(request.url()).pathname)) evidence.modelRequests.push(request.url()); });
   await page.goto(base + "/index.html");
   for (const script of ["v1-demo-domain.js", "truth-persistence-domain.js", "raw-source-storage-domain.js"]) await page.addScriptTag({ url: base + "/" + script });
@@ -60,6 +69,11 @@ try {
         label: null, mime_type: file.type, content_hash: await AriadneRawSourceStorage.sha256Blob(file), created_at: "2026-09-03T08:00:00Z",
         material_type: "CANDIDATE", local_reference: AriadneRawSourceStorage.localReferenceFor(sourceId), batch_id: null, provenance: {}, authority: AriadneTruthPersistence.AUTHORITY.source };
       await AriadneRawSourceStorage.persistDurableSource(db, source, file);
+      const legacy = { source_document_id: "legacy-learning-source", original_filename: file.name,
+        content_hash: source.content_hash.slice(7), byte_size: file.size, document_type: "resume", media_type: file.type,
+        file_blob: file, extraction_method: "utf8_text_v0", extracted_pages: [], model_call_made: false,
+        unknown_note: "  Historical wording\n\n " };
+      await new Promise((resolve, reject) => { const tx = db.transaction("source_documents", "readwrite"); tx.objectStore("source_documents").add(legacy); tx.oncomplete = resolve; tx.onerror = tx.onabort = () => reject(tx.error); });
     } finally { db.close(); }
   }, { seed, sourceId: working.source_document_id });
   const read = names => page.evaluate(async names => {
@@ -73,7 +87,21 @@ try {
   await page.waitForFunction(() => document.body.textContent.includes("无法") || document.body.textContent.includes("WORKSPACE_STORAGE_UNAVAILABLE"));
   const backupCount = await page.evaluate(() => new Promise((resolve, reject) => { const r = indexedDB.open("job-radar-local-first-v1", 17); r.onsuccess = () => { const db = r.result, q = db.transaction("candidate_context_revisions").objectStore("candidate_context_revisions").getAll(); q.onsuccess = () => { resolve(q.result.length); db.close(); }; }; r.onerror = () => reject(r.error); }));
   assert.equal(backupCount, 1);
-  failCommit = false; await page.reload();
+  failCommit = false; corruptClaim = true;
+  for (const pathname of ["/personal-information.html", "/jd.html", "/workspace.html"]) {
+    await page.goto(base + pathname);
+    await page.waitForFunction(() => document.body.textContent.includes("文件内容与保存记录不一致"));
+    assert.equal(await page.locator("body").innerText().then(text => text.includes("操作未完成，请重试")), false);
+    if (pathname === "/workspace.html") {
+      assert.equal(await page.locator("#workspace-personal-count").innerText(), "暂时无法读取");
+      assert.equal(await page.locator("#workspace-job-count").innerText(), "暂时无法读取");
+      await page.screenshot({ path: path.join(output, "workspace-integrity-error.png"), fullPage: true });
+    }
+  }
+  const notActivated = await page.evaluate(async () => (await (await fetch("/api/workspace", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "status", workspace: localStorage.getItem(AriadneContentDatabase.WORKSPACE_KEY), database: "job-radar-local-first-v1" }) })).json()).initialized);
+  assert.equal(notActivated, false, "real digest mismatch must not activate partial migration");
+  evidence.checks.push("true hash mismatch blocks atomically; personal, Job and home expose the storage cause, never fake empty data");
+  corruptClaim = false; await page.goto(base + "/personal-information.html");
   await page.waitForSelector('[data-transition-key="candidate:item-edu-001"]');
   const migrated = await read(Object.keys(seed));
   for (let i = 0; i < migrated.length; i++) assert.deepEqual(migrated[i], seed[Object.keys(seed)[i]]);
@@ -82,6 +110,18 @@ try {
   const restored = await page.evaluate(async source => { const db = await AriadneTruthPersistence.openDatabase(); try { const raw = await AriadneRawSourceStorage.resolveRawSource(db, source); return { text: await raw.file.text(), name: raw.file.name, hash: raw.source_document.content_hash }; } finally { db.close(); } }, working.source_document_id);
   assert.equal(restored.text, "  Original synthetic material\n\n "); assert.equal(restored.name, "合成经历.md");
   evidence.checks.push("durable original restores exact bytes, filename and hash from disk");
+  const legacyCopy = await page.evaluate(async () => {
+    const load = db => new Promise((resolve, reject) => { const r = db.transaction("source_documents").objectStore("source_documents").get("legacy-learning-source"); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
+    const db = await AriadneTruthPersistence.openDatabase();
+    const native = await new Promise((resolve, reject) => { const r = indexedDB.open("job-radar-local-first-v1"); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
+    try {
+      const serialize = async row => ({ ...row, file_blob: { bytes: Array.from(new Uint8Array(await row.file_blob.arrayBuffer())), name: row.file_blob.name, type: row.file_blob.type, lastModified: row.file_blob.lastModified } });
+      return [await serialize(await load(db)), await serialize(await load(native))];
+    } finally { db.close(); native.close(); }
+  });
+  assert.deepEqual(legacyCopy[0], legacyCopy[1]);
+  assert.match(legacyCopy[0].content_hash, /^[a-f0-9]{64}$/);
+  evidence.checks.push("bare-hash learning source and prefixed canonical source migrate together; original bytes, hash spelling, unknown fields and browser backup unchanged");
   await page.goto(base + `/candidate-detail.html?context=${accepted.revision.context_id}&item=${working.payload.items[0].item_id}`);
   await page.waitForFunction(() => document.querySelector("#candidate-title").textContent === "Royal College of Art RCA");
   await page.click("#open-direct-edit"); await page.fill("#candidate-edit-title", "已保存的合成经历");
@@ -116,6 +156,15 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.screenshot({ path: path.join(output, "job-mobile.png"), fullPage: true });
+  await page.goto(base + "/workspace.html");
+  await page.waitForFunction(() => document.querySelector("#workspace-personal-count").textContent === "1 张资料卡片");
+  assert.equal(await page.locator("#workspace-job-count").innerText(), "1 个职位对象");
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.screenshot({ path: path.join(output, "workspace-mobile.png"), fullPage: true });
+  await page.reload();
+  await page.waitForFunction(() => document.querySelector("#workspace-personal-count").textContent === "1 张资料卡片");
+  assert.equal(await page.locator("#workspace-job-count").innerText(), "1 个职位对象");
+  evidence.checks.push("home uses the same library queries; confirmed cards count once after edit history and reload");
   assert.deepEqual(evidence.modelRequests, []);
   assert.deepEqual(evidence.errors, []);
   await fs.writeFile(path.join(output, "results.json"), JSON.stringify(evidence, null, 2));

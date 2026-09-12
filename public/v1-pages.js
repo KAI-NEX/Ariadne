@@ -187,6 +187,8 @@
     return candidateFactLabel(value);
   }
   function personalErrorCopy(error) {
+    const storageCopy = window.AriadneContentDatabase?.errorCopy(error);
+    if (storageCopy) return storageCopy;
     const code = String(error?.code || error?.message || error || "");
     const messages = {
       candidate_source_identity_required: "无法确认这张卡片对应的原始文件。",
@@ -251,6 +253,8 @@
   }
 
   function jobErrorCopy(error) {
+    const storageCopy = window.AriadneContentDatabase?.errorCopy(error);
+    if (storageCopy) return storageCopy;
     const code = String(error?.code || error?.message || error || "");
     const messages = {
       unsupported_document_type: "暂不支持这种文件格式。",
@@ -1086,9 +1090,17 @@
   }
 
   async function initWorkspace() {
-    const [candidates, jobs] = await Promise.all([Demo.getAll(Demo.DEMO_STORES.candidates), Demo.getAll(Demo.DEMO_STORES.jobs)]);
-    byId("workspace-personal-count").textContent = candidates.length ? `${candidates.length} 个待审核对象` : "尚未添加";
-    byId("workspace-job-count").textContent = jobs.length ? `${jobs.length} 个职位对象` : "尚未添加";
+    try {
+      const [candidates, jobs] = await Promise.all([readPersonalLibrary(), readJobLibrary()]);
+      const candidateCount = candidates.canonical.length + candidates.legacy.length;
+      const jobCount = jobs.canonical.length + jobs.legacy.length;
+      byId("workspace-personal-count").textContent = candidateCount ? `${candidateCount} 张资料卡片` : "尚未添加";
+      byId("workspace-job-count").textContent = jobCount ? `${jobCount} 个职位对象` : "尚未添加";
+    } catch (error) {
+      byId("workspace-personal-count").textContent = "暂时无法读取";
+      byId("workspace-job-count").textContent = "暂时无法读取";
+      throw error;
+    }
     window.requestAnimationFrame(playPendingCardReturn);
   }
 
@@ -1130,7 +1142,7 @@
     }));
   }
 
-  async function renderPersonalLibrary() {
+  async function readPersonalLibrary() {
     // A new Truth-only workspace need not have legacy demo stores. Their
     // absence must not prevent the authoritative library from rendering.
     const legacyDatabase = await Demo.openDatabase();
@@ -1140,7 +1152,6 @@
         legacyRecords = await LocalCandidateReview.getAll(legacyDatabase, Demo.DEMO_STORES.candidates);
       }
     } finally { legacyDatabase.close(); }
-    const legacy = await localizedCandidateRecords(legacyRecords);
     let canonical = [];
     if (Truth && LocalCandidateReview) {
       const database = await Truth.openDatabase();
@@ -1152,7 +1163,12 @@
       const revisions = LocalCandidateReview.activeConfirmedRevisions(revisionRecords, lifecycleRecords);
       canonical = revisions.flatMap((revision) => (revision.payload.items || []).map((item) => ({ ...item, context_id: revision.context_id, revision_id: revision.revision_id, data_class: "CANONICAL_CONFIRMED", review_status: "CONFIRMED", source_refs: item.grounding_refs || [] })));
     }
-    const items = [...canonical, ...legacy];
+    return { canonical, legacy: legacyRecords };
+  }
+
+  async function renderPersonalLibrary() {
+    const { canonical, legacy } = await readPersonalLibrary();
+    const items = [...canonical, ...await localizedCandidateRecords(legacy)];
     const grid = byId("candidate-card-grid");
     grid.innerHTML = personalGuideCardMarkup() + items.map(candidateCardMarkup).join("");
     window.requestAnimationFrame(playPendingCardReturn);
@@ -2805,13 +2821,18 @@
     } finally { if (owned) db.close(); }
   }
 
-  async function renderJobLibrary() {
-    const rendering = ++jobLibraryRender;
+  async function readJobLibrary() {
     const records = await localizedJobRecords(await Demo.getAll(Demo.DEMO_STORES.jobs));
     const canonical = await canonicalJobRecords();
     const legacy = LocalJobLifecycle ? LocalJobLifecycle.libraryJobs(records) : records;
     const canonicalIds = new Set(canonical.map((job) => job.job_context_id));
-    const jobs = [...canonical, ...legacy.filter((job) => !canonicalIds.has(job.job_context_id))];
+    return { canonical, legacy: legacy.filter((job) => !canonicalIds.has(job.job_context_id)) };
+  }
+
+  async function renderJobLibrary() {
+    const rendering = ++jobLibraryRender;
+    const { canonical, legacy } = await readJobLibrary();
+    const jobs = [...canonical, ...legacy];
     const applications = JobApplications ? await JobApplications.all() : new Map();
     if (rendering !== jobLibraryRender) return;
     jobApplicationRecords = applications;
@@ -3891,6 +3912,6 @@
   }
   Promise.resolve(initializePage()).catch((error) => {
     const message = document.querySelector(".v1-inline-message");
-    if (message) { message.textContent = `页面初始化失败：${error.message}`; message.classList.add("error"); }
+    if (message) { message.textContent = `页面初始化失败：${window.AriadneContentDatabase?.errorCopy(error) || error.message}`; message.classList.add("error"); }
   });
 })();

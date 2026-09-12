@@ -34,6 +34,15 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def source_hash_matches(claimed, actual):
+    # Learning-era sources stored bare hex; canonical sources include the scheme.
+    # Compare bytes' digest without rewriting either source record or its identity.
+    if not isinstance(claimed, str):
+        return False
+    match = re.fullmatch(r"(?:sha256:)?([a-fA-F0-9]{64})", claimed)
+    return bool(match and match[1].lower() == actual)
+
+
 class WorkspaceStorage:
     def __init__(self, root=None):
         self.root = Path(root or os.environ.get("ARIADNE_WORKSPACE_ROOT") or
@@ -151,7 +160,7 @@ class WorkspaceStorage:
         def save_blobs(value, parent=None):
             if isinstance(value, dict) and value.get("$blob") in {"base64", "file"}:
                 entry = self._blob_reference(directory, value, (parent or {}).get("filename"))
-                if parent and parent.get("content_hash") and parent["content_hash"] != "sha256:" + entry["sha256"]:
+                if parent and parent.get("content_hash") and not source_hash_matches(parent["content_hash"], entry["sha256"]):
                     raise WorkspaceError("WORKSPACE_SOURCE_HASH_MISMATCH", 409)
                 return entry
             if isinstance(value, dict):

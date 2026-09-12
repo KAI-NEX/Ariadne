@@ -2443,6 +2443,11 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                 raise WorkspaceError("WORKSPACE_ACTION_INVALID")
             self.send_json(HTTPStatus.OK, result)
         except WorkspaceError as error:
+            # Only operation identifiers, never source names, IDs or content.
+            from src.workspace_storage import CONTRACT
+            self.log_message("workspace_error code=%s action=%s database=%s", error.code,
+                             action if "action" in locals() and isinstance(action, str) and action in {"status", "read", "blob", "stage_blob", "commit"} else "invalid",
+                             database if "database" in locals() and isinstance(database, str) and database in CONTRACT["databases"] else "invalid")
             self.send_json(error.status, {"error": error.code})
         except (ValueError, KeyError, TypeError):
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": "WORKSPACE_REQUEST_INVALID"})

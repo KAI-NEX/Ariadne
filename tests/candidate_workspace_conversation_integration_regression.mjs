@@ -689,11 +689,13 @@ assert.throws(() => Conversation.validateAction({ ...continuedCategory.action.no
 }), /IMPLICIT_MULTI_VIOLATION/);
 // Missing optional legacy stores must not hide confirmed Candidate revisions.
 const libraryOwner = pages.match(/  async function renderPersonalLibrary\([\s\S]*?\n  \}/)?.[0];
+const libraryReader = pages.match(/  async function readPersonalLibrary\([\s\S]*?\n  \}/)?.[0];
 assert(libraryOwner);
 for (const hasLegacy of [false, true]) {
   const grid = { innerHTML: "" };
   const optionalDb = { objectStoreNames: { contains: () => hasLegacy }, close() {} };
-  const readLibrary = new Function("Demo", "localizedCandidateRecords", "Truth", "LocalCandidateReview", "byId", "personalGuideCardMarkup", "candidateCardMarkup", "window", "playPendingCardReturn", `${libraryOwner}; return renderPersonalLibrary;`)(
+  assert(libraryReader, "library and home share the authoritative collection reader");
+  const readLibrary = new Function("Demo", "localizedCandidateRecords", "Truth", "LocalCandidateReview", "byId", "personalGuideCardMarkup", "candidateCardMarkup", "window", "playPendingCardReturn", `${libraryReader}; ${libraryOwner}; return renderPersonalLibrary;`)(
     { openDatabase: async () => optionalDb, DEMO_STORES: { candidates: "optional_legacy" } }, async x => x,
     { openDatabase: async () => optionalDb }, {
       getAll: async (_db, store) => {

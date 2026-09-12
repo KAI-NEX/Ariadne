@@ -14,13 +14,18 @@
   const canonical = value => JSON.stringify(value, (_key, item) => item && !Array.isArray(item) && typeof item === "object"
     ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
 
-  function storageError(code) {
-    const copy = code === "WORKSPACE_VERSION_CONFLICT" ? "内容已在其他页面更新，请刷新后再保存。"
+  function errorCopy(error) {
+    const code = String(error?.code || error?.message || error || "");
+    if (!code.startsWith("WORKSPACE_")) return null;
+    return code === "WORKSPACE_VERSION_CONFLICT" ? "内容已在其他页面更新，请刷新后再保存。"
       : ["WORKSPACE_FILE_CHANGED", "WORKSPACE_SOURCE_HASH_MISMATCH"].includes(code) ? "文件内容与保存记录不一致，请保留原文件并核对；本次没有覆盖它。"
       : code === "WORKSPACE_FILE_MISSING" ? "工作区中的文件暂时找不到，请恢复原文件后重试。"
       : code.startsWith("WORKSPACE_MIGRATION") ? "工作区迁移未完成，旧记录仍保留，请重试或检查迁移记录。"
       : "无法完成工作区读写，请检查本机服务和磁盘空间，重连后刷新核对。";
-    return Object.assign(new Error(copy), { code });
+  }
+
+  function storageError(code) {
+    return Object.assign(new Error(errorCopy(code) || errorCopy("WORKSPACE_STORAGE_UNAVAILABLE")), { code });
   }
 
   function workspaceId() {
@@ -261,5 +266,5 @@
     return connection(workspace, database, await connections.get(key));
   }
 
-  return Object.freeze({ open, connection, serialize, deserialize, WORKSPACE_KEY });
+  return Object.freeze({ open, connection, serialize, deserialize, errorCopy, WORKSPACE_KEY });
 }));
