@@ -101,13 +101,11 @@
     return output;
   }
   function batches(entries, budget = 14000, maximum = 10) {
-    const groups = []; let group = [], size = 0;
-    for (const entry of entries) { const cost = Context.bytes(entry); if (group.length && (size + cost > budget || group.length >= maximum)) { groups.push(group); group = []; size = 0; } group.push(entry); size += cost; }
-    if (group.length) groups.push(group); return groups;
+    return Context.batches(entries, budget, maximum);
   }
   async function refresh(db, { runtime_snapshot, consent, call = callRuntime, onProgress = () => {} }) {
     const snapshot = await snapshotFromDatabase(db);
-    const runtimeIdentity = JSON.stringify([runtime_snapshot.provider, runtime_snapshot.model, runtime_snapshot.protocol, runtime_snapshot.execution_settings?.connection_id, runtime_snapshot.execution_settings?.descriptor_revision, runtime_snapshot.execution_settings?.settings_schema_version, runtime_snapshot.execution_settings?.effective_settings]);
+    const runtimeIdentity = Context.runtimeIdentity(runtime_snapshot);
     if (snapshot.overview?.runtime_identity === runtimeIdentity || !snapshot.records.length) return { snapshot, calls: 0, usage: {}, cached: true };
     const fragments = [];
     for (const record of snapshot.records) {
@@ -136,15 +134,16 @@
     await write(db, "job_overview_snapshots", overview); return { snapshot: { ...fresh, overview }, calls, usage, cached: false };
   }
   function discussionContext(snapshot, message, turns) {
-    const terms = Context.terms(message), ranked = snapshot.records.map((record) => ({ ...record, score: terms.reduce((n, term) => n + (JSON.stringify(record.semantic).toLowerCase().includes(term) ? 1 : 0), 0) })).sort((a, b) => b.score - a.score || a.ref.localeCompare(b.ref));
+    const complete = snapshot.records.length <= 60 && snapshot.records.reduce((sum, record) => sum + Context.bytes({ ref: record.ref, ...record.semantic }), 0) <= Contract.limits.evidence_bytes;
+    const terms = Context.terms(message), ranked = complete ? snapshot.records : snapshot.records.map((record) => ({ ...record, score: terms.reduce((n, term) => n + (JSON.stringify(record.semantic).toLowerCase().includes(term) ? 1 : 0), 0) })).sort((a, b) => b.score - a.score || a.ref.localeCompare(b.ref));
     const evidence = []; let bytes = 0, truncated = 0;
     for (const record of ranked) {
       let value = { ref: record.ref, ...record.semantic }, limited = false;
-      if (Context.bytes(value) > 6000) { limited = true; value = { ...value, summary: value.summary?.slice(0, 1200) || null, requirements: value.requirements.slice(0, 12).map((entry) => ({ label: entry.label.slice(0, 100), detail: entry.detail.slice(0, 300) })), uncertainties: value.uncertainties.slice(0, 6) }; }
+      if (!complete && Context.bytes(value) > 6000) { limited = true; value = { ...value, summary: value.summary?.slice(0, 1200) || null, requirements: value.requirements.slice(0, 12).map((entry) => ({ label: entry.label.slice(0, 100), detail: entry.detail.slice(0, 300) })), uncertainties: value.uncertainties.slice(0, 6) }; }
       const cost = Context.bytes(value); if (evidence.length >= 60 || bytes + cost > Contract.limits.evidence_bytes) continue; evidence.push(value); bytes += cost; if (limited) truncated++;
     }
     const context = { scope: Contract.scope, evidence, overview: snapshot.overview ? { authority: snapshot.overview.authority, summary: snapshot.overview.summary, uncertainties: snapshot.overview.uncertainties, covered_jobs: snapshot.overview.covered_jobs } : null,
-      coverage: { total_jobs: snapshot.records.length, included_jobs: evidence.length, omitted_jobs: snapshot.records.length - evidence.length, truncated_jobs: truncated, strategy: "LEXICAL_WITH_BOUNDED_DETAIL", evidence_bytes: bytes },
+      coverage: { total_jobs: snapshot.records.length, included_jobs: evidence.length, omitted_jobs: snapshot.records.length - evidence.length, truncated_jobs: truncated, strategy: complete ? "COMPLETE_CURRENT_EVIDENCE" : "LEXICAL_WITH_BOUNDED_DETAIL", evidence_bytes: bytes },
       history: Context.boundedHistory(turns.filter((entry) => entry.fingerprint === snapshot.fingerprint).map((entry) => ({ ...entry, output: entry.output ? { ...entry.output, message: [entry.output.message, ...(entry.output.insights || []).map((item) => item.text), ...(entry.output.uncertainties || [])].join("\n") } : null })), 4000) };
     if (Context.bytes(context) > Contract.limits.context_bytes) throw new Error("JOB_OVERVIEW_CONTEXT_LIMIT"); return context;
   }
@@ -152,9 +151,17 @@
     const message = text(human_message, Contract.limits.human_message), turn = { turn_id: id("job-overview-turn"), created_at: now(), human_message: message, status: "SENDING", output: null };
     await write(db, "job_overview_turns", turn);
     try {
-      const refreshed = await refresh(db, options), snapshot = refreshed.snapshot;
-      const turns = (await getAll(db, "job_overview_turns")).sort((a, b) => a.created_at.localeCompare(b.created_at)), context = discussionContext(snapshot, message, turns);
-      options.onProgress?.("正在结合全部职位概况回应…");
+      let snapshot = await snapshotFromDatabase(db);
+      // Small collections can be read in full in the answering call. A digest
+      // is optional; large collections retain the all-Job synthesis path.
+      if (snapshot.overview?.runtime_identity !== Context.runtimeIdentity(options.runtime_snapshot)) snapshot = { ...snapshot, overview: null };
+      const turns = (await getAll(db, "job_overview_turns")).sort((a, b) => a.created_at.localeCompare(b.created_at));
+      let context = discussionContext(snapshot, message, turns), refreshed = { calls: 0, usage: {} };
+      if (context.coverage.omitted_jobs || context.coverage.truncated_jobs) {
+        refreshed = await refresh(db, options); snapshot = refreshed.snapshot;
+        context = discussionContext(snapshot, message, turns);
+      }
+      options.onProgress?.(context.coverage.strategy === "COMPLETE_CURRENT_EVIDENCE" ? "正在阅读当前职位并回应…" : "正在结合全部职位概况回应…");
       const request = requestFor("DISCUSS", context, message, options.runtime_snapshot, options.consent), result = await (options.call || callRuntime)(request), output = validateResult(result, request);
       if ((await snapshotFromDatabase(db)).fingerprint !== snapshot.fingerprint) throw new Error("JOB_OVERVIEW_CONTEXT_CHANGED");
       const insights = output.insights.map((entry) => ({ text: entry.text, identities: entry.evidence_refs.map((ref) => snapshot.records.find((record) => record.ref === ref).identity) }));

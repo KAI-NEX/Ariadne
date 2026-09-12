@@ -31,6 +31,8 @@
 
 这些内容从旧工作区的项目规则、Ariadne 专属决策及本仓库现有契约中重新整理；相关依据已在本仓库，不引入旧工作区作为必需读取路径。未整份导入系统 AGENTS、全局决策日志或其他项目记录。
 
+2026-09-12 用户确认内容简化方向：人通过卡片浏览编辑，AI 按范围读取多份 Markdown，保留原始文件及来源关系，并要求保留现有功能。目标收敛为文件与内容库、卡片界面、上下文准备、模型执行、修改保存五项职责。当前已落地完整证据优先及小集合职位单次对话；Markdown 主存储尚未迁移，IndexedDB 领域记录仍为当前权威。必要职责、功能保留表和迁移条件见 [内容架构复核与简化](docs/current/CONTENT_ARCHITECTURE_SIMPLIFICATION.md)。
+
 ## 3. 当前实现与边界
 
 - 2026-09-09 已实现 Codex 本机直连及 Web 配对连接器，当前验证组合为 `codex / gpt-5.6-sol / CODEX_EXEC_JSONL`。两种方式均经本机客户端向 OpenAI 推理，保持 Model、来源完整性与人工保存边界；公开 HTTPS origin 的本地网络授权仍待实际部署验收。启动、配对与限制见 [Codex 运行指南](docs/current/CODEX_RUNTIME_CONNECTOR.md)。

@@ -25,7 +25,7 @@
   function unknownMarkup(values) { return values?.length ? `<ul class="job-overview-unknown">${values.map((entry) => `<li>${esc(entry)}</li>`).join("")}</ul>` : ""; }
   function render() {
     const { snapshot, turns } = state, overview = snapshot.overview;
-    el("job-overview-state").textContent = `当前 ${snapshot.records.length} 份职位描述：${snapshot.confirmed_count} 份已保存，${snapshot.working_count} 份未确认草稿。${overview ? "概况已更新；结论为模型理解。" : "概况待更新；发送问题时也会更新。"}`;
+    el("job-overview-state").textContent = `当前 ${snapshot.records.length} 份职位描述：${snapshot.confirmed_count} 份已保存，${snapshot.working_count} 份未确认草稿。${overview ? "概况已更新；结论为模型理解。" : "可直接讨论当前职位；资料较多时会分批理解。"}`;
     el("job-overview-summary").textContent = overview?.summary || (snapshot.records.length ? "先了解这些职位各自在做什么，再比较共同要求与差异。" : "还没有可汇总的职位描述。添加真实职位描述后，可以在这里一起讨论。演示卡片不纳入概况。");
     el("job-overview-insights").innerHTML = insightsMarkup(overview?.insights);
     el("job-overview-unknowns").innerHTML = overview?.uncertainties?.length ? `<div class="personal-unknowns"><h3>还需要确认</h3>${unknownMarkup(overview.uncertainties)}</div>` : "";

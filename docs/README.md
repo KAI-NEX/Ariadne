@@ -6,6 +6,8 @@
 
 日常入口还包括 [README.md](../README.md)、[中文 README](../README.zh-CN.md)、[项目经历](../PROJECT_HISTORY.md)、[TECHNICAL_EVIDENCE.md](../TECHNICAL_EVIDENCE.md) 与 [NEXT_PHASE_HANDOFF.md](../NEXT_PHASE_HANDOFF.md)。历史清单提及的根目录 `文件说明.md` 不在当前仓库；本页和 PROJECT_CONTEXT 承担现行导航职责。
 
+当前内容简化方向、必要职责、功能保留表及 Markdown 迁移条件见 [内容架构复核与简化](current/CONTENT_ARCHITECTURE_SIMPLIFICATION.md)。其中明确区分已落地的上下文简化与尚未实施的主存储迁移。
+
 ## 当前视觉体系
 
 [Ariadne VI 系统](current/ARIADNE_VI_SYSTEM.md) · [可浏览总览](../public/vi-system.html) · [基础定义](../public/vi/manifest.json)。界面、图标、中英文字体、网格与简历对齐、色彩、组件、动效及维护检查从这里开始。

@@ -64,16 +64,7 @@
     }
     return fragments;
   }
-  function batches(entries, budget = 15000, maxCount = 10) {
-    const groups = []; let group = [], size = 0;
-    for (const entry of entries) {
-      const cost = Context.bytes(entry);
-      if (group.length && (size + cost > budget || group.length === maxCount)) { groups.push(group); group = []; size = 0; }
-      group.push(entry); size += cost;
-    }
-    if (group.length) groups.push(group);
-    return groups;
-  }
+  const batches = Context.batches;
   function overviewFor(snapshot) {
     const value = snapshot.personal_understanding;
     if (!value || value.source_fingerprint !== snapshot.aggregate_fingerprint) return null;
@@ -83,7 +74,7 @@
   }
   async function refresh(database, { runtime_snapshot, consent, call = callRuntime, onProgress = () => {} } = {}) {
     const snapshot = await Candidate.buildSnapshotFromDatabase(database);
-    const runtimeIdentity = JSON.stringify([runtime_snapshot.provider, runtime_snapshot.model, runtime_snapshot.protocol, runtime_snapshot.execution_settings?.connection_id, runtime_snapshot.execution_settings?.descriptor_revision, runtime_snapshot.execution_settings?.settings_schema_version, runtime_snapshot.execution_settings?.effective_settings]);
+    const runtimeIdentity = Context.runtimeIdentity(runtime_snapshot);
     if (snapshot.personal_understanding?.runtime_identity === runtimeIdentity) return { snapshot, calls: 0, usage: {}, cached: true };
     const fragments = await fragmentsFor(snapshot, runtimeIdentity);
     if (!fragments.length) return { snapshot, calls: 0, usage: {}, cached: true };
@@ -182,7 +173,7 @@
       // charged before every question after a source/settings change.
       onProgress("正在读取当前资料与对话…");
       const snapshot = await Candidate.buildSnapshotFromDatabase(database);
-      const runtimeIdentity = JSON.stringify([runtime_snapshot.provider, runtime_snapshot.model, runtime_snapshot.protocol, runtime_snapshot.execution_settings?.connection_id, runtime_snapshot.execution_settings?.descriptor_revision, runtime_snapshot.execution_settings?.settings_schema_version, runtime_snapshot.execution_settings?.effective_settings]);
+      const runtimeIdentity = Context.runtimeIdentity(runtime_snapshot);
       const [memories, turns] = await Promise.all([Memory.getAll(database, "personal_memory_revisions"), Memory.getAll(database, "personal_conversation_turns")]);
       const compiled = discussionContext({ ...snapshot, personal_understanding: snapshot.personal_understanding?.runtime_identity === runtimeIdentity ? snapshot.personal_understanding : null }, humanMessage, memories, turns.sort((a, b) => a.created_at.localeCompare(b.created_at)));
       onProgress("正在结合个人资料回应…");

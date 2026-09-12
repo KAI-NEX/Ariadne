@@ -6,6 +6,21 @@
   else root.AriadnePersonalContext = api;
 }(typeof globalThis !== "undefined" ? globalThis : this, function create() {
   const bytes = (value) => new TextEncoder().encode(typeof value === "string" ? value : JSON.stringify(value)).length;
+  function runtimeIdentity(snapshot) {
+    const settings = snapshot.execution_settings;
+    return JSON.stringify([snapshot.provider, snapshot.model, snapshot.protocol, settings?.connection_id,
+      settings?.descriptor_revision, settings?.settings_schema_version, settings?.effective_settings]);
+  }
+  function batches(entries, budget = 15000, maximum = 10) {
+    const groups = []; let group = [], size = 0;
+    for (const entry of entries) {
+      const cost = bytes(entry);
+      if (group.length && (size + cost > budget || group.length >= maximum)) { groups.push(group); group = []; size = 0; }
+      group.push(entry); size += cost;
+    }
+    if (group.length) groups.push(group);
+    return groups;
+  }
   function terms(value) {
     const text = String(value || "").toLowerCase();
     const result = text.match(/[a-z0-9]{2,}/g) || [];
@@ -28,9 +43,10 @@
   }
   function select(snapshot, query, budget = 24000) {
     const all = records(snapshot), tokens = terms(query), seenSources = new Set();
+    const complete = all.reduce((sum, entry) => sum + bytes(entry.semantic) + 1, 0) <= budget;
     // This is a bounded retrieval heuristic, not semantic understanding. The
     // model receives explicit coverage and must not infer absent capability.
-    const ranked = all.map((entry) => {
+    const ranked = complete ? all : all.map((entry) => {
       const body = JSON.stringify(entry.semantic).toLowerCase();
       const title = String(entry.semantic.title || "").toLowerCase();
       return { ...entry, score: tokens.reduce((sum, token) => sum + (body.includes(token) ? 1 : 0), 0)
@@ -49,7 +65,7 @@
     for (const entry of ordered) {
       const group = [entry, ...(entry.semantic.related_candidate_refs || []).map((ref) => all.find((item) => item.ref === ref)).filter(Boolean)];
       const additions = group.filter((item) => !selected.has(item.ref)).map((item) => {
-        const semantic = bytes(item.semantic) > 6000 ? limited(item.semantic) : structuredClone(item.semantic);
+        const semantic = !complete && bytes(item.semantic) > 6000 ? limited(item.semantic) : structuredClone(item.semantic);
         return { ...item, semantic, was_truncated: bytes(semantic) !== bytes(item.semantic) };
       });
       const cost = additions.reduce((sum, item) => sum + bytes(item.semantic) + 1, 0);
@@ -70,7 +86,7 @@
       structural_counts: { candidate_snapshot_present: true, confirmed_count: view.confirmed.length, working_count: view.working.length,
         project_count: entries.filter((item) => String(item.item_type || item.item_subtype).toUpperCase() === "PROJECT").length,
         evidence_count: entries.filter((item) => item.facts?.length || String(item.summary || "").trim()).length },
-      context_coverage: { strategy: "LEXICAL_DIVERSITY_WITH_CONFIRMED_MEMORY", total_records: all.length, included_records: entries.length,
+      context_coverage: { strategy: complete ? "COMPLETE_CURRENT_EVIDENCE" : "LEXICAL_DIVERSITY_WITH_CONFIRMED_MEMORY", total_records: all.length, included_records: entries.length,
         omitted_records: all.length - entries.length, truncated_records: truncated.size, evidence_bytes: used, budget_bytes: budget,
         complete: all.length === entries.length && !truncated.size },
     };
@@ -118,5 +134,5 @@
     if (part) chunks.push(part);
     return chunks;
   }
-  return Object.freeze({ bytes, terms, records, limited, select, boundedHistory, catalog, splitText });
+  return Object.freeze({ bytes, runtimeIdentity, batches, terms, records, limited, select, boundedHistory, catalog, splitText });
 }));
