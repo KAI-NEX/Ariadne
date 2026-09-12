@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-12",
+  "artifacts": [
+    {
+      "id": "01-job-radar-to-ariadne",
+      "diagram_type": "lifecycle",
+      "output": "/Users/kai/Documents/GitKaiNex/Ariadne/docs/architecture/archify/2026-09-12-project-evolution/01-job-radar-to-ariadne.html",
+      "final_specification": "01-job-radar-to-ariadne.lifecycle.v3.json",
+      "specification_sha256": "7753b51b2701277adaf62ca9ed78fddd50b0a0662c43785e5b6715c0f2b08729",
+      "specification_bytes": 4070,
+      "artifact_sha256": "05bbcabd1ab40fa4d2f54338ab69d83b11815fa1ed5168f2c4cca9b42a2bbc7a",
+      "artifact_bytes": 809971,
+      "validation": "9/9 showcase, 0 errors, 0 warnings",
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 2
+    },
+    {
+      "id": "02-document-understanding",
+      "diagram_type": "workflow",
+      "output": "/Users/kai/Documents/GitKaiNex/Ariadne/docs/architecture/archify/2026-09-12-project-evolution/02-document-understanding.html",
+      "final_specification": "02-document-understanding.workflow.v2.json",
+      "specification_sha256": "7247e8cd5e04c5bea82d1f64697845aa0c43ce106fc9c5dff86530fcdb9a8774",
+      "specification_bytes": 4786,
+      "artifact_sha256": "d28f027fa3562094f748b50c4045df4e57d8eeaad8ec765c36f22dd8f013a57d",
+      "artifact_bytes": 814900,
+      "validation": "9/9 showcase, 0 errors, 0 warnings",
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 1
+    },
+    {
+      "id": "03-context-authority",
+      "diagram_type": "workflow",
+      "output": "/Users/kai/Documents/GitKaiNex/Ariadne/docs/architecture/archify/2026-09-12-project-evolution/03-context-authority.html",
+      "final_specification": "03-context-authority.workflow.v2.json",
+      "specification_sha256": "11814dd09cdfe97dd0ed036788efeb5ff6cca3757eadcd83a73164eee3f53426",
+      "specification_bytes": 4383,
+      "artifact_sha256": "18aeef1e9f2dfc851f91f3d172bf67dac4b355534313efc07ae70ed8778c174c",
+      "artifact_bytes": 813829,
+      "validation": "9/9 showcase, 0 errors, 0 warnings",
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 1
+    },
+    {
+      "id": "04-motion-debugging",
+      "diagram_type": "workflow",
+      "output": "/Users/kai/Documents/GitKaiNex/Ariadne/docs/architecture/archify/2026-09-12-project-evolution/04-motion-debugging.html",
+      "final_specification": "04-motion-debugging.workflow.v2.json",
+      "specification_sha256": "150605fb1426e34491a46fbb4fc3deedd5cec943769ab9ecc80d796403c5ecc8",
+      "specification_bytes": 4779,
+      "artifact_sha256": "ac9375d29468e3e8fd0ddff48e66ca2dcf3a529bd07c55a505ca6709f03932fc",
+      "artifact_bytes": 816459,
+      "validation": "9/9 showcase, 0 errors, 0 warnings",
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 1
+    }
+  ],
+  "automated_browser_viewports": [
+    "1440x900 light",
+    "1600x1000 light",
+    "1920x1080 light",
+    "2048x1320 light",
+    "1440x900 dark",
+    "2048x1320 dark"
+  ],
+  "manual_visual_review": {
+    "status": "passed",
+    "scope": [
+      "1440x900 light screenshot for each artifact",
+      "2048x1320 dark screenshot for each artifact"
+    ],
+    "observations": [
+      "No visible clipping or unreadable relationship label",
+      "Exception paths remain visually subordinate to the main path",
+      "Cards and main diagram use the desktop height as a balanced whole",
+      "Light and dark themes preserve hierarchy and contrast"
+    ]
+  }
+}

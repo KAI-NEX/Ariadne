@@ -1,0 +1,48 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "上下文为什么会乱 · 从当前决定到可恢复记录",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [930, 720]
+  },
+  "lanes": [
+    { "id": "decision", "label": "决定" },
+    { "id": "implementation", "label": "实施" },
+    { "id": "verification", "label": "验证与记录" },
+    { "id": "exception", "label": "上下文漂移", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "scope", "label": "选当前依据", "fromCol": 0, "toCol": 1, "variant": "security" },
+    { "id": "change", "label": "限制影响范围", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "record", "label": "验证并交接", "fromCol": 4, "toCol": 5 }
+  ],
+  "mainPath": ["human_goal", "authority", "bounded_context", "scoped_change", "acceptance", "handover"],
+  "nodes": [
+    { "id": "human_goal", "lane": "decision", "col": 0, "type": "external", "label": "本轮目标", "sublabel": "对象、结果、保留项", "tag": "用户决定" },
+    { "id": "authority", "lane": "decision", "col": 1, "type": "security", "label": "当前依据", "sublabel": "最新决定 + 适用契约", "tag": "唯一入口" },
+    { "id": "bounded_context", "lane": "implementation", "col": 2, "type": "database", "label": "有界上下文", "sublabel": "只读相关来源与版本", "tag": "Candidate / Job 隔离" },
+    { "id": "scoped_change", "lane": "implementation", "col": 3, "type": "backend", "label": "最小完整修改", "sublabel": "先画影响范围", "tag": "不扩展阶段" },
+    { "id": "acceptance", "lane": "verification", "col": 4, "type": "frontend", "label": "受影响路径验收", "sublabel": "正常、失败、保存边界", "tag": "真实浏览器" },
+    { "id": "handover", "lane": "verification", "col": 5, "type": "security", "label": "增量记录", "sublabel": "结论、未知、替代关系", "tag": "可恢复" },
+    { "id": "stale_doc", "lane": "exception", "col": 1, "type": "external", "label": "过期 next step", "sublabel": "历史快照冒充命令", "tag": "时间错位" },
+    { "id": "mixed_scope", "lane": "exception", "col": 2, "type": "database", "label": "混入无关材料", "sublabel": "旧版 / 跨域 / 私密", "tag": "范围污染" },
+    { "id": "silent_overwrite", "lane": "exception", "col": 3, "type": "security", "label": "覆盖确认状态", "sublabel": "实现进度冒充决定", "tag": "authority 冲突" }
+  ],
+  "edges": [
+    { "id": "goal_authority", "from": "human_goal", "to": "authority", "label": "明确范围", "variant": "security", "role": "main" },
+    { "id": "authority_context", "from": "authority", "to": "bounded_context", "label": "按任务读取", "variant": "emphasis", "role": "main" },
+    { "id": "context_change", "from": "bounded_context", "to": "scoped_change", "label": "保留身份", "variant": "emphasis", "role": "main" },
+    { "id": "change_acceptance", "from": "scoped_change", "to": "acceptance", "label": "验证行为", "variant": "emphasis", "role": "main" },
+    { "id": "acceptance_handover", "from": "acceptance", "to": "handover", "label": "证据化", "variant": "security", "role": "main" },
+    { "id": "stale_authority", "from": "stale_doc", "to": "authority", "label": "核对生效时间", "variant": "security", "role": "return" },
+    { "id": "mixed_context", "from": "mixed_scope", "to": "bounded_context", "label": "隔离", "variant": "security", "role": "return" },
+    { "id": "overwrite_change", "from": "silent_overwrite", "to": "scoped_change", "label": "恢复提案边界", "variant": "security", "role": "return" }
+  ],
+  "cards": [
+    { "dot": "rose", "title": "混乱通常不是“记忆不够”", "items": ["旧文档没有标明已失效", "Candidate、Job 或版本范围被混用", "代码已完成被误写成用户已确认"] },
+    { "dot": "cyan", "title": "项目后来增加的结构", "items": ["PROJECT_CONTEXT 负责稳定目标", "PROJECT_STATUS 记录当前证据", "领域契约约束 Runtime、Proposal、Save 与 revision"] },
+    { "dot": "emerald", "title": "最重要的学习", "items": ["更多上下文不一定更正确", "交接要保存未知、否决和权限边界", "普通讨论不能静默改变确认数据"] }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "从 Job Radar 到 Ariadne · 五次边界扩张",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [930, 720]
+  },
+  "lanes": [
+    { "id": "main", "label": "产品主线" },
+    { "id": "learning", "label": "关键认识与新增控制" }
+  ],
+  "states": [
+    { "id": "radar", "type": "start", "label": "简单 Job Radar", "sublabel": "职位记录 · 搜索 · 状态", "tag": "SQLite / 页面", "lane": "main", "col": 0, "step": "01" },
+    { "id": "real_sources", "type": "active", "label": "接入真实材料", "sublabel": "网页 · PDF · 截图 · 作品集", "tag": "异构来源", "lane": "main", "col": 1, "step": "02" },
+    { "id": "local_foundation", "type": "decision", "label": "本地文档理解", "sublabel": "原生文本 · 选择性 OCR · 结构", "tag": "local-first", "lane": "main", "col": 2, "step": "03" },
+    { "id": "ai_native", "type": "active", "label": "AI-native 工作流", "sublabel": "Candidate / Job · Working · 对话", "tag": "Human Review", "lane": "main", "col": 3, "step": "04", "width": 125 },
+    { "id": "ariadne", "type": "success", "label": "Ariadne · 衡", "sublabel": "先理解两端，再解释关系与行动", "tag": "当前方向", "lane": "main", "col": 4, "step": "05" },
+    { "id": "layer_insight", "type": "decision", "label": "OCR 不是文档理解", "sublabel": "识字、顺序、结构、映射分层", "tag": "保留来源定位", "lane": "learning", "col": 0, "width": 140 },
+    { "id": "truth_insight", "type": "decision", "label": "模型输出不是事实", "sublabel": "Runtime + Proposal + Human Save", "tag": "Working ≠ Confirmed", "lane": "learning", "col": 1, "width": 140 },
+    { "id": "ui_insight", "type": "decision", "label": "静态相同 ≠ 过程相同", "sublabel": "动效、缓存、共享样式需真实验证", "tag": "Browser evidence", "lane": "learning", "col": 2, "width": 140 }
+  ],
+  "transitions": [
+    { "id": "local_to_layer", "from": "local_foundation", "to": "layer_insight", "variant": "emphasis", "route": "straight", "fromSide": "bottom", "toSide": "top" },
+    { "id": "ai_to_truth", "from": "ai_native", "to": "truth_insight", "variant": "security", "route": "straight", "fromSide": "bottom", "toSide": "top" },
+    { "id": "ariadne_to_ui", "from": "ariadne", "to": "ui_insight", "variant": "dashed", "route": "straight", "fromSide": "bottom", "toSide": "top" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "为什么越来越难", "items": ["输入从规则化职位扩展为真实个人材料", "目标从保存记录扩展为理解、关联与建议", "每次扩张都增加来源、语义、状态或权限责任"] },
+    { "dot": "amber", "title": "复杂度不只有一种", "items": ["真实难度：异构资料与歧义", "主动约束：隐私、本地、确认权与一致性", "可减少返工：错层诊断、旧依据与缺少停止条件"] },
+    { "dot": "rose", "title": "现在的核心没有变成自动投递", "items": ["Candidate 与 Job 分别理解", "AI 解释两者关系并提出可审阅建议", "目标职位与是否保存始终由用户决定"] }
+  ]
+}

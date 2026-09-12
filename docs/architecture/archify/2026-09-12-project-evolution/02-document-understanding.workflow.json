@@ -1,0 +1,51 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "本地识别为何变复杂 · 从识字到可确认对象",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [930, 800]
+  },
+  "lanes": [
+    { "id": "source", "label": "来源" },
+    { "id": "reading", "label": "读取与 OCR" },
+    { "id": "structure", "label": "结构与业务映射" },
+    { "id": "review", "label": "人工审核" },
+    { "id": "exception", "label": "有界例外", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "ingest", "label": "保留来源", "fromCol": 0, "toCol": 1 },
+    { "id": "extract", "label": "按页选择读取路径", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "understand", "label": "形成可审核对象", "fromCol": 4, "toCol": 5, "variant": "security" }
+  ],
+  "mainPath": ["source_bundle", "page_gate", "native_text", "document_blocks", "domain_mapping", "human_review"],
+  "nodes": [
+    { "id": "source_bundle", "lane": "source", "col": 0, "type": "database", "label": "SourceDocument", "sublabel": "PDF / DOCX / MD / TXT", "tag": "原件 + hash" },
+    { "id": "page_gate", "lane": "reading", "col": 1, "type": "security", "label": "逐页检查", "sublabel": "原生文字是否可用？", "tag": "不是整份二选一" },
+    { "id": "native_text", "lane": "reading", "col": 2, "type": "backend", "label": "原生文字块", "sublabel": "可用时优先", "tag": "最快路径" },
+    { "id": "apple_vision", "lane": "exception", "col": 2, "width": 140, "type": "backend", "label": "Apple Vision V1 Auto", "sublabel": "无文字层的 PDF 页", "tag": "选择性 OCR" },
+    { "id": "gaptree_order", "lane": "exception", "col": 3, "width": 130, "type": "backend", "label": "GapTree 顺序", "sublabel": "仅 OCR 多栏 Resume", "tag": "条件式" },
+    { "id": "document_blocks", "lane": "structure", "col": 3, "width": 115, "type": "database", "label": "DocumentBlock v1", "sublabel": "页 · bbox · 方法", "tag": "统一中间层" },
+    { "id": "domain_mapping", "lane": "structure", "col": 4, "type": "backend", "label": "分域结构与映射", "sublabel": "Resume / Portfolio 分开", "tag": "CareerEntity Proposal" },
+    { "id": "manual_boundary", "lane": "exception", "col": 4, "type": "security", "label": "边界不足则停下", "sublabel": "不猜项目分组", "tag": "needs_manual_selection" },
+    { "id": "human_review", "lane": "review", "col": 5, "width": 115, "type": "security", "label": "实体级人工审核", "sublabel": "确认 / 编辑 / 拒绝", "tag": "确认后派生 Evidence" }
+  ],
+  "edges": [
+    { "id": "bundle_gate", "from": "source_bundle", "to": "page_gate", "label": "逐页", "variant": "emphasis", "role": "main" },
+    { "id": "gate_native", "from": "page_gate", "to": "native_text", "label": "原生可用", "variant": "emphasis", "role": "main" },
+    { "id": "native_blocks", "from": "native_text", "to": "document_blocks", "label": "含定位", "variant": "emphasis", "role": "main" },
+    { "id": "blocks_mapping", "from": "document_blocks", "to": "domain_mapping", "label": "分域映射", "variant": "emphasis", "role": "main" },
+    { "id": "mapping_review", "from": "domain_mapping", "to": "human_review", "label": "提案", "variant": "security", "role": "main" },
+    { "id": "gate_vision", "from": "page_gate", "to": "apple_vision", "label": "无文字层", "variant": "dashed", "role": "branch" },
+    { "id": "vision_order", "from": "apple_vision", "to": "gaptree_order", "label": "OCR 多栏", "variant": "dashed", "role": "branch" },
+    { "id": "vision_blocks", "from": "gaptree_order", "to": "document_blocks", "label": "统一格式", "variant": "dashed", "role": "return" },
+    { "id": "mapping_manual", "from": "domain_mapping", "to": "manual_boundary", "label": "边界不足", "variant": "security", "role": "error" },
+    { "id": "manual_review", "from": "manual_boundary", "to": "human_review", "label": "人工划分", "variant": "security", "role": "return" }
+  ],
+  "cards": [
+    { "dot": "violet", "title": "为什么比较了许多 GitHub 项目", "items": ["SmartResume：采用分离 extraction 与来源范围思路", "RAGFlow：采用按页选择 native / OCR 的模式", "Docling：只借鉴 typed IR / provenance；未成为依赖"] },
+    { "dot": "amber", "title": "为什么没有继续堆引擎", "items": ["Paddle 约 725.6 秒/页、约 4 GB RSS，且没有实体增益", "Surya 未产出可比较结果并引入 runtime / license 边界", "全局 GapTree 与盲目 native/OCR 融合产生真实回归"] },
+    { "dot": "emerald", "title": "最终停止条件", "items": ["20 份、305 页完成；6/6 truth 文档通过", "18 份可审核，2 份安全转人工，0 crash", "没有重复真实失败，不重开 OCR 架构研究"] }
+  ]
+}

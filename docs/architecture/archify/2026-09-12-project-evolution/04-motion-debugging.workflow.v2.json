@@ -1,0 +1,50 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "动效为什么反复返工 · 从症状到逐帧证据",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1220, 660]
+  },
+  "lanes": [
+    { "id": "observe", "label": "观察" },
+    { "id": "diagnose", "label": "诊断与修复" },
+    { "id": "verify", "label": "验证" },
+    { "id": "exception", "label": "曾出现的根因", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "reproduce", "label": "复现", "fromCol": 0, "toCol": 1 },
+    { "id": "repair", "label": "分层定位与原子修复", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "prove", "label": "逐态证明", "fromCol": 4, "toCol": 5, "variant": "security" }
+  ],
+  "mainPath": ["visible_symptom", "real_repro", "failure_layer", "atomic_fix", "frame_sampling", "regression"],
+  "nodes": [
+    { "id": "visible_symptom", "lane": "observe", "col": 0, "width": 155, "type": "external", "label": "可见症状", "sublabel": "闪动 / 跳变 / 关闭突兀", "tag": "用户观察" },
+    { "id": "real_repro", "lane": "observe", "col": 1, "width": 165, "type": "frontend", "label": "真实浏览器复现", "sublabel": "同页 / 同态 / 同操作", "tag": "不是截图" },
+    { "id": "failure_layer", "lane": "diagnose", "col": 2, "width": 165, "type": "backend", "label": "定位故障层", "sublabel": "DOM / CSS / 合成 / 导航", "tag": "单层修改" },
+    { "id": "atomic_fix", "lane": "diagnose", "col": 3, "width": 165, "type": "frontend", "label": "原子修复", "sublabel": "保留已确认行为", "tag": "范围明确" },
+    { "id": "frame_sampling", "lane": "verify", "col": 4, "width": 170, "type": "frontend", "label": "中间帧与返回", "sublabel": "开 / 离 / 关 / 焦点", "tag": "reduced motion" },
+    { "id": "regression", "lane": "verify", "col": 5, "width": 165, "type": "security", "label": "跨页面回归", "sublabel": "Candidate / Job / Runtime", "tag": "用户验收" },
+    { "id": "compositing", "lane": "exception", "col": 2, "width": 160, "type": "backend", "label": "合成层重建", "sublabel": "filter 触发重栅格", "tag": "文字闪动" },
+    { "id": "fill_mode", "lane": "exception", "col": 3, "width": 160, "type": "frontend", "label": "fill 覆盖", "sublabel": "退出 transition 失效", "tag": "关闭突兀" },
+    { "id": "double_transition", "lane": "exception", "col": 4, "width": 165, "type": "frontend", "label": "两套过渡叠加", "sublabel": "card clone + page fade", "tag": "色温跳变" },
+    { "id": "cache", "lane": "exception", "col": 5, "width": 165, "type": "database", "label": "浏览器旧缓存", "sublabel": "代码与观察版本不同", "tag": "错误归因" }
+  ],
+  "edges": [
+    { "id": "symptom_repro", "from": "visible_symptom", "to": "real_repro", "label": "录屏", "variant": "emphasis", "role": "main" },
+    { "id": "repro_layer", "from": "real_repro", "to": "failure_layer", "label": "采样", "variant": "emphasis", "role": "main" },
+    { "id": "layer_fix", "from": "failure_layer", "to": "atomic_fix", "label": "最小改动", "variant": "emphasis", "role": "main" },
+    { "id": "fix_frames", "from": "atomic_fix", "to": "frame_sampling", "label": "连续过程", "variant": "emphasis", "role": "main" },
+    { "id": "frames_regression", "from": "frame_sampling", "to": "regression", "label": "通过后冻结", "variant": "security", "role": "main" },
+    { "id": "compositing_layer", "from": "compositing", "to": "failure_layer", "label": "隔离 filter", "variant": "security", "role": "return" },
+    { "id": "fill_fix", "from": "fill_mode", "to": "atomic_fix", "label": "释放 transform", "variant": "security", "role": "return" },
+    { "id": "double_frames", "from": "double_transition", "to": "frame_sampling", "label": "单一路径", "variant": "security", "role": "return" },
+    { "id": "cache_regression", "from": "cache", "to": "regression", "label": "版本证据", "variant": "dashed", "role": "return" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "为什么静态 VI 对不上动效质量", "items": ["Figma 证明静态位置，不证明浏览器合成与时序", "同一终点可以经过完全不同的中间帧", "打开、退出、返回和键盘路径都要验收"] },
+    { "dot": "amber", "title": "为什么修一处会影响另一处", "items": ["共享 CSS 与 ProductShell 有多个消费者", "iframe、3D transform ancestor 与页面导航会叠加", "缓存会让旧资源伪装成新修复失败"] },
+    { "dot": "emerald", "title": "后来学会的停止方法", "items": ["先冻结参考画面与可观察症状", "只修有证据的故障层并回归相关路径", "视觉通过、自动回归和用户验收分别记录"] }
+  ]
+}
