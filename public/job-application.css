@@ -3,6 +3,11 @@
 .v1-job-tracked-card { position: relative; display: flex; min-width: 0; }
 .v1-job-tracked-card > .v1-candidate-card { flex: 1; height: auto; }
 .v1-job-tracked-card > .v1-candidate-card:hover { transform: none; }
+.v1-job-tracked-card.has-source-link > .v1-candidate-card { padding-bottom: calc(var(--vi-space-24) + 42px); }
+.v1-job-source-link { position: absolute; z-index: 2; left: var(--vi-space-24); right: var(--vi-space-24); bottom: var(--vi-space-24); display: flex; align-items: baseline; gap: var(--vi-space-8); min-width: 0; color: var(--vi-text-secondary); font: var(--vi-text-caption)/1.5 var(--vi-font-ui); text-decoration: none; }
+.v1-job-source-link span { flex: 0 0 auto; color: var(--vi-ink); }
+.v1-job-source-link small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: inherit; }
+.v1-job-source-link:hover span, .v1-job-source-link:focus-visible span { text-decoration: underline; text-underline-offset: 3px; }
 .v1-job-stage-placeholder { min-height: var(--vi-target-comfort); min-width: 84px; font-size: var(--vi-text-caption); }
 .v1-job-tracked-card > .v1-candidate-card .v1-job-stage-placeholder { visibility: hidden; }
 .v1-job-stage-select.runtime-selector { position: absolute; top: var(--vi-space-24); left: calc(var(--vi-space-24) - 2px); width: auto; height: var(--vi-target-comfort); justify-content: flex-start; gap: var(--vi-space-8); padding: var(--vi-space-8) var(--vi-space-12); border-radius: var(--vi-radius-pill); corner-shape: round; }

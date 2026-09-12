@@ -2940,11 +2940,14 @@
     const canonical = job.data_class === "CANONICAL_CONFIRMED";
     const stateBadge = canonical ? "" : '<span class="v1-review-chip">演示数据</span>';
     const state = JobApplications ? jobApplicationRecords.get(job.job_context_id) || JobApplications.initial(job.job_context_id) : null;
+    const sourceLink = JobApplications?.sourceLink(job);
     const chip = state ? `<span class="v1-type-chip v1-job-stage-placeholder" aria-hidden="true">${JobApplications.STAGES[state.stage]}</span>` : '<span class="v1-type-chip">职位描述</span>';
     const card = `<a class="v1-candidate-card job" data-transition-key="job:${escapeHtml(job.job_context_id)}" href="/job-detail.html?job=${encodeURIComponent(job.job_context_id)}"><div class="v1-card-top">${chip}${stateBadge}</div><h3>${escapeHtml(job.title)}</h3><p class="v1-card-subtitle">${escapeHtml(cardSubtitleText(job.company, job.location))}</p><p class="v1-card-summary">${escapeHtml(job.summary)}</p><ul>${(job.requirements || []).slice(0, 3).map((item) => `<li>${escapeHtml(item.label)}</li>`).join("")}</ul></a>`;
-    if (!JobApplications) return card;
+    const externalLink = sourceLink ? `<a class="v1-job-source-link" href="${escapeHtml(sourceLink.href)}" target="_blank" rel="noopener noreferrer" aria-label="打开${escapeHtml(job.title)}的原始职位链接"><span>职位链接</span><small>${escapeHtml(sourceLink.visible)}</small></a>` : "";
+    if (!JobApplications && !externalLink) return card;
     // Keep the dropdown trigger outside the link, while sharing its visual alignment.
-    return `<article class="v1-job-tracked-card">${card}<button type="button" class="runtime-selector v1-job-stage-select" data-job-stage="${escapeHtml(job.job_context_id)}" data-stage="${state.stage}" data-job-title="${escapeHtml(job.title)}" data-revision="${state.revision}" aria-label="${escapeHtml(job.title)}的投递状态：${JobApplications.STAGES[state.stage]}" aria-haspopup="listbox" aria-controls="job-stage-options" aria-expanded="false"><span>${JobApplications.STAGES[state.stage]}</span><span class="runtime-chevron vi-icon" data-icon="chevron-down" aria-hidden="true"></span></button></article>`;
+    const stageSelect = JobApplications ? `<button type="button" class="runtime-selector v1-job-stage-select" data-job-stage="${escapeHtml(job.job_context_id)}" data-stage="${state.stage}" data-job-title="${escapeHtml(job.title)}" data-revision="${state.revision}" aria-label="${escapeHtml(job.title)}的投递状态：${JobApplications.STAGES[state.stage]}" aria-haspopup="listbox" aria-controls="job-stage-options" aria-expanded="false"><span>${JobApplications.STAGES[state.stage]}</span><span class="runtime-chevron vi-icon" data-icon="chevron-down" aria-hidden="true"></span></button>` : "";
+    return `<article class="v1-job-tracked-card${externalLink ? " has-source-link" : ""}">${card}${stageSelect}${externalLink}</article>`;
   }
 
   function jobGuideCardMarkup() {

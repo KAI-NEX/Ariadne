@@ -33,6 +33,18 @@
     const isClosed = job => (applications.get(job.job_context_id) || initial(job.job_context_id)).stage === "CLOSED";
     return [...records.filter(job => !isClosed(job)), ...records.filter(isClosed)];
   }
+  function sourceLink(job) {
+    const raw = job?.source_url || job?.imported_from?.source_url;
+    if (typeof raw !== "string" || !raw.trim()) return null;
+    try {
+      const url = new URL(raw.trim());
+      if (!["http:", "https:"].includes(url.protocol)) return null;
+      return Object.freeze({
+        href: url.href,
+        visible: `${url.host}${url.pathname === "/" ? "" : url.pathname}${url.search}`,
+      });
+    } catch (_error) { return null; }
+  }
   function open(indexedDb = globalThis.indexedDB) {
     return new Promise((resolve, reject) => {
       if (!indexedDb) { reject(Error("浏览器无法保存职位阶段。")); return; }
@@ -66,5 +78,5 @@
       tx.onerror = tx.onabort = () => reject(failure || Error("阶段保存失败，原记录仍保留。请重试。"));
     }); } finally { db.close(); }
   }
-  return Object.freeze({ DB_NAME, STAGES, OUTCOMES, initial, validate, next, matches, orderJobs, all, save });
+  return Object.freeze({ DB_NAME, STAGES, OUTCOMES, initial, validate, next, matches, orderJobs, sourceLink, all, save });
 }));
