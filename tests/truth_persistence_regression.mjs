@@ -529,18 +529,13 @@ await Truth.persistRecord(memoryDb, "processing_batches", cancelledBatch);
 assert.equal(memoryDb.records.get("processing_batches").get(cancelledBatch.batch_id).status, "CANCELLED");
 assert.equal(memoryDb.records.get("candidate_context_revisions").size, 3); // Prior successes remain; cancelled/not-started sources create no revision and cause no rollback.
 
-const openers = ["v1-demo-domain.js", "career-evidence.js", "local-first.js", "career-profile.js", "local-jobs.js"];
-for (const filename of openers) {
+const sharedStorageSchema = JSON.parse(fs.readFileSync(path.join(root, "data/workspace_storage_v1.json"), "utf8")).databases[Truth.DB_NAME];
+for (const filename of ["v1-demo-domain.js", "career-evidence.js", "local-first.js", "career-profile.js", "local-jobs.js"]) {
   const sourceText = fs.readFileSync(path.join(root, "public", filename), "utf8");
-  assert.match(sourceText, /const DB_VERSION = 17;/, `${filename} must open IndexedDB v16`);
-  for (const spec of Truth.NEW_STORE_SPECS) {
-    assert(sourceText.includes(`"${spec.name}"`), `${filename} must add ${spec.name}`);
-    assert(sourceText.includes(`"${spec.keyPath}"`), `${filename} must use ${spec.keyPath}`);
-  }
-  for (const legacyStore of ["demo_candidate_items", "demo_job_contexts", "demo_conversations", "demo_ui_state"]) {
-    assert(sourceText.includes(`"${legacyStore}"`), `${filename} must preserve ${legacyStore}`);
-  }
+  assert.match(sourceText, /AriadneContentDatabase\.open\(DB_NAME/, `${filename} must use the same content repository`);
 }
+for (const spec of Truth.STORE_SPECS) assert.equal(sharedStorageSchema[spec.name], spec.keyPath);
+for (const legacyStore of ["demo_candidate_items", "demo_job_contexts", "demo_conversations", "demo_ui_state"]) assert(sharedStorageSchema[legacyStore]);
 
 const domainSource = fs.readFileSync(path.join(root, "public", "truth-persistence-domain.js"), "utf8");
 assert.doesNotMatch(domainSource, /\bfetch\s*\(|XMLHttpRequest|DeepSeek|Qwen|Gemini/);

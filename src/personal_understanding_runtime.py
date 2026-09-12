@@ -8,6 +8,8 @@ from __future__ import annotations
 from src.model_settings import apply_execution_settings
 from src.conversation_delivery import conversation_delivery
 
+from src.markdown_context import render_context, INSTRUCTION as MARKDOWN_CONTEXT_INSTRUCTION
+
 import json
 import re
 from pathlib import Path
@@ -143,8 +145,8 @@ Nothing is saved by this response. Tell the Human to review the proposal and Sav
 
 def build_payload(request: dict) -> dict:
     return augment_payload({"model": request["runtime_snapshot"]["model"], "messages": [
-        {"role": "system", "content": prompt(request["phase"])},
-        {"role": "user", "content": json.dumps({"context": request["context"], "human_message": request["human_message"]}, ensure_ascii=False, separators=(",", ":"))},
+        {"role": "system", "content": prompt(request["phase"]) + MARKDOWN_CONTEXT_INSTRUCTION},
+        {"role": "user", "content": render_context({"context": request["context"], "human_message": request["human_message"]})},
     ], "tools": [{"type": "function", "function": {"name": "deliver_personal_understanding", "strict": True, "parameters": output_schema(request["phase"])}}],
         "tool_choice": {"type": "function", "function": {"name": "deliver_personal_understanding"}},
         "thinking": {"type": "disabled"}, "temperature": 0, "max_tokens": 6000}, request, PersonalUnderstandingError)

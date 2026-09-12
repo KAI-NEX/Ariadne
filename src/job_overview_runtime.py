@@ -9,6 +9,8 @@ from src.conversation_attachments import validate_attachments, augment_payload
 from src.runtime_binding import valid_binding, resolve_runtime_credential
 
 from src.runtime_binding import valid_binding, resolve_runtime_credential
+from src.markdown_context import render_context, INSTRUCTION as MARKDOWN_CONTEXT_INSTRUCTION
+
 import json
 from pathlib import Path
 from src.execution_contract import validate_runtime_snapshot, ExecutionContractError
@@ -92,8 +94,8 @@ Follow the function schema exactly. uncertainties is an array of plain STRINGS, 
 
 def build_payload(request):
     phase = request["phase"]
-    return augment_payload({"model": request["runtime_snapshot"]["model"], "messages": [{"role": "system", "content": prompt(phase)},
-        {"role": "user", "content": json.dumps({"context": request["context"], "human_message": request["human_message"]}, ensure_ascii=False, separators=(",", ":"))}],
+    return augment_payload({"model": request["runtime_snapshot"]["model"], "messages": [{"role": "system", "content": prompt(phase) + MARKDOWN_CONTEXT_INSTRUCTION},
+        {"role": "user", "content": render_context({"context": request["context"], "human_message": request["human_message"]})}],
         "tools": [{"type": "function", "function": {"name": TOOL, "strict": True, "parameters": digest_schema("DISTILL" if phase == "DISTILL" else "SYNTHESIZE")}}],
         "tool_choice": {"type": "function", "function": {"name": TOOL}}, "thinking": {"type": "disabled"}, "temperature": 0, "max_tokens": 6000}, request, JobOverviewError)
 

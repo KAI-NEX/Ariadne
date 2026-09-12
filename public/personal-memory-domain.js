@@ -51,6 +51,7 @@
   }
   function getAll(database, name) {
     if (!database.objectStoreNames.contains(name)) return Promise.resolve([]);
+    if (name === "source_documents" && database.getAllMetadata) return database.getAllMetadata(name);
     return new Promise((resolve, reject) => {
       const request = database.transaction(name, "readonly").objectStore(name).getAll();
       request.onsuccess = () => resolve(request.result || []);

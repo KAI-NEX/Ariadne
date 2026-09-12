@@ -10,6 +10,8 @@ from __future__ import annotations
 from src.model_settings import apply_execution_settings
 from src.conversation_delivery import conversation_delivery
 
+from src.markdown_context import render_context, INSTRUCTION as MARKDOWN_CONTEXT_INSTRUCTION
+
 import json
 import re
 from dataclasses import dataclass
@@ -299,8 +301,8 @@ def build_job_conversation_payload(request: JobConversationRequest) -> dict[str,
     provider_input = {"context": context, "human_message": request.human_message, "history": history}
     _assert_provider_safe(provider_input)
     messages = [
-        {"role": "system", "content": natural_job_conversation_prompt()},
-        {"role": "user", "content": json.dumps({"active_context": context}, ensure_ascii=False, separators=(",", ":"))},
+        {"role": "system", "content": natural_job_conversation_prompt() + MARKDOWN_CONTEXT_INSTRUCTION},
+        {"role": "user", "content": render_context({"active_context": context})},
     ]
     for turn in history:
         role = "assistant" if turn.get("role") == "ASSISTANT" else "user"

@@ -1,6 +1,5 @@
-/* Browser-only Ariadne storage: no app.py route and no network request. */
+/* Historical learning screen; all content uses the shared workspace repository. */
 const DB_NAME = "job-radar-local-first-v1";
-const DB_VERSION = 17;
 const JOBS = "jobs";
 const CANDIDATES = "candidates";
 const RuntimeGate = window.JobRadarRuntimeGate;
@@ -11,65 +10,7 @@ let deepseekModel = null;
 const FULL_VISION_PROMPT = "vision_extract_v1_full";
 
 function openDatabase() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(JOBS)) db.createObjectStore(JOBS, { keyPath: "job_id" });
-      if (!db.objectStoreNames.contains(CANDIDATES)) db.createObjectStore(CANDIDATES, { keyPath: "candidate_id" });
-      if (!db.objectStoreNames.contains("source_documents")) db.createObjectStore("source_documents", { keyPath: "source_document_id" });
-      if (!db.objectStoreNames.contains("runtime_snapshots")) db.createObjectStore("runtime_snapshots", { keyPath: "snapshot_id" });
-      if (!db.objectStoreNames.contains("extraction_artifacts")) db.createObjectStore("extraction_artifacts", { keyPath: "artifact_id" });
-      if (!db.objectStoreNames.contains("career_evidence")) db.createObjectStore("career_evidence", { keyPath: "evidence_id" });
-      if (!db.objectStoreNames.contains("review_decisions")) db.createObjectStore("review_decisions", { keyPath: "decision_id" });
-      if (!db.objectStoreNames.contains("career_profiles")) db.createObjectStore("career_profiles", { keyPath: "profile_id" });
-      if (!db.objectStoreNames.contains("extraction_runs")) db.createObjectStore("extraction_runs", { keyPath: "extraction_run_id" });
-      if (!db.objectStoreNames.contains("career_entities")) db.createObjectStore("career_entities", { keyPath: "entity_id" });
-      if (!db.objectStoreNames.contains("entity_review_decisions")) db.createObjectStore("entity_review_decisions", { keyPath: "decision_id" });
-      if (!db.objectStoreNames.contains("correction_memory")) db.createObjectStore("correction_memory", { keyPath: "correction_id" });
-      if (!db.objectStoreNames.contains("ai_career_contexts")) db.createObjectStore("ai_career_contexts", { keyPath: "artifact_id" });
-      if (!db.objectStoreNames.contains("ai_career_profiles")) db.createObjectStore("ai_career_profiles", { keyPath: "profile_id" });
-      if (!db.objectStoreNames.contains("career_intelligence")) db.createObjectStore("career_intelligence", { keyPath: "record_id" });
-      if (!db.objectStoreNames.contains("candidate_contexts")) db.createObjectStore("candidate_contexts", { keyPath: "context_id" });
-      if (!db.objectStoreNames.contains("candidate_proposals")) db.createObjectStore("candidate_proposals", { keyPath: "candidate_proposal_id" });
-      if (!db.objectStoreNames.contains("candidate_context_patches")) db.createObjectStore("candidate_context_patches", { keyPath: "patch_id" });
-      if (!db.objectStoreNames.contains("processing_runs")) db.createObjectStore("processing_runs", { keyPath: "run_id" });
-      if (!db.objectStoreNames.contains("processing_batches")) db.createObjectStore("processing_batches", { keyPath: "batch_id" });
-      if (!db.objectStoreNames.contains("context_proposals")) db.createObjectStore("context_proposals", { keyPath: "proposal_id" });
-      if (!db.objectStoreNames.contains("context_review_decisions")) db.createObjectStore("context_review_decisions", { keyPath: "review_id" });
-      if (!db.objectStoreNames.contains("candidate_working_models")) db.createObjectStore("candidate_working_models", { keyPath: "working_model_id" });
-      if (!db.objectStoreNames.contains("candidate_workspace_acceptances")) db.createObjectStore("candidate_workspace_acceptances", { keyPath: "acceptance_id" });
-      if (!db.objectStoreNames.contains("candidate_context_revisions")) db.createObjectStore("candidate_context_revisions", { keyPath: "revision_id" });
-      if (!db.objectStoreNames.contains("candidate_context_lifecycle")) db.createObjectStore("candidate_context_lifecycle", { keyPath: "lifecycle_id" });
-      if (!db.objectStoreNames.contains("job_context_revisions")) db.createObjectStore("job_context_revisions", { keyPath: "revision_id" });
-      if (!db.objectStoreNames.contains("processing_consents")) db.createObjectStore("processing_consents", { keyPath: "consent_id" });
-      if (!db.objectStoreNames.contains("conversation_sessions")) db.createObjectStore("conversation_sessions", { keyPath: "conversation_id" });
-      if (!db.objectStoreNames.contains("conversation_messages")) db.createObjectStore("conversation_messages", { keyPath: "message_id" });
-      if (!db.objectStoreNames.contains("conversation_turn_executions")) db.createObjectStore("conversation_turn_executions", { keyPath: "execution_id" });
-      if (!db.objectStoreNames.contains("candidate_actions")) db.createObjectStore("candidate_actions", { keyPath: "action_id" });
-      if (!db.objectStoreNames.contains("job_analyses")) db.createObjectStore("job_analyses", { keyPath: "analysis_id" });
-      if (!db.objectStoreNames.contains("job_conversation_sessions")) db.createObjectStore("job_conversation_sessions", { keyPath: "conversation_id" });
-      if (!db.objectStoreNames.contains("job_conversation_messages")) db.createObjectStore("job_conversation_messages", { keyPath: "message_id" });
-      if (!db.objectStoreNames.contains("job_turn_executions")) db.createObjectStore("job_turn_executions", { keyPath: "execution_id" });
-      if (!db.objectStoreNames.contains("job_change_proposals")) db.createObjectStore("job_change_proposals", { keyPath: "job_change_proposal_id" });
-      if (!db.objectStoreNames.contains("job_change_decisions")) db.createObjectStore("job_change_decisions", { keyPath: "job_change_decision_id" });
-      if (!db.objectStoreNames.contains("personal_memory_revisions")) db.createObjectStore("personal_memory_revisions", { keyPath: "revision_id" });
-      if (!db.objectStoreNames.contains("personal_memory_proposals")) db.createObjectStore("personal_memory_proposals", { keyPath: "proposal_id" });
-      if (!db.objectStoreNames.contains("personal_memory_decisions")) db.createObjectStore("personal_memory_decisions", { keyPath: "decision_id" });
-      if (!db.objectStoreNames.contains("personal_understanding_fragments")) db.createObjectStore("personal_understanding_fragments", { keyPath: "fragment_id" });
-      if (!db.objectStoreNames.contains("personal_understanding_snapshots")) db.createObjectStore("personal_understanding_snapshots", { keyPath: "understanding_id" });
-      if (!db.objectStoreNames.contains("personal_conversation_turns")) db.createObjectStore("personal_conversation_turns", { keyPath: "turn_id" });
-      if (!db.objectStoreNames.contains("job_overview_fragments")) db.createObjectStore("job_overview_fragments", { keyPath: "fragment_id" });
-      if (!db.objectStoreNames.contains("job_overview_snapshots")) db.createObjectStore("job_overview_snapshots", { keyPath: "overview_id" });
-      if (!db.objectStoreNames.contains("job_overview_turns")) db.createObjectStore("job_overview_turns", { keyPath: "turn_id" });
-      if (!db.objectStoreNames.contains("demo_candidate_items")) db.createObjectStore("demo_candidate_items", { keyPath: "item_id" });
-      if (!db.objectStoreNames.contains("demo_job_contexts")) db.createObjectStore("demo_job_contexts", { keyPath: "job_context_id" });
-      if (!db.objectStoreNames.contains("demo_conversations")) db.createObjectStore("demo_conversations", { keyPath: "conversation_id" });
-      if (!db.objectStoreNames.contains("demo_ui_state")) db.createObjectStore("demo_ui_state", { keyPath: "state_id" });
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+  return window.AriadneContentDatabase.open(DB_NAME);
 }
 
 async function withStore(storeName, mode, operation) {

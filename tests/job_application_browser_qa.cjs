@@ -5,15 +5,18 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs/promises');
 const path=require('node:path');
 (async()=>{
-  const output=path.resolve('.cache/job-stage-menu-20260912');await fs.mkdir(output,{recursive:true});
+  const output=path.resolve(process.env.ARIADNE_QA_OUTPUT || '.cache/job-stage-menu-20260912');await fs.mkdir(output,{recursive:true});
   const browser=await chromium.launch({channel:'chrome',headless:true});
   try {
     const context=await browser.newContext({viewport:{width:1280,height:900}}),page=await context.newPage();
     const errors=[],posts=[];
     page.on('pageerror',error=>errors.push(error.message));
     context.on('page',p=>p.on('pageerror',error=>errors.push(error.message)));
-    context.on('request',request=>{if(request.method()==='POST')posts.push(request.url());});
-    const base='http://127.0.0.1:8028',jobId='qa-chip-ai-pm',select=`[data-job-stage="${jobId}"]`;
+    context.on('request',request=>{if(request.method()==='POST' && new URL(request.url()).pathname!=='/api/workspace')posts.push(request.url());});
+    let failStageSave=false;
+    await context.route('**/api/workspace',route=>failStageSave && route.request().method()==='POST' && route.request().postDataJSON()?.action==='commit' && route.request().postDataJSON()?.database==='ariadne-job-applications-v1'
+      ? route.fulfill({status:503,contentType:'application/json',body:'{"error":"WORKSPACE_STORAGE_UNAVAILABLE"}'}) : route.continue());
+    const base=process.argv[2] || 'http://127.0.0.1:8028',jobId='qa-chip-ai-pm',select=`[data-job-stage="${jobId}"]`;
     const choose=async(stage)=>{await page.click(select);await page.click(`[data-stage-option="${stage}"]`);};
     const shot=async(p,name,options={})=>{
       await p.evaluate(()=>Promise.all(document.getAnimations().filter(animation=>animation.effect?.getComputedTiming().iterations!==Infinity).map(animation=>animation.finished.catch(()=>{}))));
@@ -45,9 +48,9 @@ const path=require('node:path');
     };
     await switchStage('APPLIED');await switchStage('IN_PROGRESS');
     await switchStage('CLOSED');
-    assert.equal(await page.evaluate(id=>[...document.querySelectorAll('[data-job-stage]')].at(-1)?.dataset.jobStage,id),jobId,'closed card moves to the end');
+    assert.equal(await page.evaluate(id=>[...document.querySelectorAll('[data-job-stage]')].at(-1)?.dataset.jobStage,jobId),jobId,'closed card moves to the end');
     await page.reload();await page.waitForSelector(select);assert.equal((await record()).stage,'CLOSED');
-    assert.equal(await page.evaluate(id=>[...document.querySelectorAll('[data-job-stage]')].at(-1)?.dataset.jobStage,id),jobId,'closed-last order survives reload');
+    assert.equal(await page.evaluate(id=>[...document.querySelectorAll('[data-job-stage]')].at(-1)?.dataset.jobStage,jobId),jobId,'closed-last order survives reload');
     await shot(page,'closed-desktop.png');
     await page.click(`[data-transition-key="job:${jobId}"]`);await page.waitForSelector('.v1-detail-overlay:not(.hidden)');
     const frame=page.frameLocator('.v1-detail-overlay iframe');
@@ -70,9 +73,9 @@ const path=require('node:path');
     assert.equal((await record()).note,'简历未通过，暂不跟进。');assert.equal((await record()).outcome,'');
     assert.ok((await record()).history.some(item=>item.outcome==='RESUME_REJECTED'));
     // Simulate a transaction abort in the card path; selected value rolls back.
-    await page.evaluate(()=>{window.qaTransaction=IDBDatabase.prototype.transaction;IDBDatabase.prototype.transaction=function(...args){const tx=qaTransaction.apply(this,args);if(this.name===AriadneJobApplications.DB_NAME&&args[1]==='readwrite')queueMicrotask(()=>tx.abort());return tx;};});
+    failStageSave=true;
     await choose('APPLIED');await page.waitForFunction(()=>document.getElementById('job-page-message').classList.contains('error'));
-    await page.evaluate(()=>{IDBDatabase.prototype.transaction=qaTransaction;});
+    failStageSave=false;
     assert.equal((await record()).stage,'IN_PROGRESS');assert.equal(await page.locator(select).getAttribute('data-stage'),'IN_PROGRESS');
     // Independent detail page: explicit save, concurrent update, failed save and retry.
     const second=await context.newPage();await second.goto(base+`/job-detail.html?job=${jobId}`);await second.waitForSelector('#job-application-note:not([disabled])');

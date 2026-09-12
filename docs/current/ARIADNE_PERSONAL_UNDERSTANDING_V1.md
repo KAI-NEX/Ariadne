@@ -35,7 +35,7 @@ Candidate 来源工作区、卡片详情和 JD 对话中的用户消息新增「
 - 原始 `SourceDocument`、Candidate/Job 确认版本、Working 和历史原地保留。数据库由 15 增量升级到 16；所有既有 opener 使用相同版本和 store 名称，没有删除 store 或重建个人数据。
 - 新增六个 store：`personal_memory_revisions`、`personal_memory_proposals`、`personal_memory_decisions`、`personal_understanding_fragments`、`personal_understanding_snapshots`、`personal_conversation_turns`。
 - 个人补充分为 FACT、PREFERENCE、GOAL、CORRECTION。模型仅提出 ADD/REPLACE/RETRACT Proposal；必须引用当前用户消息中的原话，关联引用必须来自本轮证据。用户可编辑、保存或暂不采纳。
-- Human Save 在一个 IndexedDB transaction 内检查提案是否已处理、目标记忆版本、关联来源身份/语义/版本，并追加记忆 revision 和 decision。旧版本不覆盖；重复保存、并发覆盖和已变化的来源绑定均被拒绝。文本修正保留既有来源绑定。
+- Human Save 在同一个[内容库事务](MARKDOWN_CONTENT_STORAGE.md)内（本机原子文件索引／网页端 IndexedDB）检查提案是否已处理、目标记忆版本、关联来源身份/语义/版本，并追加记忆 revision 和 decision。旧版本不覆盖；重复保存、并发覆盖和已变化的来源绑定均被拒绝。文本修正保留既有来源绑定。
 - 「不再使用」经用户再次确认后追加 RETRACTED 版本；历史仍可查看，后续当前快照排除。相关来源移除或版本改变时，绑定的补充暂不使用，不能把旧修正套到新资料上。
 - 用户确认是用户自述的权威，不等于外部事实核验。偏好和目标不会成为能力证据。个人记忆不是 Candidate 原卡片的静默修改，也不推进 Job 版本。
 

@@ -10,6 +10,7 @@
 # Local runtime state and diagnostics
 data/job_radar.db
 data/runtime/
+data/workspaces/
 data/uploads/
 data/local_ocr_uploads/
 logs/

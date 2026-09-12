@@ -46,6 +46,12 @@
     } catch (_error) { return null; }
   }
   function open(indexedDb = globalThis.indexedDB) {
+    if (indexedDb === globalThis.indexedDB && globalThis.AriadneContentDatabase) {
+      return globalThis.AriadneContentDatabase.open(DB_NAME, () => openNative(indexedDb));
+    }
+    return openNative(indexedDb);
+  }
+  function openNative(indexedDb) {
     return new Promise((resolve, reject) => {
       if (!indexedDb) { reject(Error("浏览器无法保存职位阶段。")); return; }
       const request = indexedDb.open(DB_NAME, 1);

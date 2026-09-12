@@ -57,7 +57,7 @@ Ariadne can sit before any of these workflows: it prepares a reviewed, source-gr
 ## What works today
 
 - Import Candidate and Job materials from PDF, DOCX, images, text, and Markdown; retain the original source and restore it later.
-- Use Local deterministic processing without provider calls, or a Model runtime that has passed Ariadne's image and visual-PDF capability gate.
+- Archive original materials in Local mode with zero provider calls; analyze them later with a Model runtime that has passed the image and visual-PDF capability gate.
 - Review model output as Working content and explicitly save it as a new confirmed version.
 - Discuss Candidate material, a specific Job, personal understanding, or an overview of all current jobs—each with its own context and write boundary.
 - Make bounded natural-language edits to existing, same-source Candidate cards; Ariadne validates identity, versions, allowed fields, and actual execution before showing a receipt.
@@ -65,6 +65,8 @@ Ariadne can sit before any of these workflows: it prepares a reviewed, source-gr
 - Use the verified local Codex runtime, or pair a web page to a local Codex connector without exposing Codex credentials to the page backend.
 
 The verified Codex combination is `codex-cli 0.153.4` with `gpt-5.6-sol`. The connector runs on loopback, uses short-lived pairing, and only exposes Ariadne's listed domain routes. Details and limitations are in the [Codex connector guide](docs/current/CODEX_RUNTIME_CONNECTOR.md).
+
+Content now uses a [shared Markdown repository](docs/current/MARKDOWN_CONTENT_STORAGE.md): real files for the local app, the same document format in browser storage for the web app. Cards are views of those documents; original files, review states, and history remain separate and traceable. Existing browser data migrates on first access, with the old database retained as a backup.
 
 ## What Ariadne deliberately does not do
 
@@ -80,7 +82,7 @@ The verified Codex combination is `codex-cli 0.153.4` with `gpt-5.6-sol`. The co
 ```text
 original material
     → durable source + provenance
-    → Local or qualified Model understanding
+    → optional qualified Model understanding
     → Working proposal / explanation / clarification
     → human review
     → explicit save

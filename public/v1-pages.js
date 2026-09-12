@@ -1109,7 +1109,7 @@
   }
 
   function personalGuideCardMarkup() {
-    return `<a class="v1-add-guide-card personal" data-transition-key="personal-guide" href="/personal-import.html"><span class="v1-add-guide-icon" aria-hidden="true">＋</span><span><b>添加个人材料</b></span><p class="v1-guide-copy"><span>保存原件，或选择已存材料交给 AI 分析。</span><span aria-hidden="true">原件保存在浏览器，发送模型前需确认</span></p></a>`;
+    return `<a class="v1-add-guide-card personal" data-transition-key="personal-guide" href="/personal-import.html"><span class="v1-add-guide-icon" aria-hidden="true">＋</span><span><b>添加个人材料</b></span><p class="v1-guide-copy"><span>保存原件，或选择已存材料交给 AI 分析。</span><span aria-hidden="true">原件保存在工作区，发送模型前需确认</span></p></a>`;
   }
 
   async function localizedCandidateRecords(records) {
@@ -2539,6 +2539,13 @@
     };
     const conversationAllowed = setDetailRuntimeMode(candidate, "candidate-ai-pane", "open-direct-edit", "candidate-ai-runtime", "candidate_conversation");
     const candidateDetailSourceId = sourceIdFor(candidate, canonicalRevision);
+    // Editing existing confirmed content works in Local mode too. Its saved
+    // Working/version is a persistence dependency, not a model capability.
+    if (canonicalRevision?.contract_id === "ariadne-context-revision-v2" && candidateDetailSourceId) {
+      const database = await Truth.openDatabase();
+      try { activeCandidateWorkingModel = await candidateWorkingModelForDetail(database, candidateDetailSourceId, itemId, canonicalRevision); }
+      finally { database.close(); }
+    }
     const candidateConversationBinding = ProductShell.bindConversation({
       messages: byId("candidate-conversation-messages"),
       form: byId("candidate-conversation-form"),
@@ -2559,7 +2566,7 @@
       if (candidateDetailSourceId && canonicalRevision) {
         const database = await Truth.openDatabase();
         try {
-          activeCandidateWorkingModel = await candidateWorkingModelForDetail(database, candidateDetailSourceId, itemId, canonicalRevision);
+          activeCandidateWorkingModel ||= await candidateWorkingModelForDetail(database, candidateDetailSourceId, itemId, canonicalRevision);
           showCandidateDetailWorkingProposal(activeCandidate, activeCandidateWorkingModel.payload.items.find((item) => item.item_id === itemId));
           activeCandidateConversationSession = await CandidateWorkspaceConversationRuntime.resolveSession(database, candidateDetailSourceId);
           window.AriadneRuntimeSelection?.bind("candidate-conversation-form", "candidate_conversation", activeCandidateConversationSession.conversation_id);
@@ -2741,6 +2748,9 @@
         editShell.complete();
         pendingDirectEdit = null;
         if (window.parent !== window) window.parent.postMessage({ type: "job-radar-v1-detail-updated", library: "personal", sourceKey: `candidate:${itemId}` }, window.location.origin);
+      } catch (error) {
+        byId("candidate-detail-message").textContent = `保存未完成：${personalErrorCopy(error)}`;
+        byId("candidate-detail-message").classList.add("error");
       } finally {
         button.disabled = false;
       }
@@ -2764,7 +2774,7 @@
   }
 
   function jobGuideCardMarkup() {
-    return `<a class="v1-add-guide-card job" data-transition-key="job-guide" href="/jd-import.html"><span class="v1-add-guide-icon" aria-hidden="true">＋</span><span><b>添加职位描述</b></span><p class="v1-guide-copy"><span>点击进入导入页面，建立期望职位卡片。</span><span aria-hidden="true">原件保存在浏览器，发送模型前需确认</span></p></a>`;
+    return `<a class="v1-add-guide-card job" data-transition-key="job-guide" href="/jd-import.html"><span class="v1-add-guide-icon" aria-hidden="true">＋</span><span><b>添加职位描述</b></span><p class="v1-guide-copy"><span>点击进入导入页面，建立期望职位卡片。</span><span aria-hidden="true">原件保存在工作区，发送模型前需确认</span></p></a>`;
   }
 
   async function localizedJobRecords(records) {
@@ -3800,6 +3810,9 @@
         }
         editShell.complete();
         pendingJobEdit = null;
+      } catch (error) {
+        byId("job-detail-message").textContent = `保存未完成：${personalErrorCopy(error)}`;
+        byId("job-detail-message").classList.add("error");
       } finally { button.disabled = false; }
     });
     if (conversationAllowed) {

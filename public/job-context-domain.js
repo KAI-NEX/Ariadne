@@ -233,7 +233,7 @@
         grounding_refs: entry.grounding_refs || [],
       }));
     }
-    payload.uncertainties = [];
+    // Saving a field does not resolve unrelated unknowns in the source material.
     return validateJobPayload(payload);
   }
 
@@ -304,6 +304,7 @@
   }
 
   function getAll(database, storeName) {
+    if (storeName === "source_documents" && database.getAllMetadata) return database.getAllMetadata(storeName);
     return new Promise((resolve, reject) => {
       const request = database.transaction(storeName, "readonly").objectStore(storeName).getAll();
       request.onsuccess = () => resolve(request.result || []);

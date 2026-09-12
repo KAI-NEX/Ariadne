@@ -1,5 +1,18 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-12 — Markdown 内容库迁移（COMPLETE；按浏览器工作区切换）
+
+- 按用户要求完成迁移和全链路接线：本机语义内容写实际 Markdown，原件保留 bytes；网页端用同格式浏览器 Markdown。Candidate/Job 卡片、Working、人工保存、个人补充、对话、投递、逐轮附件及四个历史页面共用同一存储边界。32 类语义记录采用无损正文区块，身份/来源/版本/状态保留；卡片只使用瞬时投影，不双写 JSON 正文。架构与恢复见 [Markdown 内容库](docs/current/MARKDOWN_CONTENT_STORAGE.md)。
+- 共用一份跨语言存储注册契约，移除四个历史页面约 190 行重复建库代码；保留现有领域 API 与学习文件。主要职责为文件与内容库、卡片、范围上下文、模型执行、人工保存；没有新增部署服务、框架、向量库。共享兼容接口只支持现有 repository 使用的有限事务操作，不宣称重建了完整 IndexedDB。
+- 原件逐份暂存，完成逐条 codec/来源 hash/文件回读校验后原子提交完整索引。旧数据库原地保留为备份；文件和历次索引不可变，删除/撤回不清掉原件。Web Locks + 文件锁 + read-set 版本检查保护并发；提交回执防网络丢响应重复保存。中断文件只留下未引用临时产物，不阻塞下一次重试；来源列表只读元数据，需要原件时再取 bytes。本机故障不自动切回旧库。
+- 四类对话/理解 Provider 输入共用 scoped Markdown renderer，保留当前引用、来源/领域范围、覆盖预算、历史、类型化 action 与 Human Save。视觉导入继续使用原图/完整 PDF；正常 Local 仍仅归档，零 Provider/本地识别。修复原有 Local 编辑已确认 Candidate 缺 Working、Job 字段保存清空未知的问题，保存错误保留编辑并明确反馈。
+- 96/96 离线回归通过（61 Node + 35 Python，包含 3 个新增存储 suite；不含另一任务的 Mac 启动器）；新边界覆盖未知文本与空白往返、原字节、暂存/提交失败重试、幂等、事务回滚、文件损坏、并发冲突、路径/origin 限制及历史保留。VI 静态/负向、脚本语法、文档链接和 diff 检查通过。
+- 五组隔离 Chrome 浏览器 QA 通过：内容迁移/两域编辑保存、浏览器 Markdown、原件归档、投递记录、附件/历史页面。覆盖刷新、失败/取消/冲突、桌面与 390 px，无页面异常。egolite 实际交互通过；截图 API 超时，按现有授权由 Chrome 补齐截图。归档测试唯一模型 POST 是合成失败替身，其他存储 POST 不算 Provider 调用。
+- 真实 Codex 沿原 `gpt-5.6-sol` 执行六条领域路径及两域明确修改。Candidate 完整两页 PDF 被传输并分别引用；Job 保留缺失摘要为未知；个人偏好只生成提案。修改实际返回 `PATCH_ITEM` 和 `PROPOSE_JOB_EDIT`，无确认写入。首次 Job 修改测试未同步 fixture 授权标记，模型文案声称创建而无实际修改；该轮不计修改通过，修正请求后重测成功，两轮证据均保留。不声称覆盖全部真实资料/模型语义质量或重新验收公开 HTTPS。
+- 当前浏览器 `http://127.0.0.1:8000` 既有主库 371 条、投递 2 条、附件 3 条实际迁移，逐条字段与所有 Blob/File 的 SHA-256、名称/类型/时间相同；旧库未变。先保存迁移前数量清单，再切换并核对回执，迁移后资料页正常；未向模型发送这些既有材料。工作区定位与回执留在忽略的本机证据中，其他 profile/origin 独立。
+- 只读核对 Ariadne 默认 CLI 的 `login status` 与 app-server `account/read(refreshToken=false)`：当前为 ChatGPT Pro、Apple 隐藏邮箱，无法可靠映射用户所说的两个别名；未切换登录/模型、未把邮箱/token 加入仓库。默认本机 8000 服务已启动新代码；其他 profile/origin 需在各自首次访问时迁移，不能推断全机已迁移。
+- QA/合成源/真实模型结果/截图保留 `.cache/markdown-migration-20260912/`，最后离线结果在 `final/regressions/results.json`。原有 Mac App、公开入口及图谱未提交改动原地保留；仅本阶段本地 commit，不 push。
+
 ## 2026-09-12 — Local 原件归档（COMPLETE）
 
 - 用户调整：本地识别最初用于学习，现在正式 Local 只保存原始资料，接入 AI 后再分析。修订 AGENTS、稳定上下文、Runtime 契约和内容简化文档；该决定取代此前保留正常 Local 确定性分析流程的要求。Markdown 主存储仍未迁移。

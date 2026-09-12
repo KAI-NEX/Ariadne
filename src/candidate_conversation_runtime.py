@@ -10,6 +10,8 @@ from __future__ import annotations
 from src.model_settings import apply_execution_settings
 from src.conversation_delivery import conversation_delivery
 
+from src.markdown_context import render_context, INSTRUCTION as MARKDOWN_CONTEXT_INSTRUCTION
+
 import json
 import hashlib
 import re
@@ -1116,8 +1118,8 @@ def _model_input(request: CandidateConversationRequest) -> dict[str, Any]:
 def build_candidate_conversation_payload(request: CandidateConversationRequest) -> dict[str, Any]:
     if request.compiled_context is None:
         messages = [
-            {"role": "system", "content": candidate_conversation_prompt()},
-            {"role": "user", "content": json.dumps(_model_input(request), ensure_ascii=False, separators=(",", ":"))},
+            {"role": "system", "content": candidate_conversation_prompt() + MARKDOWN_CONTEXT_INSTRUCTION},
+            {"role": "user", "content": render_context(_model_input(request))},
         ]
     else:
         context_only = {
@@ -1126,8 +1128,8 @@ def build_candidate_conversation_payload(request: CandidateConversationRequest) 
             "summary": request.compiled_context.get("summary"),
         }
         messages = [
-            {"role": "system", "content": candidate_conversation_prompt()},
-            {"role": "user", "content": json.dumps({"message_type": "COMPILED_CANDIDATE_CONTEXT", "context": context_only}, ensure_ascii=False, separators=(",", ":"))},
+            {"role": "system", "content": candidate_conversation_prompt() + MARKDOWN_CONTEXT_INSTRUCTION},
+            {"role": "user", "content": render_context({"message_type": "COMPILED_CANDIDATE_CONTEXT", "context": context_only})},
         ]
         for index, turn in enumerate(request.compiled_context["bounded_history"], 1):
             messages.append({"role": "user", "content": json.dumps({"history_ref": f"history-{index}", "text": str(turn["user"]["text"])}, ensure_ascii=False)})

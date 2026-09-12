@@ -40,10 +40,11 @@ def fake_deepseek_transport(_credential: str, provider_payload: dict, *, respons
     provider_calls.append({"model": provider_payload.get("model"), "message_count": len(provider_payload.get("messages") or [])})
     assert "ariadne-semantic-candidate-action-v5" in provider_payload["messages"][0]["content"]
     assert "final USER message is the current turn intent" in provider_payload["messages"][0]["content"]
-    compiled_context = json.loads(provider_payload["messages"][1]["content"])["context"]
-    assert compiled_context["candidate"]["candidate_items"][0]["title"] == "Royal College of Art RCA"
-    assert compiled_context["candidate"]["candidate_items"][0]["card_ref"] == "card-1"
-    assert "item_id" not in compiled_context["candidate"]["candidate_items"][0]
+    compiled_context = provider_payload["messages"][1]["content"]
+    assert compiled_context.startswith("# Ariadne scoped context\n")
+    assert '- title: "Royal College of Art RCA"' in compiled_context
+    assert '- card_ref: "card-1"' in compiled_context
+    assert "item_id" not in compiled_context
     expected_human_message = "Royal College of Art RCA → Royal College of Art"
     assert "current_user_message" not in compiled_context
     assert "bounded_history" not in compiled_context

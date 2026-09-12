@@ -7,6 +7,8 @@
 > **PHASE:** Runtime / AI Architecture
 > **DOCUMENT DATE:** 2026-09-01
 
+2026-09-12 存储更新：卡片和已有领域保存现通过[Markdown 内容库](MARKDOWN_CONTENT_STORAGE.md)，本机写实际文件、网页端保存同格式 Markdown；四类对话/理解上下文改为范围明确的 Markdown。旧章节的 IndexedDB 部署描述是历史快照；Runtime、来源完整性、视觉 PDF、传输同意和人工保存权限不变。
+
 ## 1. Status and Authority
 
 ### 2026-09-12 用户调整：Local 仅保存原件

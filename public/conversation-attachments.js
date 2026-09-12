@@ -29,7 +29,8 @@
     return { name: file.name, mime_type: mime, size: raw.byteLength, content_hash: `sha256:${digest}`, data_url: dataUrl };
   }
   async function persist(request, files, records, domain) {
-    const db = await new Promise((resolve, reject) => { const open = indexedDB.open(CONTRACT, 1); open.onupgradeneeded = () => open.result.createObjectStore("turns", { keyPath: "request_id" }); open.onsuccess = () => resolve(open.result); open.onerror = () => reject(open.error); });
+    const nativeOpen = () => new Promise((resolve, reject) => { const open = indexedDB.open(CONTRACT, 1); open.onupgradeneeded = () => open.result.createObjectStore("turns", { keyPath: "request_id" }); open.onsuccess = () => resolve(open.result); open.onerror = () => reject(open.error); });
+    const db = await (root.AriadneContentDatabase ? root.AriadneContentDatabase.open(CONTRACT, nativeOpen) : nativeOpen());
     try {
       await new Promise((resolve, reject) => { const tx = db.transaction("turns", "readwrite");
         tx.objectStore("turns").add({ request_id: requestId(request), domain, conversation_id: request.conversation?.conversation_id || domain,
@@ -143,7 +144,7 @@
   function finish(request, ok, error = null) {
     const active = pending.get(requestId(request)); if (!active) return;
     pending.delete(requestId(request)); const { state, files } = active; state.busy = false;
-    if (ok) { state.files = state.files.filter(f => !files.includes(f)); state.consent.checked = false; state.status.textContent = `本轮已发送：${files.map(f => f.name).join("、")}。原件已保存在此浏览器；再次查看请重新添加，不自动纳入确认资料。`; }
+    if (ok) { state.files = state.files.filter(f => !files.includes(f)); state.consent.checked = false; state.status.textContent = `本轮已发送：${files.map(f => f.name).join("、")}。原件已保存在此工作区；再次查看请重新添加，不自动纳入确认资料。`; }
     else state.status.textContent = errorCopy(error) || "本轮未完成，附件保留，可以重试。";
     state.render();
   }

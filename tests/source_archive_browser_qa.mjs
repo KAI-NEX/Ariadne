@@ -16,7 +16,12 @@ try {
  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
  const page = await context.newPage();
  page.on('pageerror', error => evidence.errors.push(error.message));
- page.on('request', request => { if (request.method() === 'POST') evidence.posts.push(new URL(request.url()).pathname); });
+ page.on('request', request => { if (request.method() === 'POST' && new URL(request.url()).pathname !== '/api/workspace') evidence.posts.push(new URL(request.url()).pathname); });
+ let failStorage = false;
+ await context.route('**/api/workspace', route => {
+  if (failStorage && route.request().method() === 'POST' && route.request().postDataJSON()?.action === 'commit') return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'WORKSPACE_STORAGE_UNAVAILABLE'})});
+  return route.continue();
+ });
  // Model errors are intentional test doubles; no Provider traffic is permitted.
  await context.route('**/api/candidate-model-structure', route => route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({error:'deepseek_network_error',network_call_made:false}) }));
  await context.route('**/api/job-model-structure', route => route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({error:'deepseek_network_error',network_call_made:false}) }));
@@ -42,7 +47,7 @@ try {
  await page.click('#start-personal-processing');
  await page.waitForFunction(()=>document.querySelector('#personal-page-message').textContent.includes('已保存 2 份原件'));
  let data=await noConclusions();for(const name of ['runtime_snapshots','processing_runs','processing_batches'])assert.equal(data[name].length,0,name);
- assert.deepEqual(evidence.posts,[],'Local import has no POST requests');
+ assert.deepEqual(evidence.posts,[],'Local import makes no model or recognition requests');
  const candidateDocs = data.source_documents.filter(record=>record.contract_id==='ariadne-source-document-v1' && record.material_type==='CANDIDATE');
  assert.equal(candidateDocs.length,2);
  const candidateId=candidateDocs.find(record=>record.source_type==='IMAGE').source_document_id;
@@ -96,11 +101,11 @@ try {
  // Storage failure is visible; no success state or semantic data is manufactured.
  await page.reload();await page.click('[data-job-import-type="Paste"]');await page.fill('#job-paste-input','仅供失败测试的原文');
  await page.waitForFunction(()=>!document.querySelector('#start-job-processing').disabled);
- await page.evaluate(()=>{window.__openDb=IDBDatabase.prototype.transaction;IDBDatabase.prototype.transaction=function(names,mode,...args){if(mode==='readwrite')throw new DOMException('Synthetic quota failure','QuotaExceededError');return window.__openDb.call(this,names,mode,...args);};});
+ failStorage = true;
  await page.click('#start-job-processing');await page.waitForFunction(()=>document.querySelector('#job-page-message').textContent.includes('原件保存未完成'));
  assert.equal(await page.locator('#start-job-processing').isEnabled(),true);
  assert.equal((await records()).source_documents.length,count);
- await page.evaluate(()=>{IDBDatabase.prototype.transaction=window.__openDb;});
+ failStorage = false;
  await page.click('#start-job-processing');await page.waitForFunction(()=>document.querySelector('#start-job-processing').textContent==='原件已保存');
  evidence.checks.push('Storage failure gives retry and never shows saved; retry succeeds');
  // An unavailable Model never blocks raw storage and is never silently invoked.

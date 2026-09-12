@@ -286,7 +286,8 @@ serialized_provider_request = json.dumps(provider_payload, ensure_ascii=False)
 assert "%PDF" not in serialized_provider_request and "document_data_url" not in serialized_provider_request
 assert "consent" not in serialized_provider_request and "CANDIDATE_MODEL_STRUCTURING" not in serialized_provider_request
 assert "item-edu-001" not in serialized_provider_request and "fact-degree-001" not in serialized_provider_request
-assert json.loads(provider_payload["messages"][1]["content"])["candidate"]["candidate_items"][0]["card_ref"] == "card-1"
+assert provider_payload["messages"][1]["content"].startswith("# Ariadne scoped context\n")
+assert '- card_ref: "card-1"' in provider_payload["messages"][1]["content"]
 
 # Compiled context is separately auditable: action rules, bounded context/history, then the exact current Human message.
 compiled_request = request_for("Current synthetic compiled instruction.")
@@ -307,10 +308,10 @@ expect_error("CONTEXT_LIMIT_EXCEEDED", lambda: validate_candidate_conversation_r
 # Subject identity is stable when turn focus changes.
 item_request = request_for(focus={"type": "ITEM", "item_id": "item-edu-001"})
 item_provider_payload = build_candidate_conversation_payload(validate_candidate_conversation_request(item_request))
-item_provider_context = json.loads(item_provider_payload["messages"][1]["content"])["candidate"]
-assert item_provider_context["candidate_items"] == []
-assert item_provider_context["other_item_directory"] == []
-assert item_provider_context["current_item"]["title"] == WORKING_MODEL["payload"]["items"][0]["title"]
+item_provider_context = item_provider_payload["messages"][1]["content"]
+assert "- candidate_items: []" in item_provider_context
+assert "- other_item_directory: []" in item_provider_context
+assert '- title: ' + json.dumps(WORKING_MODEL["payload"]["items"][0]["title"], ensure_ascii=False) in item_provider_context
 assert WORKING_MODEL["payload"]["items"][1]["title"] not in json.dumps(item_provider_payload, ensure_ascii=False)
 draft_request = request_for(focus={"type": "ITEM_DRAFT", "item_id": "item-edu-001", "draft_fingerprint": "sha256:" + "b" * 64})
 draft_item = {**WORKING_MODEL["payload"]["items"][0], "title": "Unsaved synthetic draft"}

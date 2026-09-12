@@ -57,12 +57,14 @@ Ariadne 可以成为这些工作流的前置层：先形成经本人审阅、有
 ## 当前能力
 
 - 导入 PDF、DOCX、图片、文本和 Markdown 的 Candidate/Job 材料；保存并恢复原始来源。
-- Local 模式采用确定性本地处理，零 Provider 调用；Model 模式仅接纳通过图片与视觉 PDF 门槛的模型。
+- Local 模式只保存原件，零 Provider 调用；之后可选择通过图片与视觉 PDF 门槛的 Model 分析。
 - 模型结果先成为 Working 内容，用户明确保存后才生成确认版本。
 - 分别讨论个人资料、具体职位、个人理解或全部职位概况，各自拥有明确上下文和写入边界。
 - 对已有、同来源的 Candidate 卡片进行受限自然语言修改；系统校验身份、版本、允许字段与实际执行，并生成回执。
 - 对话附件需逐轮确认传输，且不自动成为确认的个人或职位资料。
 - 支持本机 Codex 直连，或让网页经本机 loopback 配对连接器使用 Codex。
+
+内容现已接入[统一 Markdown 内容库](docs/current/MARKDOWN_CONTENT_STORAGE.md)：本机保存真实文件，网页端在浏览器内保存同格式文档；卡片从同一文档生成视图，原件、审阅状态和历史保留。既有浏览器数据在首次访问时迁移，旧数据库原地留作备份。
 
 当前已验证的 Codex 组合为 `codex-cli 0.153.4` / `gpt-5.6-sol`。连接器只监听 loopback、使用短期配对，并只开放 Ariadne 定义的领域路由；细节见 [Codex 运行指南](docs/current/CODEX_RUNTIME_CONNECTOR.md)。
 
@@ -80,7 +82,7 @@ Ariadne 可以成为这些工作流的前置层：先形成经本人审阅、有
 ```text
 原始材料
   → 可恢复的来源与定位
-  → Local 或合格 Model 的理解
+  → 可选的合格 Model 理解
   → Working 提案 / 解释 / 澄清
   → 人工审阅
   → 明确保存

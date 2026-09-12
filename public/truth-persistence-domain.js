@@ -706,6 +706,13 @@
   }
 
   function openDatabase(indexedDb = globalThis.indexedDB) {
+    if (indexedDb === globalThis.indexedDB && globalThis.AriadneContentDatabase) {
+      return globalThis.AriadneContentDatabase.open(DB_NAME);
+    }
+    return openNativeDatabase(indexedDb);
+  }
+
+  function openNativeDatabase(indexedDb) {
     if (!indexedDb || typeof indexedDb.open !== "function") return Promise.reject(new TruthPersistenceError("indexeddb_unavailable"));
     return new Promise((resolve, reject) => {
       const request = indexedDb.open(DB_NAME, DB_VERSION);

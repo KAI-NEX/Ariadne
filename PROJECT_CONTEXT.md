@@ -1,6 +1,6 @@
 # Ariadne 项目上下文
 
-更新：2026-09-09。用途：新任务的项目入口与稳定产品约束；当前实现进度和验收结果由 [PROJECT_STATUS.md](PROJECT_STATUS.md) 记录。本文依据用户本次明确的产品目标整理，择要保留已有项目决策，不复制个人背景或学习记录。
+更新：2026-09-12。用途：新任务的项目入口与稳定产品约束；当前实现进度和验收结果由 [PROJECT_STATUS.md](PROJECT_STATUS.md) 记录。本文依据用户本次明确的产品目标整理，择要保留已有项目决策，不复制个人背景或学习记录。
 
 ## 1. 要解决的问题
 
@@ -31,11 +31,11 @@
 
 这些内容从旧工作区的项目规则、Ariadne 专属决策及本仓库现有契约中重新整理；相关依据已在本仓库，不引入旧工作区作为必需读取路径。未整份导入系统 AGENTS、全局决策日志或其他项目记录。
 
-2026-09-12 用户确认内容简化方向：人通过卡片浏览编辑，AI 按范围读取多份 Markdown，保留原始文件及来源关系，并要求保留现有功能。目标收敛为文件与内容库、卡片界面、上下文准备、模型执行、修改保存五项职责。当前已落地完整证据优先及小集合职位单次对话；Markdown 主存储尚未迁移，IndexedDB 领域记录仍为当前权威。必要职责、功能保留表和迁移条件见 [内容架构复核与简化](docs/current/CONTENT_ARCHITECTURE_SIMPLIFICATION.md)。
+2026-09-12 用户确认内容简化方向：人通过卡片浏览编辑，AI 按范围读取多份 Markdown，保留原始文件及来源关系，并要求保留现有功能。目标收敛为文件与内容库、卡片界面、上下文准备、模型执行、修改保存五项职责。当前已完成完整证据优先、小集合职位单次对话及 Markdown 主存储接线：本机真实文件库、网页端同格式浏览器库，卡片从同一文档产生投影，旧 IndexedDB 留作备份且不双写。迁移按 origin/工作区首次访问触发，隔离测试库及当前浏览器本机 8000 的 376 条既有记录已实际迁移并逐条核对；其他 profile/origin 不自动合并。职责取舍见 [内容架构复核与简化](docs/current/CONTENT_ARCHITECTURE_SIMPLIFICATION.md)，实际布局、恢复及验收见 [Markdown 内容库](docs/current/MARKDOWN_CONTENT_STORAGE.md)。
 
 ## 3. 当前实现与边界
 
-- 2026-09-12 用户将 Local 简化为原件保存：不再在正常导入中执行本地识别、OCR 或确定性结构化。Candidate/Job 共用原件归档，保留文件、hash、来源链接和职位材料顺序；接入可用 AI 后由用户选择已存原件、确认传输再分析。历史卡片/草稿/对话和学习模块保留；Model 输入准备仍可本地读文档或完整转图。本次没有迁移 Markdown 主存储。
+- 2026-09-12 用户将 Local 简化为原件保存：不再在正常导入中执行本地识别、OCR 或确定性结构化。Candidate/Job 共用原件归档，保留文件、hash、来源链接和职位材料顺序；接入可用 AI 后由用户选择已存原件、确认传输再分析。历史卡片/草稿/对话和学习模块保留；Model 输入准备仍可本地读文档或完整转图。随后 Markdown 内容库迁移已完成代码和合成验收，见上述存储契约。
 
 - 2026-09-09 已实现 Codex 本机直连及 Web 配对连接器，当前验证组合为 `codex / gpt-5.6-sol / CODEX_EXEC_JSONL`。两种方式均经本机客户端向 OpenAI 推理，保持 Model、来源完整性与人工保存边界；公开 HTTPS origin 的本地网络授权仍待实际部署验收。启动、配对与限制见 [Codex 运行指南](docs/current/CODEX_RUNTIME_CONNECTOR.md)。
 - 2026-09-08 用户确认模型接入最低要求：所有 Model 操作（包括纯文字对话）只使用有明确图片输入和视觉 PDF 处理能力的多模态模型。PDF 可原生发送，也可完整逐页转图；仅 OCR/文本抽取、模型列表存在、名称含 vision 或一次文字连通检查都不能替代能力证据。未来 Gemini/其他 Provider 同样遵守此门槛，且须完成对应 Ariadne adapter 验证后才能执行。
@@ -68,8 +68,8 @@
 ## 5. 开发与运行入口
 
 - 后端：根目录 `app.py`，Python 标准库；前端：`public/` 中原生 HTML/CSS/JavaScript；领域及 Provider 后端：`src/`。
-- 持久化：当前交互数据主要在原浏览器 profile 的 IndexedDB；legacy JD 数据在 `data/job_radar.db`。改变浏览器 profile、host 或端口会改变浏览器数据上下文。
+- 持久化：本机正常入口使用 `data/workspaces/<workspace-id>/` 的 Markdown/原件及状态文件；网页端使用浏览器 Markdown 库。origin 的 localStorage 保存工作区 ID，旧 IndexedDB 保留迁移备份；legacy SQL 数据仍原地在 `data/job_radar.db`。改变 profile、host、端口或清空映射不自动关联旧磁盘目录，恢复需核对身份。
 - 从仓库根启动：`PYTHONDONTWRITEBYTECODE=1 python3 app.py`，正常入口为 `http://127.0.0.1:8000/`。重启前先核对占用端口进程的 cwd 与身份。
 - Node 回归按文件运行：`node tests/<name>_regression.mjs`；Python：`PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 python3 tests/<name>_regression.py`。跨语言 route suite 必要时设置 `ARIADNE_NODE_BINARY` 为现有 Node 可执行路径。
-- 最新已记录的自动回归基线为 42 Node + 23 Python（2026-09-09）；计数会随项目变化，应以实际文件与运行结果为准。常驻 stub server、可选私有 fixture 和可选 smoke 不计作默认回归套件。
-- 这是本地运行项目，当前没有 package/requirements/lock manifest；不要为文档整理安装依赖或引入新框架。测试日志、编译产物和私人截图保存在仓库外。
+- 最新已记录的自动回归基线为 61 Node + 35 Python（2026-09-12）；计数会随项目变化，应以实际文件与运行结果为准。常驻 stub server、可选私有 fixture 和可选 smoke 不计作默认回归套件。
+- 这是本地运行项目，当前没有 package/requirements/lock manifest；不要为文档整理安装依赖或引入新框架。测试日志、编译产物和私人截图保存在忽略的 `.cache/` 或仓库外，不加入 Git。

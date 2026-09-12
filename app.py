@@ -893,6 +893,19 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         if not self.local_request_allowed():
             return
         parsed = urlparse(self.path)
+        if parsed.path == "/workspace-storage-contract.js":
+            from src.workspace_storage import CONTRACT
+            body = ("globalThis.AriadneWorkspaceStorageContract = " + json.dumps(CONTRACT, ensure_ascii=False) + ";\n").encode("utf-8")
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if parsed.path == "/api/workspace":
+            from src.workspace_storage import CONTRACT
+            self.send_json(HTTPStatus.OK, CONTRACT)
+            return
         if parsed.path == "/candidate-conversation-contract-manifest.js":
             self.candidate_conversation_contract_manifest()
             return
@@ -1028,6 +1041,10 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self) -> None:  # noqa: N802 - required by the standard library
+        if urlparse(self.path).path == "/api/workspace":
+            if self.local_request_allowed():
+                self.handle_workspace()
+            return
         parsed = urlparse(self.path)
         if not self.local_request_allowed():
             return
@@ -2401,6 +2418,36 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                 return
             row = connection.execute("SELECT * FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
         self.send_json(HTTPStatus.OK, {"job": job_payload(row)})
+
+    def handle_workspace(self) -> None:
+        from src.workspace_storage import WorkspaceStorage, WorkspaceError
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= 256 * 1024 * 1024 or self.headers.get_content_type() != "application/json":
+                raise WorkspaceError("WORKSPACE_REQUEST_INVALID")
+            request = json.loads(self.rfile.read(length))
+            library = WorkspaceStorage()
+            workspace, database = request["workspace"], request["database"]
+            action = request["action"]
+            if action == "status":
+                result = library.status(workspace, database)
+            elif action == "read":
+                result = library.read(workspace, database, request["stores"], include_blobs=not request.get("metadata_only", False))
+            elif action == "stage_blob":
+                result = library.stage_blob(workspace, request["value"], request.get("filename"))
+            elif action == "blob":
+                result = library.blob(workspace, request["entry"])
+            elif action == "commit":
+                result = library.commit(workspace, database, request["expected"], request["writes"], initialize=request.get("initialize", False), transaction_id=request["transaction_id"])
+            else:
+                raise WorkspaceError("WORKSPACE_ACTION_INVALID")
+            self.send_json(HTTPStatus.OK, result)
+        except WorkspaceError as error:
+            self.send_json(error.status, {"error": error.code})
+        except (ValueError, KeyError, TypeError):
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": "WORKSPACE_REQUEST_INVALID"})
+        except OSError:
+            self.send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "WORKSPACE_STORAGE_UNAVAILABLE"})
 
     def send_json(self, status: HTTPStatus, payload: dict) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")

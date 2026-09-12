@@ -28,6 +28,14 @@
 
 `prefer_codex` 是本机操作者明确选择的初始偏好：本机运行方式页面在当前 origin 首次应用一次，随后尊重用户的新选择。单纯读取模型列表不会选择模型。配置没有登录 token。`ARIADNE_CODEX_ENABLED=0` 可明确禁用；不删除已有资料。
 
+## 使用哪个登录账号
+
+Ariadne 使用所选本机 Codex CLI 的当前登录。可执行文件按 `ARIADNE_CODEX_BINARY`、PATH 中的 `codex`、应用内置 Codex 顺序解析；执行环境保留启动 Ariadne 时的 `CODEX_HOME`，未设置时使用 CLI 默认配置目录。这与开发任务的模型选择、浏览器登录或用户自行命名的账号别名不是一一对应关系。
+
+先用同一个可执行文件的 `login status` 核对登录方式；当前 CLI 支持通过 app-server 的 `account/read`（`refreshToken: false`）只读返回账号邮箱/套餐。Apple 隐藏邮箱未必能映射用户习惯的别名，不能据此猜测或自动切换账号。不读取、展示或记录登录 token 来做账号说明。
+
+2026-09-12 内容库改为[Markdown 主存储](MARKDOWN_CONTENT_STORAGE.md)，模型仍由上述账号执行。文档读写接口不加入 Web 配对连接器白名单，配对不授予网页任意磁盘访问权限。
+
 ## Web 配对
 
 在本机项目目录运行：

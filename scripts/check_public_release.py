@@ -7,7 +7,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN_DIRS = {'.codex', '.cache', '.auth', 'node_modules', '__pycache__', 'private_fixtures', 'browser-profile'}
-PRIVATE_DATA_DIRS = {'runtime', 'uploads', 'local_ocr_uploads', 'resumes', 'portfolios', 'candidate_documents', 'candidate_context_exports', 'personal_exports', 'source_documents', 'career_sources', 'raw', 'jd_corpus', 'indexeddb_exports', 'localstorage_exports', 'session_exports', 'runtime_exports', 'conversation_exports'}
+PRIVATE_DATA_DIRS = {'workspaces', 'runtime', 'uploads', 'local_ocr_uploads', 'resumes', 'portfolios', 'candidate_documents', 'candidate_context_exports', 'personal_exports', 'source_documents', 'career_sources', 'raw', 'jd_corpus', 'indexeddb_exports', 'localstorage_exports', 'session_exports', 'runtime_exports', 'conversation_exports'}
 SECRET_NAMES = {'auth.json', 'credentials.json', 'secrets.json', 'token.json', 'tokens.json', 'access_token.json', 'api_key.txt', 'apikey.txt'}
 SECRET_PATTERN = re.compile(rb'(?:sk-[A-Za-z0-9_-]{20,}|AIza[A-Za-z0-9_-]{30,}|gh[pousr]_[A-Za-z0-9_]{25,}|github_pat_[A-Za-z0-9_]{30,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----)')
 SYNTHETIC_FILES = {'tests/runtime_execution_contract_regression.py', 'tests/runtime_execution_contract_regression.mjs'}
