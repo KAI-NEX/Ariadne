@@ -9,6 +9,14 @@
 
 ## 1. Status and Authority
 
+### 2026-09-12 用户调整：Local 仅保存原件
+
+本条取代下文 baseline 中“正常 Local 导入负责 OCR、提取及确定性结构化”的要求。个人/职位导入的 Local 主操作为保存原件；不创建 RuntimeSnapshot、ProcessingRun、ExtractionArtifact、Proposal 或确认 revision。`SourceDocument` 和原始 bytes 继续由现有存储保存；有序来源组使用同一 store 内的 `ariadne-source-archive-v1` 索引，只有来源身份、顺序、链接和保存时间，无语义正文，不引入另一份事实源。
+
+保存原件不依赖模型资格：Local、未接通的 Model 及已接通 Model 的“只保存原件，稍后分析”都可以显式归档。它不是 Model 失败后的自动 fallback。只有用户点击模型分析、通过已有多模态资格与传输确认后才进入原有执行链路；本地读取、完整 PDF 转图等 delivery preparation 仍可在此时执行。保存/模型失败均不得伪造成功或确认信息。
+
+旧 Local extraction/OCR/structuring 模块、底层 capability baseline、学习页和历史记录原地保留用于兼容与学习，不能据其存在重新把本地分析接回正式导入。历史提案仍可人工审核；已确认卡片、对话、领域权限、模型配置、来源完整性和版本冲突边界不变。参见[内容简化](CONTENT_ARCHITECTURE_SIMPLIFICATION.md)。
+
 ### 2026-09-10 用户确认方向：统一模型选择与对话内调节
 
 用户确认首页仅显示简洁模型名（例如「GPT Sol」），对话输入框左下提供模型/推理强度切换，后续其他模型复用同一结构。目标架构、默认/对话覆盖、参数目录、版本化快照、迁移及验收见 [统一模型选择与对话内调节](MODEL_SELECTION_AND_TUNING_ARCHITECTURE.md)。当前已实现共用控件、对话覆盖、默认偏好、参数校验和实际执行链路；Sol 保留 medium 默认，可选 low/medium/high。目录不赋予新型号资格，具体实施与验收范围见该文。

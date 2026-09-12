@@ -198,7 +198,7 @@ assert.equal(failingDatabase.records.get("source_documents").size, 0);
 
 const rawModuleText = fs.readFileSync(path.join(root, "public", "raw-source-storage-domain.js"), "utf8");
 assert.doesNotMatch(rawModuleText, /\bfetch\s*\(|XMLHttpRequest|Provider|MODEL_CALL/);
-assert.match(fs.readFileSync(path.join(root, "public", "v1-pages.js"), "utf8"), /sourceForExtraction = \{ \.\.\.source, file: durableSource\.file \}/);
+assert.match(fs.readFileSync(path.join(root, "public", "v1-pages.js"), "utf8"), /RawSource\.persistArchive\(database, documents, sourceUrl\)/);
 
 console.log(JSON.stringify({
   raw_write_read_types: fixtures.length,
@@ -212,3 +212,46 @@ console.log(JSON.stringify({
   storage_failure_atomic: "pass",
   provider_calls: 0,
 }));
+
+// 2026-09-12: durable, ordered archives replace the normal Local analysis flow.
+const JobSource = require('../public/local-job-extraction-domain.js');
+const archiveDatabase = memoryDatabase();
+const originalText = '  原始职位描述\r\n\r\n职责由用户提供。\n  ';
+const pasted = await JobSource.preparePastedText(originalText, 'archive-job', 'https://example.test/jobs/original');
+assert.equal(await pasted.file.text(), originalText, 'pasted originals preserve whitespace');
+const other = await JobSource.prepareSource(fixtures[0], 'archive-job');
+const documents = [];
+for (const entry of [other, pasted]) documents.push((await RawSource.persistDurableSource(archiveDatabase, JobSource.sourceDocumentFor(entry), entry.file)).source_document);
+const archive = await RawSource.persistArchive(archiveDatabase, documents, pasted.source_url);
+assert.deepEqual(archive.source_document_ids, documents.map(source => source.source_document_id));
+const beforeDuplicate = structuredClone([...archiveDatabase.records.get('source_documents')]);
+assert.deepEqual(await RawSource.persistArchive(archiveDatabase, documents, pasted.source_url), archive);
+assert.deepEqual([...archiveDatabase.records.get('source_documents')], beforeDuplicate, 'duplicate save is idempotent');
+const restored = await RawSource.resolveArchive(archiveDatabase, archive.source_document_id, 'JOB');
+assert.equal(restored.source_url, pasted.source_url);
+assert.deepEqual(restored.sources.map(source => source.source_document.source_document_id), archive.source_document_ids);
+assert.equal(await restored.sources[1].file.text(), originalText);
+assert.deepEqual([...new Uint8Array(await restored.sources[0].file.arrayBuffer())], [...new Uint8Array(await fixtures[0].arrayBuffer())]);
+await assert.rejects(RawSource.resolveArchive(archiveDatabase, archive.source_document_id, 'CANDIDATE'), /source_archive_invalid/);
+await assert.rejects(RawSource.persistArchive(archiveDatabase, [documents[0], documents[0]]), /source_archive_invalid/);
+await assert.rejects(RawSource.persistArchive(archiveDatabase, []), /source_archive_invalid/);
+const reverse = await RawSource.persistArchive(archiveDatabase, [...documents].reverse(), null);
+assert.notEqual(reverse.source_document_id, archive.source_document_id, 'order is part of identity');
+assert.equal((await RawSource.resolveArchive(archiveDatabase, reverse.source_document_id, 'JOB')).source_url, null, 'explicitly empty archive URL does not inherit an old URL');
+assert.equal(RawSource.archiveOptions([...archiveDatabase.records.get('source_documents').values()], 'JOB').length, 2);
+for (const name of ['runtime_snapshots', 'processing_runs', 'processing_batches', 'extraction_artifacts', 'context_proposals', 'candidate_context_revisions', 'job_context_revisions']) assert.equal(archiveDatabase.records.get(name).size, 0, name + ' unchanged');
+archiveDatabase.failWrites = true;
+await assert.rejects(RawSource.persistArchive(archiveDatabase, documents, 'https://example.test/jobs/retry'), /synthetic_raw_storage_failure/);
+archiveDatabase.failWrites = false;
+assert.equal(RawSource.archiveOptions([...archiveDatabase.records.get('source_documents').values()], 'JOB').length, 2, 'failed archive never appears as saved');
+const payloadKey = RawSource.payloadRecordIdFor(documents[0].source_document_id);
+const savedPayload = archiveDatabase.records.get('source_documents').get(payloadKey);
+archiveDatabase.records.get('source_documents').delete(payloadKey);
+await assert.rejects(RawSource.resolveArchive(archiveDatabase, archive.source_document_id, 'JOB'), /raw_source_payload_missing/);
+archiveDatabase.records.get('source_documents').set(payloadKey, { ...savedPayload, file_blob: new Blob(['corrupted']) });
+await assert.rejects(RawSource.resolveArchive(archiveDatabase, archive.source_document_id, 'JOB'), /raw_source_(?:integrity_mismatch|payload_envelope_invalid)/);
+console.log('source_archive_order_identity_scope_failures_no_semantic_writes=pass');
+
+const archiveDeletePlan = Review.sourceHardDeletePlan({ source_documents: [sources[0].source, { contract_id: RawSource.ARCHIVE_CONTRACT, source_document_id: 'archive-index-for-delete', source_document_ids: [sources[0].source.source_document_id] }, { contract_id: RawSource.ARCHIVE_CONTRACT, source_document_id: 'unrelated-archive', source_document_ids: ['another-source'] }] }, sources[0].source.source_document_id);
+assert(archiveDeletePlan.source_documents.includes('archive-index-for-delete'), 'explicit source deletion includes its archive index');
+assert(!archiveDeletePlan.source_documents.includes('unrelated-archive'));

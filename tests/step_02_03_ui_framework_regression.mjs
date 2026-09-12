@@ -75,7 +75,7 @@ assert.doesNotMatch(jd, /v1-bottom-sheet|job-empty|open-job-import/);
 assert.match(jobImport, /<div><h1>添加职位描述<\/h1><\/div>/);
 assert.doesNotMatch(jobImport, /导入一份职位描述|提供本地文件或粘贴职位文本。每份职位描述会形成独立的职位上下文。/);
 assert.match(jobImport, /粘贴文本/);
-assert.match(jobImport, />图像</);
+assert.match(jobImport, />文件</);
 assert.ok(jobImport.indexOf('data-job-import-type="Document"') < jobImport.indexOf('data-job-import-type="Paste"'));
 assert.match(jobImport, /data-job-import-type="Document" aria-pressed="true"/);
 assert.match(jobImport, /\.pdf,.png,.jpg,.jpeg,.docx/);
@@ -119,9 +119,9 @@ assert.equal(Demo.applyDemoJobPatch(Demo.JOB_FIXTURE, jobPatch).item_version, (N
 // State language, no provider call, and persistence separation.
 assert.deepEqual(Demo.CANDIDATE_PROCESSING_STATES.map(([state]) => state), ["PREPARING", "WAITING", "UNDERSTANDING", "BUILDING_CARDS", "READY_FOR_REVIEW"]);
 assert.deepEqual(Demo.JOB_PROCESSING_STATES.map(([state]) => state), ["PREPARING", "WAITING", "UNDERSTANDING", "BUILDING_CARDS", "READY_FOR_REVIEW"]);
-assert.match(pages, /fetch\("\/api\/local-ocr-capability"/);
-assert.match(pages, /\/api\/local-candidate-extract/);
-assert.match(pages, /\/api\/local-candidate-image-ocr/);
+assert.doesNotMatch(pages, /fetch\("\/api\/local-ocr-capability"/);
+assert.doesNotMatch(pages, /\/api\/local-candidate-extract/);
+assert.doesNotMatch(pages, /\/api\/local-candidate-image-ocr/);
 assert.doesNotMatch(pages, /fetch\("\/api\/local-ocr"/);
 assert.ok(Demo.STORES.some(([name]) => name === "demo_candidate_items"));
 assert.ok(Demo.STORES.some(([name]) => name === "demo_job_contexts"));
@@ -309,14 +309,14 @@ assert.match(pages, /const acceptCandidateFiles =/);
 assert.match(pages, /Array\.from\(files \|\| \[\]\)/);
 assert.match(pages, /const batchId = !replace && selectedCandidateSources\[0\]\?\.batch_id/);
 assert.match(pages, /new Map\(prepared\.map\(\(source\) => \[source\.source_document_id, source\]\)\)/);
-assert.match(pages, /LocalCandidateReview\.sourceImportState\(source\.source_document_id, records\)/);
+assert.match(pages, /modelSourceImportState\(source\.source_document_id, records\)/);
 assert.match(pages, /SourceInput\.renderBundlePreview\([\s\S]*selectedCandidateSources/);
 assert.doesNotMatch(pages, /支持多文件|可上传多个文件|批量上传/);
-assert.match(pages, /for \(let index = 0; index < sources\.length; index \+= 1\)/);
-assert.match(pages, /await processCandidateSource\(source, snapshot, database, candidateBatchAbortController\.signal\)/);
-assert.match(pages, /async function processCandidateSource\(source, snapshot, database, signal\)[\s\S]*persistCanonicalSource/);
-assert.match(pages, /LocalCandidate\.processingRunFor\(source, snapshot\.snapshot_id, "FAILED"/);
-assert.match(pages, /if \(result\.cancelled\) \{/);
+assert.match(read("source-input-domain.js"), /for \(const source of sources\)/);
+assert.doesNotMatch(pages, /await processCandidateSource\(/);
+assert.match(pages, /async function archiveSelectedSources\(kind\)[\s\S]*SourceInput\.persistDurableBundle/);
+assert.doesNotMatch(pages, /LocalCandidate\.processingRunFor\(/);
+assert.match(pages, /原件保存未完成，请重试/);
 // Completion is reachable from proposal review, candidate removal, durable-source
 // acknowledgement, and the accepted Candidate Workspace publication path.
 assert.equal((pages.match(/completeEmbeddedImport\("personal"/g) || []).length, 4);
@@ -343,11 +343,11 @@ assert.doesNotMatch(read("source-input-domain.js"), /\{ container, list, name, m
 assert.doesNotMatch(`${personalImport}\n${jobImport}`, /id="(?:personal|job)-file-(?:name|meta|icon)"/);
 assert.doesNotMatch(jobImport, /data-job-processing-mode|id="job-processing-modes"/);
 assert.doesNotMatch(pages, /selectedJobProcessingMode|configureJobProcessingMode/);
-assert.match(pages, /for \(const source of sources\)/);
-assert.match(pages, /await processJobSource\(source, snapshot, database, jobBatchAbortController\.signal\)/);
-assert.match(pages, /async function processJobSource\(source, snapshot, database, signal\)[\s\S]*LocalJob\.persistCanonicalSource[\s\S]*JobContext\.proposalFor/);
-assert.match(pages, /catch \(error\) \{[\s\S]*lastError = error;[\s\S]*其他独立来源将继续处理/);
-assert.match(pages, /const pending = await renderAwaitingJobReviews\(\{ reset: true \}\)/);
+assert.match(read("source-input-domain.js"), /for \(const source of sources\)/);
+assert.doesNotMatch(pages, /await processJobSource\(/);
+assert.match(pages, /async function runJobProcessing\(\) \{ return archiveSelectedSources\("job"\); \}/);
+assert.match(pages, /原件保存未完成，请重试；已成功保存的文件会保留。/);
+assert.match(pages, /await renderAwaitingJobReviews\(\{ reset: true \}\)/);
 assert.match(pages, /if \(!remaining\.length\) \{/);
 assert.doesNotMatch(jobImport, /支持多文件|可同时上传多个|批量上传/);
 assert.match(pages, /LocalJob\.preparePastedText/);
@@ -423,7 +423,7 @@ assert.match(styles, /font-family: "Recursive", "Inter", "PingFang SC", "Microso
 assert.doesNotMatch(styles, /font-family:[^;]*IBM Plex Serif/);
 assert.doesNotMatch(styles, /\.v1-back::before \{[^}]*width: 17px/s);
 assert.doesNotMatch(pages, /打开材料|打开职位上下文|PDF · 图片 · 粘贴文本|简历 · 作品集 · 项目/);
-assert.match(pages, /点击进入导入页面，建立待审核的职业对象。/);
+assert.match(pages, /保存原件，或选择已存材料交给 AI 分析。/);
 assert.match(pages, /点击进入导入页面，建立期望职位卡片。/);
 assert.match(styles, /\.v1-file-picker \{[^}]*min-height: 230px[^}]*padding: 0/s);
 assert.match(styles, /\.v1-file-dropzone > span \{ opacity: \.9; \}/);

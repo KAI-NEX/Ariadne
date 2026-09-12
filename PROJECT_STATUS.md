@@ -1,5 +1,15 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-12 — Local 原件归档（COMPLETE）
+
+- 用户调整：本地识别最初用于学习，现在正式 Local 只保存原始资料，接入 AI 后再分析。修订 AGENTS、稳定上下文、Runtime 契约和内容简化文档；该决定取代此前保留正常 Local 确定性分析流程的要求。Markdown 主存储仍未迁移。
+- Candidate/Job 共用归档逻辑；移除页面内本地 OCR 探测、提取、结构化及批次编排，`v1-pages.js` 相对前阶段净减少 301 行。保留原始 bytes、hash、文件名、用户材料类型、职位链接和有序来源组；粘贴文本不裁掉空行/首尾空格。同一 store 增加只含来源身份/顺序/链接/时间的轻量索引，无新表、依赖或服务；显式删除 Candidate 来源时包含相关索引。
+- 两个导入页共用原生原件选择框，刷新后恢复；Local 或模型暂不可用时可保存，可用模型也有“只保存原件，稍后分析”。Candidate 继续逐份分析已有支持的图片/PDF/DOCX；TXT/Markdown 可归档，未扩大 adapter 支持范围。Job 恢复原顺序/链接并进入已有模型传输确认；修复恢复来源缺少 captured_via 时的契约错误，已有 Working 仅按完全相同来源组恢复。
+- 保留模型能力资格、人工传输确认、技术输入准备、模型失败显式返回、Working/人工保存及旧版本；原有卡片/对话/历史审核继续可用。学习用 Local 模块和底层接口原地保留，正式导入不再调用，也不制造提案或确认内容。
+- 验证：59 个 Node + 34 个 Python 已跟踪离线回归通过（93 套件）；旧学习契约测试继续保留，页面断言按新决定调整。扩充来源存储回归覆盖原字节/空白、顺序、重复保存、领域隔离、损坏/缺失、写入失败与删除索引边界。VI 静态和负向检查通过，无新增漂移。
+- egolite 实际保存/刷新恢复并核对零 ProcessingRun/ExtractionArtifact/Proposal/revision；其截图 API 的 Page.captureScreenshot 超时，按现有授权改用独立 Chrome 测试会话补充桌面/390 px 截图。`tests/source_archive_browser_qa.mjs` 覆盖归档、重载、顺序、重复、存储失败/重试、模型不可用仍可保存、恢复后传输确认/取消，以及模拟模型失败保留原件。七组检查通过，无页面错误/横向溢出；Local 无 POST。唯一模型 POST 是隔离测试替身，不是实际 Provider 调用或模型质量证据。
+- QA 原地保留在 `.cache/local-archive-20260912/`，最终浏览器证据在 `final-check/`。未操作真实用户工作区、外部 Provider 或凭据；未完成磁盘 Markdown 主存储迁移。其他图谱、Mac 启动器和公开入口改动按各自任务保留。
+
 ## 2026-09-12 — 内容架构复核与上下文简化（COMPLETE；Markdown 主存储尚未迁移）
 
 - 按用户“人看卡片、AI 读多份 Markdown、保留原件、保留现有功能”的方向复核当前代码。新增[内容架构复核与简化](docs/current/CONTENT_ARCHITECTURE_SIMPLIFICATION.md)：十二类职责中五类保留保护、五类合并实现、一类按规模启用、一类隔离兼容；目标为文件与内容库、卡片界面、上下文准备、模型执行、修改保存五项职责，附现有功能保留表与主存储切换的完成条件。分类不代表删代码比例；当前 IndexedDB 仍为内容权威，未把新增文档说明当作已实施迁移。

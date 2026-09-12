@@ -63,6 +63,13 @@
 - 验证：Archify showcase 9/9、0 errors、0 warnings；自动浏览器四个桌面尺寸无溢出，浅色/深色端点截图通过人工视觉复核；1 轮视觉修正。
 - 未知与下一步：Markdown 主存储往返、真实模型质量和完整存储迁移仍未验收；未来上下文预算、分片条件或 authority 变化时更新本图。
 
+### 2026-09-12 · Local 原件归档
+
+- 用户修订：本地识别用于学习，正式 Local 仅保存原件，接入 AI 后再分析。
+- 实现：两域共用原件保存与来源选择；保留原始 bytes/hash、职位材料顺序和链接，取消页面内本地 OCR/提取/结构化编排。已有卡片、人工保存与模型执行契约保留。
+- 图源影响：当前架构图中的 Local 识别主分支已成为历史，需要在下次架构图修订时替换为归档、随后显式发起 Model 的路径；现有图/截图原地保留，不将旧图称为最新运行证据。
+- 依据：[内容简化](../../../current/CONTENT_ARCHITECTURE_SIMPLIFICATION.md)、[Runtime 现行修订](../../../current/ARIADNE_RUNTIME_EXECUTION_CONTRACT.md)、PROJECT_STATUS 同日条目。Markdown 主存储尚未迁移。
+
 ### 2026-09-12 · 内容架构复核与上下文简化
 
 - 用户目标：卡片面向人、多份 Markdown 面向 AI、保留原件；重新审视复杂度并在保留现有功能的前提下简化。

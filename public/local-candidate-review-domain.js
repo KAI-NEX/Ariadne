@@ -262,7 +262,7 @@
     const conversationSessions = (records.conversation_sessions || []).filter((session) => session.source_document_id === sourceId);
     const conversationIds = new Set(conversationSessions.map((session) => session.conversation_id));
     return Object.freeze({
-      source_documents: sourceRecords.filter((source) => source.source_document_id === sourceId || RawSource.isPayloadRecordFor(source, sourceId)).map((source) => source.source_document_id),
+      source_documents: sourceRecords.filter((source) => source.source_document_id === sourceId || RawSource.isPayloadRecordFor(source, sourceId) || RawSource.isArchiveRecordFor(source, sourceId)).map((source) => source.source_document_id),
       extraction_artifacts: (records.extraction_artifacts || []).filter((artifact) => artifact.source_document_id === sourceId).map((artifact) => artifact.artifact_id),
       processing_runs: (records.processing_runs || []).filter((run) => run.source_document_id === sourceId).map((run) => run.run_id),
       context_proposals: proposals.map((proposal) => proposal.proposal_id),

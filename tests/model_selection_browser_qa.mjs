@@ -105,7 +105,7 @@ try {
     const w=list.find(item=>item.source_document_id===sid);
     await T.persistRecord(db,'context_proposals',{contract_id:'ariadne-context-proposal-v1',proposal_id:w.proposal_ids[0],proposal_type:'CANDIDATE_CONTEXT',source_document_ids:[sid],processing_run_id:w.processing_run_id,runtime_snapshot_id:w.runtime_snapshot_id,created_at:w.created_at,payload:{contract_id:'ariadne-model-candidate-proposal-payload-v1',items:w.payload.items},grounding_refs:[{source_document_id:sid,location:'p. 1',excerpt_or_reference:'Synthetic only'}],warnings:[],uncertainties:[],status:'AWAITING_REVIEW',authority:T.AUTHORITY.proposal});db.close();
   },sid);
-  await candidate.reload();await candidate.locator('#saved-candidate-source-trigger').click();await candidate.locator(`[data-saved-candidate-source="${sid}"]`).click();await candidate.locator('#start-personal-processing').filter({hasText:'查看工作区'}).click();
+  await candidate.reload();await candidate.selectOption('#saved-candidate-source-select',sid);await candidate.locator('#start-personal-processing').filter({hasText:'查看工作区'}).click();
   await trigger(candidate).waitFor({state:'visible'});await choose(candidate,'low');
   const scoped=await candidate.evaluate(()=>AriadneCandidateWorkspaceConversationRuntime.createRuntimeSnapshot());
   assert.ok(scoped.execution_settings.scope);assert.equal(scoped.execution_settings.effective_settings.reasoning_effort,'low');

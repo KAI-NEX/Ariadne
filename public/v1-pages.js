@@ -10,7 +10,6 @@
   const ProcessingIndicator = window.AriadneProcessingIndicator;
   const LocalContextLifecycle = window.AriadneLocalContextLifecycle;
   const LocalCandidate = window.AriadneLocalCandidateExtraction;
-  const LocalCandidateProposal = window.AriadneLocalCandidateProposal;
   const LocalCandidateReview = window.AriadneLocalCandidateReview;
   const CandidateModel = window.AriadneCandidateModelRuntime;
   const CandidateConversation = window.AriadneCandidateConversation;
@@ -200,6 +199,7 @@
       document_read_failed: "无法读取这个本地文件。",
       document_size_limit_exceeded: "每个文件最大支持 30 MB；请压缩后重试。",
       image_size_limit_exceeded: "每个文件最大支持 30 MB；请压缩后重试。",
+      source_archive_invalid: "保存的来源组无效；操作已停止。",
       raw_source_reference_missing: "原始文件的本地引用不存在；操作已停止。",
       raw_source_reference_invalid: "原始文件的本地引用无效；操作已停止。",
       raw_source_reference_unsupported: "原始文件的本地引用无法由当前版本解析；操作已停止。",
@@ -301,6 +301,11 @@
     }
   }
 
+  function candidateAnalysisReady(gate) {
+    return gate.allowed && gate.authority.runtime.mode === "model"
+      && selectedCandidateSources.length === 1 && ["PDF", "IMAGE", "DOCX"].includes(selectedCandidateSources[0]?.source_type);
+  }
+
   function refreshCandidateImportGate() {
     const mode = currentAriadneMode();
     const operation = mode === "model" ? candidateImportOperation() : "candidate_import";
@@ -308,27 +313,28 @@
     if (byId("candidate-understanding-provider")) byId("candidate-understanding-provider").textContent = runtimeLabel(gate.authority.runtime);
     const button = byId("start-personal-processing");
     if (!button) return gate;
-    const local = gate.authority.runtime.mode === "local";
-    const modelReady = gate.allowed && gate.authority.runtime.mode === "model";
-    document.body.dataset.candidateImportRuntime = local ? "local" : modelReady ? "model-ready" : "model-unavailable";
-    button.textContent = modelReady
-      ? candidateExecutionState === "PROCESSING" ? "正在使用模型分析" : candidateExecutionState === "COMPLETE" ? "查看工作区" : "使用模型分析"
-      : !local ? "模型导入尚不可用" : candidateExecutionState === "COMPLETED_SOURCE" ? "确认" : candidateExecutionState === "COMPLETE" ? "本地提取已完成" : candidateExecutionState === "PROCESSING" ? "正在本地提取" : "开始本地提取";
-    const modelSourceIneligible = modelReady && (selectedCandidateSources.length !== 1 || !["PDF", "IMAGE", "DOCX"].includes(selectedCandidateSources[0]?.source_type));
-    button.disabled = candidateProcessingInProgress || (!modelReady && candidateExecutionState === "COMPLETE") || candidateExecutionState === "COMPLETED_SOURCE" || !selectedCandidateSources.length || !gate.allowed || modelSourceIneligible;
+    const modelReady = candidateAnalysisReady(gate);
+    document.body.dataset.candidateImportRuntime = mode === "local" ? "local" : modelReady ? "model-ready" : "model-unavailable";
+    button.textContent = candidateProcessingInProgress ? "正在处理"
+      : modelReady ? candidateExecutionState === "COMPLETE" ? "查看工作区" : "使用模型分析"
+      : candidateExecutionState === "ARCHIVED" ? "原件已保存" : "保存原件";
+    button.disabled = candidateProcessingInProgress || !selectedCandidateSources.length || (!modelReady && candidateExecutionState === "ARCHIVED");
     button.classList.toggle("hidden", modelReady && candidateExecutionState === "PROCESSING");
-    byId("personal-file-input").disabled = (!local && !modelReady) || candidateProcessingInProgress;
+    byId("save-personal-source").classList.toggle("hidden", !modelReady);
+    byId("save-personal-source").disabled = candidateProcessingInProgress || candidateExecutionState === "ARCHIVED";
+    byId("personal-file-input").disabled = candidateProcessingInProgress;
     byId("personal-file-input").multiple = true;
     byId("personal-file-input").accept = ".pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,image/png,image/jpeg";
-    byId("personal-dropzone").disabled = (!local && !modelReady) || candidateProcessingInProgress;
-    byId("personal-dropzone").setAttribute("aria-disabled", String((!local && !modelReady) || candidateProcessingInProgress));
-    byId("personal-import-types").querySelectorAll("button").forEach((item) => { item.disabled = (!local && !modelReady) || candidateProcessingInProgress; });
-    byId("personal-runtime-summary").textContent = modelReady
-      ? `本次模型导入：${runtimeLabel(gate.authority.runtime)} · 图像能力已验证`
-      : local ? "当前运行：本地确定规则。材料不会发送给模型服务商。" : unavailableCopy(gate, "个人材料语义结构化");
-    const candidateBoundary = byId("personal-processing-boundary");
-    if (candidateBoundary) candidateBoundary.textContent = modelReady ? "正在处理当前材料；模型结果只进入待审核工作区" : "仅本地读取、提取与确定规则；不调用模型服务商";
-    setRuntimeGateMessage("personal-page-message", gate.allowed ? "" : unavailableCopy(gate, "个人材料语义结构化"));
+    byId("personal-dropzone").disabled = candidateProcessingInProgress;
+    byId("personal-dropzone").setAttribute("aria-disabled", String(candidateProcessingInProgress));
+    byId("saved-candidate-source-select").disabled = candidateProcessingInProgress;
+    byId("personal-import-types").querySelectorAll("button").forEach((item) => { item.disabled = candidateProcessingInProgress; });
+    byId("personal-runtime-summary").textContent = mode === "local"
+      ? "仅保存原件，不识别、不分析。接入 AI 后可继续。"
+      : modelReady ? `本次模型导入：${runtimeLabel(gate.authority.runtime)} · 也可以先保存原件`
+      : "可以先保存原件。AI 分析需选择一份受支持的材料，并接入可用模型。";
+    if (byId("personal-processing-boundary")) byId("personal-processing-boundary").textContent = modelReady
+      ? "模型结果只进入待审核工作区" : "仅保存原始材料；不调用模型服务商";
     return gate;
   }
 
@@ -340,26 +346,28 @@
     const gate = currentOperationGate(modelMode ? jobImportOperation() : "job_import");
     const button = byId("start-job-processing");
     if (!button) return gate;
+    const modelReady = modelMode && gate.allowed;
     document.body.dataset.jobImportRuntime = modelMode ? "model" : "local";
     document.body.dataset.jobImportLifecycle = jobExecutionState;
-    button.textContent = jobExecutionState === "REVIEWING" ? "请完成下方审核" : jobExecutionState === "WORKING" ? "查看 Working Job" : jobExecutionState === "SAVED" ? "职位已保存" : jobProcessingInProgress
-      ? modelMode ? "人工智能正在解析" : "正在本地整理"
-      : modelMode ? "使用人工智能解析" : "开始本地整理";
-    button.disabled = jobProcessingInProgress || ["REVIEWING", "READY_TO_SAVE", "SAVED"].includes(jobExecutionState) || !selectedJobSource || !gate.allowed;
-    byId("job-file-input").disabled = jobProcessingInProgress || !gate.allowed;
+    button.textContent = jobProcessingInProgress ? "正在处理" : modelReady
+      ? jobExecutionState === "REVIEWING" ? "请完成下方审核" : jobExecutionState === "WORKING" ? "查看 Working Job" : jobExecutionState === "SAVED" ? "职位已保存" : "使用人工智能解析"
+      : jobExecutionState === "SOURCE_STORED" ? "原件已保存" : "保存原件";
+    button.disabled = jobProcessingInProgress || !selectedJobSource || (modelReady
+      ? ["REVIEWING", "READY_TO_SAVE", "SAVED"].includes(jobExecutionState) : jobExecutionState === "SOURCE_STORED");
+    byId("save-job-source").classList.toggle("hidden", !modelReady);
+    byId("save-job-source").disabled = jobProcessingInProgress || !selectedJobSource || jobExecutionState === "SOURCE_STORED";
+    byId("job-file-input").disabled = jobProcessingInProgress;
     byId("job-file-input").multiple = true;
-    byId("job-dropzone").disabled = jobProcessingInProgress || !gate.allowed;
-    byId("job-dropzone").setAttribute("aria-disabled", String(jobProcessingInProgress || !gate.allowed));
+    byId("job-dropzone").disabled = jobProcessingInProgress;
+    byId("job-dropzone").setAttribute("aria-disabled", String(jobProcessingInProgress));
+    ["job-paste-input", "job-link-input", "saved-job-source-select"].forEach(id => { byId(id).disabled = jobProcessingInProgress; });
     byId("job-import-types")?.querySelectorAll("button").forEach((item) => { item.disabled = jobProcessingInProgress; });
-    byId("job-runtime-summary").textContent = modelMode && gate.allowed
-      ? `本次模型导入：${runtimeLabel(gate.authority.runtime)} · ${selectedJobSources.some((source) => source.source_type === "PDF") ? "完整 PDF 图像理解" : gate.operation === "job_image_import" ? "图像能力已验证" : "文本语义能力已验证"}`
-      : modelMode ? unavailableCopy(gate, gate.operation === "job_image_import" ? "职位图片理解" : "职位文本理解")
-      : "本地确定规则；不会调用模型服务商。";
-    const jobBoundary = byId("job-processing-boundary");
-    if (jobBoundary) jobBoundary.textContent = modelMode
-      ? "原始来源已持久保留 · 只读技术解析 · Provider 负责语义理解"
-      : "本地读取真实内容 · 原始来源持久保留 · 无模型调用";
-    setRuntimeGateMessage("job-page-message", gate.allowed ? "" : unavailableCopy(gate, modelMode ? "职位语义理解" : "本地职位整理"));
+    byId("job-runtime-summary").textContent = runtime.mode === "local"
+      ? "仅保存原件，不识别、不分析。接入 AI 后可继续。"
+      : modelReady ? `本次模型导入：${runtimeLabel(gate.authority.runtime)} · 也可以先保存原件`
+      : "模型分析暂不可用；仍可保存原始材料，稍后继续。";
+    if (byId("job-processing-boundary")) byId("job-processing-boundary").textContent = modelReady
+      ? "原始来源已持久保留 · Provider 负责语义理解" : "仅保存原始材料；不调用模型服务商";
     return gate;
   }
 
@@ -1101,7 +1109,7 @@
   }
 
   function personalGuideCardMarkup() {
-    return `<a class="v1-add-guide-card personal" data-transition-key="personal-guide" href="/personal-import.html"><span class="v1-add-guide-icon" aria-hidden="true">＋</span><span><b>添加个人材料</b></span><p class="v1-guide-copy"><span>点击进入导入页面，建立待审核的职业对象。</span><span aria-hidden="true">原件保存在浏览器，发送模型前需确认</span></p></a>`;
+    return `<a class="v1-add-guide-card personal" data-transition-key="personal-guide" href="/personal-import.html"><span class="v1-add-guide-icon" aria-hidden="true">＋</span><span><b>添加个人材料</b></span><p class="v1-guide-copy"><span>保存原件，或选择已存材料交给 AI 分析。</span><span aria-hidden="true">原件保存在浏览器，发送模型前需确认</span></p></a>`;
   }
 
   async function localizedCandidateRecords(records) {
@@ -1722,73 +1730,79 @@
     closeCandidateWorkspaceLayer("profile");
   }
 
-  function setSavedCandidateSourceMenu(open) {
-    const selector = byId("saved-candidate-source-selector");
-    const trigger = byId("saved-candidate-source-trigger");
-    const list = byId("saved-candidate-source-list");
-    if (!selector || !trigger || !list) return;
-    selector.classList.toggle("is-open", open);
-    list.classList.toggle("is-open", open);
-    trigger.setAttribute("aria-expanded", String(open));
-    list.setAttribute("aria-hidden", String(!open));
-    list.inert = !open;
+  async function renderSavedSources(kind) {
+    const section = byId(`saved-${kind}-sources`);
+    if (!section) return;
+    const database = await Truth.openDatabase();
+    let records;
+    try { records = await (kind === "candidate" ? LocalCandidateReview : JobContext).getAll(database, "source_documents"); }
+    finally { database.close(); }
+    // Candidate analysis still operates on one document; Job restores an ordered bundle.
+    const options = RawSource.archiveOptions(kind === "candidate" ? records.filter(record => record.contract_id !== RawSource.ARCHIVE_CONTRACT) : records, kind === "candidate" ? "CANDIDATE" : "JOB");
+    const select = byId(`saved-${kind}-source-select`);
+    const previous = select.value;
+    select.innerHTML = '<option value="">选择已保存的原件</option>' + options.map(option => `<option value="${escapeHtml(option.id)}">${escapeHtml(option.label)}</option>`).join("");
+    if (options.some(option => option.id === previous)) select.value = previous;
+    section.classList.toggle("hidden", !options.length);
   }
 
-  async function renderSavedCandidatePdfSources() {
-    const section = byId("saved-candidate-sources");
-    if (!section || !Truth || !LocalCandidateReview) return;
-    const gate = refreshCandidateImportGate();
-    setSavedCandidateSourceMenu(false);
-    if (gate.authority.runtime.mode !== "model" || !gate.allowed) {
-      section.classList.add("hidden");
-      setSavedCandidateSourceMenu(false);
-      byId("saved-candidate-source-list").innerHTML = "";
-      return;
-    }
-    const database = await Truth.openDatabase();
-    let sources;
-    try {
-      sources = (await LocalCandidateReview.getAll(database, "source_documents")).filter((source) => source.contract_id === "ariadne-source-document-v1"
-        && source.material_type === "CANDIDATE" && ["PDF", "DOCX", "IMAGE"].includes(source.source_type) && source.local_reference);
-    } finally { database.close(); }
-    const selected = selectedCandidateSources.find((item) => sources.some((source) => source.source_document_id === item.source_document_id));
-    byId("saved-candidate-source-summary").textContent = selected ? selected.filename || selected.file?.name : "选择已保存在本机的资料";
-    byId("saved-candidate-source-list").innerHTML = sources.map((source, index) => `<button type="button" class="runtime-menu-item v1-saved-source-button" style="--runtime-menu-index:${index + 1}" role="option" data-saved-candidate-source="${escapeHtml(source.source_document_id)}" aria-selected="${selectedCandidateSources.some((item) => item.source_document_id === source.source_document_id)}"><span>${escapeHtml(source.filename)}</span></button>`).join("");
-    section.classList.toggle("hidden", !sources.length);
-  }
+  async function renderSavedCandidatePdfSources() { return renderSavedSources("candidate"); }
 
   async function selectSavedCandidatePdf(sourceId) {
     const selectionVersion = ++candidateSelectionVersion;
-    const gate = CandidateModel.assertEligibleGate(refreshCandidateImportGate());
-    void gate;
     const database = await Truth.openDatabase();
     let restoredWorkingModel = null;
     try {
+      const { sources: [resolved] } = await RawSource.resolveArchive(database, sourceId, "CANDIDATE");
+      const sourceDocument = resolved.source_document;
       const records = await readCandidateRecords(database);
-      const sourceDocument = records.source_documents.find((source) => source.source_document_id === sourceId);
-      if (!sourceDocument) throw new Error("raw_source_document_missing");
-      const resolved = await RawSource.resolveRawSource(database, sourceId);
       if (selectionVersion !== candidateSelectionVersion) return;
       restoredWorkingModel = latestCandidateWorkingModel(records, sourceId);
       selectedCandidateSources = [{
-        file: resolved.file,
-        mime_type: sourceDocument.mime_type,
-        source_type: sourceDocument.source_type,
-        content_hash: sourceDocument.content_hash,
-        source_document_id: sourceDocument.source_document_id,
-        batch_id: `batch-candidate-model-${crypto.randomUUID()}`,
-        import_state: modelSourceImportState(sourceId, records),
+        file: resolved.file, mime_type: sourceDocument.mime_type, source_type: sourceDocument.source_type,
+        content_hash: sourceDocument.content_hash, source_document_id: sourceDocument.source_document_id,
+        batch_id: `batch-candidate-${crypto.randomUUID()}`, import_state: modelSourceImportState(sourceId, records),
       }];
     } finally { database.close(); }
+    closeCandidateWorkspaceLayer("import");
     setCompletedSourceSheet(false);
-    byId("personal-page-message").textContent = "";
-    byId("personal-page-message").classList.remove("error");
     activeCandidateWorkingModel = restoredWorkingModel ? Truth.validateCandidateWorkingModel(restoredWorkingModel) : null;
-    candidateExecutionState = activeCandidateWorkingModel ? "COMPLETE" : "READY";
+    candidateExecutionState = activeCandidateWorkingModel ? "COMPLETE" : "ARCHIVED";
+    byId("personal-page-message").textContent = "已恢复原件；尚未发起新的分析。";
+    byId("personal-page-message").classList.remove("error");
     showCandidateSource(selectedCandidateSources[0]);
-    setSavedCandidateSourceMenu(false);
-    await renderAwaitingCandidateReviews({ reset: true, sourceIds: [] });
-    await renderSavedCandidatePdfSources();
+    await renderAwaitingCandidateReviews({ reset: true, sourceIds: [sourceId] });
+  }
+
+  async function selectSavedJobSources(archiveId) {
+    const selectionVersion = ++jobSelectionVersion;
+    const database = await Truth.openDatabase();
+    let restored;
+    try {
+      restored = await RawSource.resolveArchive(database, archiveId, "JOB");
+      const modelMode = currentAriadneMode() === "model";
+      const sources = [];
+      for (const resolved of restored.sources) {
+        const document = resolved.source_document;
+        sources.push({ file: resolved.file, name: document.filename, size: resolved.file.size,
+          mime_type: document.mime_type, source_type: document.source_type, content_hash: document.content_hash,
+          source_document_id: document.source_document_id, source_url: restored.source_url, captured_via: document.provenance?.captured_via || "JOB_FILE_PICKER",
+          batch_id: document.batch_id, import_type: "Document", sizeLabel: formatBytes(resolved.file.size),
+          import_state: await jobSourceImportState(document.source_document_id, database, modelMode) });
+      }
+      if (selectionVersion !== jobSelectionVersion) return;
+      configureJobImportType("Document");
+      selectedJobSources = sources;
+      byId("job-link-input").value = restored.source_url || "";
+    } finally { database.close(); }
+    jobModelConsentBundle = null;
+    const restoredVersion = jobSelectionVersion;
+    const working = currentAriadneMode() === "model" && Boolean(await savedModelJobProposalForSource(selectedJobSources[0]?.source_document_id));
+    if (restoredVersion !== jobSelectionVersion) return;
+    beginJobImportLifecycle(working ? ModelImportLifecycle.STATES.WORKING : ModelImportLifecycle.STATES.SOURCE_STORED);
+    showJobSource(selectedJobSources[0]);
+    byId("job-page-message").textContent = "已按保存顺序恢复原件和职位链接；尚未发起新的分析。";
+    byId("job-page-message").classList.remove("error");
   }
 
   function proposalItemEditor(item, index, fallbackRefs) {
@@ -1894,7 +1908,7 @@
     ProcessingIndicator.set(byId("personal-processing"), {
       active,
       copy: label,
-      boundary: currentAriadneMode() === "model" ? "正在等待模型时不会改用本地结果" : "本地确定性处理 · Provider 调用 0",
+      boundary: currentAriadneMode() === "model" ? "正在等待模型时不会改用本地结果" : "仅保存原件 · 不进行识别或分析",
       state,
     });
   }
@@ -1914,212 +1928,48 @@
     refreshCandidateImportGate();
   }
 
-  async function localOcrEnvironmentCapability() {
-    const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/local-ocr-capability", { method: "POST" });
-    const payload = await response.json();
-    if (!response.ok || !["supported", "unsupported", "unverified"].includes(payload.local_ocr)) {
-      throw new Error(payload.error || "local_ocr_capability_unavailable");
-    }
-    return payload.local_ocr;
-  }
-
-  async function extractCandidateSource(source, snapshot, signal) {
-    const documentDataUrl = await LocalCandidate.readAsDataURL(source.file, source.mime_type);
-    const image = source.source_type === "IMAGE";
-    const response = await (globalThis.AriadneConnector || globalThis).fetch(image ? "/api/local-candidate-image-ocr" : "/api/local-candidate-extract", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal,
-      body: JSON.stringify({
-        filename: source.file.name,
-        media_type: source.mime_type,
-        source_document_id: source.source_document_id,
-        runtime_snapshot: snapshot,
-        ...(image ? { image_data_url: documentDataUrl } : { document_data_url: documentDataUrl }),
-      }),
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || "candidate_local_extraction_failed");
-    if (result.model_call_made !== false || result.runtime_snapshot_id !== snapshot.snapshot_id || result.content_hash !== source.content_hash) {
-      throw new Error("candidate_local_extraction_contract_failed");
-    }
-    return result;
-  }
-
-  async function processCandidateSource(source, snapshot, database, signal) {
-    const sourceDocument = LocalCandidate.sourceDocumentFor(source);
-    let durableSource;
+  async function archiveSelectedSources(kind) {
+    const candidate = kind === "candidate";
+    if (candidate ? candidateProcessingInProgress : jobProcessingInProgress) return;
+    const sources = [...(candidate ? selectedCandidateSources : selectedJobSources)];
+    if (!sources.length) return;
+    const prefix = candidate ? "personal" : "job";
+    const adapter = candidate ? LocalCandidate : LocalJob;
+    const sourceUrl = candidate ? null : byId("job-link-input").value.trim() || null;
+    if (candidate) candidateProcessingInProgress = true;
+    else jobProcessingInProgress = true;
+    const refresh = candidate ? refreshCandidateImportGate : refreshJobImportGate;
+    refresh();
+    let database;
     try {
-      durableSource = await LocalCandidate.persistCanonicalSource(database, sourceDocument, source.file);
-    } catch (error) {
-      return { sourceId: source.source_document_id, failed: true, error: String(error?.code || error?.message || "raw_source_persistence_failed").slice(0, 180) };
-    }
-    const sourceForExtraction = { ...source, file: durableSource.file };
-    const startedAt = new Date().toISOString();
-    let run = LocalCandidate.processingRunFor(source, snapshot.snapshot_id, "PENDING", startedAt);
-    await Truth.persistRecord(database, "processing_runs", run);
-    run = LocalCandidate.processingRunFor(source, snapshot.snapshot_id, "RUNNING", startedAt, { run_id: run.run_id, started_at: startedAt });
-    await Truth.persistRecord(database, "processing_runs", run);
-    try {
-      setCandidateExtractionState("EXTRACTING", `正在本地读取并提取：${source.file.name}`);
-      const result = await extractCandidateSource(sourceForExtraction, snapshot, signal);
-      const artifact = LocalCandidate.artifactFor(source, run, result);
-      await Truth.persistRecord(database, "extraction_artifacts", artifact);
-      run = LocalCandidate.processingRunFor(source, snapshot.snapshot_id, "SUCCEEDED", startedAt, {
-        run_id: run.run_id,
-        started_at: startedAt,
-        finished_at: new Date().toISOString(),
-        output_artifact_ids: [artifact.artifact_id],
-      });
-      await Truth.persistRecord(database, "processing_runs", run);
-      return { sourceId: source.source_document_id, succeeded: true, artifact };
-    } catch (error) {
-      if (error?.name === "AbortError") {
-        const cancelled = Truth.cancelProcessingRun(run, new Date().toISOString());
-        await Truth.persistRecord(database, "processing_runs", cancelled);
-        return { sourceId: source.source_document_id, cancelled: true };
-      }
-      const errorCode = String(error?.message || "candidate_local_extraction_failed").slice(0, 180);
-      const failed = LocalCandidate.processingRunFor(source, snapshot.snapshot_id, "FAILED", startedAt, {
-        run_id: run.run_id,
-        started_at: startedAt,
-        finished_at: new Date().toISOString(),
-        error_code: errorCode,
-      });
-      await Truth.persistRecord(database, "processing_runs", failed);
-      return { sourceId: source.source_document_id, failed: true, error: errorCode };
-    }
-  }
-
-  async function processCandidateProposal(source, artifact, snapshot, database, signal) {
-    const startedAt = new Date().toISOString();
-    let run = LocalCandidateProposal.processingRunFor(source, snapshot.snapshot_id, "PENDING", startedAt);
-    await Truth.persistRecord(database, "processing_runs", run);
-    run = LocalCandidateProposal.processingRunFor(source, snapshot.snapshot_id, "RUNNING", startedAt, { run_id: run.run_id, started_at: startedAt });
-    await Truth.persistRecord(database, "processing_runs", run);
-    try {
-      setCandidateExtractionState("STRUCTURING", `正在按本地确定规则整理：${source.file.name}`);
-      const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/local-candidate-structure", { method: "POST", headers: { "Content-Type": "application/json" }, signal, body: JSON.stringify({ source_document_id: source.source_document_id, runtime_snapshot: snapshot, candidate_material_type: artifact.payload.candidate_material_type, pages: artifact.payload.pages }) });
-      const result = await response.json();
-      if (!response.ok || result.model_call_made !== false || result.runtime_snapshot_id !== snapshot.snapshot_id) throw new Error(result.error || "candidate_local_structuring_failed");
-      const proposals = LocalCandidateProposal.proposalsFor({ source, artifact, structuringRun: run, result });
-      for (const proposal of proposals) await Truth.persistRecord(database, "context_proposals", proposal);
-      run = LocalCandidateProposal.processingRunFor(source, snapshot.snapshot_id, "SUCCEEDED", startedAt, { run_id: run.run_id, started_at: startedAt, finished_at: new Date().toISOString(), proposal_ids: proposals.map((proposal) => proposal.proposal_id) });
-      await Truth.persistRecord(database, "processing_runs", run);
-      return { succeeded: true, proposals, manual: proposals.some((proposal) => proposal.payload.manual_review_required) };
-    } catch (error) {
-      if (error?.name === "AbortError") {
-        await Truth.persistRecord(database, "processing_runs", Truth.cancelProcessingRun(run, new Date().toISOString()));
-        return { cancelled: true };
-      }
-      const failed = LocalCandidateProposal.processingRunFor(source, snapshot.snapshot_id, "FAILED", startedAt, { run_id: run.run_id, started_at: startedAt, finished_at: new Date().toISOString(), error_code: String(error?.message || "candidate_local_structuring_failed").slice(0, 180) });
-      await Truth.persistRecord(database, "processing_runs", failed);
-      return { failed: true, error: failed.error_code };
-    }
-  }
-
-  async function runCandidateProcessing() {
-    if (byId("candidate-understanding-provider")) byId("candidate-understanding-provider").textContent = runtimeLabel(gate.authority.runtime);
-    const button = byId("start-personal-processing");
-    const gate = refreshCandidateImportGate();
-    if (!gate.allowed || gate.authority.runtime.mode !== "local") throw new Error(`runtime_capability_${gate.state}`);
-    if (!RuntimeExecution || !Truth || !LocalCandidate || !LocalCandidateProposal) throw new Error("local_candidate_extraction_dependencies_unavailable");
-    const sources = selectedCandidateSources.filter((source) => ["NEW", "RETRY"].includes(source.import_state));
-    if (!sources.length) {
-      await renderAwaitingCandidateReviews({ reset: true, sourceIds: selectedCandidateSources.filter((source) => source.import_state === "PENDING_REVIEW").map((source) => source.source_document_id) });
-      return;
-    }
-    candidateProcessingInProgress = true;
-    candidateExecutionState = "PROCESSING";
-    candidateBatchAbortController = new AbortController();
-    button.disabled = true;
-    byId("replace-personal-file").textContent = "取消本次提取";
-    byId("personal-processing").classList.remove("hidden");
-    setCandidateExtractionState("PREPARING", "正在验证本地执行环境");
-    const batchId = sources[0].batch_id;
-    const batchCreatedAt = new Date().toISOString();
-    let database = null;
-    try {
-      const localOcr = await localOcrEnvironmentCapability();
-      const snapshot = RuntimeExecution.createRuntimeSnapshot(
-        { mode: "local" },
-        { environmentCapabilities: { local_ocr: localOcr } },
-      );
       database = await Truth.openDatabase();
-      await Truth.persistRecord(database, "runtime_snapshots", snapshot);
-      await Truth.persistRecord(database, "processing_batches", LocalCandidate.batchFor(sources, "PENDING", batchCreatedAt));
-      await Truth.persistRecord(database, "processing_batches", LocalCandidate.batchFor(sources, "RUNNING", batchCreatedAt, { batch_id: batchId, created_at: batchCreatedAt }));
-      const completed = [];
-      const failures = [];
-      let proposalCount = 0;
-      let manualReviewCount = 0;
-      for (let index = 0; index < sources.length; index += 1) {
-        const source = sources[index];
-        if (candidateBatchAbortController.signal.aborted) {
-          const cancelled = LocalCandidate.batchFor(sources, "CANCELLED", batchCreatedAt, {
-            batch_id: batchId,
-            created_at: batchCreatedAt,
-            cancelled_at: new Date().toISOString(),
-            completed_source_ids: completed,
-            cancelled_source_id: source.source_document_id,
-            not_started_source_ids: sources.slice(index + 1).map((item) => item.source_document_id),
-          });
-          await Truth.persistRecord(database, "processing_batches", cancelled);
-          setCandidateExtractionState("CANCELLED", "已取消本次本地提取；未处理剩余文件");
-          byId("personal-page-message").textContent = "本次导入已取消。此前已完成的本地提取记录保留；未形成已确认候选信息。";
-          return;
-        }
-        showCandidateSource(source);
-        const result = await processCandidateSource(source, snapshot, database, candidateBatchAbortController.signal);
-        if (result.cancelled) {
-          const cancelled = LocalCandidate.batchFor(sources, "CANCELLED", batchCreatedAt, {
-            batch_id: batchId,
-            created_at: batchCreatedAt,
-            cancelled_at: new Date().toISOString(),
-            completed_source_ids: completed,
-            cancelled_source_id: source.source_document_id,
-            not_started_source_ids: sources.slice(index + 1).map((item) => item.source_document_id),
-          });
-          await Truth.persistRecord(database, "processing_batches", cancelled);
-          setCandidateExtractionState("CANCELLED", "已取消本次本地提取；未处理剩余文件");
-          byId("personal-page-message").textContent = "本次导入已取消。此前已完成的本地提取记录保留；未形成已确认候选信息。";
-          return;
-        }
-        if (result.succeeded) {
-          const proposalResult = await processCandidateProposal(source, result.artifact, snapshot, database, candidateBatchAbortController.signal);
-          if (proposalResult.cancelled) {
-            const cancelled = LocalCandidate.batchFor(sources, "CANCELLED", batchCreatedAt, { batch_id: batchId, created_at: batchCreatedAt, cancelled_at: new Date().toISOString(), completed_source_ids: completed, cancelled_source_id: source.source_document_id, not_started_source_ids: sources.slice(index + 1).map((item) => item.source_document_id) });
-            await Truth.persistRecord(database, "processing_batches", cancelled);
-            setCandidateExtractionState("CANCELLED", "已取消本次本地整理；未处理剩余文件");
-            return;
-          }
-          if (proposalResult.failed) failures.push(proposalResult);
-          else { completed.push(result.sourceId); proposalCount += proposalResult.proposals.length; if (proposalResult.manual) manualReviewCount += proposalResult.proposals.filter((proposal) => proposal.payload.manual_review_required).length; }
-        }
-        if (result.failed) failures.push(result);
+      const documents = await SourceInput.persistDurableBundle({ database,
+        sources: sources.map(source => ({ ...source, source_url: candidate ? source.source_url : sourceUrl })),
+        sourceDocumentFor: adapter.sourceDocumentFor, persistDurableSource: adapter.persistCanonicalSource });
+      await RawSource.persistArchive(database, documents, sourceUrl);
+      const currentSources = candidate ? selectedCandidateSources : selectedJobSources;
+      const selectionUnchanged = JSON.stringify(currentSources.map(source => source.source_document_id)) === JSON.stringify(sources.map(source => source.source_document_id));
+      if (selectionUnchanged) {
+        if (candidate) candidateExecutionState = "ARCHIVED";
+        else beginJobImportLifecycle(ModelImportLifecycle.STATES.SOURCE_STORED);
       }
-      const finalStatus = failures.length ? "FAILED" : "COMPLETED";
-      await Truth.persistRecord(database, "processing_batches", LocalCandidate.batchFor(sources, finalStatus, batchCreatedAt, {
-        batch_id: batchId,
-        completed_source_ids: completed,
-        created_at: batchCreatedAt,
-        finished_at: new Date().toISOString(),
-      }));
-      setCandidateExtractionState("READY_FOR_REVIEW", failures.length ? "本地提取完成，但部分文件失败" : "本地提取已完成");
-      byId("personal-page-message").textContent = failures.length
-        ? `已有文件完成本地提取，但 ${failures.length} 个文件未能完成整理。${personalErrorCopy({ code: failures[0]?.error })} 尚未形成正式候选信息，未调用服务商或模型。`
-        : `已根据本地确定规则生成 ${proposalCount} 条候选信息提案（${manualReviewCount} 条需人工处理）；均待人工审核，尚未形成正式候选信息，未调用服务商或模型。`;
-      byId("personal-page-message").classList.toggle("error", failures.length > 0);
-      await renderAwaitingCandidateReviews({ reset: true, sourceIds: sources.map((source) => source.source_document_id) });
+      byId(`${prefix}-page-message`).textContent = selectionUnchanged
+        ? `已保存 ${documents.length} 份原件，未识别或分析。接入 AI 后可从上方选择原件继续。`
+        : `已保存 ${documents.length} 份原件；当前选择已变化，新材料还需保存。`;
+      byId(`${prefix}-page-message`).classList.remove("error");
+    } catch (error) {
+      byId(`${prefix}-page-message`).textContent = "原件保存未完成，请重试；已成功保存的文件会保留。";
+      byId(`${prefix}-page-message`).classList.add("error");
     } finally {
       database?.close?.();
-      candidateBatchAbortController = null;
-      candidateProcessingInProgress = false;
-      if (candidateExecutionState === "PROCESSING") candidateExecutionState = "COMPLETE";
-      byId("replace-personal-file").textContent = "替换";
-      refreshCandidateImportGate();
+      if (candidate) candidateProcessingInProgress = false;
+      else jobProcessingInProgress = false;
+      refresh();
+      await renderSavedSources(kind);
     }
   }
+
+  async function runCandidateProcessing() { return archiveSelectedSources("candidate"); }
 
   function runtimeIdentity(runtime) {
     return JSON.stringify({ mode: runtime.mode, provider: runtime.provider, model: runtime.model });
@@ -2349,30 +2199,10 @@
       byId("personal-import-types").querySelectorAll("button").forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
       if (selectedCandidateSources.length) handleCandidateFiles(selectedCandidateSources.map((source) => source.file));
     });
-    byId("saved-candidate-source-trigger").addEventListener("click", () => {
-      const selector = byId("saved-candidate-source-selector");
-      setSavedCandidateSourceMenu(!selector.classList.contains("is-open"));
+    byId("saved-candidate-source-select").addEventListener("change", event => {
+      if (event.target.value && !candidateProcessingInProgress) selectSavedCandidatePdf(event.target.value).catch(showPersonalError);
     });
-    document.addEventListener("click", (event) => {
-      const selector = byId("saved-candidate-source-selector");
-      if (selector && !selector.contains(event.target)) setSavedCandidateSourceMenu(false);
-    });
-    byId("saved-candidate-source-selector").addEventListener("keydown", (event) => {
-      if (event.key === "Escape") { setSavedCandidateSourceMenu(false); byId("saved-candidate-source-trigger").focus(); }
-      if (["ArrowDown", "ArrowUp"].includes(event.key)) {
-        event.preventDefault();
-        setSavedCandidateSourceMenu(true);
-        const options = [...byId("saved-candidate-source-list").querySelectorAll('[role="option"]')];
-        if (!options.length) return;
-        const current = options.indexOf(document.activeElement);
-        options[(current + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length].focus();
-      }
-    });
-    byId("saved-candidate-source-list").addEventListener("click", (event) => {
-      const button = event.target.closest("[data-saved-candidate-source]");
-      if (!button || candidateProcessingInProgress) return;
-      selectSavedCandidatePdf(button.dataset.savedCandidateSource).catch(showPersonalError);
-    });
+    byId("save-personal-source").addEventListener("click", () => runCandidateProcessing().catch(showPersonalError));
     const acceptCandidateFiles = async (files, { replace = false, captured_via: capturedVia = "FILE_PICKER" } = {}) => {
       const selectionVersion = ++candidateSelectionVersion;
       const gate = refreshCandidateImportGate();
@@ -2385,40 +2215,23 @@
       byId("personal-page-message").classList.remove("error");
       const batchId = !replace && selectedCandidateSources[0]?.batch_id
         ? selectedCandidateSources[0].batch_id
-        : `${modelReady ? "batch-candidate-model" : "batch-candidate-extraction"}-${crypto.randomUUID()}`;
+        : `${modelReady ? "batch-candidate-model" : "batch-candidate-archive"}-${crypto.randomUUID()}`;
       candidateExecutionState = "READY";
       const prepared = await Promise.all(selectedFiles.map(async (file) => ({ ...(await LocalCandidate.prepareSource(file, batchId, selectedCandidateType)), captured_via: capturedVia })));
+      if (selectionVersion !== candidateSelectionVersion) return;
       const unique = [...new Map(prepared.map((source) => [source.source_document_id, source])).values()];
       const database = await Truth.openDatabase();
       let records;
-      try {
-        records = await readCandidateRecords(database);
-        const existingStates = unique.map((source) => ({
-          source,
-          import_state: modelReady ? modelSourceImportState(source.source_document_id, records) : LocalCandidateReview.sourceImportState(source.source_document_id, records),
-        }));
-        for (const item of existingStates.filter((entry) => modelReady || ["PENDING_REVIEW", "ACTIVE", "COMPLETED"].includes(entry.import_state))) {
-          const existingDocument = records.source_documents.find((record) => record.source_document_id === item.source.source_document_id);
-          await LocalCandidate.persistCanonicalSource(database, existingDocument || LocalCandidate.sourceDocumentFor(item.source), item.source.file);
-        }
-      } finally { database.close(); }
+      try { records = await readCandidateRecords(database); }
+      finally { database.close(); }
       if (selectionVersion !== candidateSelectionVersion) return;
-      const incoming = unique.map((source) => ({ ...source, import_state: modelReady ? modelSourceImportState(source.source_document_id, records) : LocalCandidateReview.sourceImportState(source.source_document_id, records) }));
+      const incoming = unique.map((source) => ({ ...source, import_state: modelSourceImportState(source.source_document_id, records) }));
       selectedCandidateSources = SourceInput.mergeSources(selectedCandidateSources, incoming, { replace });
+      activeCandidateWorkingModel = null;
+      candidateExecutionState = "READY";
       if (selectedCandidateSources[0]) showCandidateSource(selectedCandidateSources[0]);
-      const pending = selectedCandidateSources.filter((source) => source.import_state === "PENDING_REVIEW");
-      const active = selectedCandidateSources.filter((source) => source.import_state === "ACTIVE");
-      const completedSources = selectedCandidateSources.filter((source) => source.import_state === "COMPLETED");
-      const actionable = selectedCandidateSources.filter((source) => ["NEW", "RETRY"].includes(source.import_state));
-      if (pending.length) await renderAwaitingCandidateReviews({ reset: true, sourceIds: pending.map((source) => source.source_document_id) });
-      else await renderAwaitingCandidateReviews({ reset: true, sourceIds: [] });
-      candidateExecutionState = modelReady ? "READY" : actionable.length ? "READY" : completedSources.length && !active.length && !pending.length ? "COMPLETED_SOURCE" : "COMPLETE";
-      if (pending.length && !actionable.length) byId("personal-page-message").textContent = "该文件已有待审核内容，已恢复审核队列。";
-      else if (completedSources.length && !actionable.length && !active.length) byId("personal-page-message").textContent = "该资料已被读取。点击确认返回个人资料。";
-      else if (active.length && !actionable.length) byId("personal-page-message").textContent = "该文件已导入，无需重复处理。";
-      else if (active.length || pending.length || completedSources.length) byId("personal-page-message").textContent = `已跳过 ${active.length + pending.length + completedSources.length} 个已导入或待审核文件；其余文件可以继续${modelReady ? "模型分析" : "本地提取"}。`;
-      else byId("personal-page-message").textContent = "";
-      setCompletedSourceSheet(candidateExecutionState === "COMPLETED_SOURCE");
+      await renderAwaitingCandidateReviews({ reset: true, sourceIds: [] });
+      byId("personal-page-message").textContent = "已选择材料；保存原件后可随时回来继续。";
       refreshCandidateImportGate();
       await renderSavedCandidatePdfSources();
     };
@@ -2430,6 +2243,8 @@
       const button = event.target.closest("[data-source-remove]");
       if (!button || candidateProcessingInProgress) return;
       selectedCandidateSources.splice(Number(button.dataset.sourceRemove), 1);
+      candidateExecutionState = "READY";
+      activeCandidateWorkingModel = null;
       candidateSelectionVersion += 1;
       if (selectedCandidateSources.length) showCandidateSource(selectedCandidateSources[0]);
       else resetInvalidCandidateSelection();
@@ -2437,7 +2252,7 @@
     byId("replace-personal-file").addEventListener("click", () => {
       if (candidateProcessingInProgress) {
         candidateBatchAbortController?.abort();
-        setCandidateExtractionState("CANCELLING", refreshCandidateImportGate().authority.runtime.mode === "model" ? "正在取消本次模型分析" : "正在取消本次本地提取");
+        setCandidateExtractionState("CANCELLING", refreshCandidateImportGate().authority.runtime.mode === "model" ? "正在取消本次模型分析" : "原件保存中");
         return;
       }
       candidateSourceInputBinding.openChooser({ replace: false });
@@ -2445,12 +2260,10 @@
     byId("start-personal-processing").addEventListener("click", () => {
       const gate = refreshCandidateImportGate();
       const sourceId = selectedCandidateSources[0]?.source_document_id;
-      const operation = ProductShell.dispatchRuntimeImport(gate, {
-        model: () => candidateExecutionState === "COMPLETE" && activeCandidateWorkingModel?.source_document_id === sourceId
-          ? renderCandidateWorkingWorkspace(sourceId, { workingModel: activeCandidateWorkingModel })
-          : openCandidateModelConsent(),
-        local: () => runCandidateProcessing(),
-      });
+      const operation = candidateAnalysisReady(gate)
+        ? candidateExecutionState === "COMPLETE" && activeCandidateWorkingModel?.source_document_id === sourceId
+          ? renderCandidateWorkingWorkspace(sourceId, { workingModel: activeCandidateWorkingModel }) : openCandidateModelConsent()
+        : runCandidateProcessing();
       Promise.resolve(operation).catch(showPersonalError);
     });
     byId("confirm-completed-source").addEventListener("click", () => {
@@ -3032,7 +2845,7 @@
     ProcessingIndicator.set(byId("job-processing"), {
       active: !["READY_FOR_REVIEW", "WORKING_READY", "CANCELLED", "FAILED"].includes(state),
       copy,
-      boundary: modelMode ? "正在等待模型时不会改用本地结果" : "本地确定性处理 · Provider 调用 0",
+      boundary: modelMode ? "正在等待模型时不会改用本地结果" : "仅保存原件 · 不进行识别或分析",
       state,
     });
   }
@@ -3074,11 +2887,12 @@
     } finally { database.close(); }
   }
 
-  async function savedModelJobProposalForSource(sourceId) {
+  async function savedModelJobProposalForSource(sourceId, sourceIds = selectedJobSources.map(source => source.source_document_id)) {
     const database = await Truth.openDatabase();
     try {
       return (await JobContext.getAll(database, "context_proposals"))
         .filter((proposal) => proposal.proposal_type === "JOB_CONTEXT" && proposal.status === "AWAITING_REVIEW" && proposal.source_document_ids.includes(sourceId)
+          && JSON.stringify(proposal.source_document_ids) === JSON.stringify(sourceIds)
           && (proposal.warnings || []).includes("model_generated_non_authoritative"))
         .sort((left, right) => String(right.created_at).localeCompare(String(left.created_at)))[0] || null;
     } finally { database.close(); }
@@ -3166,8 +2980,9 @@
       for (const source of LocalContextLifecycle.uniqueSources(prepared)) incoming.push({ ...source, import_state: await jobSourceImportState(source.source_document_id, database, modelMode) });
       selectedJobSources = SourceInput.mergeSources(selectedJobSources, incoming, { replace });
     } finally { database.close(); }
-    if (selectedJobSources.some((source) => ["NEW", "RETRY"].includes(source.import_state))) beginJobImportLifecycle();
-    else if (modelMode && selectedJobSources.some((source) => source.import_state === "WORKSPACE")) beginJobImportLifecycle(ModelImportLifecycle.STATES.WORKING);
+    if (!modelMode || selectedJobSources.some((source) => ["NEW", "RETRY"].includes(source.import_state))) beginJobImportLifecycle();
+    else if (modelMode && await savedModelJobProposalForSource(selectedJobSources[0]?.source_document_id)) beginJobImportLifecycle(ModelImportLifecycle.STATES.WORKING);
+    else if (modelMode && selectedJobSources.some((source) => source.import_state === "WORKSPACE")) beginJobImportLifecycle();
     else if (selectedJobSources.some((source) => source.import_state === "PENDING_REVIEW")) beginJobImportLifecycle(ModelImportLifecycle.STATES.REVIEWING);
     else beginJobImportLifecycle(ModelImportLifecycle.STATES.SAVED);
     if (selectedJobSources[0]) showJobSource(selectedJobSources[0]);
@@ -3177,7 +2992,7 @@
     const activeCount = selectedJobSources.filter((source) => source.import_state === "ACTIVE").length;
     const pendingCount = selectedJobSources.filter((source) => source.import_state === "PENDING_REVIEW").length;
     const messages = [];
-    if (selectedJobSources.length) messages.push(`已识别 ${selectedJobSources.length} 个独立来源。`);
+    if (selectedJobSources.length) messages.push(`已选择 ${selectedJobSources.length} 份原件。`);
     if (duplicateCount) messages.push(`${duplicateCount} 个完全相同的文件已合并处理。`);
     if (activeCount) messages.push(`${activeCount} 个来源已导入，不会重复生成。`);
     if (pendingCount) messages.push(`${pendingCount} 个来源将恢复现有待审核草稿。`);
@@ -3189,71 +3004,6 @@
     byId("job-page-message").classList.toggle("error", !selectedJobSources.length);
     await renderAwaitingJobReviews({ reset: true });
     refreshJobImportGate();
-  }
-
-  async function extractJobSource(source, snapshot, signal) {
-    const documentDataUrl = await LocalJob.readAsDataURL(source.file, source.mime_type);
-    const image = source.source_type === "IMAGE";
-    const response = await (globalThis.AriadneConnector || globalThis).fetch(image ? "/api/local-job-image-ocr" : "/api/local-job-extract", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal,
-      body: JSON.stringify({
-        filename: source.file.name,
-        media_type: source.mime_type,
-        source_document_id: source.source_document_id,
-        runtime_snapshot: snapshot,
-        ...(image ? { image_data_url: documentDataUrl } : { document_data_url: documentDataUrl }),
-      }),
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || "job_local_extraction_failed");
-    if (result.model_call_made !== false || result.runtime_snapshot_id !== snapshot.snapshot_id || result.content_hash !== source.content_hash) throw new Error("job_local_extraction_contract_failed");
-    return result;
-  }
-
-  async function processJobSource(source, snapshot, database, signal) {
-    if (snapshot.mode !== "local" || snapshot.capabilities.deterministic_structuring !== "supported") throw new Error("job_local_runtime_required");
-    setJobProcessingState("PREPARING", "正在读取职位材料");
-    const sourceDocument = LocalJob.sourceDocumentFor(source);
-    const durable = await LocalJob.persistCanonicalSource(database, sourceDocument, source.file);
-    if (signal.aborted) return { cancelled: true };
-
-    let extractionRun = LocalJob.processingRunFor(source, snapshot.snapshot_id, "PENDING");
-    await Truth.persistRecord(database, "processing_runs", extractionRun);
-    extractionRun = LocalJob.processingRunFor(source, snapshot.snapshot_id, "RUNNING", { run_id: extractionRun.run_id });
-    await Truth.persistRecord(database, "processing_runs", extractionRun);
-    setJobProcessingState("UNDERSTANDING", "正在理解职位要求");
-    let result;
-    try {
-      result = await extractJobSource({ ...source, file: durable.file }, snapshot, signal);
-    } catch (error) {
-      const failed = LocalJob.processingRunFor(source, snapshot.snapshot_id, "FAILED", { run_id: extractionRun.run_id, started_at: extractionRun.started_at, error_code: String(error?.message || "JOB_LOCAL_EXTRACTION_FAILED").slice(0, 180) });
-      await Truth.persistRecord(database, "processing_runs", failed);
-      throw error;
-    }
-    const artifact = LocalJob.artifactFor(source, extractionRun, result);
-    extractionRun = LocalJob.processingRunFor(source, snapshot.snapshot_id, "SUCCEEDED", { run_id: extractionRun.run_id, started_at: extractionRun.started_at, output_artifact_ids: [artifact.artifact_id] });
-    await Truth.persistRecord(database, "extraction_artifacts", artifact);
-    await Truth.persistRecord(database, "processing_runs", extractionRun);
-    if (signal.aborted) return { cancelled: true };
-
-    setJobProcessingState("BUILDING_CARDS", "正在生成结构化职位草稿");
-    let structuringRun = JobContext.structuringRunFor(source, snapshot.snapshot_id, "RUNNING");
-    await Truth.persistRecord(database, "processing_runs", structuringRun);
-    let proposal;
-    try {
-      proposal = JobContext.proposalFor({ source: sourceDocument, artifact, structuring_run: structuringRun, source_url: source.source_url });
-    } catch (error) {
-      structuringRun = JobContext.structuringRunFor(source, snapshot.snapshot_id, "FAILED", { run_id: structuringRun.run_id, started_at: structuringRun.started_at, error_code: String(error?.message || "JOB_LOCAL_STRUCTURING_FAILED").slice(0, 180) });
-      await Truth.persistRecord(database, "processing_runs", structuringRun);
-      throw error;
-    }
-    await Truth.persistRecord(database, "context_proposals", proposal);
-    structuringRun = JobContext.structuringRunFor(source, snapshot.snapshot_id, "SUCCEEDED", { run_id: structuringRun.run_id, started_at: structuringRun.started_at, proposal_ids: [proposal.proposal_id] });
-    await Truth.persistRecord(database, "processing_runs", structuringRun);
-    setJobProcessingState("READY_FOR_REVIEW", "已生成真实内容的待审核职位草稿");
-    return { proposal, artifact, source_document: sourceDocument, provider_calls: 0 };
   }
 
   async function readJobSourceForModel(database, source, sourceDocument, runtimeSnapshot, signal) {
@@ -3315,7 +3065,7 @@
     if (!JobModel || !selectedJobSource || !selectedJobSources.length) throw new Error("job_model_source_bundle_invalid");
     const gate = JobModel.assertEligibleGate(refreshJobImportGate());
     const selectionVersion = jobSelectionVersion;
-    const sources = [...selectedJobSources];
+    const sources = selectedJobSources.map(source => ({ ...source, source_url: byId("job-link-input").value.trim() || null }));
     const database = await Truth.openDatabase();
     let sourceDocuments;
     try {
@@ -3325,6 +3075,7 @@
         sourceDocumentFor: LocalJob.sourceDocumentFor,
         persistDurableSource: LocalJob.persistCanonicalSource,
       });
+      await RawSource.persistArchive(database, sourceDocuments, sources[0]?.source_url || null);
     } finally { database.close(); }
     const currentGate = refreshJobImportGate();
     if (selectionVersion !== jobSelectionVersion || currentGate.authority.runtime.mode !== "model") throw new Error("job_model_consent_mismatch");
@@ -3434,66 +3185,7 @@
     }
   }
 
-  async function runJobProcessing() {
-    const button = byId("start-job-processing");
-    const gate = refreshJobImportGate();
-    if (!gate.allowed || gate.authority.runtime.mode !== "local") throw new Error(`runtime_capability_${gate.state}`);
-    const batchAuthority = gate.authority;
-    jobProcessingInProgress = true;
-    jobBatchAbortController = new AbortController();
-    button.disabled = true;
-    byId("replace-job-file").textContent = "取消本次整理";
-    byId("job-processing").classList.remove("hidden");
-    const currentSourceUrl = byId("job-link-input")?.value.trim() || null;
-    const sources = (selectedJobImportType === "Paste" ? [selectedJobSource] : selectedJobSources).filter((source) => ["NEW", "RETRY"].includes(source.import_state || "NEW")).map((source) => ({ ...source, source_url: currentSourceUrl || source.source_url }));
-    let lastError = null;
-    const database = await Truth.openDatabase();
-    try {
-      const localOcr = sources.some((source) => source.source_type === "IMAGE") ? await localOcrEnvironmentCapability() : "unverified";
-      const snapshot = RuntimeExecution.createRuntimeSnapshot(batchAuthority.runtime, { environmentCapabilities: { local_ocr: localOcr }, operation: "JOB_LOCAL_IMPORT", schemaVersion: JobContext.PAYLOAD_CONTRACT });
-      await Truth.persistRecord(database, "runtime_snapshots", snapshot);
-      if (jobImportLifecycle?.state === ModelImportLifecycle.STATES.SOURCE_SELECTED) transitionJobImportLifecycle(ModelImportLifecycle.STATES.SOURCE_STORED);
-      if (jobImportLifecycle?.state === ModelImportLifecycle.STATES.SOURCE_STORED) transitionJobImportLifecycle(ModelImportLifecycle.STATES.MODEL_PROCESSING);
-      for (const source of sources) {
-        if (jobBatchAbortController.signal.aborted) {
-          transitionJobImportLifecycle(ModelImportLifecycle.STATES.MODEL_FAILED);
-          byId("job-page-message").textContent = "本次职位整理已取消；此前已保存的草稿保留，剩余文件没有处理。";
-          byId("job-page-message").classList.remove("error");
-          return;
-        }
-        showJobSource(source);
-        try {
-          const result = await processJobSource(source, snapshot, database, jobBatchAbortController.signal);
-          if (result.cancelled) {
-            transitionJobImportLifecycle(ModelImportLifecycle.STATES.MODEL_FAILED);
-            byId("job-page-message").textContent = "本次职位整理已取消；当前来源未形成成功结果，剩余文件没有处理，此前已保存的草稿保留。";
-            byId("job-page-message").classList.remove("error");
-            return;
-          }
-        }
-        catch (error) {
-          lastError = error;
-          byId("job-page-message").textContent = `无法整理 ${source.name}：${error.message}；其他独立来源将继续处理。`;
-          byId("job-page-message").classList.add("error");
-        }
-      }
-      const pending = await renderAwaitingJobReviews({ reset: true });
-      transitionJobImportLifecycle(ModelImportLifecycle.STATES.PROPOSAL_READY);
-      resolveJobProposalLifecycle(pending.length);
-      if (pending.length) {
-        byId("job-page-message").textContent = `已从真实内容建立 ${pending.length} 条待审核职位草稿，请逐条确认或拒绝。`;
-        byId("job-page-message").classList.remove("error");
-      }
-      if (lastError && !pending.length) throw lastError;
-    } finally {
-      database.close();
-      jobBatchAbortController = null;
-      jobProcessingInProgress = false;
-      byId("replace-job-file").textContent = "替换";
-      byId("job-processing").classList.add("hidden");
-      refreshJobImportGate();
-    }
-  }
+  async function runJobProcessing() { return archiveSelectedSources("job"); }
 
   function jobReviewMarkup(proposal, position, total) {
     const job = proposal.payload;
@@ -3671,24 +3363,32 @@
   function initJobImport() {
     ProductShell.bindImportShell(document);
     jobSharedWorkspace();
+    renderSavedSources("job").catch(showJobError);
+    byId("saved-job-source-select").addEventListener("change", event => {
+      if (event.target.value && !jobProcessingInProgress) selectSavedJobSources(event.target.value).catch(showJobError);
+    });
+    byId("save-job-source").addEventListener("click", () => runJobProcessing().catch(showJobError));
+    byId("job-link-input").addEventListener("input", () => {
+      if (selectedJobSources.length) { jobSelectionVersion += 1; jobModelConsentBundle = null; beginJobImportLifecycle(); refreshJobImportGate(); }
+    });
     byId("job-import-types").addEventListener("click", (event) => {
       const button = event.target.closest("[data-job-import-type]");
       if (!button) return;
       configureJobImportType(button.dataset.jobImportType);
     });
     byId("job-paste-input").addEventListener("input", async (event) => {
-      const text = event.target.value.trim();
-      if (!text) { resetJobSource(); return; }
+      const text = event.target.value;
+      if (!text.trim()) { resetJobSource(); return; }
       const selectionVersion = ++jobSelectionVersion;
       const source = await LocalJob.preparePastedText(text, `job-batch-${crypto.randomUUID()}`, byId("job-link-input")?.value.trim() || null);
       const database = await Truth.openDatabase();
       const modelMode = refreshJobImportGate().authority.runtime.mode === "model";
       const importState = await jobSourceImportState(source.source_document_id, database, modelMode);
       database.close();
-      if (selectionVersion !== jobSelectionVersion || event.target.value.trim() !== text) return;
+      if (selectionVersion !== jobSelectionVersion || event.target.value !== text) return;
       selectedJobSource = { ...source, sizeLabel: `${text.length} 字符`, import_type: "Paste", import_state: importState };
       selectedJobSources = [selectedJobSource];
-      if (["NEW", "RETRY"].includes(selectedJobSource.import_state)) beginJobImportLifecycle();
+      if (!modelMode || ["NEW", "RETRY"].includes(selectedJobSource.import_state)) beginJobImportLifecycle();
       else if (modelMode && selectedJobSource.import_state === "WORKSPACE") beginJobImportLifecycle(ModelImportLifecycle.STATES.WORKING);
       else if (selectedJobSource.import_state === "PENDING_REVIEW") beginJobImportLifecycle(ModelImportLifecycle.STATES.REVIEWING);
       else beginJobImportLifecycle(ModelImportLifecycle.STATES.SAVED);
@@ -3712,7 +3412,7 @@
     byId("replace-job-file").addEventListener("click", () => {
       if (jobProcessingInProgress) {
         jobBatchAbortController?.abort();
-        setJobProcessingState("CANCELLING", refreshJobImportGate().authority.runtime.mode === "model" ? "正在取消本次 ARIADNE AI 理解" : "正在取消本次职位整理");
+        setJobProcessingState("CANCELLING", refreshJobImportGate().authority.runtime.mode === "model" ? "正在取消本次 ARIADNE AI 理解" : "原件保存中");
         return;
       }
       if (selectedJobImportType === "Paste") byId("job-paste-input").focus();
@@ -3720,12 +3420,11 @@
     });
     byId("start-job-processing").addEventListener("click", () => {
       const gate = refreshJobImportGate();
-      const operation = ProductShell.dispatchRuntimeImport(gate, {
-        model: () => selectedJobSource?.import_state === "WORKSPACE"
+      const operation = gate.authority.runtime.mode === "model" && gate.allowed
+        ? jobExecutionState === "WORKING"
           ? savedModelJobProposalForSource(selectedJobSource.source_document_id).then((proposal) => proposal ? showJobWorkingWorkspace(proposal) : Promise.reject(new Error("job_working_proposal_missing")))
-          : openJobModelConsent(),
-        local: () => runJobProcessing(),
-      });
+          : openJobModelConsent()
+        : runJobProcessing();
       Promise.resolve(operation).catch(showJobError);
     });
     byId("job-workspace-save").addEventListener("click", () => saveJobWorkingWorkspace().catch(showJobError));

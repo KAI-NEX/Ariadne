@@ -19,7 +19,8 @@ const candidateDetail = read("public/candidate-detail.html");
 const jobDetail = read("public/job-detail.html");
 const productSurfaces = [candidateImport, jobImport, candidateDetail, jobDetail];
 
-assert.match(pages, /modelMode \? "使用人工智能解析" : "开始本地整理"/);
+assert.match(pages, /"职位已保存" : "使用人工智能解析"/);
+assert.match(pages, /"原件已保存" : "保存原件"/);
 assert.doesNotMatch(jobImport, /链接只作为来源信息保存在本地；本页不会自动访问或上传该网址。/);
 assert.doesNotMatch(pages.slice(pages.indexOf("function showJobSource"), pages.indexOf("function resetJobSource")), /原始来源保存在本机；确认后发送有界文本证据/);
 assert.match(pages, /source_url: sourceUrl/);

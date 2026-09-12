@@ -109,10 +109,10 @@ for (const html of [candidateDetail, jobDetail, personalImport, jobImport]) {
 }
 assert.match(candidateDetail, /id="candidate-ai-pane" class="v1-conversation-pane hidden"/);
 assert.match(jobDetail, /id="job-ai-pane" class="v1-conversation-pane hidden"/);
-assert.match(pages, /仅本地读取、提取与确定规则；不调用模型服务商/);
-assert.match(pages, /本地读取真实内容 · 原始来源持久保留 · 无模型调用/);
-assert.match(personalImport, /开始本地提取/);
-assert.match(jobImport, /开始本地整理/);
+assert.match(pages, /仅保存原始材料；不调用模型服务商/);
+assert.match(pages, /仅保存原件，不识别、不分析。接入 AI 后可继续。/);
+assert.match(personalImport, /保存原件/);
+assert.match(jobImport, /保存原件/);
 assert.doesNotMatch(jobImport, /data-job-processing-mode|id="job-processing-modes"/);
 assert.match(personalImport, /local-candidate-extraction-domain\.js/);
 assert.match(personalImport, /candidate-model-runtime-domain\.js/);
@@ -128,41 +128,22 @@ assert.match(pages, /"job_conversation"/);
 assert.match(pages, /runtime\.mode === "model" && gate\.allowed/);
 assert.match(pages, /ProductShell\.applyDetailRuntime\(shell,/);
 assert.match(productShell, /shell\.conversationPane\.querySelectorAll\("input, textarea, button"\)[\s\S]*control\.disabled = !conversationAllowed/);
-assert.match(pages, /fetch\("\/api\/local-ocr-capability"/);
-assert.match(pages, /fetch\(image \? "\/api\/local-candidate-image-ocr" : "\/api\/local-candidate-extract"/);
+assert.doesNotMatch(pages, /fetch\("\/api\/local-ocr-capability"/);
+assert.doesNotMatch(pages, /fetch\(image \? "\/api\/local-candidate-image-ocr" : "\/api\/local-candidate-extract"/);
 assert.match(pages, /fetch\("\/api\/candidate-model-structure"/);
 assert.doesNotMatch(pages, /fetch\("\/api\/local-ocr"/);
 
-const candidateProcess = pages.slice(pages.indexOf("async function processCandidateSource"), pages.indexOf("async function runCandidateProcessing"));
-assert.match(candidateProcess, /persistCanonicalSource/);
-assert.match(candidateProcess, /extraction_artifacts/);
-assert.doesNotMatch(candidateProcess, /createLocalCandidateFixtures|persistCandidateImport|findCandidateDuplicates/);
-const candidateRun = pages.slice(pages.indexOf("async function runCandidateProcessing"), pages.indexOf("function initPersonal"));
-const candidateCancel = candidateRun.match(/if \(result\.cancelled\) \{([\s\S]*?)\n        \}/)?.[1] || "";
-assert.match(candidateCancel, /return;/);
-assert.doesNotMatch(candidateCancel, /continue|completeEmbeddedImport|returnToCardLibrary/);
-assert.match(candidateRun, /createRuntimeSnapshot/);
-assert.match(candidateProcess, /snapshot\.snapshot_id/);
-
-const jobProcess = pages.slice(pages.indexOf("async function processJobSource"), pages.indexOf("async function runJobProcessing"));
-assert.ok(jobProcess.indexOf('snapshot.mode !== "local"') < jobProcess.indexOf("LocalJob.persistCanonicalSource"));
-assert.ok(jobProcess.indexOf("LocalJob.persistCanonicalSource") < jobProcess.indexOf("signal.aborted"));
-assert.match(jobProcess, /extraction_artifacts/);
-assert.match(jobProcess, /JobContext\.proposalFor/);
-assert.doesNotMatch(jobProcess, /Demo\.createLocalJobFixture|LocalJobLifecycle\.persistPendingImport/);
-const jobRun = pages.slice(pages.indexOf("async function runJobProcessing"), pages.indexOf("function jobReviewMarkup"));
-assert.match(jobRun, /const gate = refreshJobImportGate\(\)/);
-assert.doesNotMatch(jobRun, /currentOperationGate|modelDescriptorForRuntime|job_model_structuring/);
-const jobCancel = jobRun.match(/if \(result\.cancelled\) \{([\s\S]*?)\n          \}/)?.[1] || "";
-assert.match(jobCancel, /return;/);
-assert.doesNotMatch(jobCancel, /continue|completeEmbeddedImport|returnToCardLibrary/);
-assert.match(jobCancel, /当前来源未形成成功结果/);
-assert.match(jobRun, /剩余文件没有处理/);
+// Archiving is independent of model eligibility and cannot produce semantic records.
+const archiveFlow = pages.slice(pages.indexOf("async function archiveSelectedSources"), pages.indexOf("function runtimeIdentity"));
+assert.match(archiveFlow, /SourceInput\.persistDurableBundle/);
+assert.match(archiveFlow, /RawSource\.persistArchive/);
+assert.doesNotMatch(archiveFlow, /fetch\(|createRuntimeSnapshot|extraction_artifacts|context_proposals|context_revisions|proposalFor/);
+assert.doesNotMatch(pages, /\/api\/local-(?:ocr-capability|candidate-extract|candidate-image-ocr|candidate-structure|job-extract|job-image-ocr)/);
 const jobGate = pages.slice(pages.indexOf("function refreshJobImportGate"), pages.indexOf("function formatBytes"));
 assert.match(jobGate, /RuntimeGate\.readStoredRuntime\(\)/);
 assert.match(jobGate, /currentOperationGate\(modelMode \? jobImportOperation\(\) : "job_import"\)/);
-assert.match(jobGate, /byId\("job-file-input"\)\.disabled = jobProcessingInProgress \|\| !gate\.allowed/);
-assert.match(jobGate, /byId\("job-dropzone"\)\.disabled = jobProcessingInProgress \|\| !gate\.allowed/);
+assert.match(jobGate, /byId\("job-file-input"\)\.disabled = jobProcessingInProgress;/);
+assert.match(jobGate, /byId\("job-dropzone"\)\.disabled = jobProcessingInProgress;/);
 assert.doesNotMatch(jobGate, /authorityFrom\(\{ mode: "(?:local|model)"/);
 
 for (const labels of [Demo.CANDIDATE_PROCESSING_STATES, Demo.JOB_PROCESSING_STATES]) {

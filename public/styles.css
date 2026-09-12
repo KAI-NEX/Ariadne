@@ -562,17 +562,17 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-source-preview-list li > span b { align-items: center; background: #e8ecf5; border-radius: 50%; color: var(--vi-focus); display: inline-flex; flex: 0 0 20px; font-size: 9px; height: 20px; justify-content: center; }
 .v1-source-preview-list li button { color: #7a8291; flex: 0 0 auto; padding: 3px; }
 .v1-file-dropzone.is-accepted { background: #eef7f2; box-shadow: inset 0 0 0 2px #74a58e; }
-.v1-body[data-candidate-import-runtime="model-unavailable"] .v1-file-dropzone, .v1-body[data-candidate-import-runtime="model-unavailable"] .v1-segmented { opacity: .45; pointer-events: none; }
+
 .v1-saved-sources { display: grid; gap: 8px; }
 .v1-saved-sources.hidden { display: none; }
 .v1-saved-source-selector { position: relative; }
 .v1-saved-source-trigger.runtime-selector, .v1-saved-source-menu.runtime-menu { width: 100%; }
-.v1-saved-source-trigger.runtime-selector { font: inherit; font-size: 15px; }
+.v1-saved-source-trigger.runtime-selector { font: inherit; font-size: 15px; min-width: 0; text-overflow: ellipsis; }
 .v1-saved-source-menu { z-index: 30; }
 .v1-saved-source-list { max-height: 248px; overflow-y: auto; overscroll-behavior: contain; }
 .v1-saved-source-selector.is-open .v1-saved-source-menu { opacity: 1; pointer-events: auto; transform: translateY(0) scale(1); transition: opacity 190ms ease, transform 280ms var(--vi-ease-standard), visibility 0s; visibility: visible; }
 .v1-saved-source-button[aria-selected="true"]::after { background: currentColor; content: ""; height: 20px; mask: url("/vi/icons/check.svg") center / 20px 20px no-repeat; position: absolute; right: 8px; top: 18px; width: 20px; -webkit-mask: url("/vi/icons/check.svg") center / 20px 20px no-repeat; }
-.v1-body[data-candidate-import-runtime="model-ready"] #personal-material-type-section, .v1-body[data-candidate-import-runtime="model-ready"] #personal-runtime-summary, .v1-body[data-candidate-import-runtime="model-ready"] #personal-file-preview { display: none; }
+
 .v1-processing { align-items: center; background: var(--vi-action); border: 1px solid #30343d; border-radius: 999px; color: var(--vi-surface); display: flex; gap: 12px; justify-self: start; padding: 10px 15px 10px 10px; width: fit-content; }
 .v1-processing p { color: #435684; font-size: 12px; font-weight: 700; margin: 0 0 3px; }
 .v1-processing-indicator { align-items: center; background: #252933; border: 1px solid rgba(255,255,255,.08); border-radius: 999px; box-shadow: none; color: var(--vi-surface); display: flex; gap: 10px; min-height: 42px; padding: 8px 14px 8px 10px; width: fit-content; }
@@ -888,6 +888,7 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-embedded-detail .v1-structured-pane::-webkit-scrollbar-thumb, .v1-embedded-detail[data-v1-page="personal-import"] .v1-page-shell::-webkit-scrollbar-thumb, .v1-embedded-detail[data-v1-page="job-import"] .v1-page-shell::-webkit-scrollbar-thumb { background: rgba(112,119,132,.48); background-clip: padding-box; border: 3px solid transparent; border-radius: 999px; }
 .v1-embedded-detail .v1-inline-message { display: none; }
 .v1-embedded-detail[data-v1-page="personal-import"] #personal-page-message.error { display: block; margin: 0 auto; max-width: 720px; }
+.v1-embedded-detail[data-v1-page="personal-import"] #personal-page-message, .v1-embedded-detail[data-v1-page="job-import"] #job-page-message { display: block; }
 .v1-embedded-detail[data-v1-page="personal-import"], .v1-embedded-detail[data-v1-page="job-import"] { height: 100vh; min-height: 0; overflow: hidden; }
 .v1-embedded-detail[data-v1-page="personal-import"] .v1-page-shell, .v1-embedded-detail[data-v1-page="job-import"] .v1-page-shell { height: 100vh; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 24px 18px max(56px, env(safe-area-inset-bottom)); scroll-padding-bottom: 52px; scrollbar-color: rgba(112,119,132,.48) transparent; scrollbar-gutter: stable; scrollbar-width: thin; }
 .v1-embedded-detail[data-v1-page="personal-import"] .v1-import-intro, .v1-embedded-detail[data-v1-page="job-import"] .v1-import-intro { margin: 2px auto 20px; }

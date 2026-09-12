@@ -22,8 +22,8 @@ assert.match(pages, /String\(code\)\.startsWith\("self_reported_"\).*该内容�
 assert.match(pages, /candidateExecutionState = "READY"/);
 assert.match(pages, /candidateExecutionState = "PROCESSING"/);
 assert.match(pages, /candidateExecutionState = "COMPLETE"/);
-assert.match(pages, /模型导入尚不可用/);
-assert.match(pages, /dataset\.candidateImportRuntime = local \? "local" : modelReady \? "model-ready" : "model-unavailable"/);
+assert.match(pages, /可以先保存原件/);
+assert.match(pages, /dataset\.candidateImportRuntime = mode === "local" \? "local" : modelReady \? "model-ready" : "model-unavailable"/);
 
 for (const field of ["candidate-edit-title", "candidate-edit-subtitle", "candidate-edit-time", "candidate-edit-summary", "candidate-edit-facts"]) assert.match(detail, new RegExp(`id="${field}"`));
 assert.match(pages, /persistUserEdit\(database, canonicalRevision, itemId, editedItem, \{ working_model: editedWorkingModel \}\)/);

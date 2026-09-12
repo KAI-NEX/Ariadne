@@ -80,7 +80,7 @@ for (const html of [candidateImport, jobImport]) assert.match(html, /class="v1-c
 assert.equal((pages.match(/ProductShell\.bindWorkspaceShell\(document,/g) || []).length, 2);
 assert.equal((pages.match(/ProductShell\.bindImportShell\(document\)/g) || []).length, 2);
 assert.equal((pages.match(/ProductShell\.createDetailEditController/g) || []).length, 2);
-assert.equal((pages.match(/ProductShell\.dispatchRuntimeImport/g) || []).length, 2);
+assert.match(pages, /async function runJobProcessing\(\) \{ return archiveSelectedSources\("job"\); \}/);
 assert.match(pages, /ProductShell\.setFeedback\(byId\("candidate-workspace-save-status"/);
 assert.match(pages, /ProductShell\.setFeedback\(byId\("job-workspace-save-status"/);
 assert.match(pages, /ProductShell\.bindDetailShell\(document,/);

@@ -128,13 +128,9 @@ assert.equal(memoryDb.records.get("candidate_context_revisions").size, 0);
 assert.doesNotMatch(pages, /Demo\.createLocalCandidateFixtures\(/);
 assert.doesNotMatch(pages, /Demo\.persistCandidateImport\(/);
 assert.doesNotMatch(pages, /Demo\.findCandidateDuplicates\(/);
-assert.match(pages, /createRuntimeSnapshot\(\s*\{ mode: "local" \}/);
-assert.match(pages, /runtime_snapshot: snapshot/);
-assert.match(pages, /local-candidate-image-ocr/);
-assert.doesNotMatch(pages, /fetch\("\/api\/local-ocr"/);
-assert.match(pages, /cancelled_source_id: source\.source_document_id/);
-assert.match(pages, /not_started_source_ids: sources\.slice\(index \+ 1\)\.map/);
-assert.match(pages, /if \(result\.cancelled\) \{[\s\S]*?return;/);
+// Historical extraction contracts above remain testable; new imports archive originals only.
+assert.match(pages, /async function runCandidateProcessing\(\) \{ return archiveSelectedSources\("candidate"\); \}/);
+assert.doesNotMatch(pages, /\/api\/local-(?:ocr|candidate-extract|candidate-image-ocr|candidate-structure)/);
 
 console.log(JSON.stringify({
   batch_runtime_snapshot: "pass",

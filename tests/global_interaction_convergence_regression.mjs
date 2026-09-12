@@ -74,9 +74,9 @@ const candidateDetail = read("public/candidate-detail.html");
 const jobDetail = read("public/job-detail.html");
 assert.equal((pages.match(/SourceInput\.bind\(/g) || []).length, 2);
 assert.equal((pages.match(/SourceInput\.renderBundlePreview\(/g) || []).length, 2);
-assert.equal((pages.match(/SourceInput\.persistDurableBundle\(/g) || []).length, 2);
+assert.equal((pages.match(/SourceInput\.persistDurableBundle\(/g) || []).length, 3);
 assert.equal((pages.match(/ProductShell\.createDetailEditController\(/g) || []).length, 2);
-assert.equal((pages.match(/ProductShell\.dispatchRuntimeImport\(/g) || []).length, 2);
+assert.match(pages, /async function runCandidateProcessing\(\) \{ return archiveSelectedSources\("candidate"\); \}/);
 assert.doesNotMatch(pages, /function installFileDropzone/);
 for (const html of [candidateImport, jobImport]) {
   assert.match(html, /source-input-domain\.js\?v=candidate-job-parity-v1/);

@@ -13,6 +13,7 @@
   const STORE_NAME = "source_documents";
   const RECORD_TYPE = "ARIADNE_CANONICAL_RAW_SOURCE_V1";
   const PAYLOAD_KEY_PREFIX = "raw-source-payload-v1::";
+  const ARCHIVE_CONTRACT = "ariadne-source-archive-v1";
   const LOCAL_REFERENCE_PREFIX = `indexeddb://${DB_NAME}/${STORE_NAME}/`;
 
   class RawSourceStorageError extends Error {
@@ -236,6 +237,73 @@
     return resolveRawSource(database, canonicalToPersist);
   }
 
+  // This index remembers a user's ordered selection. It contains no extracted
+  // content or conclusions; the original SourceDocuments remain authoritative.
+  async function persistArchive(database, documents, sourceUrl = null) {
+    const sources = documents.map(Truth.validateSourceDocument);
+    if (!sources.length || new Set(sources.map(source => source.material_type)).size !== 1
+      || new Set(sources.map(source => source.source_document_id)).size !== sources.length) {
+      throw new RawSourceStorageError("source_archive_invalid");
+    }
+    for (const source of sources) await resolveRawSource(database, source);
+    const sourceIds = sources.map(source => source.source_document_id);
+    const identity = JSON.stringify([sources[0].material_type, sourceIds, sourceUrl]);
+    const hash = await sha256Blob(new Blob([identity]));
+    const key = `source-archive-v1::${hash.slice(7)}`;
+    const existing = await readRecord(database, key);
+    if (existing) {
+      if (existing.contract_id !== ARCHIVE_CONTRACT || existing.material_type !== sources[0].material_type
+        || JSON.stringify(existing.source_document_ids) !== JSON.stringify(sourceIds) || existing.source_url !== sourceUrl) {
+        throw new RawSourceStorageError("source_archive_invalid");
+      }
+      return existing;
+    }
+    const archive = {
+      contract_id: ARCHIVE_CONTRACT, source_document_id: key,
+      material_type: sources[0].material_type, source_document_ids: sourceIds,
+      source_url: sourceUrl, created_at: new Date().toISOString(),
+    };
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction(STORE_NAME, "readwrite");
+      transaction.objectStore(STORE_NAME).put(archive);
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error || new RawSourceStorageError("raw_source_persistence_failed"));
+      transaction.onabort = transaction.onerror;
+    });
+    return archive;
+  }
+
+  async function resolveArchive(database, key, materialType) {
+    const record = await readRecord(database, key);
+    const ids = record?.contract_id === ARCHIVE_CONTRACT ? record.source_document_ids : [key];
+    if (!Array.isArray(ids) || !ids.length || new Set(ids).size !== ids.length
+      || (record?.contract_id === ARCHIVE_CONTRACT && record.material_type !== materialType)) {
+      throw new RawSourceStorageError("source_archive_invalid");
+    }
+    const sources = [];
+    for (const sourceId of ids) {
+      const resolved = await resolveRawSource(database, sourceId);
+      if (resolved.source_document.material_type !== materialType) throw new RawSourceStorageError("source_archive_invalid");
+      sources.push(resolved);
+    }
+    return { sources, source_url: record?.contract_id === ARCHIVE_CONTRACT ? record.source_url : sources[0].source_document.provenance?.source_url || null };
+  }
+
+  function isArchiveRecordFor(record, sourceId) {
+    return record?.contract_id === ARCHIVE_CONTRACT && Array.isArray(record.source_document_ids) && record.source_document_ids.includes(sourceId);
+  }
+
+  function archiveOptions(records, materialType) {
+    const sources = records.filter(record => record.contract_id === "ariadne-source-document-v1" && record.material_type === materialType && record.local_reference);
+    const byId = new Map(sources.map(source => [source.source_document_id, source]));
+    const archives = records.filter(record => record.contract_id === ARCHIVE_CONTRACT && record.material_type === materialType
+      && Array.isArray(record.source_document_ids) && record.source_document_ids.length && record.source_document_ids.every(id => byId.has(id)));
+    const groupedIds = new Set(archives.flatMap(archive => archive.source_document_ids));
+    return [...archives.map(archive => ({ id: archive.source_document_id, label: archive.source_document_ids.map(id => byId.get(id).filename).join("、"), created_at: archive.created_at })),
+      ...sources.filter(source => !groupedIds.has(source.source_document_id)).map(source => ({ id: source.source_document_id, label: source.filename, created_at: source.created_at }))]
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }
+
   return Object.freeze({
     DB_NAME,
     STORE_NAME,
@@ -253,5 +321,6 @@
     sourceDocumentForId,
     resolveRawSource,
     persistDurableSource,
+    ARCHIVE_CONTRACT, persistArchive, resolveArchive, archiveOptions, isArchiveRecordFor,
   });
 }));

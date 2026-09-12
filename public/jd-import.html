@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ariadne · 添加职位描述</title>
-    <link rel="stylesheet" href="/styles.css?v=candidate-job-parity-v1&amp;vi=1&amp;composer=4&amp;loading-center=1&amp;wave=1">
+    <link rel="stylesheet" href="/styles.css?v=candidate-job-parity-v1&amp;vi=1&amp;composer=4&amp;loading-center=1&amp;wave=1&amp;archive=1">
     <link rel="stylesheet" href="/personal-understanding.css">
     <link rel="stylesheet" href="/wave-physics-loader.css?v=2">
   </head>
@@ -26,16 +26,21 @@
           <section>
             <p class="v1-field-label">输入方式</p>
             <div id="job-import-types" class="v1-segmented two" role="radiogroup" aria-label="职位描述输入方式">
-              <button type="button" data-job-import-type="Document" aria-pressed="true">图像</button>
+              <button type="button" data-job-import-type="Document" aria-pressed="true">文件</button>
               <button type="button" data-job-import-type="Paste" aria-pressed="false">粘贴文本</button>
             </div>
+          </section>
+          <section id="saved-job-sources" class="v1-saved-sources hidden">
+            <label class="v1-field-label" for="saved-job-source-select">已保存在本机的原件</label>
+            <select id="saved-job-source-select" class="runtime-selector v1-saved-source-trigger"><option value="">选择已保存的原件</option></select>
           </section>
           <section id="job-file-section" class="v1-file-picker"><button id="job-dropzone" class="v1-file-dropzone" type="button" aria-controls="job-file-input"><span id="job-dropzone-copy">点击上传文件或直接拖拽文件至此</span></button><input id="job-file-input" class="v1-file-input" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,application/pdf,image/png,image/jpeg,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></section>
           <section id="job-paste-section" class="v1-paste-input hidden"><label for="job-paste-input">职位描述</label><textarea id="job-paste-input" placeholder="在此粘贴职位描述…"></textarea></section>
           <section class="v1-link-input"><label for="job-link-input">职位链接 <span>选填</span></label><input id="job-link-input" type="url" inputmode="url" placeholder="https://example.com/jobs/…"></section>
           <section id="job-file-preview" class="v1-file-preview hidden" aria-label="已选择的来源"><ol id="job-source-preview-list" class="v1-source-preview-list"></ol><button id="replace-job-file" type="button">添加来源</button></section>
           <section id="job-processing" class="v1-processing v1-processing-indicator hidden" aria-live="polite"></section>
-          <button id="start-job-processing" class="v1-primary-button v1-sheet-primary" type="button" disabled>开始本地整理</button>
+          <button id="start-job-processing" class="v1-primary-button v1-sheet-primary" type="button" disabled>保存原件</button>
+          <button id="save-job-source" class="v1-tertiary-button hidden" type="button">只保存原件，稍后分析</button>
         </div>
       </section>
       <section id="job-ai-workspace" class="v1-workspace-layer hidden" aria-label="职位信息工作区" tabindex="-1" data-ariadne-shell="workspace">
@@ -89,7 +94,7 @@
     <dialog id="job-model-failure-dialog" class="v1-error-dialog" aria-labelledby="job-model-failure-title">
       <h2 id="job-model-failure-title">MODEL_FAILED</h2>
       <p>ARIADNE AI 未能完成职位理解；没有保存模型职位提案，也没有自动执行本地整理。</p>
-      <p>如需改用本地整理，请返回“运行方式”将 ARIADNE 切换为本地运行，再发起一次新的导入。</p>
+      <p>原件会继续保留。可以稍后重试，或在“运行方式”连接可用模型后继续。</p>
       <div class="v1-button-row"><a class="v1-primary-button" href="/index.html">打开运行方式</a><button id="dismiss-job-model-failure" class="v1-dialog-dismiss" type="button">关闭</button></div>
     </dialog>
     <script src="/conversation-output.js?v=2"></script>
@@ -98,14 +103,14 @@
     <script src="/runtime-capabilities.js?v=runtime-gate-v1"></script>
     <script src="/runtime-capability-gate.js?v=runtime-gate-v1"></script>
     <script src="/truth-persistence-domain.js?v=job-intelligence-v1"></script>
-    <script src="/raw-source-storage-domain.js?v=job-intelligence-v1"></script>
+    <script src="/raw-source-storage-domain.js?v=raw-archive-1"></script>
     <script src="/source-input-domain.js?v=candidate-job-parity-v1"></script>
-    <script src="/wave-physics-loader.js?v=1"></script><script src="/processing-indicator-domain.js?v=ui-contract-addendum-v5&amp;wave=1"></script>
+    <script src="/wave-physics-loader.js?v=1"></script><script src="/processing-indicator-domain.js?v=ui-contract-addendum-v5&amp;wave=1&amp;archive=1"></script>
     <script src="/model-import-lifecycle-domain.js?v=job-model-import-v1"></script>
     <script src="/product-shell-domain.js?v=shared-product-shell-v4"></script>
     <script src="/model-workspace-ui-domain.js?v=product-convergence-v2"></script>
     <script src="/job-intelligence-contract-manifest.js?v=job-intelligence-v1"></script>
-    <script src="/local-job-extraction-domain.js?v=job-intelligence-v1"></script>
+    <script src="/local-job-extraction-domain.js?v=raw-archive-1"></script>
     <script src="/job-context-domain.js?v=job-intelligence-v1"></script>
     <script src="/job-model-runtime-domain.js?v=job-model-import-v1"></script>
     <script src="/personal-memory-domain.js"></script>
@@ -121,7 +126,7 @@
     <script src="/v1-demo-domain.js?v=v1-motion-33"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
     <script src="/personal-memory-bridge.js"></script>
-    <script src="/v1-pages.js?v=candidate-job-parity-v1"></script>
+    <script src="/v1-pages.js?v=raw-archive-1"></script>
     <script src="/conversation-model-selector.js?v=compact-menu-1"></script>
     <script src="/conversation-attachments.js?v=inline-composer-3&amp;composer=3"></script>
   </body>

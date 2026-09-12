@@ -76,8 +76,8 @@
   }
 
   function pastedTextFile(text, name = "pasted-job-description.txt") {
-    const normalized = String(text || "").trim();
-    if (!normalized) throw new LocalJobExtractionError("source_text_required");
+    const normalized = String(text || "");
+    if (!normalized.trim()) throw new LocalJobExtractionError("source_text_required");
     if (typeof File === "function") return new File([normalized], name, { type: "text/plain", lastModified: 0 });
     const blob = new Blob([normalized], { type: "text/plain" });
     Object.defineProperty(blob, "name", { value: name, enumerable: true });
@@ -103,7 +103,7 @@
       batch_id: source.batch_id,
       provenance: {
         supplied_by: "USER",
-        captured_via: source.captured_via,
+        captured_via: source.captured_via || "JOB_FILE_PICKER",
         source_url: source.source_url,
         raw_source_recoverability: "DURABLE_BROWSER_LOCAL",
       },
