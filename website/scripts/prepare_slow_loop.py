@@ -16,14 +16,17 @@ parser.add_argument('source', type=Path)
 parser.add_argument('output', type=Path)
 parser.add_argument('work', type=Path)
 parser.add_argument('--intermediate', type=Path, help='Reuse a retained lossless slow shot from this recipe')
+parser.add_argument('--overlap', type=int, default=16, help='Dissolve frames in the encoded video')
 args = parser.parse_args()
+if not 2 < args.overlap < 277 // 2:
+    raise ValueError('Dissolve must fit inside the continuous shot')
 shot = args.intermediate or args.work / 'slow-shot.mkv'
 if args.output.exists() or (not args.intermediate and shot.exists()) or args.output.resolve() == args.source.resolve():
     raise FileExistsError('Keep existing outputs; choose a new output and work directory')
 args.work.mkdir(parents=True, exist_ok=True)
 args.output.parent.mkdir(parents=True, exist_ok=True)
 ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
-fps, slowdown, start, end, overlap = 24, 3, 25, 119, 16
+fps, slowdown, start, end, overlap = 24, 3, 25, 119, args.overlap
 # Reserve frame 118 as interpolation lookahead. The delivered shot ends at 117;
 # 92 source-frame intervals become 276 intervals, without a held endpoint.
 shot_frames = (end - start - 2) * slowdown + 1

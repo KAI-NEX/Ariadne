@@ -20,27 +20,27 @@ pnpm preview
 - 用户明确要求预接即将部署的 Web 入口：`https://web.ariadne.kai-nex.com`。不再根据 loopback 环境替换成本机入口，也不阻断尚未解析的稳定域名。
 - 体验页并列 Web 和本地使用；GitHub v0.1.0 当前没有独立安装包，下载使用真实 `https://github.com/KAI-NEX/Ariadne/archive/refs/heads/main.zip`，明确标注「下载源码 / Download source」及需要本机配置。准备好安装包后再更换真实下载 URL。
 
-## 动画与素材（当前：11 秒慢速循环）
+## 动画与素材（当前：8.5 秒循环，约 3 秒叠映）
 
-保留最初视频的鱼群、色彩、水窗与光影。原视频第 119 帧（约 4.958 秒）含内部硬切；同字节原片保存在 `public/media/ariadne-original.mp4`。当前首页只引用 `public/media/ariadne-original-slow-loop-v2.mp4`。
+当前首页使用 `public/media/ariadne-original-soft-loop-v2.mp4`，保持原鱼群、水窗和光影。用户先将一圈调到 8.5 秒，再要求延长淡入淡出；因此沿用已有无损慢动作中间片，将叠映从 16 帧扩至 72 帧，使用起止斜率为零的 smoothstep 曲线。
 
-上一版 3.25 秒一圈，衔接出现过于频繁。本版使用原片 25–117 帧（118 帧仅作补间前瞻），将游速降至约三分之一：仅在这段连续素材的相邻帧之间进行运动补间，保持 24 fps；补间不跨原片硬切，也不跨首尾叠映。先得到 277 帧连续慢动作，再以固定 16 帧 smoothstep 叠映首尾。输出 1920×1080 / 24 fps / 261 帧，10.875 秒（约 11 秒）。
+成片 1920×1080 / 24 fps / 205 帧，媒体时长 8.541667 秒。`LoopingScene.jsx` 在元数据就绪及重新可见时按 `duration / 8.5` 设置速度（约 1.005 倍），让页面实际周期保持 8.5 秒。其中约 5.51 秒为连续游动，约 2.99 秒为渐入渐出的叠映，比上一版约 0.52 秒的过渡更舒缓。延长叠映也意味着双影存在更久，不宣称每条鱼的独立运动路径物理闭合。
 
-每圈约 10.21 秒是未叠映游动，过渡仍为约 0.67 秒，约占整圈 6%；不会因慢放变成长时间双影。过渡发生频率比 3.25 秒版降低约 70%。原片及先前叠映、正反播放、光流与三维试制全部原地保留。相邻帧运动补间依赖估计，不宣称每个新帧都是原始拍摄；有限原片也不保证每条鱼的物理轨迹闭合，接合仍有短暂淡入淡出。
+中间片来自原片 25–117 帧（118 帧仅作补间前瞻），相邻原帧之间补间后以约三分之一速度播放。补间不跨原片内部硬切或首尾叠映，保留原始时间锚点；不是重新生成鱼群，也不是原始拍摄的新帧。当前仅重新合成叠映，不重复估计运动。原始 193 帧视频保存在 `public/media/ariadne-original.mp4`，第 119 帧已有内部硬切，持续避开该切点。
 
-`LoopingScene.jsx` 使用单个原生 `autoPlay muted loop playsInline` 视频，浏览器以正常播放速率播放已生成的慢动作。没有双视频切换、每圈更换 src、重新挂载或主动 load()；没有暂停按钮或减少动态效果自动暂停，重新可见及前台意外暂停时恢复播放，不重置 currentTime。浏览器后台和系统挂起仍由平台控制。
+页面使用单个原生 `autoPlay muted loop playsInline` 视频。没有双视频切换、每圈更换 src、重新挂载或主动 load()；没有暂停按钮或减少动态效果自动暂停，重新可见及前台意外暂停时恢复播放，不重置 currentTime。浏览器后台和系统挂起仍由平台控制。
 
 复现（依赖 numpy、opencv-python-headless、imageio-ffmpeg）：
 
 ```sh
-python scripts/prepare_slow_loop.py public/media/ariadne-original.mp4 OUTPUT WORKDIR
-python scripts/check_slow_loop.py public/media/ariadne-original.mp4 public/media/ariadne-original-slow-loop-v2.mp4 WORKDIR/slow-shot.mkv
+python scripts/prepare_slow_loop.py public/media/ariadne-original.mp4 OUTPUT WORKDIR --overlap 72
+python scripts/check_slow_loop.py public/media/ariadne-original.mp4 public/media/ariadne-original-soft-loop-v2.mp4 WORKDIR/slow-shot.mkv --overlap 72 --loop-seconds 8.5 --expected-blend-seconds 3
 ```
 
-编辑脚本针对这份素材的已核验切点，拒绝覆盖已有输出和中间片；历史版本仍可由 `prepare_original_loop.py` 复现。原片、无损慢动作中间片、成片和 QA 都保留。桌面保留 70% 水平构图，手机 85%；透明导航、三页及中英内容不变，生产页面无 Three.js 或运行时补间依赖。
+已有无损中间片时，可加 `--intermediate PATH/slow-shot.mkv` 跳过重复补间；检查命令也使用同一路径。脚本拒绝覆盖源和已有输出；默认 16 帧参数保留旧版复现。原片、试片、无损中间片和 QA 全部原地保留。桌面 70% / 手机 85% 构图、透明导航、三页及中英内容不变，生产页面无 Three.js 或运行时补间依赖。
 
 ## 验证与范围
 
-- 媒体回归检查 11 秒总时长、固定短叠映、原帧时间锚点、无定格帧、游速降低及循环接缝；检查补间中的鱼身和光影。
-- Vite 生产构建、VI 静态/负向和 diff 检查；egolite 实测连续六圈、0 暂停 / 重新加载 / 丢帧，并检查窄屏播放。本次页面截屏接口超时；保留当前浏览器视频帧、语义及布局读数、离线逐帧图像作为动画证据。
-- 新证据在 `.cache/website-slow-loop-20260914/`。没有发布、push、域名修改、模型调用或资料读取；真实手机硬件及公网加载未测。
+- 媒体回归检查帧数、8.5 秒播放目标、约 3 秒叠映、原帧时间锚点、无定格帧及循环接缝。
+- Vite 生产构建、VI 静态/负向和 diff 检查；egolite 实测有效播放时长、连续循环及无暂停或重新加载，保留浏览器视频帧及运行记录作为动画证据。
+- 新证据在 `.cache/website-soft-loop-3s-20260914/`。没有发布、push、域名修改、模型调用或资料读取；真实手机硬件及公网加载未测。
