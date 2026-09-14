@@ -4,7 +4,11 @@ import cv2
 import numpy as np
 
 parser=argparse.ArgumentParser()
-parser.add_argument('source');parser.add_argument('output');args=parser.parse_args()
+parser.add_argument('source');parser.add_argument('output')
+parser.add_argument('--start-frame',type=int,default=0)
+parser.add_argument('--overlap',type=int,default=24)
+parser.add_argument('--reference-loop',help='Optional previous delivery for continuity comparison')
+args=parser.parse_args()
 def inspect(path):
  cap=cv2.VideoCapture(path);fps=cap.get(cv2.CAP_PROP_FPS);frames=[]
  while True:
@@ -16,8 +20,16 @@ def inspect(path):
  return {'frames':len(frames),'fps':fps,'largest_change_frame':int(np.argmax(delta))+1,'max_change':max(delta),'median_change':float(np.median(delta)),'loop_change':float(np.abs(frames[0]-frames[-1]).mean())}
 source=inspect(args.source);output=inspect(args.output)
 assert source['largest_change_frame']==119,'reinspect source if the embedded cut changes'
-assert output['frames']==95 and output['fps']==24
+assert output['frames']==119-args.start_frame-args.overlap and output['fps']==24
 assert output['max_change']<source['max_change']*.5,'embedded flash must be removed'
 assert output['max_change']<output['median_change']*3,'no new abrupt frame discontinuity'
 assert output['loop_change']<output['max_change'],'file wrap is a normal-size frame change'
-print(json.dumps({'source':source,'output':output,'passed':True},indent=2))
+result={'source':source,'output':output,'passed':True}
+if args.reference_loop:
+ reference=inspect(args.reference_loop)
+ assert output['max_change']<reference['max_change']*1.1,'shorter dissolve must not introduce a larger motion spike'
+ assert output['loop_change']<reference['loop_change']*1.1,'preserve the smooth file boundary'
+ assert args.overlap<24,'refinement must reduce time spent showing two shots at once'
+ result['reference']=reference
+ result['blend_duration_seconds']=args.overlap/output['fps']
+print(json.dumps(result,indent=2))

@@ -20,20 +20,27 @@ pnpm preview
 - 用户明确要求预接即将部署的 Web 入口：`https://web.ariadne.kai-nex.com`。不再根据 loopback 环境替换成本机入口，也不阻断尚未解析的稳定域名。
 - 体验页并列 Web 和本地使用；GitHub v0.1.0 当前没有独立安装包，下载使用真实 `https://github.com/KAI-NEX/Ariadne/archive/refs/heads/main.zip`，明确标注「下载源码 / Download source」及需要本机配置。准备好安装包后再更换真实下载 URL。
 
-## 动画与素材（当前：原画面融合循环）
+## 动画与素材（当前：精简叠映循环）
 
-保留最初视频的鱼群、色彩、水窗与光影。原视频不只是结尾有跳变：第 119 帧（约 4.958 秒）已有一次内部硬切。原片同字节保存为 `public/media/ariadne-original.mp4`；当前首页使用 `public/media/ariadne-original-blend-v1.mp4`。
+保留最初视频的鱼群、色彩、水窗与光影。原视频第 119 帧（约 4.958 秒）含内部硬切；同字节原片保存在 `public/media/ariadne-original.mp4`。当前首页只引用 `public/media/ariadne-original-blend-v2.mp4`。
 
-编辑只选取内部硬切前的 0–118 帧，尾部与开头用 24 帧 smoothstep 柔和叠化，输出 1920×1080 / 24 fps / 95 帧（约 3.958 秒）。最后一帧接回自然相邻的原帧，没有内部硬切或文件末尾直接跳回。叠化期间两组原画面会短暂重叠；这是保留原素材的柔和融合，不宣称每条鱼的独立物理轨迹闭合。全程正向播放，无鱼身几何变形、倒放或三维替换。
+新版选取 25–118 帧，尾部 103–118 帧与开头 25–40 帧用 16 帧 smoothstep 叠映，随后自然衔接第 41 帧。输出 1920×1080 / 24 fps / 78 帧（3.25 秒）。两端鱼群分布更接近，叠映从上一版 1 秒缩短到约 0.67 秒；两幅画面都保持原速度正向播放，鱼与光影一起处理，不改变鱼身几何。固定裁切、透明导航、三页及中英内容保持。
 
-`LoopingScene.jsx` 使用原生 `autoPlay muted loop playsInline`；没有暂停按钮或减少动态效果自动暂停，重新可见及前台意外暂停时恢复播放，不重置 currentTime。浏览器后台或系统挂起仍由平台控制。
+用户试看后选择保留叠映。本次没有采用正反播放试片；原片、上一版叠映、正反播放、光流与三维试制及 QA 全部原地保留。有限原片不能保证每条鱼都沿闭合路径游动，过渡仍有短暂淡入淡出；优化目标是减少大范围双影和接缝突变。
 
-复现：`python scripts/prepare_original_loop.py SOURCE OUTPUT WORKDIR`，依赖 numpy、opencv-python-headless、imageio-ffmpeg；脚本针对这份素材的已核验切点，不作为通用自动剪辑器，并拒绝覆盖已有输出。原片、光流变形试片、三维试制和历史 QA 全部原地保留，当前构建只引用选定融合素材。运动对齐试片出现变形，未用于页面。
+`LoopingScene.jsx` 使用单个原生 `autoPlay muted loop playsInline` 视频。过渡已合成在同一 MP4 中，没有双视频切换、每圈更换 src、重新挂载或主动 load()；没有暂停按钮或减少动态效果自动暂停，重新可见及前台意外暂停时恢复播放，不重置 currentTime。浏览器后台和系统挂起仍由平台控制。
 
-桌面保留 70% 水平构图，手机 85%；水窗留在导航下方，透明导航、中英切换、三页结构与淡入淡出保持。生产页面无 Three.js 运行依赖。
+复现（依赖 numpy、opencv-python-headless、imageio-ffmpeg）：
+
+```sh
+python scripts/prepare_original_loop.py public/media/ariadne-original.mp4 OUTPUT WORKDIR --start-frame 25 --overlap 16
+python scripts/check_original_loop.py public/media/ariadne-original.mp4 public/media/ariadne-original-blend-v2.mp4 --start-frame 25 --overlap 16 --reference-loop public/media/ariadne-original-blend-v1.mp4
+```
+
+编辑脚本针对这份素材的已核验切点，并拒绝覆盖已有输出；省略新参数仍可复现上一版。桌面保留 70% 水平构图，手机 85%；生产页面无 Three.js 运行依赖。
 
 ## 验证与范围
 
-- 检查整段原视频及输出所有帧：鱼群区域最大相邻变化从内部硬切的 18.63 降至 4.94；循环接缝变化为 2.30，处于正常相邻帧范围。
+- 检查整段原视频及输出所有帧：原片内部硬切的鱼群区域相邻变化为 18.63，新版整段峰值 5.04、循环接缝 2.35，接缝处于普通相邻帧范围；缩短叠映后的峰值与上一版差异小于 10%。
 - Vite 生产构建、VI 静态/负向和 diff 检查；egolite 实际浏览器检查整圈及连续循环。
-- 原片与历史试制在原目录保留，新证据在 `.cache/website-flow-loop-20260914/`。没有发布、push、域名修改、模型调用或资料读取；真实手机硬件及公网加载未测。
+- 原片与历史试制在原目录保留，新证据在 `.cache/website-blend-refine-20260914/`。没有发布、push、域名修改、模型调用或资料读取；真实手机硬件及公网加载未测。

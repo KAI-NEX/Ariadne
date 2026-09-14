@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import videoSource from '../public/media/ariadne-original-blend-v1.mp4';
+import videoSource from '../public/media/ariadne-original-blend-v2.mp4';
 
 export default function LoopingScene() {
   const video = useRef(null);
