@@ -40,14 +40,14 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--vi-focus); outl
 @keyframes pageFadeIn { from { opacity: 0; } to { opacity: 1; } }
 .hero { height: 100dvh; min-height: 540px; background: var(--vi-site-background); }
 .scene-frame { position: absolute; inset: 64px 0 0; }
-.hero-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 70% center; }
+.fish-scene { position: absolute; inset: 0; }
+.fish-scene video { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 70% center; }
 .hero-content { height: 100%; padding: clamp(148px, 19vh, 196px) clamp(24px, 4.45vw, 80px) 56px; pointer-events: none; }
 .hero-content a, .hero-content button { pointer-events: auto; }
 h1 { font-size: clamp(40px, 4.7vw, 72px); font-weight: 500; line-height: 1.25; letter-spacing: -.025em; }
 h1 span { display: block; }
 .slogan-en { font-size: clamp(52px, 6.5vw, 96px); font-weight: 400; line-height: 1.06; letter-spacing: -.06em; }
 .hero-description { font-size: clamp(14px, 1.2vw, 18px); line-height: 1.85; color: color-mix(in srgb, var(--vi-surface) 75%, transparent); margin-bottom: 24px; max-width: 400px; }
-.video-control { display: inline-flex; align-items: center; justify-content: center; height: 44px; width: 44px; flex-shrink: 0; background: color-mix(in srgb, var(--vi-site-background) 60%, transparent); border: 1px solid color-mix(in srgb, var(--vi-surface) 30%, transparent); border-radius: 50%; }
 .menu-toggle { position: relative; z-index: 50; width: 44px; height: 44px; border: 0; background: transparent; transition: transform 150ms; }
 .menu-toggle:active { transform: scale(.9); }
 .menu-symbol { position: absolute; inset: 0; display: grid; place-items: center; opacity: 1; transform: rotate(0) scale(1); transition: transform 300ms, opacity 300ms; }
@@ -95,7 +95,7 @@ h2 { font-weight: 500; font-size: 24px; line-height: 1.4; letter-spacing: -.025e
   .slogan-en { font-size: clamp(48px, 11.5vw, 70px); }
   .hero-description { max-width: 245px; font-size: 14px; }
   .scene-frame { top: 252px; }
-  .hero-video { object-position: 85% center; }
+  .fish-scene video { object-position: 85% center; }
   .hero-bottom { gap: 12px; }
   .interior-page { padding-top: 124px; }
   .interior-page > .vi-container { min-height: calc(100dvh - 124px); padding-inline: 24px; }

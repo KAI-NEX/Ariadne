@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ArrowRight, ArrowUpRight, Menu, X, Pause, Play, Download, Globe, Monitor } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Menu, X, Download, Globe, Monitor } from 'lucide-react';
 import { COPY, WEB_URL, GITHUB_URL, DOWNLOAD_URL } from './content';
-import VIDEO from '../public/media/ariadne-fish-loop-v4.mp4';
+import LoopingScene from './LoopingScene';
 import '../../public/vi/tokens.css';
 import '../../public/vi/layout.css';
 import './styles.css';
@@ -69,21 +69,11 @@ function Header({ page, copy, language, setLanguage, navigate }) {
   </header>;
 }
 function Hero({ copy, language, navigate }) {
-  const video = useRef(null);
-  const [playing, setPlaying] = useState(false);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    const preference = matchMedia('(prefers-reduced-motion: reduce)');
-    const sync = () => { if (preference.matches) video.current.pause(); else video.current.play().catch(() => setPlaying(false)); };
-    sync(); preference.addEventListener('change', sync);
-    return () => preference.removeEventListener('change', sync);
-  }, []);
   return <section className="hero relative w-full overflow-hidden" aria-labelledby="page-title">
-    <div className="scene-frame"><video ref={video} className="hero-video" src={VIDEO} autoPlay={!matchMedia('(prefers-reduced-motion: reduce)').matches} muted loop playsInline preload="auto" aria-hidden="true" onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onError={() => { setFailed(true); setPlaying(false); }} /></div>
+    <div className="scene-frame"><LoopingScene /></div>
     <div className="hero-content relative z-10 flex flex-col justify-between">
       <h1 id="page-title" tabIndex={-1} aria-label={copy.slogan.join(language === 'en' ? ' ' : '')} className={language === 'en' ? 'slogan-en' : ''}>{copy.slogan.map(line => <span key={line}>{line}</span>)}</h1>
       <div className="hero-bottom flex justify-between items-end"><div><p className="hero-description">{copy.description}</p><Action href="#about" onClick={event => navigate(event, 'about')}>{copy.more}</Action></div>
-        {!failed && <button className="video-control" aria-label={playing ? copy.pause : copy.play} onClick={() => { if (playing) video.current.pause(); else video.current.play().catch(() => setPlaying(false)); }}>{playing ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}</button>}
       </div>
     </div>
   </section>;
