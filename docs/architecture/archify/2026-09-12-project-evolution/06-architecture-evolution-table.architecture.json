@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Ariadne 架构调整表 · 从 Job Radar 到 Markdown 内容库",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1390, 650],
+    "views": [
+      {
+        "id": "job-radar-start",
+        "label": "起点 · Job Radar",
+        "focus": ["job_radar"],
+        "note": "输入、目标和权威都较窄：SQLite 保存职位，页面负责检索与状态。"
+      },
+      {
+        "id": "local-learning",
+        "label": "本地分析阶段",
+        "focus": ["job_radar", "local_analysis", "retired_complexity"],
+        "note": "真实 PDF 与截图进入后，OCR、顺序、结构和人工审核把问题扩展成文档理解。"
+      },
+      {
+        "id": "ai-boundaries",
+        "label": "AI 双域阶段",
+        "focus": ["local_analysis", "ai_dual_domain", "retained_boundaries"],
+        "note": "Candidate 与 Job 分开理解；AI 只生成回答或 Proposal，Human Save 才确认。"
+      },
+      {
+        "id": "runtime-simplification",
+        "label": "运行路径收敛",
+        "focus": ["ai_dual_domain", "runtime_simplify", "retired_complexity", "retained_boundaries"],
+        "note": "Local 回到原件归档；预算内完整直答，只有大集合才分片综合。"
+      },
+      {
+        "id": "markdown-current",
+        "label": "当前 · Markdown 内容库",
+        "focus": ["runtime_simplify", "markdown_library", "current_core", "retained_boundaries"],
+        "note": "一份 Markdown 正文同时供卡片投影与范围化 AI 上下文，旧 IndexedDB 只作备份。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "job_radar",
+      "type": "database",
+      "label": "① Job Radar",
+      "sublabel": "SQLite 职位记录 / 搜索与状态",
+      "tag": "输入窄 · 规则化",
+      "pos": [40, 150],
+      "size": [190, 82]
+    },
+    {
+      "id": "local_analysis",
+      "type": "backend",
+      "label": "② 本地文档分析",
+      "sublabel": "OCR → Block / Entity → 人工审核",
+      "tag": "学习与隐私探索",
+      "pos": [320, 150],
+      "size": [190, 82]
+    },
+    {
+      "id": "ai_dual_domain",
+      "type": "cloud",
+      "label": "③ AI 双域架构",
+      "sublabel": "SourceDocument → Candidate / Job",
+      "tag": "Working / Human Save",
+      "pos": [600, 150],
+      "size": [190, 82]
+    },
+    {
+      "id": "runtime_simplify",
+      "type": "security",
+      "label": "④ 运行路径简化",
+      "sublabel": "Local 只归档 / 预算内完整直答",
+      "tag": "大集合才分片",
+      "pos": [880, 150],
+      "size": [190, 82]
+    },
+    {
+      "id": "markdown_library",
+      "type": "database",
+      "label": "⑤ Markdown 内容库",
+      "sublabel": "一份正文 → 卡片 + Scoped AI",
+      "tag": "当前 · 2026-09-13",
+      "pos": [1160, 150],
+      "size": [190, 82]
+    },
+    {
+      "id": "retired_complexity",
+      "type": "backend",
+      "label": "退出日常主路径",
+      "sublabel": "本地 OCR / 规则结构化 · 多份语义正文",
+      "pos": [185, 410],
+      "size": [250, 88]
+    },
+    {
+      "id": "retained_boundaries",
+      "type": "security",
+      "label": "一路保留的保护",
+      "sublabel": "来源 / 版本 / 领域隔离 · Human Save",
+      "pos": [570, 410],
+      "size": [250, 88]
+    },
+    {
+      "id": "current_core",
+      "type": "frontend",
+      "label": "当前五项职责",
+      "sublabel": "内容库 / 卡片 / 上下文 / 模型 / 保存",
+      "pos": [955, 410],
+      "size": [250, 88]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "架构演进主线",
+      "wraps": ["job_radar", "local_analysis", "ai_dual_domain", "runtime_simplify", "markdown_library"],
+      "pad": 32
+    },
+    {
+      "kind": "region",
+      "label": "调整结果",
+      "wraps": ["retired_complexity", "retained_boundaries", "current_core"],
+      "pad": 32
+    }
+  ],
+  "connections": [
+    {
+      "id": "radar-to-local",
+      "from": "job_radar",
+      "to": "local_analysis",
+      "label": "真实材料进入"
+    },
+    {
+      "id": "local-to-ai",
+      "from": "local_analysis",
+      "to": "ai_dual_domain",
+      "label": "双域语义理解"
+    },
+    {
+      "id": "ai-to-simplify",
+      "from": "ai_dual_domain",
+      "to": "runtime_simplify",
+      "label": "移除重复层",
+      "variant": "emphasis"
+    },
+    {
+      "id": "simplify-to-markdown",
+      "from": "runtime_simplify",
+      "to": "markdown_library",
+      "label": "统一 Markdown 正文",
+      "labelAt": [1115, 246],
+      "variant": "emphasis"
+    },
+    {
+      "id": "local-retired",
+      "from": "local_analysis",
+      "to": "retired_complexity",
+      "label": "学习代码保留",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "variant": "dashed"
+    },
+    {
+      "id": "ai-retained",
+      "from": "ai_dual_domain",
+      "to": "retained_boundaries",
+      "label": "安全边界沉淀",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [695, 300],
+      "variant": "security"
+    },
+    {
+      "id": "markdown-core",
+      "from": "markdown_library",
+      "to": "current_core",
+      "label": "主结构收敛",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "逐步增加",
+      "items": [
+        "真实材料带来 OCR、阅读顺序、结构与审核",
+        "AI 双域带来 SourceDocument、Proposal 与版本边界",
+        "模型执行带来能力认证、传输确认和失败关闭"
+      ]
+    },
+    {
+      "dot": "orange",
+      "title": "后来退出主路径",
+      "items": [
+        "正式 Local 不再用 OCR 或规则假装理解材料",
+        "小集合不再强制先 DISTILL / SYNTHESIZE",
+        "IndexedDB 不再维护第二份可编辑语义正文"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "现在的结构",
+      "items": [
+        "本机真实 Markdown；网页端使用同格式浏览器库",
+        "卡片由同一正文投影，AI 只读当前范围",
+        "旧库留作备份且不双写，人工保存仍是确认边界"
+      ]
+    }
+  ]
+}

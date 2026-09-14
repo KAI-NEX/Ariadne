@@ -10,21 +10,23 @@
 | --- | --- |
 | 图谱首次交付 | 2026-09-12 |
 | 图谱基线 commit | `02700c8`（`docs: map Ariadne project evolution`） |
-| 产品变化复核截至 | `f761cd6`（2026-09-12） |
+| 产品变化复核截至 | `eea3274`（2026-09-13） |
 | 总阅读入口 | `README.md` |
-| 当前产品架构图 | `../2026-09-11/ariadne.html` |
+| 当前架构演进表 | `06-architecture-evolution-table.html` |
+| 旧版运行结构参考 | `../2026-09-11/ariadne.html` |
 | 项目稳定目标 | `PROJECT_CONTEXT.md` |
 | 最新实现证据 | `PROJECT_STATUS.md` 最新适用条目 |
 | 跨任务记忆 | 不启用外部项目记忆插件；以本台账、项目上下文、项目状态和 Git 为可审查记录 |
 
-基线的四张演进图、运行优化对比图及当前架构图共同组成一个整体：
+基线的四张专题演进图、运行优化阶段快照、架构调整总表及旧版运行结构参考共同组成一个整体：
 
 1. `01-job-radar-to-ariadne`：产品边界为何从职位记录扩张为 Candidate / Job 分别理解、关联与行动。
 2. `02-document-understanding`：真实材料为何把问题从 OCR 扩张为顺序、结构、领域映射与人工审核。
 3. `03-context-authority`：为什么需要区分当前决定、适用契约、有界上下文、确认数据和增量记录。
 4. `04-motion-debugging`：为什么静态视觉正确不等于浏览器过程正确，以及如何用逐帧证据停止返工。
 5. `05-content-context-simplification`：上下文调用怎样从逐条截取、预先概况，简化为预算内完整读取和一次 DISCUSS，同时保留大集合保护。
-6. `../2026-09-11/ariadne`：SourceDocument、Runtime、Local/Model、Working/Proposal 与 Human Save 如何连接。
+6. `06-architecture-evolution-table`：从职位数据库、本地文档分析、双域 AI、Runtime 简化到 Markdown 内容库，哪些能力逐步加入、哪些退出日常路径、哪些保护继续保留。
+7. `../2026-09-11/ariadne`：SourceDocument、Runtime、Local/Model、Working/Proposal 与 Human Save 如何连接；它是旧版结构参考，不再作为当前存储形态的唯一依据。
 
 ## 哪些变化需要更新哪张图
 
@@ -36,6 +38,7 @@
 | 新的系统性动效故障层或浏览器验收方法形成 | `04-motion-debugging` | 产生可复用的诊断方法，不只是修好一个像素问题 |
 | Runtime、Provider、HTTP、本地服务、持久化或安全边界改变 | `../2026-09-11/ariadne` | 当前运行结构或真实数据流改变 |
 | 上下文预算、截取、分片综合或模型调用编排改变 | `05-content-context-simplification` | 优化前后的主调用路径或保护分支改变 |
+| 主存储形态、长期职责分层或重要架构阶段改变 | `06-architecture-evolution-table` | 需要重新说明“从哪里来、为什么改、当前留下什么” |
 | 文案、间距、单卡片能力或孤立 bug fix | 只记本台账 | 没有改变上述长期边界时不重画图 |
 
 如果一次变化同时影响多张图，先更新“当前架构”，再更新解释它为何出现的演进图。这样可以避免把愿景误画成已经运行的结构。
@@ -52,6 +55,18 @@
 
 ## 更新记录
 
+### 2026-09-14 · 新增从 Job Radar 到 Markdown 内容库的架构调整表
+
+- 用户目标：参考 2026-09-12 至 2026-09-13 的内容迁移，说明 Ariadne 从一开始到现在怎样一点点改变，而不是只展示某一次优化后的静态结构。
+- 实际变化：新增 `06-architecture-evolution-table`，在一张图中串联五个阶段：Job Radar 职位数据库、本地文档分析、Candidate/Job 双域 AI、Runtime 简化、Markdown 内容库；另列“退出日常路径”“保留保护”“当前五项职责”。
+- 为什么发生：早期复杂度分别解决真实问题——职位收集、本地材料识别、两域语义与写入权、长上下文成本；迁移后的优化不是放弃这些边界，而是把多份语义表示和多条处理链收敛为“一份 Markdown 正文，多种按需投影”。
+- 当前事实：Local 正式导入只归档原件；同一 Markdown 正文既投影为人看的卡片，也生成有范围、有预算的模型上下文；旧 IndexedDB 只作备份，不双写。实际 Codex 浏览器主库已恢复并迁移 1,854 条记录。
+- 影响范围：更新演进阅读入口和持续跟踪规则；第 5 张图保留为第一次 Runtime 简化的历史快照，第 6 张图承担当前跨阶段总览。旧版运行结构图继续保留作边界参考。
+- 依据：`b470872`（Local 原件归档）、`6435e14`（Markdown 内容库迁移）、`eea3274`（历史 hash 表示恢复与 1,854 条主库迁移），以及 [Markdown 内容存储契约](../../../current/MARKDOWN_CONTENT_STORAGE.md)、[内容架构复核与简化](../../../current/CONTENT_ARCHITECTURE_SIMPLIFICATION.md)、[项目上下文](../../../../PROJECT_CONTEXT.md) 和 [项目状态](../../../../PROJECT_STATUS.md)。引用任务仅用于定位本次迁移结论，事实回到仓库复核。
+- 是否改图：是；新增 `06-architecture-evolution-table`，不覆盖 01–05 和旧版运行结构图。
+- 验证：Archify showcase 9/9、0 errors、0 warnings；自动浏览器四个桌面尺寸无溢出；1440×900 与 2048×1320 的浅色/深色端点截图全部通过视觉复核；正式交付后 0 轮修正。
+- 未知与下一步：图只说明已经有证据的架构演进，不声称模型语义质量已经由用户全面验收。后续主存储、职责分层或端到端阶段变化时优先更新本表。
+
 ### 2026-09-12 · 停用并清理 Letta 项目记忆插件
 
 - 用户决定：Ariadne 不再调用 `letta-kai-memory`，清除该插件并取消后续记忆检查点。
@@ -66,9 +81,9 @@
 - 为什么发生：此前的复杂度把小集合也送入为规模问题准备的压缩链，增加调用与语义损失；现在按整体预算和数量决定路径，让常见输入保留完整当前语义，同时不牺牲大集合覆盖。
 - 影响范围：上下文准备与模型调用编排；未改变来源身份、Candidate/Job 隔离、Provider 能力门禁、Working/Proposal、Human Save 或 confirmed revision。
 - 依据：`f761cd6`、[内容架构复核与简化](../../../current/CONTENT_ARCHITECTURE_SIMPLIFICATION.md)、[项目状态](../../../../PROJECT_STATUS.md) 的 2026-09-12 COMPLETE 条目。
-- 是否改图：新增独立对比图；不把 Markdown 主存储画成当前状态，也不以此替代完整运行架构图。
+- 是否改图：新增独立对比图；当时没有把尚未迁移的 Markdown 主存储画成当前状态。随后迁移已在 `6435e14` 完成，当前跨阶段状态由 `06-architecture-evolution-table` 接续说明。
 - 验证：Archify showcase 9/9、0 errors、0 warnings；自动浏览器四个桌面尺寸无溢出，浅色/深色端点截图通过人工视觉复核；1 轮视觉修正。
-- 未知与下一步：Markdown 主存储往返、真实模型质量和完整存储迁移仍未验收；未来上下文预算、分片条件或 authority 变化时更新本图。
+- 当时未知与后续结果：当时尚未验收 Markdown 主存储往返、真实模型质量和完整存储迁移；其中存储迁移后来已经完成，真实模型语义质量仍须按具体任务验证。未来上下文预算、分片条件或 authority 变化时更新本图。
 
 ### 2026-09-12 · Local 原件归档
 

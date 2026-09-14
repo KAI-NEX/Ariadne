@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-12",
+  "generated_at": "2026-09-14",
   "artifacts": [
     {
       "id": "01-job-radar-to-ariadne",
@@ -71,6 +71,20 @@
       "browser_evidence": "passed",
       "visual_review": "passed",
       "correction_rounds": 1
+    },
+    {
+      "id": "06-architecture-evolution-table",
+      "diagram_type": "architecture",
+      "output": "/Users/kai/Documents/GitKaiNex/Ariadne/docs/architecture/archify/2026-09-12-project-evolution/06-architecture-evolution-table.html",
+      "final_specification": "06-architecture-evolution-table.architecture.json",
+      "specification_sha256": "d1b76058628394fd6d6c3c486977e9621749d37bd5e0cc088b2b3c814dd1219f",
+      "specification_bytes": 6284,
+      "artifact_sha256": "e433e1032b1f44b019f334ac5d97787cbdee2a3f86c715cea34e8fb9126b25d1",
+      "artifact_bytes": 811728,
+      "validation": "9/9 showcase, 0 errors, 0 warnings",
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 0
     }
   ],
   "automated_browser_viewports": [
@@ -86,7 +100,8 @@
     "scope": [
       "1440x900 light screenshot for each artifact",
       "2048x1320 dark screenshot for each artifact",
-      "05-content-context-simplification additionally inspected at both endpoint themes"
+      "05-content-context-simplification additionally inspected at both endpoint themes",
+      "06-architecture-evolution-table inspected at 1440x900 and 2048x1320 in both light and dark themes"
     ],
     "observations": [
       "No visible clipping or unreadable relationship label",
