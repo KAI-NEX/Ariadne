@@ -515,6 +515,18 @@
       "value": "\"Inter\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", ui-sans-serif, sans-serif",
       "group": "type",
       "label": "既有文件夹标题：Inter / 系统中文黑体"
+    },
+    {
+      "name": "--vi-site-background",
+      "value": "#000",
+      "group": "color",
+      "label": "官网视频与深色叙事背景"
+    },
+    {
+      "name": "--vi-font-site",
+      "value": "\"Geist\", \"PingFang SC\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", sans-serif",
+      "group": "type",
+      "label": "官网正文：参考指定 Geist 与中文黑体回退"
     }
   ],
   "icons": [

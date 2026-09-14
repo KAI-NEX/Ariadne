@@ -197,3 +197,11 @@ AI 对话等待使用用户提供的 WavePhysicsLoader 轨迹，由 `wave-physic
 ## 2026-09-09 模型选择页背景预设确认
 
 用户确认当前浏览器效果就是发布预设。核对当前保存值与 `public/ascii-waves.js` 的 `LOCKED_BACKGROUND_SETTINGS` 一致：opacity 0.77、fontSize 6.8、density 1.1、speed 2.8、direction 65、twist 2、tension 0.4；maxCells 70000、maxPixelRatio 2。后续调整从这组参数开始，「恢复预设」也返回此基准；本次不改变背景效果。
+
+## 2026-09-14 独立官网
+
+`website/` 承载用户指定的全屏视频官网，四区块为首页、介绍、网页版、下载。官网采用参考的黑底白字与 Geist：新 token `--vi-site-background`、`--vi-font-site` 在 manifest 维护并由脚本生成；中文沿用现有 CJK 回退，Ariadne 字标沿用 Recursive。此展示尺度仅用于官网，不更换主工作区字体和色彩。
+
+内容段落沿用 `vi-container/vi-grid` 网格，控件继承现有 44 px 热区、12 px 圆角、间距、焦点及动画曲线 token；官网共用 `Action` 组件。按用户参考使用 Lucide React 的方向、菜单、关闭和视频控制图标，不新增字体箭头。首页保留原视频颜色、70% 水平裁切及错落入场，手机菜单可键盘操作；减少动态效果时暂停视频并取消入场/滚动动画。
+
+`check_vi.py` 原范围为 `public/`，不宣称覆盖 JSX/Tailwind；官网源 CSS 另用同一 `scan_source` 检查新增硬编码色彩/字体，配合构建和实际浏览器验收。原例外台账不扩容。构建/截图等证据在忽略目录原地保留，官网说明见 [website/README.md](../../website/README.md)。

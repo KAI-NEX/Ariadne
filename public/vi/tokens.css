@@ -85,4 +85,6 @@
   --vi-grid-columns: 12;
   --vi-grid-columns-mobile: 4;
   --vi-font-object: "Inter", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", ui-sans-serif, sans-serif;
+  --vi-site-background: #000;
+  --vi-font-site: "Geist", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
 }
