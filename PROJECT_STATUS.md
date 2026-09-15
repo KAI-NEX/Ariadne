@@ -1,12 +1,13 @@
 # AI Job Radar｜Phase 4 Status
 
-## 2026-09-15 — GitHub Run failed 定位与测试等待修正（LOCAL VALIDATED；远端待验收）
+## 2026-09-15 — GitHub Run failed 定位与测试等待修正（COMPLETE；远端通过）
 
 - 用户反复反馈的是 GitHub `Verify source and isolation` 工作流失败；此前误判为工具执行或作品集失败，现更正。读取实际 [失败运行](https://github.com/KAI-NEX/Ariadne/actions/runs/34973395385)：提交 `6367782` 的公开文件检查成功，离线回归 97/98，唯一失败为 `content_database_regression.mjs`，后续 VI/Gitleaks 尚未运行；旧日志只输出测试名，缺少退出码与错误正文，无法据此确认最终根因。
 - 修正该测试的无界并发等待：在两个读取快照均返回后才继续事务，提交与重试走正常传输；等待参与者和本地 HTTP 请求均设 10 秒上限，消费直接响应并在失败时输出测试服务诊断。保留恰好一次成功、另一次版本冲突、回滚及原件完整性断言，不通过跳过测试或放宽产品约束消除红灯。
 - 回归执行器打印失败退出码和日志尾部，超时保留已有输出及明确的 120 秒超时标记；避免 GitHub 临时运行机销毁后只剩一条 Run failed。非零退出及超时诊断的合成检查通过。
 - 下载并校验 CI 同版 Node 22.23.2；本机 Node 24、Node 22 单项及仅含 Git 已跟踪文件的干净检出 98/98 回归通过，公开文件/VI/diff 检查通过。本地 Python 为 3.12，GitHub 为 3.11；本地未重现远端原失败，因此此条不宣称 GitHub 已恢复绿色，需将本次修改推送后实际复验。证据在 `.cache/ci-run-failure-20260915/`；未调用模型、改动应用数据或修改旧目录，原有未提交内容保留。
 - 用户授权推送后，`ea7b1a4` 的 [远端日志](https://github.com/KAI-NEX/Ariadne/actions/runs/34975841919) 明确失败在测试服务的 `storage_test_server_timeout`，尚未进入数据库断言；此前并发屏障修改属于健壮性补强，不是已证实的远端根因。后续测试服务使用运行器的同一 Python，固定 loopback 服务名以避免构造时无关的 `getfqdn` DNS 查询，冷启动上限 30 秒；20 秒仍未就绪时输出 Python 栈，子进程早退/启动错误立即失败，端口按完整行验证。应用服务及模型等待预算不变；Node 22 的真实存储测试与缺失解释器快速失败检查通过，继续等待远端验收。
+- 最终 `b121cdd` 已推送并在 [GitHub 实际运行](https://github.com/KAI-NEX/Ariadne/actions/runs/34976499436) 全部通过：98/98 回归、公开文件检查、VI 检查、全历史 Gitleaks 均成功且未发现凭据。已证实失败发生在测试服务启动阶段，修正后远端恢复；原日志不足以进一步断言 DNS 是唯一耗时来源。旧失败运行保留为历史，不删除或关闭验证来隐藏错误。
 
 ## 2026-09-15 — 修复完整作品集的 Codex 分析超时（COMPLETE）
 
