@@ -239,6 +239,7 @@
       candidate_model_source_delivery_failed: "图片或 PDF 无法发送给图文模型；没有发送材料。",
       candidate_model_source_identity_mismatch: "PDF 来源身份校验失败；没有发送材料。",
       deepseek_network_error: "连接模型失败；未保存任何模型提案。",
+      codex_timeout: "模型分析超过等待时限；原件已保留，未保存任何模型提案。可以重试，无需重新上传。",
       deepseek_provider_http_error: "模型未能完成这次请求；未保存任何模型提案。",
       deepseek_response_too_large: "模型返回内容超过安全上限；未保存任何模型提案。",
       deepseek_response_malformed: "模型返回内容无法解析；未保存任何模型提案。",
@@ -2403,6 +2404,7 @@
       candidateExecutionState = "READY";
       refreshCandidateImportGate();
       const dialog = byId("candidate-model-failure-dialog");
+      byId("candidate-model-failure-copy").textContent = personalErrorCopy(error);
       if (!dialog.open) dialog.showModal();
       return;
     }

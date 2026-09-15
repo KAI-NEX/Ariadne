@@ -20,6 +20,9 @@ from copy import deepcopy
 from src.runtime_binding import CODEX_MODEL, CODEX_CREDENTIAL, codex_enabled
 
 MAX_OUTPUT = 8_000_000
+BASE_TIMEOUT_SECONDS = 180
+MAX_TIMEOUT_SECONDS = 900
+SECONDS_PER_ADDITIONAL_IMAGE = 30
 EXECUTION_SLOTS = threading.BoundedSemaphore(2)
 DISABLED_FEATURES = (
     "shell_tool", "unified_exec", "shell_snapshot", "apps", "plugins", "hooks",
@@ -27,6 +30,20 @@ DISABLED_FEATURES = (
     "multi_agent", "memories", "code_mode", "code_mode_host", "in_app_browser",
     "remote_plugin", "tool_suggest", "goals", "sleep_tool",
 )
+
+
+def execution_timeout(image_count):
+    """Allow complete visual documents to finish without making waits unbounded."""
+    return min(MAX_TIMEOUT_SECONDS,
+               BASE_TIMEOUT_SECONDS + SECONDS_PER_ADDITIONAL_IMAGE * max(0, image_count - 1))
+
+
+class CodexTimeoutError(TimeoutError):
+    def __init__(self, timeout, image_count):
+        super().__init__("CODEX_TIMEOUT")
+        # Operational metadata only: no source text, filenames or CLI output.
+        self.diagnostics = {"provider": "codex", "timeout_seconds": timeout,
+                            "input_image_count": image_count}
 
 
 def codex_binary():
@@ -168,7 +185,7 @@ def parse_events(raw, function_name, output_schema=None):
             "choices": [{"finish_reason": "tool_calls" if function_name else "stop", "message": message}]}
 
 
-def call_codex(credential, payload, *, timeout=180):
+def call_codex(credential, payload, *, timeout=None):
     if not codex_enabled() or credential != CODEX_CREDENTIAL or payload.get("model") != CODEX_MODEL:
         raise ValueError("CODEX_RUNTIME_NOT_ELIGIBLE")
     if payload.get("reasoning_effort") not in {"low", "medium", "high"}:
@@ -186,6 +203,8 @@ def _execute(payload, timeout):
     with tempfile.TemporaryDirectory(prefix="ariadne-codex-") as name:
         directory = Path(name)
         prompt, images, schema, function_name = prepare_input(payload, directory)
+        if timeout is None:
+            timeout = execution_timeout(len(images))
         with (directory / "input.txt").open("w+b") as stdin, (directory / "events.jsonl").open("w+b") as stdout:
             stdin.write(prompt.encode("utf-8")); stdin.seek(0)
             process = subprocess.Popen(command(directory, images, schema, payload.get("reasoning_effort")), stdin=stdin, stdout=stdout,
@@ -194,7 +213,7 @@ def _execute(payload, timeout):
             try:
                 while True:
                     if time.monotonic() >= deadline:
-                        raise TimeoutError("CODEX_TIMEOUT")
+                        raise CodexTimeoutError(timeout, len(images))
                     if os.fstat(stdout.fileno()).st_size > MAX_OUTPUT:
                         raise ValueError("CODEX_OUTPUT_LIMIT")
                     try:

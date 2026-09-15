@@ -61,7 +61,8 @@ python3 scripts/run_codex_connector.py
 - Codex CLI 从独立临时目录执行，显式选择模型，使用 ephemeral 会话，忽略用户 config 和 execpolicy rules，关闭项目文档注入、shell、浏览器、插件、apps、图像生成和多代理工具。清除继承的桌面工具管道、任务身份、权限配置和 API 环境覆盖。只将当前领域请求和附件交给该进程。
 - 使用受支持的独立 OpenAI provider 配置通过 HTTPS 调用，避免实测环境中的 WebSocket 重试延迟。没有读取或复制 Codex 登录 token。
 - 对函数 schema，wire 层把 optional 字段编码为 required + nullable，返回后恢复 optional 表达，再经过完整领域校验。内部 chat-shaped envelope 是领域转换结构，不声称 Codex 原生返回 Chat Completions 或实际执行了该函数工具。
-- 每次执行限制 180 秒、最多两个并行子进程、8 MB 事件输出。只接受完成的 JSON 对象；子进程失败、非预期工具活动、截断/不完整输出和超时均失败。取消仍沿用原有 generation 校验，不能保证已经发出的上游请求立即停止。
+- 文本或单图执行限制 180 秒；完整视觉材料每多一张图增加 30 秒，最多 900 秒（25 页 PDF 为 900 秒）。这是按实际交付图数设置的等待预算，不截断页面、不切换模型或推理强度，也不保证服务商在期限内完成。最多两个并行子进程、8 MB 事件输出。只接受完成的 JSON 对象；子进程失败、非预期工具活动、截断/不完整输出和超时均失败。取消仍沿用原有 generation 校验，不能保证已经发出的上游请求立即停止。
+- Candidate 导入的 Codex 超时返回 `codex_timeout`，诊断仅含 Provider、等待上限和输入图数；前端显示对应错误及原件保留/重试说明，不再把所有失败替换成通用服务报错。失败不生成 Working/Proposal 或确认资料；重试仍需既有传输确认。
 
 ## 图片和完整 PDF
 

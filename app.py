@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from src.runtime_binding import CODEX_MODEL, CODEX_CREDENTIAL, CODEX_PROTOCOL, codex_enabled, local_runtime_preference
-from src.codex_runtime import call_codex
+from src.codex_runtime import CodexTimeoutError, call_codex
 from src.pdf_delivery import render_complete_pdf_pages
 from src.conversation_attachments import CONTRACT as ATTACHMENTS_CONTRACT, REQUEST_LIMIT as ATTACHMENTS_REQUEST_LIMIT
 
@@ -1231,6 +1231,8 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             def provider_call(api_key: str, provider_payload: dict) -> tuple[int, dict]:
                 try:
                     return call_ariadne_model(api_key, provider_payload, response_limit=8_000_000)
+                except CodexTimeoutError as error:
+                    raise CandidateModelRuntimeError("codex_timeout", "transport", True, error.diagnostics) from error
                 except ValueError as error:
                     code = "deepseek_response_too_large" if str(error) == "provider_response_too_large" else "deepseek_response_malformed"
                     raise CandidateModelRuntimeError(code, "parsing", True) from error
