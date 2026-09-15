@@ -12,7 +12,7 @@
 | 图谱基线 commit | `02700c8`（`docs: map Ariadne project evolution`） |
 | 产品变化复核截至 | `eea3274`（2026-09-13） |
 | 总阅读入口 | `README.md` |
-| 当前架构演进表 | `06-architecture-evolution-table.html` |
+| 当前架构演进表 | `07-architecture-evolution-six-stages.html` |
 | 旧版运行结构参考 | `../2026-09-11/ariadne.html` |
 | 项目稳定目标 | `PROJECT_CONTEXT.md` |
 | 最新实现证据 | `PROJECT_STATUS.md` 最新适用条目 |
@@ -26,7 +26,8 @@
 4. `04-motion-debugging`：为什么静态视觉正确不等于浏览器过程正确，以及如何用逐帧证据停止返工。
 5. `05-content-context-simplification`：上下文调用怎样从逐条截取、预先概况，简化为预算内完整读取和一次 DISCUSS，同时保留大集合保护。
 6. `06-architecture-evolution-table`：从职位数据库、本地文档分析、双域 AI、Runtime 简化到 Markdown 内容库，哪些能力逐步加入、哪些退出日常路径、哪些保护继续保留。
-7. `../2026-09-11/ariadne`：SourceDocument、Runtime、Local/Model、Working/Proposal 与 Human Save 如何连接；它是旧版结构参考，不再作为当前存储形态的唯一依据。
+7. `07-architecture-evolution-six-stages`：在 06 基础上把“边界完整但系统膨胀”与“保留保护、主动简化”拆开，形成适合 README 的六阶段主叙事。
+8. `../2026-09-11/ariadne`：SourceDocument、Runtime、Local/Model、Working/Proposal 与 Human Save 如何连接；它是旧版结构参考，不再作为当前存储形态的唯一依据。
 
 ## 哪些变化需要更新哪张图
 
@@ -38,7 +39,7 @@
 | 新的系统性动效故障层或浏览器验收方法形成 | `04-motion-debugging` | 产生可复用的诊断方法，不只是修好一个像素问题 |
 | Runtime、Provider、HTTP、本地服务、持久化或安全边界改变 | `../2026-09-11/ariadne` | 当前运行结构或真实数据流改变 |
 | 上下文预算、截取、分片综合或模型调用编排改变 | `05-content-context-simplification` | 优化前后的主调用路径或保护分支改变 |
-| 主存储形态、长期职责分层或重要架构阶段改变 | `06-architecture-evolution-table` | 需要重新说明“从哪里来、为什么改、当前留下什么” |
+| 主存储形态、长期职责分层或重要架构阶段改变 | `07-architecture-evolution-six-stages` | 需要重新说明“从哪里来、为什么改、当前留下什么” |
 | 文案、间距、单卡片能力或孤立 bug fix | 只记本台账 | 没有改变上述长期边界时不重画图 |
 
 如果一次变化同时影响多张图，先更新“当前架构”，再更新解释它为何出现的演进图。这样可以避免把愿景误画成已经运行的结构。
@@ -54,6 +55,17 @@
 7. 把有来源的决定、实际修改和验证结果写回本台账或项目状态，并以 Git commit 保存可审查证据。
 
 ## 更新记录
+
+### 2026-09-15 · README 采用六阶段架构演进主线
+
+- 用户目标：把项目从纯本地 Job Radar、本地文档分析、大模型语义理解、复杂架构、整体简化到本地存储重构的因果写清楚，并直接同步 GitHub。
+- 实际变化：新增 `07-architecture-evolution-six-stages`；根目录中英 README 使用同一套六阶段说明和图像入口。旧图和 06 第一版总表继续保留。
+- 为什么发生：06 把“边界完整但系统膨胀”和“保留保护、主动简化”压在同一步，不能充分解释用户提供的图一为何曾经合理、后来又为何需要简化。
+- 影响范围：公开 README、图谱阅读入口和演进追踪；没有修改应用 Runtime、存储实现、Provider、资料或确认数据。
+- 依据：`0b63323`、`c96c105`、`f761cd6`、`b470872`、`6435e14`、`eea3274`，以及当前项目上下文、状态、Markdown 存储契约和用户引用的 `SimplifyArchitecture` 任务。聊天只用于定位，具体事实回到仓库复核。
+- 是否改图：是；新增六阶段 Architecture 图，06 保留为前一版五阶段总表。
+- 验证：Archify showcase 9/9、0 errors、0 warnings；自动浏览器四个桌面尺寸无溢出；1440×900 与 2048×1320 明暗截图均通过视觉复核；交付后 0 轮修正。
+- 未知与下一步：这是一份历史因果说明，不把真实模型质量、全部浏览器 profile 或未来功能写成已完成能力。
 
 ### 2026-09-14 · 新增从 Job Radar 到 Markdown 内容库的架构调整表
 

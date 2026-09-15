@@ -4,7 +4,7 @@
 >
 > Ariadne 将个人资料与职位描述转化为可审阅、有版本、可追溯来源的职业判断；模型不能静默改写“你是谁”。
 
-[English README](README.md) · [完整项目经历](PROJECT_HISTORY.md) · [运行时契约](docs/current/ARIADNE_RUNTIME_EXECUTION_CONTRACT.md) · [Codex 连接器](docs/current/CODEX_RUNTIME_CONNECTOR.md)
+[English README](README.md) · [架构演进图](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.html) · [完整项目经历](PROJECT_HISTORY.md) · [运行时契约](docs/current/ARIADNE_RUNTIME_EXECUTION_CONTRACT.md) · [Codex 连接器](docs/current/CODEX_RUNTIME_CONNECTOR.md)
 
 ## 它解决什么问题
 
@@ -94,21 +94,35 @@ Ariadne 可以成为这些工作流的前置层：先形成经本人审阅、有
 
 ## 从 Job Radar 到 Ariadne
 
-项目最初叫 **Job Radar**，是本地优先的职位记录与文档理解实验。后来问题被重新定义：不是“如何让 Agent 自动找工作”，而是“如何让 AI 帮助一个人在有依据的前提下做职业判断”。
+项目最初叫 **Job Radar**，只是一个本地职位记录工具。它后来并不是按预定蓝图一次建成，而是在每套架构解决一个真实问题后，又暴露出下一层问题，才逐步发展成 Ariadne。产品方向也从“保存和结构化求职资料”转向“帮助用户形成有来源、真正有用的职业判断”。
 
-从 2026-08-24 到 2026-09-10，项目状态记录了 **83 条带日期的阶段、修复或决策**；当前 Git 历史有 **80 次可追溯提交**。这些不是 83 个功能版本，而是架构、资料理解、隐私边界、运行时安全、模型接入、界面与验证共同形成的过程。
+[![Ariadne 架构演进](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.visual-check.1440x900.light.png)](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.html)
 
-主要转折：
+### 1. 从纯本地 Job Radar 开始
 
-1. Job Radar 的本地职位记录与人工审核。
-2. 原生 PDF 读取、Apple PDFKit/Vision OCR、来源定位与证据边界。
-3. 研究开源的职位追踪、简历、浏览器执行和可移植资料模式；借鉴思路，不复制第三方代码。
-4. 建立 Candidate/Job 双事实域、Working 与确认数据分离、传输确认及 fail-closed 模型契约。
-5. 引入具备图像与完整视觉 PDF 处理资格的多模态模型流程。
-6. 加入受限 Codex runtime 与 loopback Web 配对连接器。
-7. 持续完善自然语言编辑回执、个人理解、职位概况、VI、DOCX、多模态对话附件，以及交互/可访问性。
+第一套架构很窄：用本地 SQLite 保存职位，页面负责搜索、状态和人工复核。因为输入、目标和数据权威都很简单，它不需要理解一个人的简历、作品集或职业经历。
 
-完整依据、阶段与非目标见 [PROJECT_HISTORY.md](PROJECT_HISTORY.md)。
+### 2. 为了准确，加入本地文档分析
+
+真实 PDF、截图、简历和作品集进入后，只提取文字已经不够。项目花了大量时间对比开源方案、运行 benchmark 和 A/B Test，逐步区分 OCR 准确率、阅读顺序、文档结构、领域映射与人工审核。Local 路径保护隐私，也能留下可检查的证据；但实现越来越复杂，因为“每个字都识别出来”和“真正理解这份材料”本来就是两个问题。
+
+### 3. 本地结构化不等于有用理解，于是接入大模型
+
+本地代码可以把材料整理成 Block、Entity 或字段，却无法可靠解释一段经历意味着什么、职位真正要求什么、二者为什么相关。因此架构转向合格的多模态模型，并把 Candidate 与 Job 分开维护。模型只能产生解释或可审阅的 **Working/Proposal**；只有用户执行 **Human Save**，内容才成为新的确认版本。
+
+### 4. 边界越来越完整，系统也越来越庞大
+
+来源完整性、Candidate/Job 隔离、上下文范围、Runtime 能力门禁、传输确认、Provider 执行、Proposal 审阅和 revision 历史都解决了真实风险。但这些能力逐层叠加后，形成了图一那样的多层协作系统：一次请求可能依次经过存储、浏览器上下文、Runtime 门禁、领域服务、外部推理、提案和持久化，边界正确，却越来越难理解和维护。
+
+### 5. 保留保护，简化整体结构
+
+下一步不是删除安全边界，而是退出重复处理链。正式 Local 不再用 OCR 或固定规则冒充语义理解，只负责零 Provider 调用地归档原件；需要理解时再明确进入 Model。预算内的当前资料直接进入一次完整语义讨论，不再强制先走 DISTILL/SYNTHESIZE；只有真正超预算的大集合才进行完整覆盖的分片综合与缓存。来源、版本、领域隔离、能力门禁、Proposal 与 Human Save 全部保留。
+
+### 6. Runtime 简化后，又发现旧本地存储逻辑有问题
+
+运行路径收敛后，原始存储设计的问题变得明显：IndexedDB 记录、派生结构、卡片和来源 envelope 容易像多份互相竞争的“真相”，迁移时还暴露了历史 hash 表示不一致。现在每条内容/版本以一份 Markdown 正文作为主要内容权威：本机 App 保存真实文件，网页端保存同格式文档；卡片和有范围的模型上下文都从这份正文投影。原件、审阅状态和历史仍单独保留，旧数据库只作备份、不再双写。
+
+所以现在的简化并不是“什么边界都不要，只随便放一个简历文件”，而是：**一份内容正文，多种受控视图，一个明确的人工确认边界**。完整证据和实现细节见[可交互 Archify 架构图](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.html)、[完整项目经历](PROJECT_HISTORY.md)及[统一 Markdown 存储契约](docs/current/MARKDOWN_CONTENT_STORAGE.md)。
 
 ## 本机启动
 

@@ -1,6 +1,6 @@
 # Ariadne 项目发展图谱
 
-首次整理：2026-09-12；最新复核：2026-09-14。这个目录用六张连续图解释：一个简单的 Job Radar 为什么逐步成为 Ariadne，以及技术复杂度、产品约束、运行优化和可减少的返工分别从哪里产生。
+首次整理：2026-09-12；最新复核：2026-09-15。这个目录用七张连续图解释：一个简单的 Job Radar 为什么逐步成为 Ariadne，以及技术复杂度、产品约束、运行优化和可减少的返工分别从哪里产生。
 
 这里的“五次边界扩张”是对证据的概念性分段，不是把历史改写成五个正式发布版本。图中保留产品名、契约名和关键技术名；较长的证据、数字与边界放在本说明中，避免把图变成难读的项目年表。
 
@@ -30,11 +30,15 @@
 
 6. [Ariadne 架构调整表：从 Job Radar 到 Markdown 内容库](06-architecture-evolution-table.html)（Architecture）
 
-   这张图把历次调整放进同一张表：职位数据库 → 本地文档分析 → Candidate/Job 双域 AI → Runtime 简化 → 已落地的 Markdown 内容库。它同时区分后来退出日常路径的本地 OCR/规则结构化、继续保留的来源/版本/领域隔离/Human Save，以及现在的五项职责：内容库、卡片、上下文、模型执行、保存。
+   这是第一版五阶段架构调整总表：职位数据库 → 本地文档分析 → Candidate/Job 双域 AI → Runtime 简化 → 已落地的 Markdown 内容库。它保留为 2026-09-14 的整理结果；第 7 张图进一步把“边界完整但系统膨胀”和“主动简化”拆成两个不同阶段。
 
-7. [旧版运行结构参考：从来源到确认版本](../2026-09-11/ariadne.html)（Architecture）
+7. [Ariadne 六阶段架构演进：从本地分析到统一 Markdown](07-architecture-evolution-six-stages.html)（Architecture）
 
-   这张较早的架构图保留 SourceDocument、Candidate/Job、Runtime 门禁、Local/Model、Working/Proposal、Human Save 与确认 revision 的连接关系，适合作为边界设计参考；其中 Local 技术处理和旧存储形态不再代表当前日常路径。当前存储事实以第 6 张图和 [Markdown 内容存储契约](../../../current/MARKDOWN_CONTENT_STORAGE.md) 为准。
+   当前总览。它明确说明：为了准确而加入本地文档分析；因为结构化不等于有用理解而接入大模型、Proposal 与 Human Save；正确边界逐层叠加后形成图一式复杂系统；随后保留保护但合并重复链路；最后针对多份内容权威和迁移问题，把本地存储重构为统一 Markdown 正文及按需投影。
+
+8. [旧版运行结构参考：从来源到确认版本](../2026-09-11/ariadne.html)（Architecture）
+
+   这张较早的架构图保留 SourceDocument、Candidate/Job、Runtime 门禁、Local/Model、Working/Proposal、Human Save 与确认 revision 的连接关系，适合作为边界设计参考；其中 Local 技术处理和旧存储形态不再代表当前日常路径。当前演进总览以第 7 张图为准，当前存储事实以 [Markdown 内容存储契约](../../../current/MARKDOWN_CONTENT_STORAGE.md) 为准。
 
 ## 从头到尾的核心结论
 
@@ -59,13 +63,14 @@ VI、UI 与动效的返工说明另一类复杂度：静态设计、共享代码
 
 ## 交付与验证
 
-最终图源为 `01-*.v3.json`、`02–04-*.v2.json`、`05-content-context-simplification.architecture.json` 与 `06-architecture-evolution-table.architecture.json`。无版本后缀的旧 JSON、`01-*.v2.json` 及维护流程候选是保留的失败/中间产物，不能用于重建当前正式 HTML。
+最终图源为 `01-*.v3.json`、`02–04-*.v2.json`、`05-content-context-simplification.architecture.json`、`06-architecture-evolution-table.architecture.json` 与 `07-architecture-evolution-six-stages.architecture.json`。无版本后缀的旧 JSON、`01-*.v2.json` 及维护流程候选是保留的失败/中间产物，不能用于重建当前正式 HTML。
 
-- 六张最终图各自通过 Archify showcase：9/9 checks，0 errors，0 warnings。
-- 六张 HTML 均通过自动浏览器检查：1440×900、1600×1000、1920×1080、2048×1320 全部无横向或纵向溢出；浅色/深色截图均成功生成。
+- 七张最终图各自通过 Archify showcase：9/9 checks，0 errors，0 warnings。
+- 七张 HTML 均通过自动浏览器检查：1440×900、1600×1000、1920×1080、2048×1320 全部无横向或纵向溢出；浅色/深色截图均成功生成。
 - 人工视觉复核覆盖每张图的 1440×900 浅色与 2048×1320 深色截图：中文节点、关系标签、异常分支、说明卡片和大屏垂直平衡通过。
 - 第一批候选在真实浏览器中因窄画布被放大而纵向溢出；第二轮调整画布比例、缩短节点文案并扩大可读节点。总历程图再补入三个真实长期产物，消除空的 Outcomes 区域。失败候选保留用于说明 QA 确实改变了交付，而不是只报告最终成功。
 - 内容与上下文优化图的首轮浏览器检查在 1440×900 多出 16px 纵向滚动；收紧画布底部留白后，第一轮视觉修正通过全部尺寸与主题检查。
 - 架构调整表在正式交付后的首轮浏览器检查即通过全部尺寸与主题检查；四张端点截图完成实际视觉复核，没有发生交付后修正。
+- 六阶段演进图的首版横向候选未达到 1440×900 的文字可读性门槛；改为两行连续时间轴后通过 showcase。正式交付后的浏览器检查和四张端点截图视觉复核一次通过，未再修改冻结图源。
 
 完整 hash、字节数和每张图的 correction rounds 见 [receipts.json](receipts.json)。每个 HTML 旁的 `*.visual-check.json` 是与最终 artifact hash 绑定的自动浏览器回执。

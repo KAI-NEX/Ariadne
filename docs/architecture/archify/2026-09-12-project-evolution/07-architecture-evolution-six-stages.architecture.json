@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Ariadne 架构演进 · 从本地分析到统一 Markdown",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1000, 480],
+    "views": [
+      {
+        "id": "job-radar-start",
+        "label": "起点 · 本地 Job Radar",
+        "focus": ["job_radar"],
+        "note": "最初是纯本地 Job Radar：SQLite 保存职位，页面负责检索、状态和人工复核。"
+      },
+      {
+        "id": "local-learning",
+        "label": "为了准确 · 本地分析",
+        "focus": ["job_radar", "local_analysis"],
+        "note": "为了准确读取真实 PDF、截图和简历，对比开源方案并做 benchmark / A/B Test，问题从 OCR 扩展到顺序、结构与审核。"
+      },
+      {
+        "id": "ai-boundaries",
+        "label": "结构化不等于理解",
+        "focus": ["local_analysis", "ai_dual_domain"],
+        "note": "本地结构化不等于有用理解，因此引入模型语义分析；Candidate 与 Job 分开，Proposal 经 Human Save 才确认。"
+      },
+      {
+        "id": "architecture-simplification",
+        "label": "复杂系统再简化",
+        "focus": ["ai_dual_domain", "complex_system", "runtime_simplify"],
+        "note": "边界正确，但图一式多层协作越来越重；后来保留安全边界，合并重复表示与调用链。"
+      },
+      {
+        "id": "markdown-current",
+        "label": "当前 · 重做本地存储",
+        "focus": ["runtime_simplify", "markdown_library"],
+        "note": "随后发现旧本地存储仍有多份真相与迁移问题，改为一份 Markdown 正文投影卡片和范围化 AI 上下文。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "job_radar",
+      "type": "database",
+      "label": "① Job Radar",
+      "sublabel": "本地 SQLite 职位记录 / 搜索与状态",
+      "tag": "纯本地 · 输入窄",
+      "pos": [40, 150],
+      "size": [210, 82]
+    },
+    {
+      "id": "local_analysis",
+      "type": "backend",
+      "label": "② 本地文档分析",
+      "sublabel": "OCR → 顺序 / 结构 → 人工审核",
+      "tag": "目标：读取准确",
+      "pos": [350, 150],
+      "size": [210, 82]
+    },
+    {
+      "id": "ai_dual_domain",
+      "type": "cloud",
+      "label": "③ 大模型语义理解",
+      "sublabel": "模型分析 → Candidate / Job",
+      "tag": "Proposal / Human Save",
+      "pos": [660, 150],
+      "size": [210, 82]
+    },
+    {
+      "id": "complex_system",
+      "type": "security",
+      "label": "④ 边界完整但膨胀",
+      "sublabel": "Source / Context / Runtime / Service",
+      "tag": "图一 · 多层协作",
+      "pos": [660, 330],
+      "size": [210, 82]
+    },
+    {
+      "id": "runtime_simplify",
+      "type": "backend",
+      "label": "⑤ 整体结构简化",
+      "sublabel": "Local 只归档 / 预算内直接讨论",
+      "tag": "大集合才分片综合",
+      "pos": [350, 330],
+      "size": [210, 82]
+    },
+    {
+      "id": "markdown_library",
+      "type": "database",
+      "label": "⑥ 本地存储重构",
+      "sublabel": "一份 Markdown → 卡片 + Scoped AI",
+      "tag": "当前 · 单一内容权威",
+      "pos": [40, 330],
+      "size": [210, 82]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "架构演进主线",
+      "wraps": ["job_radar", "local_analysis", "ai_dual_domain", "complex_system", "runtime_simplify", "markdown_library"],
+      "pad": 32
+    }
+  ],
+  "connections": [
+    {
+      "id": "radar-to-local",
+      "from": "job_radar",
+      "to": "local_analysis",
+      "label": "为了准确"
+    },
+    {
+      "id": "local-to-ai",
+      "from": "local_analysis",
+      "to": "ai_dual_domain",
+      "label": "结构化 ≠ 理解"
+    },
+    {
+      "id": "ai-to-complex",
+      "from": "ai_dual_domain",
+      "to": "complex_system",
+      "label": "边界逐层加入",
+      "labelAt": [765, 246],
+      "variant": "security"
+    },
+    {
+      "id": "complex-to-simplify",
+      "from": "complex_system",
+      "to": "runtime_simplify",
+      "label": "保留边界 · 合并链路",
+      "variant": "emphasis"
+    },
+    {
+      "id": "simplify-to-markdown",
+      "from": "runtime_simplify",
+      "to": "markdown_library",
+      "label": "重做存储权威",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "为什么先增加复杂度",
+      "items": [
+        "为了准确：对比开源方案、benchmark 与 A/B Test，区分 OCR、顺序和结构问题",
+        "本地结构化只能整理字段，不能解释经历与职位之间的意义",
+        "大模型负责语义理解；Proposal 与 Human Save 防止推断静默变成事实"
+      ]
+    },
+    {
+      "dot": "orange",
+      "title": "为什么后来简化",
+      "items": [
+        "图一式系统把正确边界分散在存储、Runtime、领域服务与提案链中",
+        "Local 回到原件归档；预算内完整资料直接进入一次语义讨论",
+        "只有真正超预算的大集合才分片综合，不让规模保护主导常见路径"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "为什么又重做存储",
+      "items": [
+        "旧 IndexedDB 与派生结构容易形成多份真相，迁移还暴露历史 hash 表示差异",
+        "本机使用真实 Markdown；网页端保存同格式文档，卡片与 AI 从同一正文投影",
+        "旧库只作备份且不双写；来源、版本、领域隔离和人工保存继续保留"
+      ]
+    }
+  ]
+}
