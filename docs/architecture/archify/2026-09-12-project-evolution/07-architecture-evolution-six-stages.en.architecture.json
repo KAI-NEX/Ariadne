@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Ariadne Architecture Evolution · Local to Unified Markdown",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [1000, 480],
+    "views": [
+      {
+        "id": "job-radar-start",
+        "label": "Start · Local Job Radar",
+        "focus": ["job_radar"],
+        "note": "The project began as a local Job Radar: SQLite stored jobs while the UI handled search, status, and human review."
+      },
+      {
+        "id": "local-learning",
+        "label": "Accuracy · Local Analysis",
+        "focus": ["job_radar", "local_analysis"],
+        "note": "Accurate PDFs, screenshots, and résumés required open-source comparisons and tests across OCR, order, structure, and review."
+      },
+      {
+        "id": "ai-boundaries",
+        "label": "Structure Is Not Understanding",
+        "focus": ["local_analysis", "ai_dual_domain"],
+        "note": "Local structure was not useful understanding, so model semantics were added; Candidate and Job stay separate, with Human Save."
+      },
+      {
+        "id": "architecture-simplification",
+        "label": "Simplify the Complex System",
+        "focus": ["ai_dual_domain", "complex_system", "runtime_simplify"],
+        "note": "The boundaries were correct, but the system became heavy; repeated representations and calls were merged without removing safeguards."
+      },
+      {
+        "id": "markdown-current",
+        "label": "Current · Rebuild Local Storage",
+        "focus": ["runtime_simplify", "markdown_library"],
+        "note": "The old store still had competing truths and migration problems, so one Markdown body now projects both cards and scoped AI context."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "job_radar",
+      "type": "database",
+      "label": "① Job Radar",
+      "sublabel": "local SQLite jobs / search and status",
+      "tag": "local only · narrow input",
+      "pos": [40, 150],
+      "size": [210, 82]
+    },
+    {
+      "id": "local_analysis",
+      "type": "backend",
+      "label": "② Local Document Analysis",
+      "sublabel": "OCR → order / structure → human review",
+      "tag": "goal: accurate reading",
+      "pos": [350, 150],
+      "size": [210, 82]
+    },
+    {
+      "id": "ai_dual_domain",
+      "type": "cloud",
+      "label": "③ Model Semantic Understanding",
+      "sublabel": "model analysis → Candidate / Job",
+      "tag": "Proposal / Human Save",
+      "pos": [660, 150],
+      "size": [210, 82]
+    },
+    {
+      "id": "complex_system",
+      "type": "security",
+      "label": "④ Complete, but Bloated",
+      "sublabel": "Source / Context / Runtime / Service",
+      "tag": "Figure 1 · layered system",
+      "pos": [660, 330],
+      "size": [210, 82]
+    },
+    {
+      "id": "runtime_simplify",
+      "type": "backend",
+      "label": "⑤ Simplified Runtime",
+      "sublabel": "Local archives / direct in-budget dialogue",
+      "tag": "chunk only at scale",
+      "pos": [350, 330],
+      "size": [210, 82]
+    },
+    {
+      "id": "markdown_library",
+      "type": "database",
+      "label": "⑥ Rebuilt Local Storage",
+      "sublabel": "one Markdown → cards + scoped AI",
+      "tag": "current · one content authority",
+      "pos": [40, 330],
+      "size": [210, 82]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Architecture Evolution",
+      "wraps": ["job_radar", "local_analysis", "ai_dual_domain", "complex_system", "runtime_simplify", "markdown_library"],
+      "pad": 32
+    }
+  ],
+  "connections": [
+    { "id": "radar-to-local", "from": "job_radar", "to": "local_analysis", "label": "need accuracy" },
+    { "id": "local-to-ai", "from": "local_analysis", "to": "ai_dual_domain", "label": "not meaning" },
+    { "id": "ai-to-complex", "from": "ai_dual_domain", "to": "complex_system", "label": "add boundaries layer by layer", "labelAt": [765, 246], "variant": "security" },
+    { "id": "complex-to-simplify", "from": "complex_system", "to": "runtime_simplify", "label": "merge paths", "variant": "emphasis" },
+    { "id": "simplify-to-markdown", "from": "runtime_simplify", "to": "markdown_library", "label": "one authority", "variant": "emphasis" }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "Why Complexity Was Added First",
+      "items": ["Accuracy required open-source comparisons, benchmarks, and A/B tests across OCR, order, and structure", "Models add meaning; Proposal and Human Save keep inference from silently becoming fact"]
+    },
+    {
+      "dot": "orange",
+      "title": "Why the System Was Simplified",
+      "items": ["Figure 1 spread correct boundaries across storage, Runtime, services, and proposals", "Local archives originals; one discussion uses complete in-budget evidence, while only large sets are chunked"]
+    },
+    {
+      "dot": "emerald",
+      "title": "Why Storage Was Rebuilt Again",
+      "items": ["IndexedDB and derived structures created competing truths and exposed historical hash differences", "One Markdown body now projects cards and scoped AI; the old store is backup-only"]
+    }
+  ]
+}

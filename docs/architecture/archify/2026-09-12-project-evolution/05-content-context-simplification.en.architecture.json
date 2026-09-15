@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Content & Context · Complete Evidence First",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [1180, 650],
+    "views": [
+      {
+        "id": "before-path",
+        "label": "Why the old path was complex",
+        "focus": ["old_records", "old_truncate", "old_overview", "old_discuss"],
+        "note": "Every record was ranked and truncated, summarized, and only then used to answer."
+      },
+      {
+        "id": "current-path",
+        "label": "How the current path is simpler",
+        "focus": ["current_records", "complete_gate", "current_discuss", "current_answer"],
+        "note": "When the material fits the budget, read it completely and answer in one DISCUSS call."
+      },
+      {
+        "id": "large-collection",
+        "label": "Large-collection protection remains",
+        "focus": ["complete_gate", "large_synthesis", "current_discuss"],
+        "note": "Only over-budget or over-count inputs use complete chunked synthesis and caching."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "old_records",
+      "type": "database",
+      "label": "Candidate / Job Records",
+      "sublabel": "current IndexedDB semantics",
+      "pos": [70, 155],
+      "size": [170, 64]
+    },
+    {
+      "id": "old_truncate",
+      "type": "backend",
+      "label": "Rank & Truncate Each",
+      "sublabel": "keyword rank / 6 KB each",
+      "pos": [310, 155],
+      "size": [170, 64]
+    },
+    {
+      "id": "old_overview",
+      "type": "backend",
+      "label": "Precompute Overview",
+      "sublabel": "DISTILL / SYNTHESIZE",
+      "pos": [550, 155],
+      "size": [170, 64]
+    },
+    {
+      "id": "old_discuss",
+      "type": "cloud",
+      "label": "Model Answer",
+      "sublabel": "then run DISCUSS",
+      "pos": [790, 155],
+      "size": [170, 64]
+    },
+    {
+      "id": "current_records",
+      "type": "database",
+      "label": "Complete Current Meaning",
+      "sublabel": "storage authority not migrated",
+      "pos": [70, 390],
+      "size": [170, 64]
+    },
+    {
+      "id": "complete_gate",
+      "type": "security",
+      "label": "Complete-evidence Gate",
+      "sublabel": "total budget / up to 60 items",
+      "pos": [310, 390],
+      "size": [170, 64]
+    },
+    {
+      "id": "current_discuss",
+      "type": "cloud",
+      "label": "One DISCUSS Call",
+      "sublabel": "no forced pre-summary",
+      "pos": [550, 390],
+      "size": [170, 64]
+    },
+    {
+      "id": "current_answer",
+      "type": "frontend",
+      "label": "Direct Answer & Dialogue",
+      "sublabel": "cards / current content",
+      "pos": [790, 390],
+      "size": [170, 64]
+    },
+    {
+      "id": "large_synthesis",
+      "type": "backend",
+      "label": "Chunked Synthesis",
+      "sublabel": "complete coverage / cache",
+      "pos": [310, 520],
+      "size": [170, 64]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Before · Layered Preprocessing",
+      "wraps": ["old_records", "old_truncate", "old_overview", "old_discuss"],
+      "pad": 34
+    },
+    {
+      "kind": "region",
+      "label": "Now · Deployed Runtime Simplification",
+      "wraps": ["current_records", "complete_gate", "current_discuss", "current_answer", "large_synthesis"],
+      "pad": 34
+    }
+  ],
+  "connections": [
+    { "id": "old-rank", "from": "old_records", "to": "old_truncate", "label": "process" },
+    { "id": "old-summary", "from": "old_truncate", "to": "old_overview", "label": "distill" },
+    { "id": "old-answer", "from": "old_overview", "to": "old_discuss", "label": "discuss" },
+    { "id": "current-budget", "from": "current_records", "to": "complete_gate", "label": "budget", "variant": "emphasis" },
+    { "id": "current-direct", "from": "complete_gate", "to": "current_discuss", "label": "read all in budget", "labelAt": [600, 468], "variant": "emphasis" },
+    { "id": "current-answer-edge", "from": "current_discuss", "to": "current_answer", "label": "respond", "variant": "emphasis" },
+    { "id": "large-branch", "from": "complete_gate", "to": "large_synthesis", "label": "over budget/count", "labelAt": [395, 468], "variant": "security" },
+    { "id": "large-return", "from": "large_synthesis", "to": "current_discuss", "label": "answer after synthesis", "variant": "dashed" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Already Improved",
+      "items": ["In-budget context is no longer truncated per record", "Small Job sets skip DISTILL / SYNTHESIZE; shared batching remains"]
+    },
+    {
+      "dot": "cyan",
+      "title": "Still Preserved",
+      "items": ["Originals, provenance, version conflicts, and Human Save", "Candidate / Job scope, model gates, large-set chunking, and cache"]
+    },
+    {
+      "dot": "amber",
+      "title": "Not Yet Complete in This Snapshot",
+      "items": ["Markdown was not yet primary; IndexedDB still held content authority", "No claim of real-model quality or storage-migration acceptance"]
+    }
+  ]
+}

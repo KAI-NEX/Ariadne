@@ -99,6 +99,48 @@
       "browser_evidence": "passed",
       "visual_review": "passed",
       "correction_rounds": 0
+    },
+    {
+      "id": "02-document-understanding-en",
+      "diagram_type": "workflow",
+      "output": "/Users/kai/Documents/GitKaiNex/Ariadne/docs/architecture/archify/2026-09-12-project-evolution/02-document-understanding.en.html",
+      "final_specification": "02-document-understanding.en.workflow.json",
+      "specification_sha256": "5e5f7fcb925555a99f1ce4b368d0bc5b3dd868336bfb0ecf04c2510477ede1b0",
+      "specification_bytes": 4848,
+      "artifact_sha256": "50ae9176fb7bb94d574cd64471611881ee52d166155bc9a73c55e6d3bc170bd8",
+      "artifact_bytes": 815464,
+      "validation": "9/9 showcase, 0 errors, 0 warnings",
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 0
+    },
+    {
+      "id": "05-content-context-simplification-en",
+      "diagram_type": "architecture",
+      "output": "/Users/kai/Documents/GitKaiNex/Ariadne/docs/architecture/archify/2026-09-12-project-evolution/05-content-context-simplification.en.html",
+      "final_specification": "05-content-context-simplification.en.architecture.json",
+      "specification_sha256": "2ba7953abdf96b76651a3ca535694846b76f844890730e3d554aa741eb849099",
+      "specification_bytes": 5034,
+      "artifact_sha256": "9dead23647c53f36219af1595d3b6856710093dbff40140ab32ce2852a89dc78",
+      "artifact_bytes": 809861,
+      "validation": "9/9 showcase, 0 errors, 0 warnings",
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 2
+    },
+    {
+      "id": "07-architecture-evolution-six-stages-en",
+      "diagram_type": "architecture",
+      "output": "/Users/kai/Documents/GitKaiNex/Ariadne/docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.en.html",
+      "final_specification": "07-architecture-evolution-six-stages.en.architecture.json",
+      "specification_sha256": "77ac74c8e2839c2c01f2117829d5c5f214da3df8a47b8b83751fa761df879f2d",
+      "specification_bytes": 5154,
+      "artifact_sha256": "c7b57a0d77e98334878e225e9bfb2559be0fa8b66358ab3a6f9403d528d716d5",
+      "artifact_bytes": 805463,
+      "validation": "9/9 showcase, 0 errors, 0 warnings",
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 1
     }
   ],
   "automated_browser_viewports": [
@@ -116,7 +158,8 @@
       "2048x1320 dark screenshot for each artifact",
       "05-content-context-simplification additionally inspected at both endpoint themes",
       "06-architecture-evolution-table inspected at 1440x900 and 2048x1320 in both light and dark themes",
-      "07-architecture-evolution-six-stages inspected at 1440x900 and 2048x1320 in both light and dark themes"
+      "07-architecture-evolution-six-stages inspected at 1440x900 and 2048x1320 in both light and dark themes",
+      "English 02, 05, and 07 variants inspected at 1440x900 in both themes and at 2048x1320 in light theme"
     ],
     "observations": [
       "No visible clipping or unreadable relationship label",

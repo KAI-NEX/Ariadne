@@ -1,6 +1,6 @@
 # Ariadne 项目发展图谱
 
-首次整理：2026-09-12；最新复核：2026-09-15。这个目录用七张连续图解释：一个简单的 Job Radar 为什么逐步成为 Ariadne，以及技术复杂度、产品约束、运行优化和可减少的返工分别从哪里产生。
+首次整理：2026-09-12；最新复核：2026-09-15。这个目录用七张连续图解释：一个简单的 Job Radar 为什么逐步成为 Ariadne，以及技术复杂度、产品约束、运行优化和可减少的返工分别从哪里产生。根目录中文 README 使用中文图；英文 README 对应使用独立英文图，图内节点、关系、卡片、导览和 Viewer 控件均切换为英文。
 
 这里的“五次边界扩张”是对证据的概念性分段，不是把历史改写成五个正式发布版本。图中保留产品名、契约名和关键技术名；较长的证据、数字与边界放在本说明中，避免把图变成难读的项目年表。
 
@@ -16,6 +16,8 @@
 
    这张图回答 OCR 与 GitHub 参考方案的问题。真实故障并不都发生在 OCR：识字、阅读顺序、文档结构、业务对象映射和人工审核是不同层。最终保留的是逐页 native/Apple Vision 选择、条件式 GapTree、DocumentBlock、Resume/Portfolio 分域映射和实体级审核。
 
+   英文 README 使用 [Why Local Recognition Became Complex](02-document-understanding.en.html) 及其独立英文截图。
+
 3. [上下文为什么会乱：从当前决定到可恢复记录](03-context-authority.html)（Workflow）
 
    这张图解释“对话越长、文档越多，为什么反而会改错”。主要问题不是缺少更多上下文，而是生效时间、领域范围、版本身份和权限被混用。后来增加 PROJECT_CONTEXT、PROJECT_STATUS、领域契约、Working/Proposal 与 revision 边界，就是为了让决定可定位、修改可限制、交接可恢复。
@@ -28,6 +30,8 @@
 
    这是一张**历史阶段快照**，直接比较第一次 Runtime 简化前后：以前每条资料先排序截取、小集合也先 DISTILL / SYNTHESIZE，再进入 DISCUSS；后来改为预算内完整读取并直接用一次 DISCUSS 回答，只有超限或数量过多时才走全量分片综合与缓存。图中“Markdown 主存储尚未迁移”只描述 2026-09-12 当时状态；随后迁移已经完成，当前状态以第 6 张图为准。
 
+   英文 README 使用 [Content & Context · Complete Evidence First](05-content-context-simplification.en.html) 及其独立英文截图。
+
 6. [Ariadne 架构调整表：从 Job Radar 到 Markdown 内容库](06-architecture-evolution-table.html)（Architecture）
 
    这是第一版五阶段架构调整总表：职位数据库 → 本地文档分析 → Candidate/Job 双域 AI → Runtime 简化 → 已落地的 Markdown 内容库。它保留为 2026-09-14 的整理结果；第 7 张图进一步把“边界完整但系统膨胀”和“主动简化”拆成两个不同阶段。
@@ -35,6 +39,8 @@
 7. [Ariadne 六阶段架构演进：从本地分析到统一 Markdown](07-architecture-evolution-six-stages.html)（Architecture）
 
    当前总览。它明确说明：为了准确而加入本地文档分析；因为结构化不等于有用理解而接入大模型、Proposal 与 Human Save；正确边界逐层叠加后形成图一式复杂系统；随后保留保护但合并重复链路；最后针对多份内容权威和迁移问题，把本地存储重构为统一 Markdown 正文及按需投影。
+
+   英文 README 使用 [Ariadne Architecture Evolution · Local to Unified Markdown](07-architecture-evolution-six-stages.en.html) 及其独立英文截图。
 
 8. [旧版运行结构参考：从来源到确认版本](../2026-09-11/ariadne.html)（Architecture）
 
@@ -63,7 +69,7 @@ VI、UI 与动效的返工说明另一类复杂度：静态设计、共享代码
 
 ## 交付与验证
 
-最终图源为 `01-*.v3.json`、`02–04-*.v2.json`、`05-content-context-simplification.architecture.json`、`06-architecture-evolution-table.architecture.json` 与 `07-architecture-evolution-six-stages.architecture.json`。无版本后缀的旧 JSON、`01-*.v2.json` 及维护流程候选是保留的失败/中间产物，不能用于重建当前正式 HTML。
+中文最终图源为 `01-*.v3.json`、`02–04-*.v2.json`、`05-content-context-simplification.architecture.json`、`06-architecture-evolution-table.architecture.json` 与 `07-architecture-evolution-six-stages.architecture.json`。英文 README 另外使用 `02-document-understanding.en.workflow.json`、`05-content-context-simplification.en.architecture.json` 与 `07-architecture-evolution-six-stages.en.architecture.json`。无版本后缀的旧 JSON、`01-*.v2.json` 及维护流程候选是保留的失败/中间产物，不能用于重建当前正式 HTML。
 
 - 七张最终图各自通过 Archify showcase：9/9 checks，0 errors，0 warnings。
 - 七张 HTML 均通过自动浏览器检查：1440×900、1600×1000、1920×1080、2048×1320 全部无横向或纵向溢出；浅色/深色截图均成功生成。
@@ -72,5 +78,6 @@ VI、UI 与动效的返工说明另一类复杂度：静态设计、共享代码
 - 内容与上下文优化图的首轮浏览器检查在 1440×900 多出 16px 纵向滚动；收紧画布底部留白后，第一轮视觉修正通过全部尺寸与主题检查。
 - 架构调整表在正式交付后的首轮浏览器检查即通过全部尺寸与主题检查；四张端点截图完成实际视觉复核，没有发生交付后修正。
 - 六阶段演进图的首版横向候选未达到 1440×900 的文字可读性门槛；改为两行连续时间轴后通过 showcase。正式交付后的浏览器检查和四张端点截图视觉复核一次通过，未再修改冻结图源。
+- 三张英文版本分别通过 Archify showcase 与自动浏览器检查；英文 02 正式交付后 0 轮视觉修正，英文 07 经 1 轮卡片压缩通过，英文 05 经 2 轮标题与卡片收敛通过。实际视觉复核覆盖 1440×900 明暗主题及 2048×1320 浅色大屏。
 
 完整 hash、字节数和每张图的 correction rounds 见 [receipts.json](receipts.json)。每个 HTML 旁的 `*.visual-check.json` 是与最终 artifact hash 绑定的自动浏览器回执。

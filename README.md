@@ -4,7 +4,7 @@
 >
 > Ariadne turns personal materials and job descriptions into reviewable, versioned, source-grounded decisions—without letting an AI silently rewrite who you are.
 
-[中文说明](README.zh-CN.md) · [Architecture evolution](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.html) · [Project history](PROJECT_HISTORY.md) · [Runtime contract](docs/current/ARIADNE_RUNTIME_EXECUTION_CONTRACT.md) · [Codex connector](docs/current/CODEX_RUNTIME_CONNECTOR.md)
+[中文说明](README.zh-CN.md) · [Architecture evolution](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.en.html) · [Project history](PROJECT_HISTORY.md) · [Runtime contract](docs/current/ARIADNE_RUNTIME_EXECUTION_CONTRACT.md) · [Codex connector](docs/current/CODEX_RUNTIME_CONNECTOR.md)
 
 ## Why Ariadne
 
@@ -96,7 +96,7 @@ The model is allowed to interpret. The person remains the authority on what beco
 
 The project began as **Job Radar**, a local job-record tool. It became Ariadne through a sequence of corrections: each architecture solved a real problem, then exposed the next one. The direction changed from “store and structure job-search material” to “help a person form useful, source-grounded career judgment.”
 
-[![Ariadne architecture evolution](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.visual-check.1440x900.light.png)](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.html)
+[![Ariadne architecture evolution](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.en.visual-check.1440x900.light.png)](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.en.html)
 
 ### 1. Local Job Radar
 
@@ -106,7 +106,7 @@ The first architecture was intentionally narrow: local SQLite job records, searc
 
 Real PDFs, screenshots, résumés, and portfolios made plain text extraction insufficient. The project compared open-source approaches, ran benchmarks and A/B tests, and separated OCR accuracy from reading order, document structure, domain mapping, and human review. Local processing protected privacy and produced inspectable evidence, but the implementation grew because “reading every character” is not the same problem as “understanding the document.”
 
-[![Why local document understanding became complex](docs/architecture/archify/2026-09-12-project-evolution/02-document-understanding.visual-check.1440x900.light.png)](docs/architecture/archify/2026-09-12-project-evolution/02-document-understanding.html)
+[![Why local document understanding became complex](docs/architecture/archify/2026-09-12-project-evolution/02-document-understanding.en.visual-check.1440x900.light.png)](docs/architecture/archify/2026-09-12-project-evolution/02-document-understanding.en.html)
 
 ### 3. Model-based semantic understanding
 
@@ -120,13 +120,13 @@ Source integrity, domain isolation, context scope, runtime capability checks, tr
 
 The system then stopped using local OCR or rule-based structure as if it were semantic understanding. Local mode returned to zero-provider original-file archiving; Model mode performs the interpretation. Within budget, current material goes directly into one discussion call instead of mandatory DISTILL/SYNTHESIZE stages. Only genuinely over-budget large collections use complete chunked synthesis and caching. Source identity, Candidate/Job separation, capability gates, proposals, and Human Save remain.
 
-[![From a layered preprocessing chain to bounded direct discussion](docs/architecture/archify/2026-09-12-project-evolution/05-content-context-simplification.visual-check.1440x900.light.png)](docs/architecture/archify/2026-09-12-project-evolution/05-content-context-simplification.html)
+[![From a layered preprocessing chain to bounded direct discussion](docs/architecture/archify/2026-09-12-project-evolution/05-content-context-simplification.en.visual-check.1440x900.light.png)](docs/architecture/archify/2026-09-12-project-evolution/05-content-context-simplification.en.html)
 
 ### 6. Rebuild local storage around one content authority
 
 The simplified runtime exposed a remaining problem in the original local storage design: IndexedDB records, derived structures, cards, and source envelopes could behave like several competing truths. Migration also revealed historical hash-format differences. The current architecture stores one canonical Markdown content body per record/version—real files in the local app and the same document format in browser storage. Cards and scoped model context are projections of that body; originals, review state, and history remain separate. The old database is retained as a backup and is not double-written.
 
-The result is deliberately smaller, not boundary-free: **one content body, several controlled views, and one explicit confirmation boundary**. Read the [interactive Archify diagram](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.html), the [full project history](PROJECT_HISTORY.md), and the [Markdown storage contract](docs/current/MARKDOWN_CONTENT_STORAGE.md) for evidence and implementation details.
+The result is deliberately smaller, not boundary-free: **one content body, several controlled views, and one explicit confirmation boundary**. Read the [interactive Archify diagram](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.en.html), the [full project history](PROJECT_HISTORY.md), and the [Markdown storage contract](docs/current/MARKDOWN_CONTENT_STORAGE.md) for evidence and implementation details.
 
 ## Run locally
 

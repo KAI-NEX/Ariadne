@@ -1,0 +1,50 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Why Local Recognition Became Complex · From Text to Reviewable Objects",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [1240, 660]
+  },
+  "lanes": [
+    { "id": "reading", "label": "Sources & OCR" },
+    { "id": "structure", "label": "Structure & Mapping" },
+    { "id": "review", "label": "Review" },
+    { "id": "exception", "label": "Exceptions", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "ingest", "label": "Preserve Source", "fromCol": 0, "toCol": 1 },
+    { "id": "extract", "label": "Choose per Page", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "understand", "label": "Reviewable Objects", "fromCol": 4, "toCol": 5, "variant": "security" }
+  ],
+  "mainPath": ["source_bundle", "page_gate", "native_text", "document_blocks", "domain_mapping", "human_review"],
+  "nodes": [
+    { "id": "source_bundle", "lane": "reading", "col": 0, "width": 142, "type": "database", "label": "SourceDocument", "sublabel": "PDF / DOCX / MD / TXT", "tag": "original + hash" },
+    { "id": "page_gate", "lane": "reading", "col": 1, "width": 137, "type": "security", "label": "Page Gate", "sublabel": "usable text layer?", "tag": "per-page choice" },
+    { "id": "native_text", "lane": "reading", "col": 2, "width": 142, "type": "backend", "label": "Native Text Blocks", "sublabel": "preferred when usable", "tag": "fastest path" },
+    { "id": "apple_vision", "lane": "exception", "col": 2, "width": 152, "type": "backend", "label": "Apple Vision V1 Auto", "sublabel": "PDF pages without text", "tag": "selective OCR" },
+    { "id": "gaptree_order", "lane": "exception", "col": 3, "width": 142, "type": "backend", "label": "GapTree Ordering", "sublabel": "multi-column OCR résumé", "tag": "conditional" },
+    { "id": "document_blocks", "lane": "structure", "col": 3, "width": 152, "type": "database", "label": "DocumentBlock v1", "sublabel": "page / bbox / method", "tag": "shared IR" },
+    { "id": "domain_mapping", "lane": "structure", "col": 4, "width": 147, "type": "backend", "label": "Domain Mapping", "sublabel": "Résumé / Portfolio", "tag": "Entity Proposal" },
+    { "id": "manual_boundary", "lane": "exception", "col": 4, "width": 142, "type": "security", "label": "Stop on Weak Bounds", "sublabel": "do not guess projects", "tag": "manual selection" },
+    { "id": "human_review", "lane": "review", "col": 5, "width": 152, "type": "security", "label": "Entity-level Review", "sublabel": "confirm / edit / reject", "tag": "confirmed-only" }
+  ],
+  "edges": [
+    { "id": "bundle_gate", "from": "source_bundle", "to": "page_gate", "label": "per page", "variant": "emphasis", "role": "main" },
+    { "id": "gate_native", "from": "page_gate", "to": "native_text", "label": "native usable", "variant": "emphasis", "role": "main" },
+    { "id": "native_blocks", "from": "native_text", "to": "document_blocks", "label": "with location", "variant": "emphasis", "role": "main" },
+    { "id": "blocks_mapping", "from": "document_blocks", "to": "domain_mapping", "label": "map by domain", "variant": "emphasis", "role": "main" },
+    { "id": "mapping_review", "from": "domain_mapping", "to": "human_review", "label": "proposal", "variant": "security", "role": "main" },
+    { "id": "gate_vision", "from": "page_gate", "to": "apple_vision", "label": "no text layer", "variant": "dashed", "role": "branch" },
+    { "id": "vision_order", "from": "apple_vision", "to": "gaptree_order", "label": "multi-column OCR", "variant": "dashed", "role": "branch" },
+    { "id": "vision_blocks", "from": "gaptree_order", "to": "document_blocks", "label": "shared format", "variant": "dashed", "role": "return" },
+    { "id": "mapping_manual", "from": "domain_mapping", "to": "manual_boundary", "label": "weak boundary", "variant": "security", "role": "error" },
+    { "id": "manual_review", "from": "manual_boundary", "to": "human_review", "label": "human grouping", "variant": "security", "role": "return" }
+  ],
+  "cards": [
+    { "dot": "violet", "title": "Why So Many GitHub Projects Were Compared", "items": ["SmartResume: separate extraction from source scope", "RAGFlow: choose native text or OCR per page", "Docling: borrow typed IR and provenance, not the dependency"] },
+    { "dot": "amber", "title": "Why We Stopped Adding Engines", "items": ["Paddle took about 725.6 s/page and 4 GB RSS with no entity gain", "Surya produced no comparable result and added runtime/license boundaries", "Global GapTree and blind native/OCR fusion caused real regressions"] },
+    { "dot": "emerald", "title": "Final Stop Conditions", "items": ["20 files and 305 pages completed; 6/6 truth documents passed", "18 reviewable, 2 safely routed to humans, 0 crashes", "No repeated real failure, so OCR architecture research stopped"] }
+  ]
+}
