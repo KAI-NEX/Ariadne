@@ -14,7 +14,8 @@ def main():
         print('Node.js is required for the JavaScript regressions.', file=sys.stderr)
         return 2
     env = {key: value for key, value in os.environ.items() if not key.startswith(('OPENAI_', 'GEMINI_', 'DEEPSEEK_', 'QWEN_'))}
-    env.update(PYTHONPATH=str(ROOT), ARIADNE_CODEX_ENABLED='0', PYTHONDONTWRITEBYTECODE='1')
+    env.update(PYTHONPATH=str(ROOT), ARIADNE_CODEX_ENABLED='0', PYTHONDONTWRITEBYTECODE='1',
+               ARIADNE_TEST_PYTHON=sys.executable)
     output = ROOT / '.cache' / 'regressions'; output.mkdir(parents=True, exist_ok=True)
     results = []
     files = sorted(list((ROOT / 'tests').glob('*regression.py')) + list((ROOT / 'tests').glob('*regression.mjs')))

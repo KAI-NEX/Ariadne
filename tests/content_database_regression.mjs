@@ -11,7 +11,26 @@ assert.deepEqual(schema, Object.fromEntries(Demo.STORES));
 for (const spec of Truth.STORE_SPECS) assert.equal(schema[spec.name], spec.keyPath);
 for (const store of Content.STORES) assert(schema[store], store);
 const root = await fs.mkdtemp(path.resolve(".cache/content-database-regression-"));
-const child = spawn("python3", ["-u", "-c", "from app import JobRadarHandler, ThreadingHTTPServer\ns=ThreadingHTTPServer(('127.0.0.1',0),JobRadarHandler)\nprint(s.server_port,flush=True)\ns.serve_forever()"], {
+const serverScript = `
+import faulthandler, sys
+faulthandler.dump_traceback_later(20)
+print('storage_server_stage=import', file=sys.stderr, flush=True)
+from app import JobRadarHandler, ThreadingHTTPServer
+from socketserver import TCPServer
+class LoopbackServer(ThreadingHTTPServer):
+    def server_bind(self):
+        # HTTPServer's default getfqdn() performs DNS during construction.
+        # This fixture serves only loopback; DNS is not part of storage acceptance.
+        TCPServer.server_bind(self)
+        self.server_name = 'localhost'
+        self.server_port = self.server_address[1]
+print('storage_server_stage=bind', file=sys.stderr, flush=True)
+s = LoopbackServer(('127.0.0.1', 0), JobRadarHandler)
+faulthandler.cancel_dump_traceback_later()
+print(s.server_port, flush=True)
+s.serve_forever()
+`;
+const child = spawn(process.env.ARIADNE_TEST_PYTHON || "python3", ["-u", "-c", serverScript], {
   env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1", ARIADNE_CODEX_ENABLED: "0", ARIADNE_WORKSPACE_ROOT: root }, stdio: ["ignore", "pipe", "pipe"],
 });
 let diagnostics = ""; child.stderr.on("data", chunk => { diagnostics += chunk; });
@@ -32,9 +51,22 @@ function barrier(size) {
 const localFetch = (url, options = {}) => originalFetch(url, { ...options, signal: AbortSignal.timeout(10000) });
 try {
   const port = await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(Error("storage_test_server_timeout")), 10000);
-    child.stdout.once("data", chunk => { clearTimeout(timer); resolve(Number(String(chunk).trim())); });
-    child.once("error", reject);
+    let output = "";
+    const finish = (error, port) => {
+      clearTimeout(timer);
+      child.stdout.off("data", onData); child.off("error", onError); child.off("exit", onExit);
+      error ? reject(error) : resolve(port);
+    };
+    const onError = error => finish(error);
+    const onExit = (code, signal) => finish(Error(`storage_test_server_exit:${code ?? signal}`));
+    const onData = chunk => {
+      output += String(chunk);
+      if (!output.includes("\n")) return;
+      const port = Number(output.trim());
+      finish(Number.isInteger(port) && port > 0 && port <= 65535 ? null : Error("storage_test_server_port_invalid"), port);
+    };
+    const timer = setTimeout(() => finish(Error("storage_test_server_timeout")), 30000);
+    child.stdout.on("data", onData); child.once("error", onError); child.once("exit", onExit);
   });
   const base = `http://127.0.0.1:${port}`;
   globalThis.fetch = (url, options) => localFetch(new URL(url, base), options);
