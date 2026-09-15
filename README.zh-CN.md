@@ -106,6 +106,8 @@ Ariadne 可以成为这些工作流的前置层：先形成经本人审阅、有
 
 真实 PDF、截图、简历和作品集进入后，只提取文字已经不够。项目花了大量时间对比开源方案、运行 benchmark 和 A/B Test，逐步区分 OCR 准确率、阅读顺序、文档结构、领域映射与人工审核。Local 路径保护隐私，也能留下可检查的证据；但实现越来越复杂，因为“每个字都识别出来”和“真正理解这份材料”本来就是两个问题。
 
+[![本地文档理解为什么变复杂](docs/architecture/archify/2026-09-12-project-evolution/02-document-understanding.visual-check.1440x900.light.png)](docs/architecture/archify/2026-09-12-project-evolution/02-document-understanding.html)
+
 ### 3. 本地结构化不等于有用理解，于是接入大模型
 
 本地代码可以把材料整理成 Block、Entity 或字段，却无法可靠解释一段经历意味着什么、职位真正要求什么、二者为什么相关。因此架构转向合格的多模态模型，并把 Candidate 与 Job 分开维护。模型只能产生解释或可审阅的 **Working/Proposal**；只有用户执行 **Human Save**，内容才成为新的确认版本。
@@ -117,6 +119,8 @@ Ariadne 可以成为这些工作流的前置层：先形成经本人审阅、有
 ### 5. 保留保护，简化整体结构
 
 下一步不是删除安全边界，而是退出重复处理链。正式 Local 不再用 OCR 或固定规则冒充语义理解，只负责零 Provider 调用地归档原件；需要理解时再明确进入 Model。预算内的当前资料直接进入一次完整语义讨论，不再强制先走 DISTILL/SYNTHESIZE；只有真正超预算的大集合才进行完整覆盖的分片综合与缓存。来源、版本、领域隔离、能力门禁、Proposal 与 Human Save 全部保留。
+
+[![从多层预处理链简化为有界的直接讨论](docs/architecture/archify/2026-09-12-project-evolution/05-content-context-simplification.visual-check.1440x900.light.png)](docs/architecture/archify/2026-09-12-project-evolution/05-content-context-simplification.html)
 
 ### 6. Runtime 简化后，又发现旧本地存储逻辑有问题
 

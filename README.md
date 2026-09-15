@@ -106,6 +106,8 @@ The first architecture was intentionally narrow: local SQLite job records, searc
 
 Real PDFs, screenshots, résumés, and portfolios made plain text extraction insufficient. The project compared open-source approaches, ran benchmarks and A/B tests, and separated OCR accuracy from reading order, document structure, domain mapping, and human review. Local processing protected privacy and produced inspectable evidence, but the implementation grew because “reading every character” is not the same problem as “understanding the document.”
 
+[![Why local document understanding became complex](docs/architecture/archify/2026-09-12-project-evolution/02-document-understanding.visual-check.1440x900.light.png)](docs/architecture/archify/2026-09-12-project-evolution/02-document-understanding.html)
+
 ### 3. Model-based semantic understanding
 
 The next correction was conceptual: locally structured blocks and fields still did not explain what an experience meant, what a job actually required, or how the two related. Ariadne introduced qualified multimodal models and separate Candidate and Job domains. Model output became a reviewable explanation or **Working/Proposal**, while **Human Save** remained the only way to create a confirmed version.
@@ -117,6 +119,8 @@ Source integrity, domain isolation, context scope, runtime capability checks, tr
 ### 5. Simplify the path without removing the protections
 
 The system then stopped using local OCR or rule-based structure as if it were semantic understanding. Local mode returned to zero-provider original-file archiving; Model mode performs the interpretation. Within budget, current material goes directly into one discussion call instead of mandatory DISTILL/SYNTHESIZE stages. Only genuinely over-budget large collections use complete chunked synthesis and caching. Source identity, Candidate/Job separation, capability gates, proposals, and Human Save remain.
+
+[![From a layered preprocessing chain to bounded direct discussion](docs/architecture/archify/2026-09-12-project-evolution/05-content-context-simplification.visual-check.1440x900.light.png)](docs/architecture/archify/2026-09-12-project-evolution/05-content-context-simplification.html)
 
 ### 6. Rebuild local storage around one content authority
 
