@@ -16,6 +16,20 @@ const child = spawn("python3", ["-u", "-c", "from app import JobRadarHandler, Th
 });
 let diagnostics = ""; child.stderr.on("data", chunk => { diagnostics += chunk; });
 const originalFetch = globalThis.fetch;
+// A failed participant must not leave its peer waiting until the suite timeout.
+function barrier(size) {
+  const waiting = [];
+  let timer;
+  return value => new Promise((resolve, reject) => {
+    waiting.push({ resolve, reject, value });
+    timer ||= setTimeout(() => waiting.forEach(item => item.reject(Error("storage_race_participant_missing"))), 10000);
+    if (waiting.length === size) {
+      clearTimeout(timer);
+      waiting.forEach(item => item.resolve(item.value));
+    }
+  });
+}
+const localFetch = (url, options = {}) => originalFetch(url, { ...options, signal: AbortSignal.timeout(10000) });
 try {
   const port = await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(Error("storage_test_server_timeout")), 10000);
@@ -23,10 +37,11 @@ try {
     child.once("error", reject);
   });
   const base = `http://127.0.0.1:${port}`;
-  globalThis.fetch = (url, options) => originalFetch(new URL(url, base), options);
+  globalThis.fetch = (url, options) => localFetch(new URL(url, base), options);
   const call = body => fetch("/api/workspace", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const init = await call({ action: "commit", workspace, database: name, expected: Object.fromEntries(Object.keys(schema).map(name => [name, null])), writes: [], initialize: true, transaction_id: "a".repeat(32) });
   assert.equal(init.status, 200);
+  await init.json();
   const db = Database.connection(workspace, name, schema);
   const transact = (stores, callback) => new Promise((resolve, reject) => {
     const tx = db.transaction(stores, "readwrite"); callback(tx);
@@ -61,35 +76,39 @@ try {
     const body = options?.body && JSON.parse(options.body);
     if (body?.action === "stage_blob") stagedCount++;
     if (body?.action === "commit") assert(!options.body.includes("base64"), "commits contain references, never all original bytes");
-    return originalFetch(new URL(url, base), options);
+    return localFetch(new URL(url, base), options);
   };
   await transact("source_documents", tx => tx.objectStore("source_documents").put({ source_document_id: "original", file_blob: file, byte_size: file.size }));
   assert.equal(stagedCount, 1, "originals upload separately from the atomic manifest transaction");
   let blobReads = 0;
   globalThis.fetch = (url, options) => {
     if (options?.body && JSON.parse(options.body).action === "blob") blobReads++;
-    return originalFetch(new URL(url, base), options);
+    return localFetch(new URL(url, base), options);
   };
   assert.deepEqual(await db.getAllMetadata("source_documents"), [{ source_document_id: "original", byte_size: 3 }]);
   assert.equal(blobReads, 0, "listing sources must not transfer original bytes");
   const storedFile = (await all("source_documents"))[0].file_blob;
   assert.equal(blobReads, 1); assert.deepEqual(new Uint8Array(await storedFile.arrayBuffer()), new Uint8Array([0, 255, 10]));
-  // Force both transactions to observe the same head, then release commits.
+  // Deliver both snapshots before either commit; retries use normal transport.
   Object.defineProperty(globalThis, "navigator", { value: {}, configurable: true });
-  const pending = [];
-  globalThis.fetch = (url, options) => {
+  const snapshots = barrier(2);
+  globalThis.fetch = async (url, options) => {
     const body = options?.body && JSON.parse(options.body);
-    if (body?.action === "commit") return new Promise(resolve => { pending.push(() => resolve(originalFetch(new URL(url, base), options))); if (pending.length === 2) pending.forEach(run => run()); });
-    return originalFetch(new URL(url, base), options);
+    const response = await localFetch(new URL(url, base), options);
+    return body?.action === "read" ? snapshots(response) : response;
   };
   const race = await Promise.allSettled(["one", "two"].map(title => transact("demo_candidate_items", tx => tx.objectStore("demo_candidate_items").put({ ...record, title }))));
   assert.equal(race.filter(result => result.status === "fulfilled").length, 1);
   assert.equal(race.find(result => result.status === "rejected").reason.code, "WORKSPACE_VERSION_CONFLICT");
-  globalThis.fetch = (url, options) => originalFetch(new URL(url, base), options);
+  globalThis.fetch = (url, options) => localFetch(new URL(url, base), options);
   const evil = await fetch("/api/workspace", { method: "POST", headers: { "Content-Type": "application/json", Origin: "https://other.example" }, body: JSON.stringify({ action: "status", workspace, database: name }) });
   assert.equal(evil.status, 403);
+  await evil.json();
   db.close(); assert.throws(() => db.transaction("source_documents"), /CLOSED/);
   console.log("PASS content repository: real HTTP/disk, scope, Markdown, native-style errors, rollback, conflicts, nested original files");
+} catch (error) {
+  console.error("Storage test server diagnostics:\n" + diagnostics.slice(-16000));
+  throw error;
 } finally {
   globalThis.fetch = originalFetch;
   child.kill("SIGTERM");

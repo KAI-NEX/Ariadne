@@ -24,11 +24,16 @@ def main():
                 cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120)
             (output / (path.name + '.log')).write_bytes(result.stdout)
             code = result.returncode
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as error:
+            captured = error.stdout or b''
+            (output / (path.name + '.log')).write_bytes(captured + b'\nSUITE_TIMEOUT: 120 seconds\n')
             code = 124
         results.append({'test': path.name, 'exit_code': code})
         if code:
-            print('FAIL:', path.name, flush=True)
+            print(f'FAIL: {path.name} (exit {code})', flush=True)
+            # CI runners are ephemeral; do not hide the only error behind a
+            # local path that disappears when the job finishes.
+            print((output / (path.name + '.log')).read_text(errors='replace')[-16000:], flush=True)
     (output / 'summary.json').write_text(json.dumps(results, indent=2))
     passed = sum(item['exit_code'] == 0 for item in results)
     print(f'{passed}/{len(results)} regression suites passed; local logs: .cache/regressions/')
