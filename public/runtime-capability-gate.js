@@ -158,6 +158,11 @@
   }
 
   function credentialFor(runtime) {
+    if (runtime?.provider === "deepseek") {
+      try {
+        if (globalThis.localStorage?.getItem("job-radar-provider-api-key:deepseek")) return "browser-key://deepseek/request";
+      } catch (_) { /* Local Keychain is still available when browser storage is disabled. */ }
+    }
     return runtime?.provider === "codex" ? "local-codex://authenticated-session" : "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision";
   }
 

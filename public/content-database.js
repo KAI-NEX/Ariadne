@@ -160,6 +160,15 @@
     const objectStoreNames = Object.assign([...names], { contains: name => Object.hasOwn(schema, name) });
     const databaseConnection = {
       name: database, objectStoreNames, storage: "MARKDOWN_FILES", close() { closed = true; },
+      async getRecord(name, key) {
+        if (closed) throw Error("WORKSPACE_CONNECTION_CLOSED");
+        if (!Object.hasOwn(schema, name)) throw Error("WORKSPACE_TRANSACTION_SCOPE_INVALID");
+        if (typeof key !== "string" || !key) throw Error("WORKSPACE_RECORD_ID_INVALID");
+        const read = await request({ action: "get", workspace, database, store: name, key });
+        if (!read.initialized) throw Error("WORKSPACE_NOT_INITIALIZED");
+        if (read.record == null) return undefined;
+        return hydrate(Content.unpack(name, schema[name], deserialize(read.record)), workspace, database);
+      },
       getAllMetadata(name) {
         return new Promise((resolve, reject) => {
           const tx = databaseConnection.transaction(name), read = tx.objectStore(name).getAllMetadata();

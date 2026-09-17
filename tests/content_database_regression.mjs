@@ -121,6 +121,24 @@ try {
   assert.equal(blobReads, 0, "listing sources must not transfer original bytes");
   const storedFile = (await all("source_documents"))[0].file_blob;
   assert.equal(blobReads, 1); assert.deepEqual(new Uint8Array(await storedFile.arrayBuffer()), new Uint8Array([0, 255, 10]));
+  // Independent point reads never download the whole store, but still verify
+  // the original and reject missing/uninitialized/closed workspaces.
+  const actions = [];
+  globalThis.fetch = (url, options) => {
+    if (options?.body) actions.push(JSON.parse(options.body).action);
+    return localFetch(new URL(url, base), options);
+  };
+  const point = await db.getRecord("source_documents", "original");
+  assert.deepEqual(new Uint8Array(await point.file_blob.arrayBuffer()), new Uint8Array([0, 255, 10]));
+  assert.deepEqual(actions, ["get", "blob"]);
+  assert.equal(await db.getRecord("source_documents", "missing"), undefined);
+  assert.equal((await db.getRecord("demo_candidate_items", record.item_id)).title, "changed");
+  const unopened = Database.connection("e".repeat(32), name, schema);
+  await assert.rejects(unopened.getRecord("source_documents", "original"), /NOT_INITIALIZED/);
+  await assert.rejects(db.getRecord("not-a-store", "original"), /SCOPE_INVALID/);
+  const temporaryConnection = Database.connection(workspace, name, schema);
+  temporaryConnection.close();
+  await assert.rejects(temporaryConnection.getRecord("source_documents", "original"), /CLOSED/);
   // Deliver both snapshots before either commit; retries use normal transport.
   Object.defineProperty(globalThis, "navigator", { value: {}, configurable: true });
   const snapshots = barrier(2);

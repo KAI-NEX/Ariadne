@@ -35,7 +35,7 @@ assert.equal((workspace.match(/v1-folder-paper/g) || []).length, 6);
 assert.match(workspace, /v1-folder-back/);
 assert.match(workspace, /v1-folder-front/);
 assert.doesNotMatch(workspace, /v1-object-arrow|v1-folder-tab/);
-assert.match(workspace, /href="\/index.html">运行方式/);
+assert.match(workspace, /href="\/index.html">连接设置/);
 assert.doesNotMatch(workspace, /v1-object-index|STEP\s*0[123]/i);
 
 // Personal list stays clean; the guide card links to a dedicated import page.
@@ -171,7 +171,7 @@ assert.equal(jobSession.scope_type, "JOB");
 
 // Reference mini sidebar: persistent desktop rail, animated hover label, mobile fallback.
 assert.match(pages, /function installMiniSidebar/);
-for (const label of ["运行方式", "工作空间", "个人资料", "职位描述"]) assert.match(pages, new RegExp(`label: "${label}"`));
+for (const label of ["连接设置", "工作空间", "个人资料", "职位描述"]) assert.match(pages, new RegExp(`label: "${label}"`));
 assert.ok(pages.indexOf('id: "runtime"') < pages.indexOf('id: "workspace"'));
 assert.match(pages, /tooltipText\.animate/);
 assert.match(pages, /pointermove/);

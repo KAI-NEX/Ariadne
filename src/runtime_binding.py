@@ -11,6 +11,7 @@ CODEX_MODEL = "gpt-5.6-sol"
 CODEX_PROTOCOL = "CODEX_EXEC_JSONL"
 CODEX_CREDENTIAL = "local-codex://authenticated-session"
 DEEPSEEK_CREDENTIAL = "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision"
+BROWSER_CREDENTIAL = "browser-key://deepseek/request"
 
 
 def codex_enabled():
@@ -42,7 +43,9 @@ def adapter_for(provider, domain_adapter):
 
 def valid_binding(snapshot, domain_adapter):
     if snapshot.provider == "deepseek":
-        identity = ("deepseek-flash", "OPENAI_CHAT_COMPLETIONS", DEEPSEEK_CREDENTIAL)
+        if snapshot.credential_ref not in {DEEPSEEK_CREDENTIAL, BROWSER_CREDENTIAL}:
+            return False
+        identity = ("deepseek-flash", "OPENAI_CHAT_COMPLETIONS", snapshot.credential_ref)
     elif snapshot.provider == "codex" and codex_enabled():
         identity = (CODEX_MODEL, CODEX_PROTOCOL, CODEX_CREDENTIAL)
     else:
@@ -57,6 +60,11 @@ def valid_binding(snapshot, domain_adapter):
 
 def resolve_runtime_credential(reference, expected, reader, **errors):
     from src.provider_runtime import resolve_credential_reference, ProviderRuntimeError
+    if reference == BROWSER_CREDENTIAL and expected == DEEPSEEK_CREDENTIAL:
+        credential = reader(BROWSER_CREDENTIAL)
+        if not credential:
+            raise ProviderRuntimeError(errors.get("missing_code", "credential_not_configured"), "credential")
+        return credential
     if reference == CODEX_CREDENTIAL:
         if not codex_enabled():
             raise ProviderRuntimeError("CODEX_NOT_ENABLED", "credential")

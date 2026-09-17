@@ -42,7 +42,8 @@ function persistSelectedRuntime() {
 function selectableModels() {
   const addedIds = new Set(state.addedModels.map((model) => `${model.provider_id}:${model.model_id}`));
   return [...state.addedModels, ...state.models.filter((model) => !addedIds.has(`${model.provider_id}:${model.model_id}`))]
-    .filter((model) => window.JobRadarRuntimeGate?.isModelRuntimeEligible({ mode: "model", provider: model.provider_id, model: model.model_id }));
+    .filter((model) => window.JobRadarRuntimeGate?.isModelRuntimeEligible({ mode: "model", provider: model.provider_id, model: model.model_id }))
+    .sort((a, b) => Number(b.provider_id === "codex") - Number(a.provider_id === "codex"));
 }
 
 function setMessage(message = "", failed = false) {
@@ -176,6 +177,7 @@ function renderModels() {
     button.type = "button"; button.setAttribute("role", "option"); button.setAttribute("aria-selected", "false"); button.dataset.model = model.model_id; button.dataset.provider = model.provider_id; button.style.setProperty("--runtime-menu-index", String(index));
     title.textContent = labelFor(model);
     detail.textContent = "图片 / PDF 导入 · 职位 / 候选人对话";
+    detail.textContent += model.provider_id === "codex" ? " · 自己的 Codex 账号" : " · 自己的 API";
     button.append(title, detail); container.append(button);
   });
   document.querySelectorAll(".runtime-existing-model").forEach((button) => button.addEventListener("click", () => {
@@ -203,6 +205,11 @@ async function loadModels() {
     const result = await response.json();
     if (!response.ok) throw Object.assign(new Error(result.error || "runtime_options_failed"), { result });
     state.models = result.models || [];
+    if (directCodexModel()) {
+      const link = byId("runtime-connect-codex");
+      link.querySelector("span").textContent = "使用本机 Codex";
+      link.querySelector("small").textContent = "使用这台电脑已有登录，无需网页配对";
+    }
     applyLocalPreference(result.local_preference);
     if (!(["READY", "OFFICIAL_READY", "LOCAL_READY"].includes(state.phase) && (state.model || state.mode === "local"))) {
       const restoredModel = selectableModels().find((model) => model.provider_id === state.provider && model.model_id === state.model);
@@ -210,7 +217,7 @@ async function loadModels() {
     }
     renderModels(); render();
   } catch (_error) {
-    // DeepSeek discovery is optional to V1. Gemini remains usable even without a local keychain entry.
+    // Keep stored selections; discovery failure never enables another Provider.
     state.models = []; renderModels();
     if (!state.model) byId("runtime-selected").textContent = "选择运行方式";
   }
@@ -253,6 +260,18 @@ byId("runtime-local").addEventListener("click", () => {
   persistSelectedRuntime(); setMessage(""); render(); closeMenu();
 });
 let codexLinkPending = false;
+function directCodexModel() {
+  return ["127.0.0.1", "localhost"].includes(location.hostname)
+    && !globalThis.AriadneConnector?.connected()
+    && selectableModels().find(model => model.provider_id === "codex");
+}
+function openCodexConnection() {
+  const model = directCodexModel();
+  if (model) {
+    selectVerifiedRuntimeModel(model.model_id, "codex");
+    setMessage("将使用这台电脑的 Codex 登录。首次使用请先在下载包中完成「登录 Codex」；发送材料仍需确认。");
+  } else window.AriadneCodexConnect.open(byId("runtime-selector"));
+}
 const addModelSheet = window.JobRadarAddModelSheet.mount({
   sheet: byId("add-model-sheet"), panel: byId("add-model-panel"), backdrop: byId("add-model-backdrop"), close: byId("add-model-close"),
   provider: byId("add-model-provider"), "provider-value": byId("add-model-provider-value"), "provider-menu": byId("add-model-provider-menu"),
@@ -264,14 +283,14 @@ const addModelSheet = window.JobRadarAddModelSheet.mount({
   writeLocalJson(ADDED_MODELS_STORAGE_KEY, state.addedModels);
   renderModels(); selectAddedMultimodalModel(connected);
 }, () => {
-  if (codexLinkPending) { codexLinkPending = false; window.AriadneCodexConnect.open(byId("runtime-selector")); }
+  if (codexLinkPending) { codexLinkPending = false; openCodexConnection(); }
   else finishMenuReturn();
 }, () => {
   if (!codexLinkPending) prepareMenuReturn();
 });
 byId("runtime-connect-codex").addEventListener("click", (event) => {
   event.preventDefault();
-  window.AriadneCodexConnect.open(byId("runtime-selector"));
+  openCodexConnection();
   closeMenu();
 });
 byId("add-model-codex-link").addEventListener("click", (event) => {

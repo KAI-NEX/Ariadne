@@ -25,7 +25,7 @@
     const prefix = form.id + "-model";
     panel.id = prefix;
     trigger.setAttribute("aria-controls", prefix);
-    panel.innerHTML = `<h3>选择模型</h3><div data-model-options role="group"></div><p>切换模型服务请回到首页。</p><p data-model-error role="status"></p>`;
+    panel.innerHTML = `<h3>选择模型</h3><div data-model-options role="group"></div><p>切换模型服务请前往<a href="/index.html">连接设置</a>。</p><p data-model-error role="status"></p>`;
     document.body.append(panel);
     const choices = panel.querySelector("[data-model-options]"), error = panel.querySelector("[data-model-error]");
     let openedRevision, openedScope, original, saving = false, opening = 0;
@@ -54,7 +54,7 @@
       error.textContent = ""; choices.replaceChildren();
       panel.showPopover(); trigger.setAttribute("aria-expanded", "true"); position();
       try {
-        if (original.mode !== "model") throw Error("当前处于 Local 模式。请先在首页选择 Model。");
+        if (original.mode !== "model") throw Error("当前处于 Local 模式。请先在连接设置选择模型。");
         if (!openedScope) throw Error("请先打开一份资料或职位。");
         const entries = await models(operation);
         if (ticket !== opening || !panel.matches(":popover-open") || busy()) return;

@@ -17,7 +17,7 @@ const before=JSON.stringify([...data]);
 assert.equal(Selection.resolve('personal_understanding','chat').provider,'codex');
 assert.equal(Selection.hasOverride('chat'),false);
 assert.equal(JSON.stringify([...data]),before,'read does not erase historical preferences');
-for(const makeDefault of [false,true]) await assert.rejects(Selection.update({scope:'chat',runtime:chosen(ds),expectedRevision:Selection.version(),makeDefault}),/首页/);
+for(const makeDefault of [false,true]) await assert.rejects(Selection.update({scope:'chat',runtime:chosen(ds),expectedRevision:Selection.version(),makeDefault}),/连接设置/);
 assert.equal(JSON.stringify([...data]),before,'rejected cross-provider change writes nothing');
 const snapshot=Selection.resolve('personal_understanding','chat');
 for(const operation of ['candidate_conversation','job_conversation','personal_understanding','job_overview'])
@@ -27,7 +27,7 @@ assert.equal(Selection.resolve('personal_understanding','chat').provider,'deepse
 assert.throws(()=>Selection.assertCurrent(snapshot,'personal_understanding'),/SELECTION_CHANGED/);
 assert.deepEqual(Selection.eligibleModels(listed,'personal_understanding').map(x=>x.provider_id),['deepseek']);
 selectHome({mode:'local'});assert.deepEqual(Selection.eligibleModels(listed,'personal_understanding'),[]);
-await assert.rejects(Selection.update({scope:'chat',runtime:chosen(sol),expectedRevision:Selection.version()}),/首页/);
+await assert.rejects(Selection.update({scope:'chat',runtime:chosen(sol),expectedRevision:Selection.version()}),/连接设置/);
 
 // Synthetic catalog/authority only: every qualified model under a Provider can
 // appear. Neither discovery alone nor a settings descriptor grants admission.

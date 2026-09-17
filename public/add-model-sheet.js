@@ -32,8 +32,7 @@
       set(key, value) { try { localStorage.setItem(key, value); } catch (_error) { /* The connection can still continue for this tab. */ } },
       remove(key) { try { localStorage.removeItem(key); } catch (_error) { /* Nothing else to clear. */ } },
     };
-    const storedProviderId = safeStorage.get(LAST_PROVIDER_STORAGE_KEY);
-    const initialProviderId = providerFor(storedProviderId) ? storedProviderId : "qwen";
+    const initialProviderId = "deepseek";
     const keyStorageKey = (providerId) => `${API_KEY_STORAGE_PREFIX}${providerId}`;
     const state = { providerId: initialProviderId, apiKey: safeStorage.get(keyStorageKey(initialProviderId)), phase: "IDLE", models: [], selectedModel: null, verified: false, error: "", providerMenuOpen: false };
     let completionTimer = null;
@@ -41,6 +40,7 @@
     let closingAnimation = null;
     let returnStartTimer = null;
     let returnOriginRect = null;
+    let attempt = 0;
     const panelControls = globalThis.JobRadarFloatingWindow?.mount(byId("panel"), {
       dragHandle: byId("panel").querySelector(".add-model-header"),
       minWidth: 420,
@@ -54,7 +54,7 @@
       return {
         IDLE: "未连接",
         SENDING: "正在发送模型列表请求…",
-        WAITING: "正在等待 Qwen 响应…",
+        WAITING: `正在等待 ${provider().name} 响应…`,
         VERIFYING: "正在验证图文输入能力…",
         DISCOVERED: `已找到 ${state.models.length} 个图文模型`,
         VERIFIED: "验证成功",
@@ -86,11 +86,12 @@
       byId("key-link").classList.toggle("hidden", !selectedProvider);
       byId("key-link").href = selectedProvider?.apiKeyUrl || "#";
       byId("key-link").textContent = selectedProvider ? `获取 ${selectedProvider.name} API Key` : "";
+      for (const id of ["key", "provider", "clear"]) byId(id).disabled = isLoading;
       byId("connect").disabled = !(selectedProvider && state.apiKey) || isLoading || state.phase === "VERIFIED";
       byId("connect").classList.toggle("is-loading", isLoading);
       byId("connect").classList.toggle("is-success", state.phase === "VERIFIED");
       byId("connect").classList.toggle("is-failed", state.phase === "FAILED");
-      connectLabel.textContent = state.phase === "FAILED" ? "重试连接" : "连接并读取可用模型";
+      connectLabel.textContent = state.phase === "FAILED" ? "重试连接" : "同意验证并连接";
       byId("connect").setAttribute("aria-label", statusCopy());
       byId("connect").title = state.phase === "FAILED" ? statusCopy() : "";
       status.textContent = statusCopy();
@@ -141,6 +142,7 @@
     function close() {
       if (completionTimer) { window.clearTimeout(completionTimer); completionTimer = null; }
       if (state.phase === "CLOSED" || closingTimer) return;
+      attempt += 1;
       persistCurrentKey();
       state.providerMenuOpen = false;
       setPanelOrigin(returnOriginRect);
@@ -197,7 +199,7 @@
       byId("key").focus();
     }
     function selectProvider(providerId) {
-      if (!providerFor(providerId)) return;
+      if (providerId !== "deepseek" || loading()) return;
       state.providerId = providerId;
       safeStorage.set(LAST_PROVIDER_STORAGE_KEY, providerId);
       state.apiKey = safeStorage.get(keyStorageKey(providerId));
@@ -206,26 +208,39 @@
       render();
     }
     async function requestConnection() {
+      if (loading()) return;
+      state.apiKey = state.apiKey.trim();
       persistCurrentKey();
-      if (state.providerId !== "qwen") { state.phase = "FAILED"; state.error = "该 Provider 的连接器正在接入中。"; render(); return; }
+      if (!state.apiKey || safeStorage.get(keyStorageKey(state.providerId)) !== state.apiKey) {
+        state.phase = "FAILED"; state.error = "浏览器无法保存 API Key，请允许本站存储后重试。"; render(); return;
+      }
+      if (state.providerId !== "deepseek") return;
+      if (!["127.0.0.1", "localhost"].includes(location.hostname)) {
+        state.phase = "FAILED"; state.error = "网页版 API 执行服务尚未开放。请下载本地版使用自己的 API，或连接自己的 Codex。"; render(); return;
+      }
+      const currentAttempt = ++attempt;
       state.models = []; state.selectedModel = null; state.verified = false; state.error = "";
       state.phase = "SENDING"; render();
       try {
         state.phase = "WAITING"; render();
-        const response = await fetch("/api/runtime-providers/qwen/connection-check", {
+        const response = await fetch("/api/runtime-providers/deepseek/connection-check", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ api_key: state.apiKey }),
+          body: JSON.stringify({ api_key: state.apiKey, confirmed: true }),
+          redirect: "error",
         });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error || "qwen_model_listing_failed");
+        if (currentAttempt !== attempt) return;
+        if (!response.ok) throw new Error(result.error || "deepseek_connection_failed");
         state.phase = "VERIFYING"; render();
         acceptDiscoveredModels(result.models, result.verified_model_id);
       } catch (error) {
+        if (currentAttempt !== attempt) return;
         state.phase = "FAILED"; state.error = "验证失败，请检查 API Key、模型权限或稍后重试。"; render();
       }
     }
     function acceptDiscoveredModels(returnedModelIds, verifiedModelId) {
-      state.models = compatibleModels(state.providerId, returnedModelIds);
+      state.models = compatibleModels(state.providerId, returnedModelIds).filter(model =>
+        globalThis.JobRadarRuntimeGate?.isModelRuntimeEligible({ mode: "model", provider: state.providerId, model: model.id }));
       state.selectedModel = state.models.some((model) => model.id === verifiedModelId) ? verifiedModelId : null;
       state.verified = Boolean(state.selectedModel);
       state.phase = state.verified ? "VERIFIED" : "DISCOVERED";

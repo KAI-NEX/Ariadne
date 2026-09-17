@@ -31,6 +31,19 @@
       try { provider = JSON.parse(options.body || "null")?.runtime_snapshot?.provider; }
       catch (_) { /* The domain endpoint owns malformed-request validation. */ }
       if (provider === "codex" && !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) throw new Error("CONNECTOR_PAIRING_REQUIRED");
+      // Credentials are attached only to qualified DeepSeek operations at the
+      // local backend. Never send them to a Codex connector or unrelated URL.
+      if ((provider === "deepseek" && operations[url.pathname]) || url.pathname === "/api/runtime-check") {
+        if (!["localhost", "127.0.0.1"].includes(url.hostname)) throw new Error("WEB_API_RUNTIME_UNAVAILABLE");
+        let key;
+        try { key = root.localStorage.getItem("job-radar-provider-api-key:deepseek"); }
+        catch (_) { /* Existing local Keychain remains a supported credential source. */ }
+        if (key) {
+          const headers = new Headers(options.headers || {});
+          headers.set("X-Ariadne-Provider-Key", key);
+          options = { ...options, headers, redirect: "error" };
+        }
+      }
       return nativeFetch(input, options);
     }
     // A saved but expired/offline connection must never send material to the

@@ -27,6 +27,12 @@ flowchart LR
 
 仍是原生网页 + 一个 Python 服务，没有新增部署服务、框架、向量数据库或通用 Agent。共享事务接口兼容当前 repository 的 get/getAll/add/put/delete/clear、回调及 abort；它不是完整 IndexedDB 实现，不支持 cursor/index/key range。新功能应复用现有 repository，不能假设任意 IndexedDB API 可用。
 
+## 2026-09-17：原件按记录读取
+
+独立只读的原件恢复经 `getRecord(store, key)` → `/api/workspace` 的 `get` action → `WorkspaceStorage.read_record`，读取并核验对应的单条记录，之后按需取原件并校验完整性。浏览器存储继续使用原生单条 `get`。此 API 不提供写入快照或可用于保存的版本；所有修改仍走原有完整读集、版本冲突、幂等和文件 hash 校验。
+
+资料列表原有 `getAllMetadata` 已避开原件传输，本次进一步减少单条恢复时扫描所有记录的工作量。仍需解析 HEAD 索引，并未把整个库重写成数据库索引。合成 1,000 条、每条 8 KiB 的本机暖缓存观察，整类读取 1,000 个对象 / 8,244,157 B，单条读取 1 个对象 / 8,275 B；三次中位数分别 105.37 ms / 0.77 ms。该观察不包含 HTTP、浏览器或模型耗时，不代表整体应用加速倍数。
+
 ## 一份正文，两种存储适配
 
 正常本机访问 `127.0.0.1` 或 `localhost` 时，内容写入实际磁盘；其他 origin 使用[浏览器适配器](../../public/content-browser-storage.js)，正文仍为相同 Markdown 格式，原件仍为 Blob/File。浏览器端无需假设文件系统权限。连接本地 Codex 不会同时授权网页访问本机内容目录。

@@ -107,6 +107,8 @@
   }
 
   function readRecord(database, key) {
+    // Resolving one original is an independent read, never a save transaction.
+    if (database.getRecord) return database.getRecord(STORE_NAME, key);
     return new Promise((resolve, reject) => {
       let transaction;
       try { transaction = database.transaction(STORE_NAME, "readonly"); }

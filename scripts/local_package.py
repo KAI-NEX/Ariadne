@@ -82,7 +82,7 @@ def serve(target, port, open_browser):
 
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     app.initialize_database()
-    print(f"Ariadne 已启动：{origin}\n在网页中选择 Local、Codex 或已接入的 API 模型。\n关闭此终端或按 Ctrl+C 停止服务；资料保留。", flush=True)
+    print(f"Ariadne 已启动：{origin}\n打开即进入工作空间；在「连接设置」选择自己的 Codex 或 API，Local 可直接保存原件。\n关闭此终端或按 Ctrl+C 停止服务；资料保留。", flush=True)
     if open_browser:
         subprocess.Popen(["/usr/bin/open", origin])
     try:
@@ -113,7 +113,7 @@ def main():
     python = target / "python/bin/python3"
     if args.mode == "connector":
         print("仅在使用公开网页版时需要配对。本地运行不需要此步骤。")
-        origin = input("输入网页来源（回车使用 https://ariadne.kai-nex.com）：").strip() or "https://ariadne.kai-nex.com"
+        origin = input("输入网页来源（回车使用 https://web.ariadne.kai-nex.com）：").strip() or "https://web.ariadne.kai-nex.com"
         command = [str(python), "-B", str(target / "app/scripts/run_codex_connector.py"), "--origin", origin]
     else:
         command = [str(python), "-B", str(target / "local_package.py"), "serve", "--port", str(args.port)]

@@ -76,7 +76,7 @@
       const next = revision();
       if (!clear) {
         const selected = homepage(storage);
-        if (selected.mode !== "model" || runtime?.mode !== "model" || runtime?.provider !== selected.provider) throw Error("切换模型服务请回到首页；对话内只能选择当前服务的模型。");
+        if (selected.mode !== "model" || runtime?.mode !== "model" || runtime?.provider !== selected.provider) throw Error("切换模型服务请前往连接设置；对话内只能选择当前服务的模型。");
         if (!Settings.descriptor(runtime.provider, runtime.model) || !root.JobRadarRuntimeGate?.isModelRuntimeEligible(runtime)) throw Error("此模型尚未通过当前操作的能力验证。");
         Settings.validate(runtime.execution_settings, runtime.provider, runtime.model);
       }

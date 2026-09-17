@@ -75,6 +75,16 @@ with tempfile.TemporaryDirectory() as temporary:
     store.commit(workspace, database, dict.fromkeys(names), writes, initialize=True)
     first = store.read(workspace, database, names)
     assert first["stores"] == {"demo_candidate_items": [card], "source_documents": [record]}
+    # A point read verifies only the requested object and returns a lazy blob.
+    with patch.object(store, "_load_record", wraps=store._load_record) as loaded:
+        point = store.read_record(workspace, database, "source_documents", "source-1")
+        assert loaded.call_count == 1
+    assert point["record"]["file_blob"]["$blob"] == "file"
+    assert store.blob(workspace, point["record"]["file_blob"]) == record["file_blob"]
+    assert store.read_record(workspace, database, "source_documents", "missing")["record"] is None
+    assert store.read_record(workspace, database, "demo_candidate_items", "card-1")["record"] == card
+    rejected("WORKSPACE_STORE_INVALID", lambda: store.read_record(workspace, database, "private_files", "source-1"))
+    rejected("WORKSPACE_RECORD_ID_INVALID", lambda: store.read_record(workspace, database, "source_documents", []))
     receipt = store.commit(workspace, database, first["versions"], [], transaction_id="1" * 32)
     assert store.commit(workspace, database, first["versions"], [], transaction_id="1" * 32) == receipt
     rejected("WORKSPACE_TRANSACTION_REUSED", lambda: store.commit(workspace, database, first["versions"], writes, transaction_id="1" * 32))
@@ -95,6 +105,7 @@ with tempfile.TemporaryDirectory() as temporary:
     binary = next((root / workspace / "originals").rglob("resume.pdf"))
     binary.write_bytes(b"changed")
     rejected("WORKSPACE_FILE_CHANGED", lambda: store.read(workspace, database, names))
+    rejected("WORKSPACE_FILE_CHANGED", lambda: store.blob(workspace, point["record"]["file_blob"]))
     binary.write_bytes(original)
     # Explicit deletion changes only the current index; originals/history persist.
     store.commit(workspace, database, latest["versions"], [{"store": "demo_candidate_items", "operation": "delete", "key": "card-1"}])

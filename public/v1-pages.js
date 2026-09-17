@@ -428,7 +428,7 @@
     if (isEmbeddedDetail) return;
     const activeSection = page === "candidate-detail" || page === "personal-import" || page === "personal-understanding" ? "personal" : page === "job-detail" || page === "job-import" || page === "job-overview" ? "jd" : page;
     const items = [
-      { id: "runtime", label: "运行方式", href: "/index.html", width: 84, base: 8 },
+      { id: "runtime", label: "连接设置", href: "/index.html", width: 84, base: 8 },
       { id: "workspace", label: "工作空间", href: "/workspace.html", width: 106, base: 8 },
       { id: "personal", label: "个人资料", href: "/personal-information.html", width: 104, base: 8 },
       { id: "jd", label: "职位描述", href: "/jd.html", width: 84, base: 8 },

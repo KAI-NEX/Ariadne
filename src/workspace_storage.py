@@ -234,6 +234,19 @@ class WorkspaceStorage:
         with self._locked(workspace) as directory:
             return {**{k: v for k, v in entry.items() if k not in {"path", "sha256", "size"}}, "$blob": "base64", "data": base64.b64encode(self._read_object(directory, entry)).decode()}
 
+    def read_record(self, workspace, database, store, key):
+        """Independent lookup; write transactions still read/version whole stores."""
+        schema = self._schema(database, [store])
+        if not isinstance(key, str) or not key:
+            raise WorkspaceError("WORKSPACE_RECORD_ID_INVALID")
+        with self._locked(workspace) as directory:
+            current = self._head(directory)["databases"].get(database)
+            if current is None:
+                return {"initialized": False, "record": None}
+            entry = current.get(store, {}).get(key)
+            record = self._load_record(directory, entry, schema[store], key, False) if entry else None
+            return {"initialized": True, "record": record}
+
     def commit(self, workspace, database, expected, writes, *, initialize=False, transaction_id=None):
         if not isinstance(expected, dict) or not isinstance(initialize, bool):
             raise WorkspaceError("WORKSPACE_REQUEST_INVALID")

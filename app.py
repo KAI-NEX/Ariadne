@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.runtime_binding import CODEX_MODEL, CODEX_CREDENTIAL, CODEX_PROTOCOL, codex_enabled, local_runtime_preference
+from src.runtime_binding import CODEX_MODEL, CODEX_CREDENTIAL, CODEX_PROTOCOL, BROWSER_CREDENTIAL, DEEPSEEK_CREDENTIAL, codex_enabled, local_runtime_preference
 from src.codex_runtime import CodexTimeoutError, call_codex
 from src.pdf_delivery import render_complete_pdf_pages
 from src.conversation_attachments import CONTRACT as ATTACHMENTS_CONTRACT, REQUEST_LIMIT as ATTACHMENTS_REQUEST_LIMIT
@@ -382,9 +382,9 @@ def call_deepseek_chat_completions(api_key: str, payload: dict, *, response_limi
             raise ValueError("provider_response_malformed") from error
 
 
-def deepseek_runtime_models() -> dict:
+def deepseek_runtime_models(api_key: str | None = None) -> dict:
     """Return account-visible DeepSeek models for the runtime selector only."""
-    api_key = read_deepseek_key()
+    api_key = read_deepseek_key() if api_key is None else api_key
     if not api_key:
         return {"ok": False, "status": HTTPStatus.PRECONDITION_REQUIRED, "error": "deepseek_key_not_configured", "failure_layer": "credential", "network_call_made": False}
     try:
@@ -436,13 +436,15 @@ def synthetic_multimodal_smoke_image_data_url() -> str:
     return "data:image/jpeg;base64," + base64.b64encode(MULTIMODAL_SMOKE_IMAGE_PATH.read_bytes()).decode("ascii")
 
 
-def deepseek_runtime_connection_check(model: str, synthetic_image_data_url: str | None = None) -> dict:
+def deepseek_runtime_connection_check(model: str, synthetic_image_data_url: str | None = None, *, api_key: str | None = None) -> dict:
     """Perform the capability-matched runtime check when explicitly authorized."""
     # Reject text-only/unknown identities before reading credentials or contacting a Provider.
     if not v1_runtime_selector_descriptors(deepseek_model_descriptors([model])):
         return {"ok": False, "status": HTTPStatus.UNPROCESSABLE_ENTITY, "error": "runtime_requires_image_and_pdf", "failure_layer": "capability", "network_call_made": False}
     synthetic_image_data_url = synthetic_image_data_url or synthetic_multimodal_smoke_image_data_url()
-    options = deepseek_runtime_models()
+    supplied_key = api_key is not None
+    api_key = read_deepseek_key() if api_key is None else api_key
+    options = deepseek_runtime_models(api_key or "")
     if not options["ok"]:
         return options
     try:
@@ -452,8 +454,7 @@ def deepseek_runtime_connection_check(model: str, synthetic_image_data_url: str 
     except ProviderRuntimeError as error:
         return {"ok": False, "status": HTTPStatus.UNPROCESSABLE_ENTITY, "error": error.code, "failure_layer": error.failure_layer, "network_call_made": True}
 
-    api_key = read_deepseek_key()
-    if not api_key:  # Credential can disappear between listing and ping.
+    if not api_key:
         return {"ok": False, "status": HTTPStatus.PRECONDITION_REQUIRED, "error": "deepseek_key_not_configured", "failure_layer": "credential", "network_call_made": False}
     check_id = f"connection-test-{uuid.uuid4()}"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
@@ -478,7 +479,7 @@ def deepseek_runtime_connection_check(model: str, synthetic_image_data_url: str 
         "ok": True, "status": HTTPStatus.OK, "provider": "deepseek", "model": model,
         "network_call_made": True,
         "diagnostics": {
-            "check_id": check_id, "purpose": "MULTIMODAL_CONNECTION_TEST" if synthetic_image_data_url else "CONNECTION_TEST", "credential": "read_from_macos_keychain",
+            "check_id": check_id, "purpose": "MULTIMODAL_CONNECTION_TEST" if synthetic_image_data_url else "CONNECTION_TEST", "credential": "request_only" if supplied_key else "read_from_macos_keychain",
             "career_data_sent": False, "protocol": test_request.protocol, "endpoint": test_request.endpoint,
             "response_id": normalized.response_id, "multimodal_connection_ready": bool(synthetic_image_data_url),
             "structured_output_verified": False,
@@ -851,6 +852,16 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(PUBLIC_PATH), **kwargs)
 
+    def runtime_api_key(self, reference=DEEPSEEK_CREDENTIAL):
+        """A browser-supplied key belongs only to this request; never persist it."""
+        supplied = self.headers.get("X-Ariadne-Provider-Key")
+        if reference == BROWSER_CREDENTIAL:
+            return supplied if supplied and 12 <= len(supplied) <= 2000 and supplied.isascii() and not any(c.isspace() for c in supplied) else None
+        # A changed credential source must not silently fall back to another key.
+        if reference != DEEPSEEK_CREDENTIAL or supplied is not None:
+            return None
+        return read_deepseek_key()
+
     def local_request_allowed(self) -> bool:
         """The local service never grants a website ambient access to credentials."""
         if getattr(self, "connector_authorized", False):
@@ -1060,6 +1071,9 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/runtime-providers/qwen/connection-check":
             self.qwen_runtime_connection_check()
             return
+        if parsed.path == "/api/runtime-providers/deepseek/connection-check":
+            self.connect_deepseek()
+            return
         if parsed.path == "/api/ai-career-ingestion-config":
             self.configure_ai_career_ingestion()
             return
@@ -1199,11 +1213,32 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         except (KeyError, ValueError, UnicodeDecodeError, json.JSONDecodeError):
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": "invalid_runtime_model", "failure_layer": "ui", "network_call_made": False})
             return
-        result = deepseek_runtime_connection_check(model)
+        reference = BROWSER_CREDENTIAL if self.headers.get("X-Ariadne-Provider-Key") is not None else DEEPSEEK_CREDENTIAL
+        result = deepseek_runtime_connection_check(model, api_key=self.runtime_api_key(reference) or "")
         if not result["ok"]:
             self.send_json(result["status"], {key: value for key, value in result.items() if key not in {"ok", "status"}})
             return
         self.send_json(HTTPStatus.OK, {key: value for key, value in result.items() if key not in {"ok", "status"}})
+
+    def connect_deepseek(self) -> None:
+        """Explicit, synthetic visual check using the caller's own API key."""
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= 4000 or self.headers.get_content_type() != "application/json":
+                raise ValueError()
+            body = json.loads(self.rfile.read(length))
+            key = body.get("api_key") if isinstance(body, dict) else None
+            if (not isinstance(key, str) or not 12 <= len(key) <= 2000 or not key.isascii()
+                or any(c.isspace() for c in key) or body.get("confirmed") is not True):
+                raise ValueError()
+        except (ValueError, TypeError, UnicodeDecodeError):
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": "API_KEY_AND_CONFIRMATION_REQUIRED", "network_call_made": False})
+            return
+        result = deepseek_runtime_connection_check(DEEPSEEK_VISION_MODEL, api_key=key)
+        public = {name: value for name, value in result.items() if name not in {"status", "models", "descriptors"}}
+        if result["ok"]:
+            public.update(models=[DEEPSEEK_VISION_MODEL], verified_model_id=DEEPSEEK_VISION_MODEL)
+        self.send_json(result["status"], public)
 
     def structure_model_candidate_proposal(self) -> None:
         """Execute the qualified Candidate image/PDF adapter after explicit consent."""
@@ -1239,7 +1274,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
 
             result = execute_candidate_model_request(
                 payload,
-                read_deepseek_key,
+                self.runtime_api_key,
                 render_complete_pdf_pages,
                 provider_call,
             )
@@ -1323,7 +1358,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                 except ValueError as error:
                     raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "parsing", True) from error
 
-            result = execute_candidate_conversation_request(payload, read_deepseek_key, provider_call)
+            result = execute_candidate_conversation_request(payload, self.runtime_api_key, provider_call)
             if not CANDIDATE_CONVERSATION_EXECUTIONS.accept(execution_id, generation):
                 self.send_json(HTTPStatus.CONFLICT, {
                     "error": "CANCELLED_TURN", "failure_layer": "generation",
@@ -1384,7 +1419,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             if not 0 < length <= ATTACHMENTS_REQUEST_LIMIT:
                 raise JobOverviewError("JOB_OVERVIEW_REQUEST_SIZE_INVALID", "request")
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
-            result = execute_job_overview(payload, read_deepseek_key,
+            result = execute_job_overview(payload, self.runtime_api_key,
                 lambda key, body: call_ariadne_model(key, body, response_limit=2_000_000))
         except JobOverviewError as error:
             self.send_json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": error.code, "failure_layer": error.failure_layer,
@@ -1404,7 +1439,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             if not 0 < length <= ATTACHMENTS_REQUEST_LIMIT:
                 raise PersonalUnderstandingError("PERSONAL_REQUEST_SIZE_INVALID", "request")
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
-            result = execute_personal_understanding(payload, read_deepseek_key,
+            result = execute_personal_understanding(payload, self.runtime_api_key,
                 lambda key, body: call_ariadne_model(key, body, response_limit=2_000_000))
         except PersonalUnderstandingError as error:
             self.send_json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": error.code, "failure_layer": error.failure_layer,
@@ -1442,7 +1477,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                 except ValueError as error:
                     raise JobConversationRuntimeError("MALFORMED_RESPONSE", "parsing", True) from error
 
-            result = execute_job_conversation_request(payload, read_deepseek_key, provider_call)
+            result = execute_job_conversation_request(payload, self.runtime_api_key, provider_call)
             if not JOB_CONVERSATION_EXECUTIONS.accept(execution_id, generation):
                 self.send_json(HTTPStatus.CONFLICT, {
                     "error": "CANCELLED_TURN", "failure_layer": "generation",
@@ -1519,7 +1554,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                     code = "deepseek_response_too_large" if str(error) == "provider_response_too_large" else "deepseek_response_malformed"
                     raise JobModelRuntimeError(code, "parsing", True) from error
 
-            result = execute_job_model_request(payload, read_deepseek_key, provider_call)
+            result = execute_job_model_request(payload, self.runtime_api_key, provider_call)
         except JobModelRuntimeError as error:
             if claimed_operation_id:
                 JOB_MODEL_IMPORT_EXECUTIONS.fail(claimed_operation_id)
@@ -2435,6 +2470,8 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                 result = library.status(workspace, database)
             elif action == "read":
                 result = library.read(workspace, database, request["stores"], include_blobs=not request.get("metadata_only", False))
+            elif action == "get":
+                result = library.read_record(workspace, database, request["store"], request["key"])
             elif action == "stage_blob":
                 result = library.stage_blob(workspace, request["value"], request.get("filename"))
             elif action == "blob":
@@ -2448,7 +2485,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             # Only operation identifiers, never source names, IDs or content.
             from src.workspace_storage import CONTRACT
             self.log_message("workspace_error code=%s action=%s database=%s", error.code,
-                             action if "action" in locals() and isinstance(action, str) and action in {"status", "read", "blob", "stage_blob", "commit"} else "invalid",
+                             action if "action" in locals() and isinstance(action, str) and action in {"status", "read", "get", "blob", "stage_blob", "commit"} else "invalid",
                              database if "database" in locals() and isinstance(database, str) and database in CONTRACT["databases"] else "invalid")
             self.send_json(error.status, {"error": error.code})
         except (ValueError, KeyError, TypeError):
