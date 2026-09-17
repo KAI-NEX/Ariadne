@@ -1,0 +1,15 @@
+.local-download-page .runtime-connect-shell {
+  padding-top: var(--vi-space-48);
+  padding-bottom: var(--vi-space-48);
+}
+.local-download-page .runtime-connect-shell h1 {
+  font-size: var(--vi-text-title);
+  letter-spacing: normal;
+  line-height: var(--vi-leading-body);
+}
+.local-download-page .runtime-connect-copy {
+  color: var(--vi-text-secondary);
+  line-height: var(--vi-leading-reading);
+}
+.local-download-page li { margin-bottom: var(--vi-space-12); }
+#local-download-hash { overflow-wrap: anywhere; font-size: var(--vi-text-caption); }

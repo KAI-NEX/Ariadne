@@ -630,6 +630,7 @@
           <div class="v1-about-copy hidden">
             <h1><span class="v1-about-name">Ariadne</span><span class="v1-about-name-zh">衡</span></h1>
             <p class="v1-about-intro">先理解你，再理解机会。</p>
+            <p><a class="runtime-back-link" href="/download.html" target="_blank" rel="noopener">下载 Ariadne 本地版 · Apple 芯片 Mac</a></p>
             <p>Ariadne · 衡是一个帮助你探索职业方向的工具。它理解你的经历与作品，也理解你选择的职位，帮你看清两者的关系。</p>
             <p>在个人资料中点击「了解我」，围绕过去的项目与经历逐步了解你；在职位描述中点击「了解职位概况」，汇总所有 JD 的职责、要求与差异。想讨论自己与某个职位的关系，可以进入该职位详情。</p>
             <p>你的文件内容、资料、对话记录和 API 密钥保存在这台电脑或当前浏览器本地，不会上传至 Ariadne 的云端服务器，请放心使用。使用 AI 功能时，必要材料仍会按你的操作与传输确认发送给所选模型服务商；API 密钥仅用于对应服务的连接与调用。</p>

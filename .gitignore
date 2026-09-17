@@ -16,6 +16,7 @@ data/local_ocr_uploads/
 logs/
 *.log
 .cache/
+/public/downloads/
 __pycache__/
 *.py[cod]
 

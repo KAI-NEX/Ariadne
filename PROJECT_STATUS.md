@@ -1,5 +1,14 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-17 — 一键本地部署包与下载入口（COMPLETE；本机测试分发）
+
+- 按用户澄清交付 ZIP 本地部署包，不做 Apple App；Apple 芯片/macOS 14+ 构建目标，双击「启动 Ariadne.command」首次安装后打开原运行选择页。包内含独立 Python、官方 Codex CLI 0.153.4（下载 SHA-256 校验）、预编译 PDFKit/Vision 工具和相关许可证，不依赖原项目目录或开发工具。
+- Codex 登录与公开网页配对分别作为可选 command；不自动登录、不预选 Codex、不执行模型调用，DeepSeek/Gemini 等现有 API 入口与能力资格原样保留。本阶段未扩展尚未完成的 Gemini 领域 adapter，不能把入口存在当作完整支持。新用户浏览器实测初始选择为 null。
+- 安装位置为 Application Support/Ariadne Local，版本代码保留、数据共用独立目录；不迁移旧开发版资料，不复制凭据、运行数据、旧目录或私人原件。重复启动复用同版本服务，端口冲突明确失败，不杀已有进程或更换 origin。现有未提交的旧 Mac App 启动器继续保留。
+- Codex 配对引导及工作空间点击 Ariadne 后的介绍浮窗新增本地下载入口；下载页显示平台、包大小与 SHA-256，检查实际 ZIP 存在后才提供链接。没有发布包的站点明确显示未发布，ZIP 和运行时仅保留在忽略目录，不进入 Git。
+- 验证：安装器/下载状态新回归及相关 Codex、Provider、Gemini 连接、Runtime gating、介绍浮窗回归共 8 套件通过，VI 与公开文件/diff 检查通过。完整 ZIP 解压校验、脱离原仓库冷启动/重复启动/冲突拒绝、三页 PDF 完整转图及逐页 OCR、损坏 PDF 拒绝通过；真实浏览器下载 hash 相同，egolite 检查两个入口、390px 无横向溢出及未发布状态。PDFKit 首次无界面上下文创建失败已修复，历史失败包与 QA 原地保留，下载 metadata 只指向修复后的版本。
+- 证据与分发产物在 `.cache/local-distribution/`，说明见 [本地部署包](docs/current/LOCAL_DISTRIBUTION.md)。仅在当前 macOS 26.6 Apple 芯片电脑验收，未完成全新电脑/Gatekeeper、全部 macOS 版本、公网 HTTPS 配对及所有 Provider 的真实模型验收；没有公开托管、配置 DNS、Apple 公证或 push。本阶段创建本地 commit，其他任务改动不纳入。
+
 ## 2026-09-15 — GitHub Run failed 定位与测试等待修正（COMPLETE；远端通过）
 
 - 用户反复反馈的是 GitHub `Verify source and isolation` 工作流失败；此前误判为工具执行或作品集失败，现更正。读取实际 [失败运行](https://github.com/KAI-NEX/Ariadne/actions/runs/34973395385)：提交 `6367782` 的公开文件检查成功，离线回归 97/98，唯一失败为 `content_database_regression.mjs`，后续 VI/Gitleaks 尚未运行；旧日志只输出测试名，缺少退出码与错误正文，无法据此确认最终根因。

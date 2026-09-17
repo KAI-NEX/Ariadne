@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ariadne · 本地部署</title>
+  <link rel="stylesheet" href="/styles.css?vi=1" />
+  <link rel="stylesheet" href="/local-download.css" />
+</head>
+<body class="runtime-page runtime-connect-page local-download-page">
+  <main class="vi-container vi-grid">
+    <section class="runtime-connect-shell vi-span-12">
+      <a class="runtime-back-link" href="/">返回运行选择</a>
+      <p class="runtime-step">Ariadne · 本地版</p>
+      <h1>解压，启动，开始使用。</h1>
+      <p class="runtime-connect-copy">完整的本地部署包，适用于 Apple 芯片 Mac。无需先安装 Python 或开发工具，也不需要安装 Apple App。你可以选择保存原件、使用 Codex 订阅，或连接已接入的 API 模型。</p>
+      <p><a id="local-download" class="runtime-back-link hidden" download>下载本地部署包</a></p>
+      <p id="local-download-status" class="runtime-message" role="status">正在检查可下载版本…</p>
+      <p id="local-download-hash" class="runtime-connect-copy"></p>
+      <ol class="runtime-connect-copy">
+        <li>解压下载文件，双击「启动 Ariadne.command」。首次自动安装，随后打开浏览器启动页。</li>
+        <li>在网页选择运行方式。使用 API 时无需登录 Codex；各模型以实际能力验证结果为准。</li>
+        <li>使用 Codex 订阅时，首次双击「登录 Codex.command」完成 ChatGPT 登录，再回网页选择 Codex。</li>
+        <li>以后双击启动即可。保持服务终端打开，按 Ctrl+C 停止；资料会保留。</li>
+      </ol>
+      <p class="runtime-connect-copy">这是未公证的本地测试包。macOS 可能要求在「隐私与安全性」中确认打开；请核对来源与校验值。当前不提供 Windows 或 Intel Mac 版本。</p>
+      <p class="runtime-connect-copy">安装包不含你的资料和密钥，也不自动迁移旧开发版资料。端口已被其他版本使用时会提示先停止原服务。首次安装与更新均保留原文件。</p>
+      <p class="runtime-connect-copy">仅在使用公开网页版时，才需要「连接网页版.command」和配对码。本地运行无需配对。</p>
+    </section>
+  </main>
+  <script src="/local-download.js"></script>
+</body>
+</html>
