@@ -22,7 +22,7 @@
     return provider.models.filter((model) => available.has(model.id));
   }
 
-  function mount(elements, onComplete, onReturn) {
+  function mount(elements, onComplete, onReturn, onReturnStart) {
     const byId = (id) => elements[id];
     const modelList = byId("model-list");
     const status = byId("status");
@@ -39,6 +39,7 @@
     let completionTimer = null;
     let closingTimer = null;
     let closingAnimation = null;
+    let returnStartTimer = null;
     let returnOriginRect = null;
     const panelControls = globalThis.JobRadarFloatingWindow?.mount(byId("panel"), {
       dragHandle: byId("panel").querySelector(".add-model-header"),
@@ -150,6 +151,7 @@
       byId("panel").classList.add("is-close-ready");
       void byId("panel").offsetWidth;
       byId("sheet").classList.add("is-closing");
+      if (byId("panel").contains(document.activeElement)) document.activeElement.blur();
       byId("sheet").setAttribute("aria-hidden", "true");
       Object.assign(panel.style, { left: `${current.left}px`, top: `${current.top}px`, width: `${current.width}px`, height: `${current.height}px`, transform: "none" });
       closingAnimation?.cancel();
@@ -172,9 +174,14 @@
       };
       closingTimer = window.setTimeout(finalizeClose, 430);
       closingAnimation.finished.then(finalizeClose).catch(() => {});
+      returnStartTimer = window.setTimeout(() => {
+        returnStartTimer = null;
+        if (closingTimer && typeof onReturnStart === "function") onReturnStart();
+      }, 0);
     }
     function open(originRect, returnRect = originRect) {
       if (closingTimer) { window.clearTimeout(closingTimer); closingTimer = null; }
+      if (returnStartTimer) { window.clearTimeout(returnStartTimer); returnStartTimer = null; }
       closingAnimation?.cancel();
       closingAnimation = null;
       panelControls?.reset();

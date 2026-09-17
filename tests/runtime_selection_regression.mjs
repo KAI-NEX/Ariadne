@@ -91,6 +91,7 @@ assert.doesNotMatch(css, /\.runtime-existing-model\[aria-selected="true"\]::afte
 assert.match(script, /button\.setAttribute\("aria-selected", String\(state\.mode === "ai"/);
 assert.match(script, /byId\("runtime-local"\)\.setAttribute\("aria-selected", String\(state\.mode === "local"\)\)/);
 assert.match(css, /\.runtime-menu\.is-open/);
+assert.match(css, /\.runtime-menu\.is-returning \{[^}]*pointer-events: none[^}]*transition: none/s);
 assert.match(css, /\.runtime-menu \{[^}]*top: 68px/s);
 assert.match(css, /\.runtime-action\.ready:hover[^}]*box-shadow/s);
 assert.match(css, /\.runtime-action\.ready:active[^}]*transform: scale\(\.9\)/s);
@@ -113,7 +114,8 @@ assert.match(css, /\.sheet-icon-button:active[^}]*scale\(\.82\)/s);
 assert.match(script, /const originRect = byId\("runtime-add-model"\)\.getBoundingClientRect\(\)/);
 assert.match(script, /addModelSheet\.open\(originRect, returnRect\)/);
 assert.match(script, /if \(codexLinkPending\)/);
-assert.match(script, /else openMenu\(\)/);
+assert.match(script, /else finishMenuReturn\(\)/);
+assert.match(script, /if \(!codexLinkPending\) prepareMenuReturn\(\)/);
 assert.match(html, /id="add-model-codex-link"[^>]*aria-haspopup="dialog"/);
 assert.doesNotMatch(html, /runtime-menu-label|id="runtime-menu" class="runtime-menu hidden"/);
 console.log("runtime_selection_ui_contract=pass");

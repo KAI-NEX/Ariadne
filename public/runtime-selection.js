@@ -83,11 +83,24 @@ function closeMenu() {
   byId("runtime-selector").setAttribute("aria-expanded", "false");
 }
 
-function openMenu() {
+function openMenu({ returning = false } = {}) {
   const menu = byId("runtime-menu");
+  menu.classList.toggle("is-returning", returning);
   menu.classList.add("is-open");
   menu.setAttribute("aria-hidden", "false");
   byId("runtime-selector").setAttribute("aria-expanded", "true");
+}
+
+function finishMenuReturn() {
+  const menu = byId("runtime-menu");
+  if (!menu.classList.contains("is-open")) openMenu({ returning: true });
+  menu.classList.remove("is-returning");
+  byId("runtime-selector").focus({ preventScroll: true });
+}
+
+function prepareMenuReturn() {
+  openMenu({ returning: true });
+  byId("runtime-selector").focus({ preventScroll: true });
 }
 
 function failureCopy(layer) {
@@ -252,7 +265,9 @@ const addModelSheet = window.JobRadarAddModelSheet.mount({
   renderModels(); selectAddedMultimodalModel(connected);
 }, () => {
   if (codexLinkPending) { codexLinkPending = false; window.AriadneCodexConnect.open(byId("runtime-selector")); }
-  else openMenu();
+  else finishMenuReturn();
+}, () => {
+  if (!codexLinkPending) prepareMenuReturn();
 });
 byId("runtime-connect-codex").addEventListener("click", (event) => {
   event.preventDefault();
