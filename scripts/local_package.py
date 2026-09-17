@@ -82,7 +82,7 @@ def serve(target, port, open_browser):
 
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     app.initialize_database()
-    print(f"Ariadne 已启动：{origin}\n打开即进入工作空间；在「连接设置」选择自己的 Codex 或 API，Local 可直接保存原件。\n关闭此终端或按 Ctrl+C 停止服务；资料保留。", flush=True)
+    print(f"Ariadne 已启动：{origin}\n先选择自己的 Codex、API 模型或本地运行，点击继续进入工作空间。\n关闭此终端或按 Ctrl+C 停止服务；资料保留。", flush=True)
     if open_browser:
         subprocess.Popen(["/usr/bin/open", origin])
     try:

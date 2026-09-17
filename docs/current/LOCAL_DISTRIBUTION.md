@@ -6,8 +6,8 @@
 
 ## 开始使用
 
-1. 解压 ZIP，在 Finder 双击「启动 Ariadne.command」。首次自动安装到 `~/Library/Application Support/Ariadne Local`，随后打开默认浏览器的 `http://127.0.0.1:8000/` 工作空间。
-2. 可直接以 Local 保存原件，或在「连接设置」选择已经接入并通过资格检查的模型。启动本身不调用模型，不传输资料、不选择 Provider。
+1. 解压 ZIP，在 Finder 双击「启动 Ariadne.command」。首次自动安装到 `~/Library/Application Support/Ariadne Local`，随后打开默认浏览器的 `http://127.0.0.1:8000/` 运行选择页。以后每次启动也从此页开始。
+2. 选择已经接入并通过资格检查的模型，或选择「本地运行」先保存原件，再点击继续进入工作空间。已保存的连接配置会保留。启动本身不调用模型，不传输资料、不选择 Provider。
 3. 若使用 ChatGPT/Codex 订阅，首次双击「登录 Codex.command」，完成官方浏览器登录，再回到「连接设置」选择 Codex。已有默认 Codex 登录可以复用；包中没有任何人的登录信息。API 使用者不必执行这个步骤。
 4. 以后直接双击「启动 Ariadne.command」。首次安装后的文件在 Application Support 中，原下载包可以留作启动入口；移动整个解压目录不影响已安装的数据。不要只移动其中的 command 文件。
 
