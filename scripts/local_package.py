@@ -113,7 +113,7 @@ def main():
     python = target / "python/bin/python3"
     if args.mode == "connector":
         print("仅在使用公开网页版时需要配对。本地运行不需要此步骤。")
-        origin = input("输入网页来源（回车使用 https://web.ariadne.kai-nex.com）：").strip() or "https://web.ariadne.kai-nex.com"
+        origin = input("输入网页来源（回车使用 https://ariadne.kai-nex.com）：").strip() or "https://ariadne.kai-nex.com"
         command = [str(python), "-B", str(target / "app/scripts/run_codex_connector.py"), "--origin", origin]
     else:
         command = [str(python), "-B", str(target / "local_package.py"), "serve", "--port", str(args.port)]

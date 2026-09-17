@@ -391,7 +391,7 @@ assert.match(styles, /\.v1-workspace-content-pane,\.v1-ariadne-pane \{[^}]*borde
 assert.match(styles, /\.v1-workspace-scroll-region,\.v1-workspace-history \{[^}]*overflow-y: auto;/);
 assert.doesNotMatch(modelRun, /processCandidateSource|processCandidateProposal|local-candidate-structure|career_evidence|Demo\./);
 assert.equal((modelRun.match(/fetch\("\/api\/candidate-model-structure"/g) || []).length, 1);
-assert.match(server, /CANDIDATE_MODEL_EXECUTIONS\.begin\(validated_request\.operation_id, validated_request\.source_document\["source_document_id"\]\)/);
+assert.match(server, /self\.execution_registry\("CANDIDATE_MODEL_EXECUTIONS"\)\.begin\(validated_request\.operation_id, validated_request\.source_document\["source_document_id"\]\)/);
 assert.match(server, /candidate-model-operation-state\/delete/);
 assert.match(pages, /fetch\("\/api\/candidate-model-operation-state\/delete"/);
 

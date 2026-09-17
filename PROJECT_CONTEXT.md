@@ -4,7 +4,9 @@
 
 ## 2026-09-17：使用与发布方向
 
-本机日常使用优先，项目所有者首选自己的 Codex，同时保留 DeepSeek。后续公开用户自带 API 凭据，或下载后使用自己的 Codex；不共享开发者账号或代付 Key。每次打开入口先选择模型或本地运行，点击继续后进入工作空间；保留已保存的连接配置。当前已补齐本机 DeepSeek 自带 Key 到六个领域执行的来源绑定和原件按记录读取；公开网页的多用户 API 执行层、真实 HTTPS 与跨电脑分发验收仍待完成。详见 [本机与网页运行方向](docs/current/LOCAL_AND_WEB_RUNTIME_DIRECTION.md)，不能把此方向记录或本机验收视为已上线。
+本机日常使用优先，项目所有者首选自己的 Codex，同时保留 DeepSeek。后续公开用户自带 API 凭据，或下载后使用自己的 Codex；不共享开发者账号或代付 Key。每次打开入口先选择模型或本地运行，点击继续后进入工作空间；保留已保存的连接配置。当前已补齐本机 DeepSeek 自带 Key 与原件按记录读取，并新增网页专用 WSGI 执行入口及会话/凭据隔离；公网托管、真实 HTTPS 与跨电脑分发验收仍待完成。详见 [本机与网页运行方向](docs/current/LOCAL_AND_WEB_RUNTIME_DIRECTION.md)，不能把此方向记录或本机验收视为已上线。
+
+2026-09-17 最新域名决定：`https://ariadne.kai-nex.com` 直接进入模型选择和应用，取代此前官网与 `web` 子域拆分方案。腾讯负责域名解析，用户尚无服务器；当前只完成可部署代码和本机预览，不表示公网已上线。部署与 DNS 步骤见 [网页部署](docs/current/WEB_DEPLOYMENT.md)。旧双域名条目保留为历史记录。
 
 ## 1. 要解决的问题
 
@@ -76,4 +78,4 @@
 - 从仓库根启动：`PYTHONDONTWRITEBYTECODE=1 python3 app.py`，正常入口为 `http://127.0.0.1:8000/`。重启前先核对占用端口进程的 cwd 与身份。
 - Node 回归按文件运行：`node tests/<name>_regression.mjs`；Python：`PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 python3 tests/<name>_regression.py`。跨语言 route suite 必要时设置 `ARIADNE_NODE_BINARY` 为现有 Node 可执行路径。
 - 最新已记录的自动回归基线为 61 Node + 35 Python（2026-09-12）；计数会随项目变化，应以实际文件与运行结果为准。常驻 stub server、可选私有 fixture 和可选 smoke 不计作默认回归套件。
-- 这是本地运行项目，当前没有 package/requirements/lock manifest；不要为文档整理安装依赖或引入新框架。测试日志、编译产物和私人截图保存在忽略的 `.cache/` 或仓库外，不加入 Git。
+- 本机运行继续使用 Python 标准库与原生前端；网页部署新增 `deploy/requirements.txt` 固定 Gunicorn 版本及 Docker/Poppler 配置。不要为文档整理安装依赖或引入新框架。测试日志、编译产物和私人截图保存在忽略的 `.cache/` 或仓库外，不加入 Git。

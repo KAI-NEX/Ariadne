@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--origin", default="https://web.ariadne.kai-nex.com")
+    parser.add_argument("--origin", default="https://ariadne.kai-nex.com")
     args = parser.parse_args()
     from src.local_connector import Pairing, connector_handler
     pairing = Pairing(args.origin)

@@ -1,0 +1,24 @@
+# Positive allowlist: private runtime data cannot enter the build context.
+**
+!Dockerfile
+!app.py
+!web_app.py
+!src/
+!src/**
+!deploy/
+!deploy/requirements.txt
+!deploy/gunicorn.conf.py
+!deploy/downloads/
+!deploy/downloads/**
+!data/
+!data/*contract*.json
+!data/*schema*.json
+!data/workspace_storage_v1.json
+!data/model_contracts/
+!data/model_contracts/*.json
+!public/
+!public/**
+public/downloads/**
+**/__pycache__/**
+**/.DS_Store
+**/*.pyc

@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { webcrypto } from 'node:crypto';
 const script = fs.readFileSync('public/local-connector.js', 'utf8');
 function client(origin = 'http://127.0.0.1:8000') {
   const calls = [], saved = new Map(), session = new Map();
-  const context = { URL, Headers, AbortSignal, Date,
+  const context = { URL, Headers, AbortSignal, Date, Blob, crypto: webcrypto,
     location: new URL(origin),
     localStorage: { getItem: key => saved.get(key) ?? null },
     sessionStorage: { getItem: key => session.get(key) ?? null, setItem: (key, value) => session.set(key, value), removeItem: key => session.delete(key) },
-    fetch: async (input, options = {}) => { calls.push({ input: String(input), options }); return { status: 200, ok: true }; },
+    fetch: async (input, options = {}) => { calls.push({ input: String(input), options }); return { status: 200, ok: true, json: async () => ({mode:'web', byok:['deepseek']}) }; },
   };
   vm.runInNewContext(script, context);
   return { fetch: context.AriadneConnector.fetch, calls, saved, session };
@@ -29,12 +30,21 @@ for (const [path, options] of [['/api/candidate-model-structure', body('codex')]
 c.saved.clear(); await c.fetch('/api/personal-understanding-turn', body('deepseek'));
 assert.equal(new Headers(c.calls.at(-1).options.headers).get('X-Ariadne-Provider-Key'), null);
 const web = client('https://web.example'); web.saved.set('job-radar-provider-api-key:deepseek', 'synthetic-browser-key');
-await assert.rejects(web.fetch('/api/personal-understanding-turn', body('deepseek')), /WEB_API_RUNTIME_UNAVAILABLE/);
+await web.fetch('/api/personal-understanding-turn', body('deepseek'));
+const hosted = web.calls.at(-1);
+assert.equal(new Headers(hosted.options.headers).get('X-Ariadne-Provider-Key'), 'synthetic-browser-key');
+assert.match(new Headers(hosted.options.headers).get('X-Ariadne-Web-Session'), /^[a-f0-9]{64}$/);
+assert.equal(new Headers(web.calls[0].options.headers).get('X-Ariadne-Provider-Key'), null);
 await assert.rejects(web.fetch('/api/personal-understanding-turn', body('codex')), /CONNECTOR_PAIRING_REQUIRED/);
-assert.equal(web.calls.length, 0);
+assert.equal(web.calls.length, 2);
+await web.fetch('/api/candidate-conversation-turn/cancel', {method:'POST', body:'{}'});
+assert.equal(new Headers(web.calls.at(-1).options.headers).get('X-Ariadne-Web-Session'), new Headers(hosted.options.headers).get('X-Ariadne-Web-Session'));
 c.session.set('ariadne-local-connector-session-v1', JSON.stringify({ token: 'synthetic-pair-token', expires: Date.now() + 10000 }));
 c.saved.set('job-radar-provider-api-key:deepseek', 'synthetic-browser-key');
 await c.fetch('/api/personal-understanding-turn', body('codex'));
 assert.equal(new Headers(c.calls.at(-1).options.headers).get('X-Ariadne-Provider-Key'), null);
 assert.equal(new Headers(c.calls.at(-1).options.headers).get('X-Ariadne-Connector'), 'synthetic-pair-token');
-console.log('PASS BYOK client: six operations, local-only credentials, Codex separation, no external credential forwarding');
+await c.fetch('/api/personal-understanding-turn', body('deepseek'));
+assert.equal(c.calls.at(-1).input, '/api/personal-understanding-turn');
+assert.equal(new Headers(c.calls.at(-1).options.headers).get('X-Ariadne-Connector'), null);
+console.log('PASS BYOK client: six operations, hosted sessions, Codex separation, no external credential forwarding');

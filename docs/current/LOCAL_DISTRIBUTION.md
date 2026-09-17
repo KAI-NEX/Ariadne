@@ -23,7 +23,7 @@ DeepSeek 用户在「连接设置 → 添加新的模型」填写自己的 API K
 
 ## 可选：连接公开网页版
 
-本地版不需要配对。以后使用公开网站时，可双击「连接网页版.command」，输入准确的 HTTPS 来源（默认 `https://web.ariadne.kai-nex.com`），将终端配对码填入网站。配对五分钟有效、一次性，连接器退出即撤销；公开 HTTPS 本地网络权限仍需网站实际部署后验收。
+本地版不需要配对。以后使用公开网站时，可双击「连接网页版.command」，输入准确的 HTTPS 来源（默认 `https://ariadne.kai-nex.com`），将终端配对码填入网站。配对五分钟有效、一次性，连接器退出即撤销；公开 HTTPS 本地网络权限仍需网站实际部署后验收。
 
 ## 构建与发布
 
@@ -31,4 +31,4 @@ DeepSeek 用户在「连接设置 → 添加新的模型」填写自己的 API K
 
 源代码通过 Git 跟踪文件的目录白名单收集，仅包含 app.py、src、public 和 data 中的公开契约；不复制运行数据。Codex 来源与官方发布 SHA-256 写入 release.json，Python 与 Codex 许可证随包保留。当前包的静态生成与本机验收不等于新电脑、公网下载或所有 Provider 的真实模型验收。
 
-本机与网页的后续发布边界见 [用户自带连接方向](LOCAL_AND_WEB_RUNTIME_DIRECTION.md)。公开网页 API 执行层尚未开放，不能把下载版本机验收当作公网验收。
+本机与网页的后续发布边界见 [用户自带连接方向](LOCAL_AND_WEB_RUNTIME_DIRECTION.md)。公开网页已有独立执行入口与部署文件，但尚未托管；不能把下载版本机验收当作公网验收。见 [网页部署](WEB_DEPLOYMENT.md)。

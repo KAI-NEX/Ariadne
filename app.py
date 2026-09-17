@@ -852,6 +852,10 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(PUBLIC_PATH), **kwargs)
 
+    def execution_registry(self, name):
+        """Local defaults; hosted requests inject isolated, bounded registries."""
+        return getattr(self, "_execution_registries", {}).get(name, globals()[name])
+
     def runtime_api_key(self, reference=DEEPSEEK_CREDENTIAL):
         """A browser-supplied key belongs only to this request; never persist it."""
         supplied = self.headers.get("X-Ariadne-Provider-Key")
@@ -1249,7 +1253,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                 raise CandidateModelRuntimeError("candidate_model_request_size_invalid", "request")
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
             validated_request = validate_candidate_model_request(payload)
-            claim_state, cached_result = CANDIDATE_MODEL_EXECUTIONS.begin(validated_request.operation_id, validated_request.source_document["source_document_id"])
+            claim_state, cached_result = self.execution_registry("CANDIDATE_MODEL_EXECUTIONS").begin(validated_request.operation_id, validated_request.source_document["source_document_id"])
             if claim_state == "COMPLETED":
                 self.send_json(HTTPStatus.OK, cached_result)
                 return
@@ -1280,10 +1284,11 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             )
         except CandidateModelRuntimeError as error:
             if claimed_operation_id:
-                CANDIDATE_MODEL_EXECUTIONS.fail(claimed_operation_id)
+                self.execution_registry("CANDIDATE_MODEL_EXECUTIONS").fail(claimed_operation_id)
             status = HTTPStatus.PRECONDITION_REQUIRED if error.failure_layer == "credential" else HTTPStatus.BAD_GATEWAY if error.failure_layer in {"provider", "transport"} else HTTPStatus.UNPROCESSABLE_ENTITY
             diagnostic = {"error": error.code, "failure_layer": error.failure_layer, "network_call_made": error.network_call_made, "diagnostics": error.diagnostics}
-            print(f"candidate_model_failure_diagnostic {json.dumps(diagnostic, ensure_ascii=False, sort_keys=True)}", flush=True)
+            if not getattr(self, "web_request", False):
+                print(f"candidate_model_failure_diagnostic {json.dumps(diagnostic, ensure_ascii=False, sort_keys=True)}", flush=True)
             self.send_json(status, {
                 "error": error.code,
                 "failure_layer": error.failure_layer,
@@ -1294,7 +1299,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             return
         except HTTPError as error:
             if claimed_operation_id:
-                CANDIDATE_MODEL_EXECUTIONS.fail(claimed_operation_id)
+                self.execution_registry("CANDIDATE_MODEL_EXECUTIONS").fail(claimed_operation_id)
             layer = "credential" if error.code in {401, 403} else "model" if error.code == 404 else "provider"
             self.send_json(HTTPStatus.BAD_GATEWAY, {
                 "error": "deepseek_provider_http_error",
@@ -1306,7 +1311,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             return
         except (URLError, TimeoutError, OSError):
             if claimed_operation_id:
-                CANDIDATE_MODEL_EXECUTIONS.fail(claimed_operation_id)
+                self.execution_registry("CANDIDATE_MODEL_EXECUTIONS").fail(claimed_operation_id)
             self.send_json(HTTPStatus.BAD_GATEWAY, {
                 "error": "deepseek_network_error",
                 "failure_layer": "transport",
@@ -1316,7 +1321,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             return
         except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
             if claimed_operation_id:
-                CANDIDATE_MODEL_EXECUTIONS.fail(claimed_operation_id)
+                self.execution_registry("CANDIDATE_MODEL_EXECUTIONS").fail(claimed_operation_id)
             self.send_json(HTTPStatus.BAD_REQUEST, {
                 "error": "candidate_model_request_invalid",
                 "failure_layer": "request",
@@ -1324,7 +1329,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                 "persistence": "not_written",
             })
             return
-        if not CANDIDATE_MODEL_EXECUTIONS.succeed(claimed_operation_id, result):
+        if not self.execution_registry("CANDIDATE_MODEL_EXECUTIONS").succeed(claimed_operation_id, result):
             self.send_json(HTTPStatus.CONFLICT, {
                 "error": "candidate_model_processing_run_stale",
                 "failure_layer": "idempotency",
@@ -1345,7 +1350,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
             validated = validate_candidate_conversation_request(payload)
             execution_id, generation = validated.execution_id, validated.generation
-            if not CANDIDATE_CONVERSATION_EXECUTIONS.begin(execution_id, generation):
+            if not self.execution_registry("CANDIDATE_CONVERSATION_EXECUTIONS").begin(execution_id, generation):
                 self.send_json(HTTPStatus.CONFLICT, {
                     "error": "TURN_ALREADY_ACTIVE", "failure_layer": "generation",
                     "network_call_made": False, "persistence": "not_written",
@@ -1359,7 +1364,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                     raise CandidateConversationRuntimeError("MALFORMED_RESPONSE", "parsing", True) from error
 
             result = execute_candidate_conversation_request(payload, self.runtime_api_key, provider_call)
-            if not CANDIDATE_CONVERSATION_EXECUTIONS.accept(execution_id, generation):
+            if not self.execution_registry("CANDIDATE_CONVERSATION_EXECUTIONS").accept(execution_id, generation):
                 self.send_json(HTTPStatus.CONFLICT, {
                     "error": "CANCELLED_TURN", "failure_layer": "generation",
                     "network_call_made": True, "persistence": "not_written",
@@ -1368,7 +1373,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                 return
         except CandidateConversationRuntimeError as error:
             if execution_id and generation:
-                CANDIDATE_CONVERSATION_EXECUTIONS.fail(execution_id, generation)
+                self.execution_registry("CANDIDATE_CONVERSATION_EXECUTIONS").fail(execution_id, generation)
             safe_diagnostics = candidate_conversation_failure_diagnostics(error)
             print(
                 "candidate_conversation_failure "
@@ -1387,7 +1392,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             return
         except HTTPError as error:
             if execution_id and generation:
-                CANDIDATE_CONVERSATION_EXECUTIONS.fail(execution_id, generation)
+                self.execution_registry("CANDIDATE_CONVERSATION_EXECUTIONS").fail(execution_id, generation)
             layer = "credential" if error.code in {401, 403} else "model" if error.code == 404 else "provider"
             self.send_json(HTTPStatus.BAD_GATEWAY, {
                 "error": "PROVIDER_HTTP_ERROR", "failure_layer": layer,
@@ -1397,7 +1402,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             return
         except (URLError, TimeoutError, OSError):
             if execution_id and generation:
-                CANDIDATE_CONVERSATION_EXECUTIONS.fail(execution_id, generation)
+                self.execution_registry("CANDIDATE_CONVERSATION_EXECUTIONS").fail(execution_id, generation)
             self.send_json(HTTPStatus.BAD_GATEWAY, {
                 "error": "PROVIDER_TRANSPORT_ERROR", "failure_layer": "transport",
                 "network_call_made": True, "persistence": "not_written",
@@ -1405,7 +1410,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             return
         except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
             if execution_id and generation:
-                CANDIDATE_CONVERSATION_EXECUTIONS.fail(execution_id, generation)
+                self.execution_registry("CANDIDATE_CONVERSATION_EXECUTIONS").fail(execution_id, generation)
             self.send_json(HTTPStatus.BAD_REQUEST, {
                 "error": "REQUEST_INVALID", "failure_layer": "request",
                 "network_call_made": False, "persistence": "not_written",
@@ -1464,7 +1469,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
             validated = validate_job_conversation_request(payload)
             execution_id, generation = validated.execution_id, validated.generation
-            if not JOB_CONVERSATION_EXECUTIONS.begin(execution_id, generation):
+            if not self.execution_registry("JOB_CONVERSATION_EXECUTIONS").begin(execution_id, generation):
                 self.send_json(HTTPStatus.CONFLICT, {
                     "error": "TURN_ALREADY_ACTIVE", "failure_layer": "generation",
                     "network_call_made": False, "persistence": "not_written",
@@ -1478,7 +1483,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                     raise JobConversationRuntimeError("MALFORMED_RESPONSE", "parsing", True) from error
 
             result = execute_job_conversation_request(payload, self.runtime_api_key, provider_call)
-            if not JOB_CONVERSATION_EXECUTIONS.accept(execution_id, generation):
+            if not self.execution_registry("JOB_CONVERSATION_EXECUTIONS").accept(execution_id, generation):
                 self.send_json(HTTPStatus.CONFLICT, {
                     "error": "CANCELLED_TURN", "failure_layer": "generation",
                     "network_call_made": True, "persistence": "not_written",
@@ -1486,7 +1491,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                 return
         except JobConversationRuntimeError as error:
             if execution_id and generation:
-                JOB_CONVERSATION_EXECUTIONS.fail(execution_id, generation)
+                self.execution_registry("JOB_CONVERSATION_EXECUTIONS").fail(execution_id, generation)
             print(
                 "job_conversation_failure "
                 f"provider_called={str(error.network_call_made).lower()} "
@@ -1504,7 +1509,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             return
         except HTTPError as error:
             if execution_id and generation:
-                JOB_CONVERSATION_EXECUTIONS.fail(execution_id, generation)
+                self.execution_registry("JOB_CONVERSATION_EXECUTIONS").fail(execution_id, generation)
             self.send_json(HTTPStatus.BAD_GATEWAY, {
                 "error": "PROVIDER_HTTP_ERROR",
                 "failure_layer": "credential" if error.code in {401, 403} else "provider",
@@ -1515,12 +1520,12 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             return
         except (URLError, TimeoutError, OSError):
             if execution_id and generation:
-                JOB_CONVERSATION_EXECUTIONS.fail(execution_id, generation)
+                self.execution_registry("JOB_CONVERSATION_EXECUTIONS").fail(execution_id, generation)
             self.send_json(HTTPStatus.BAD_GATEWAY, {"error": "PROVIDER_TRANSPORT_ERROR", "failure_layer": "transport", "network_call_made": True, "persistence": "not_written"})
             return
         except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
             if execution_id and generation:
-                JOB_CONVERSATION_EXECUTIONS.fail(execution_id, generation)
+                self.execution_registry("JOB_CONVERSATION_EXECUTIONS").fail(execution_id, generation)
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": "REQUEST_INVALID", "failure_layer": "request", "network_call_made": False, "persistence": "not_written"})
             return
         self.send_json(HTTPStatus.OK, result)
@@ -1534,7 +1539,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
                 raise JobModelRuntimeError("job_model_request_size_invalid", "request")
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
             validated = validate_job_model_request(payload)
-            claim_state, cached_result = JOB_MODEL_IMPORT_EXECUTIONS.begin(validated.operation_id, validated.source_document["source_document_id"])
+            claim_state, cached_result = self.execution_registry("JOB_MODEL_IMPORT_EXECUTIONS").begin(validated.operation_id, validated.source_document["source_document_id"])
             if claim_state == "COMPLETED":
                 self.send_json(HTTPStatus.OK, cached_result)
                 return
@@ -1557,7 +1562,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             result = execute_job_model_request(payload, self.runtime_api_key, provider_call)
         except JobModelRuntimeError as error:
             if claimed_operation_id:
-                JOB_MODEL_IMPORT_EXECUTIONS.fail(claimed_operation_id)
+                self.execution_registry("JOB_MODEL_IMPORT_EXECUTIONS").fail(claimed_operation_id)
             status = HTTPStatus.PRECONDITION_REQUIRED if error.failure_layer == "credential" else HTTPStatus.BAD_GATEWAY if error.failure_layer in {"provider", "transport", "model"} else HTTPStatus.UNPROCESSABLE_ENTITY
             self.send_json(status, {
                 "error": error.code, "failure_layer": error.failure_layer,
@@ -1566,7 +1571,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             return
         except HTTPError as error:
             if claimed_operation_id:
-                JOB_MODEL_IMPORT_EXECUTIONS.fail(claimed_operation_id)
+                self.execution_registry("JOB_MODEL_IMPORT_EXECUTIONS").fail(claimed_operation_id)
             self.send_json(HTTPStatus.BAD_GATEWAY, {
                 "error": "deepseek_provider_http_error", "failure_layer": "credential" if error.code in {401, 403} else "provider",
                 "provider_http_status": error.code, "network_call_made": True, "persistence": "not_written",
@@ -1574,7 +1579,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             return
         except (URLError, TimeoutError, OSError):
             if claimed_operation_id:
-                JOB_MODEL_IMPORT_EXECUTIONS.fail(claimed_operation_id)
+                self.execution_registry("JOB_MODEL_IMPORT_EXECUTIONS").fail(claimed_operation_id)
             self.send_json(HTTPStatus.BAD_GATEWAY, {
                 "error": "deepseek_network_error", "failure_layer": "transport",
                 "network_call_made": True, "persistence": "not_written",
@@ -1582,13 +1587,13 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
             return
         except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
             if claimed_operation_id:
-                JOB_MODEL_IMPORT_EXECUTIONS.fail(claimed_operation_id)
+                self.execution_registry("JOB_MODEL_IMPORT_EXECUTIONS").fail(claimed_operation_id)
             self.send_json(HTTPStatus.BAD_REQUEST, {
                 "error": "job_model_request_invalid", "failure_layer": "request",
                 "network_call_made": False, "persistence": "not_written",
             })
             return
-        if not JOB_MODEL_IMPORT_EXECUTIONS.succeed(claimed_operation_id, result):
+        if not self.execution_registry("JOB_MODEL_IMPORT_EXECUTIONS").succeed(claimed_operation_id, result):
             self.send_json(HTTPStatus.CONFLICT, {
                 "error": "job_model_processing_run_stale", "failure_layer": "idempotency",
                 "network_call_made": True, "persistence": "not_written",
@@ -1612,7 +1617,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": "TURN_CANCEL_REQUEST_INVALID", "network_call_made": False})
             return
-        invalidated = CANDIDATE_CONVERSATION_EXECUTIONS.cancel(execution_id, generation)
+        invalidated = self.execution_registry("CANDIDATE_CONVERSATION_EXECUTIONS").cancel(execution_id, generation)
         self.send_json(HTTPStatus.OK, {
             "execution_id": execution_id, "generation": generation,
             "state": "CANCELLED" if invalidated else "NOT_ACTIVE",
@@ -1633,7 +1638,7 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         except (KeyError, ValueError, UnicodeDecodeError, json.JSONDecodeError):
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": "candidate_model_source_invalid", "network_call_made": False})
             return
-        cleared = CANDIDATE_MODEL_EXECUTIONS.forget_source(source_id)
+        cleared = self.execution_registry("CANDIDATE_MODEL_EXECUTIONS").forget_source(source_id)
         self.send_json(HTTPStatus.OK, {"source_document_id": source_id, "operation_states_cleared": cleared, "network_call_made": False})
 
     def qwen_runtime_connection_check(self) -> None:

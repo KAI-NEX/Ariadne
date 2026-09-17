@@ -1,0 +1,21 @@
+{
+    servers {
+        timeouts {
+            read_header 10s
+            read_body 120s
+            idle 1m
+        }
+    }
+}
+
+ariadne.kai-nex.com {
+    encode zstd gzip
+    request_body {
+        max_size 41MB
+    }
+    reverse_proxy web:8080 {
+        transport http {
+            response_header_timeout 300s
+        }
+    }
+}

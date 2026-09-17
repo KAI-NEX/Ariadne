@@ -187,6 +187,8 @@
     return candidateFactLabel(value);
   }
   function personalErrorCopy(error) {
+    const webCopy = window.AriadneConnector?.errorCopy?.(error);
+    if (webCopy) return webCopy;
     const storageCopy = window.AriadneContentDatabase?.errorCopy(error);
     if (storageCopy) return storageCopy;
     const code = String(error?.code || error?.message || error || "");
@@ -231,7 +233,7 @@
       candidate_model_credential_reference_invalid: "模型凭据引用无效；没有发送材料。",
       CONNECTOR_UNREACHABLE: "无法连接本机连接器，请检查它是否运行及浏览器本地网络权限。没有改用其他模型。",
       CONNECTOR_PAIRING_REQUIRED: "本机连接已过期或撤销，请重新配对。",
-      deepseek_key_not_configured: "尚未配置可用的 DeepSeek 本机凭据；没有发送材料。",
+      deepseek_key_not_configured: "尚未配置可用的 DeepSeek API 凭据；没有发送材料。",
       candidate_model_pdf_render_failed: "PDF 页面无法完整渲染；没有发送不完整内容。",
       candidate_model_request_size_invalid: "模型请求超过本地服务允许的大小；没有发送材料。",
       candidate_model_pdf_payload_invalid: "PDF 内容校验失败；没有发送材料。",
@@ -254,6 +256,8 @@
   }
 
   function jobErrorCopy(error) {
+    const webCopy = window.AriadneConnector?.errorCopy?.(error);
+    if (webCopy) return webCopy;
     const storageCopy = window.AriadneContentDatabase?.errorCopy(error);
     if (storageCopy) return storageCopy;
     const code = String(error?.code || error?.message || error || "");
@@ -271,7 +275,7 @@
       job_model_credential_reference_invalid: "模型凭据引用无效；没有发送职位内容。",
       CONNECTOR_UNREACHABLE: "无法连接本机连接器，请检查它是否运行及浏览器本地网络权限。没有改用其他模型。",
       CONNECTOR_PAIRING_REQUIRED: "本机连接已过期或撤销，请重新配对。",
-      deepseek_key_not_configured: "尚未配置可用的 DeepSeek 本机凭据。",
+      deepseek_key_not_configured: "尚未配置可用的 DeepSeek API 凭据。",
       deepseek_network_error: "连接模型失败。",
       deepseek_provider_http_error: "模型未能完成这次职位理解。",
       deepseek_response_too_large: "模型返回内容超过安全上限。",
@@ -633,7 +637,7 @@
             <p><a class="runtime-back-link" href="/download.html" target="_blank" rel="noopener">下载 Ariadne 本地版 · Apple 芯片 Mac</a></p>
             <p>Ariadne · 衡是一个帮助你探索职业方向的工具。它理解你的经历与作品，也理解你选择的职位，帮你看清两者的关系。</p>
             <p>在个人资料中点击「了解我」，围绕过去的项目与经历逐步了解你；在职位描述中点击「了解职位概况」，汇总所有 JD 的职责、要求与差异。想讨论自己与某个职位的关系，可以进入该职位详情。</p>
-            <p>你的文件内容、资料、对话记录和 API 密钥保存在这台电脑或当前浏览器本地，不会上传至 Ariadne 的云端服务器，请放心使用。使用 AI 功能时，必要材料仍会按你的操作与传输确认发送给所选模型服务商；API 密钥仅用于对应服务的连接与调用。</p>
+            <p>原件、资料和对话保存在本机或当前浏览器。选择 API 模型并确认发送后，本次材料和 API Key 会经当前 Ariadne 服务转发给模型服务商；网页版经过网站服务器，本地版经过本机服务。Key 不在服务端持久保存，上传材料仅作临时处理；结果会短暂保留在内存中以处理重试。连接 Codex 时，材料由你自己的电脑发送给 OpenAI。</p>
           </div>
         </div>
       </section>

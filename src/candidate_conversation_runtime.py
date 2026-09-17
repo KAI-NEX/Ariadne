@@ -160,7 +160,8 @@ class CandidateConversationExecutionRegistry:
     def accept(self, execution_id: str, generation: str) -> bool:
         with self._lock:
             accepted = self._active.get(execution_id) == generation and (execution_id, generation) not in self._cancelled
-            self._active.pop(execution_id, None)
+            if self._active.get(execution_id) == generation:
+                self._active.pop(execution_id, None)
             self._cancelled.discard((execution_id, generation))
             return accepted
 

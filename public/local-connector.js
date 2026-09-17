@@ -4,11 +4,45 @@
   const BASE = "http://127.0.0.1:8765";
   const KEY = "ariadne-local-connector-session-v1";
   const nativeFetch = root.fetch.bind(root);
+  const WEB_SESSION_KEY = "ariadne-web-api-session-v1";
+  let webRuntimePromise;
+  const localOrigin = () => ["localhost", "127.0.0.1", "[::1]"].includes(root.location.hostname);
+  function webSession() {
+    let value = root.sessionStorage.getItem(WEB_SESSION_KEY);
+    if (!/^[a-f0-9]{64}$/.test(value || "")) {
+      value = (root.crypto.randomUUID() + root.crypto.randomUUID()).replaceAll("-", "");
+      root.sessionStorage.setItem(WEB_SESSION_KEY, value);
+    }
+    return value;
+  }
+  async function webRuntime() {
+    if (!webRuntimePromise) webRuntimePromise = nativeFetch("/api/web-runtime", { cache: "no-store", redirect: "error" })
+      .then(async response => {
+        const value = await response.json();
+        if (!response.ok || value.mode !== "web" || !value.byok?.includes("deepseek")) throw new Error("WEB_API_RUNTIME_UNAVAILABLE");
+        return value;
+      }).catch(error => { webRuntimePromise = null; throw error; });
+    return webRuntimePromise;
+  }
   function session() {
     try { return JSON.parse(root.sessionStorage.getItem(KEY) || "null"); }
     catch (_) { throw new Error("CONNECTOR_SESSION_INVALID"); }
   }
   function clear() { root.sessionStorage.removeItem(KEY); }
+  function errorCopy(error) {
+    const code = String(error?.code || error?.message || error || "");
+    return ({ WEB_API_RUNTIME_UNAVAILABLE: "网站的 API 服务暂不可用，请稍后重试或使用本地版。",
+      WEB_OWN_API_KEY_REQUIRED: "请先在连接设置中填写并验证你自己的 API Key。",
+      WEB_SERVICE_BUSY: "网站正在处理其他请求，请稍后手动重试。",
+      WEB_SESSION_BUSY: "本页已有请求正在处理，请等待完成。",
+      WEB_SESSION_OPERATION_LIMIT: "本次连接的处理次数已达上限，请稍后重新打开页面。",
+      WEB_OPERATION_CONTENT_CONFLICT: "请求内容已变化，请重新确认材料后再分析。",
+      WEB_RESULT_EXPIRED_REVIEW_BEFORE_RETRY: "这次分析已经执行，结果缓存已失效；请先核对已有结果，再决定是否重新付费分析。",
+      WEB_SOURCE_PREPARATION_FAILED: "原件未能完整读取，请核对文件；复杂 Word 文档可导出为 PDF 后重试。",
+      WEB_REQUEST_SIZE_INVALID: "网页版单次材料总量约限 30 MB，请减少本次文件数量后重试。",
+      WEB_RUNTIME_NOT_ALLOWED: "网页版需要使用你自己验证过的 API 连接；Codex 请通过本机连接器使用。",
+    })[code] || null;
+  }
   async function apiFetch(input, options = {}) {
     const connection = session();
     const url = new URL(input, root.location.href);
@@ -24,25 +58,34 @@
         await root.AriadneRuntimeSelection.beforeDispatch(request.runtime_snapshot, operation);
       }
     }
-    if (!connection) {
+    let provider;
+    try { provider = JSON.parse(options.body || "null")?.runtime_snapshot?.provider; }
+    catch (_) { /* The domain endpoint owns malformed-request validation. */ }
+    const check = url.pathname === "/api/runtime-providers/deepseek/connection-check";
+    if (!provider && ["/api/candidate-conversation-turn/cancel", "/api/candidate-model-operation-state/delete"].includes(url.pathname)) {
+      try { provider = JSON.parse(root.localStorage.getItem("job-radar-selected-runtime") || "null")?.provider; }
+      catch (_) { /* Keep the existing connector boundary when unavailable. */ }
+    }
+    if (!connection || provider === "deepseek" || check) {
       // Closing a tab discards its pairing session but retains its selected
       // runtime. Never post a Codex request to a hosted server in that state.
-      let provider;
-      try { provider = JSON.parse(options.body || "null")?.runtime_snapshot?.provider; }
-      catch (_) { /* The domain endpoint owns malformed-request validation. */ }
       if (provider === "codex" && !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) throw new Error("CONNECTOR_PAIRING_REQUIRED");
-      // Credentials are attached only to qualified DeepSeek operations at the
-      // local backend. Never send them to a Codex connector or unrelated URL.
-      if ((provider === "deepseek" && operations[url.pathname]) || url.pathname === "/api/runtime-check") {
-        if (!["localhost", "127.0.0.1"].includes(url.hostname)) throw new Error("WEB_API_RUNTIME_UNAVAILABLE");
+      // Own keys go only to the selected same-origin execution service, never
+      // to the local Codex connector or an unrelated URL.
+      const ownKeyRoute = (provider === "deepseek" && (operations[url.pathname] || url.pathname === "/api/local-source-read"))
+        || ["/api/runtime-check", "/api/candidate-conversation-turn/cancel", "/api/candidate-model-operation-state/delete"].includes(url.pathname);
+      if (ownKeyRoute || check) {
+        const headers = new Headers(options.headers || {});
+        if (!localOrigin()) {
+          await webRuntime();
+          if (typeof options.body === "string" && new Blob([options.body]).size > 41000000) throw new Error("WEB_REQUEST_SIZE_INVALID");
+          headers.set("X-Ariadne-Web-Session", webSession());
+        }
         let key;
         try { key = root.localStorage.getItem("job-radar-provider-api-key:deepseek"); }
         catch (_) { /* Existing local Keychain remains a supported credential source. */ }
-        if (key) {
-          const headers = new Headers(options.headers || {});
-          headers.set("X-Ariadne-Provider-Key", key);
-          options = { ...options, headers, redirect: "error" };
-        }
+        if (key && !check) headers.set("X-Ariadne-Provider-Key", key);
+        options = { ...options, headers, redirect: "error" };
       }
       return nativeFetch(input, options);
     }
@@ -78,5 +121,5 @@
       });
     } finally { clear(); }
   }
-  root.AriadneConnector = Object.freeze({ fetch: apiFetch, pair, disconnect, connected: () => Boolean(session()) });
+  root.AriadneConnector = Object.freeze({ fetch: apiFetch, pair, disconnect, webRuntime, errorCopy, connected: () => Boolean(session()) });
 }(globalThis));

@@ -215,15 +215,12 @@
         state.phase = "FAILED"; state.error = "浏览器无法保存 API Key，请允许本站存储后重试。"; render(); return;
       }
       if (state.providerId !== "deepseek") return;
-      if (!["127.0.0.1", "localhost"].includes(location.hostname)) {
-        state.phase = "FAILED"; state.error = "网页版 API 执行服务尚未开放。请下载本地版使用自己的 API，或连接自己的 Codex。"; render(); return;
-      }
       const currentAttempt = ++attempt;
       state.models = []; state.selectedModel = null; state.verified = false; state.error = "";
       state.phase = "SENDING"; render();
       try {
         state.phase = "WAITING"; render();
-        const response = await fetch("/api/runtime-providers/deepseek/connection-check", {
+        const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/runtime-providers/deepseek/connection-check", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ api_key: state.apiKey, confirmed: true }),
           redirect: "error",
