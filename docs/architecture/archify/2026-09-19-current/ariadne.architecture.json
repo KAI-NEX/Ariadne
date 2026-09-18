@@ -1,0 +1,252 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Ariadne · 当前运行架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/KAI-NEX/Ariadne",
+      "revision": "4400d0548a66f53a3bf91fc9d1abf3c79948bb12",
+      "provider": "github",
+      "link_mode": "web"
+    }
+  },
+  "components": [
+    {
+      "id": "web-store",
+      "type": "database",
+      "label": "浏览器内容库",
+      "sublabel": "IndexedDB · Markdown 文档",
+      "pos": [
+        40,
+        110
+      ],
+      "size": [
+        218,
+        82
+      ],
+      "sources": [
+        {
+          "path": "public/content-database.js"
+        }
+      ]
+    },
+    {
+      "id": "web-ui",
+      "type": "frontend",
+      "label": "网页工作台",
+      "sublabel": "Cloudflare Pages · 共用前端",
+      "pos": [
+        355,
+        110
+      ],
+      "size": [
+        218,
+        82
+      ],
+      "sources": [
+        {
+          "path": "deploy/cloudflare/pages-worker.js"
+        }
+      ]
+    },
+    {
+      "id": "web-api",
+      "type": "cloud",
+      "label": "网页 API",
+      "sublabel": "Cloudflare Python Worker",
+      "pos": [
+        670,
+        110
+      ],
+      "size": [
+        218,
+        82
+      ],
+      "sources": [
+        {
+          "path": "deploy/cloudflare/worker.py"
+        }
+      ],
+      "brand": "cloudflare"
+    },
+    {
+      "id": "providers",
+      "type": "external",
+      "label": "多模态模型",
+      "sublabel": "用户 API Key · BYOK",
+      "pos": [
+        985,
+        110
+      ],
+      "size": [
+        218,
+        82
+      ],
+      "sources": [
+        {
+          "path": "src/byok_providers.py"
+        }
+      ]
+    },
+    {
+      "id": "local-store",
+      "type": "database",
+      "label": "本地内容库",
+      "sublabel": "原始文件 · Markdown · 版本",
+      "pos": [
+        40,
+        365
+      ],
+      "size": [
+        218,
+        82
+      ],
+      "sources": [
+        {
+          "path": "src/workspace_storage.py"
+        }
+      ]
+    },
+    {
+      "id": "app",
+      "type": "frontend",
+      "label": "macOS App",
+      "sublabel": "AppKit + WKWebView",
+      "pos": [
+        355,
+        365
+      ],
+      "size": [
+        218,
+        82
+      ],
+      "sources": [
+        {
+          "path": "scripts/desktop_macos.swift"
+        }
+      ]
+    },
+    {
+      "id": "local-api",
+      "type": "backend",
+      "label": "本地 Python 服务",
+      "sublabel": "127.0.0.1 · 随 App 启停",
+      "pos": [
+        670,
+        365
+      ],
+      "size": [
+        218,
+        82
+      ],
+      "sources": [
+        {
+          "path": "scripts/local_package.py"
+        }
+      ]
+    },
+    {
+      "id": "codex",
+      "type": "external",
+      "label": "本机 Codex",
+      "sublabel": "个人登录 · 受限领域调用",
+      "pos": [
+        985,
+        365
+      ],
+      "size": [
+        218,
+        82
+      ],
+      "sources": [
+        {
+          "path": "scripts/run_codex_connector.py"
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "web-save",
+      "from": "web-ui",
+      "to": "web-store",
+      "label": "显式保存",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "web-request",
+      "from": "web-ui",
+      "to": "web-api",
+      "label": "领域请求",
+      "variant": "emphasis"
+    },
+    {
+      "id": "web-model",
+      "from": "web-api",
+      "to": "providers",
+      "label": "确认传输",
+      "variant": "security"
+    },
+    {
+      "id": "local-save",
+      "from": "local-api",
+      "to": "local-store",
+      "label": "版本写入",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "route": "auto"
+    },
+    {
+      "id": "app-request",
+      "from": "app",
+      "to": "local-api",
+      "label": "领域请求",
+      "variant": "emphasis"
+    },
+    {
+      "id": "local-model",
+      "from": "local-api",
+      "to": "providers",
+      "label": "BYOK",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "route": "orthogonal-v"
+    },
+    {
+      "id": "local-codex",
+      "from": "local-api",
+      "to": "codex",
+      "label": "可选",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "相同的产品边界",
+      "items": [
+        "Candidate 与 Job 分开理解、分别版本化",
+        "模型先生成 Working；用户保存才成为确认版本"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "相同的执行约束",
+      "items": [
+        "Local 仅保存原件，模型调用为零",
+        "Model 须通过图片 / 视觉 PDF 能力与传输确认"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "不同的运行与存储位置",
+      "items": [
+        "网页与 App 内容库独立；不会自动互相同步",
+        "网页版可另行配对本机 Codex；凭据保留在本机"
+      ]
+    }
+  ]
+}

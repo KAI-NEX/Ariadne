@@ -6,6 +6,31 @@
 
 [English README](README.md) · [架构演进图](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.html) · [完整项目经历](PROJECT_HISTORY.md) · [运行时契约](docs/current/ARIADNE_RUNTIME_EXECUTION_CONTRACT.md) · [Codex 连接器](docs/current/CODEX_RUNTIME_CONNECTOR.md)
 
+## 开始使用
+
+[打开网页版](https://ariadne.kai-nex.com/) · [官网下载页](https://ariadne.kai-nex.com/download.html) · [直接下载 macOS App ZIP](https://github.com/KAI-NEX/Ariadne/releases/download/local-20260918-172135/Ariadne-Local-macOS-arm64-20260918-172135.zip) · [Release 与 SHA-256 校验文件](https://github.com/KAI-NEX/Ariadne/releases/tag/local-20260918-172135)
+
+### 安装本地 App
+
+**Apple 芯片 Mac · macOS 14+ · 无需安装 Python、Node.js，也不需要 Apple Developer 账户。** 当前为早期预览版，只在构建电脑上完成验收，尚未覆盖全部兼容系统；暂不提供 Intel Mac 和 Windows 安装包。
+
+1. 下载 **`Ariadne-Local-macOS-arm64-20260918-172135.zip`**（约 109 MiB）。在 GitHub Release 页展开 **Assets**，选择这个 ZIP；自动生成的 **Source code** 是源码，不是 App 安装包。
+2. 解压，将 **Ariadne.app** 拖入「应用程序」，双击打开。在 Dock 图标上右键 →「选项 → 在程序坞中保留」，以后即可点击启动。
+3. 选择「本地运行」先保存原始资料，或填写自己的 API Key 连接已支持的模型。如需 Codex，可从 Mac 菜单「Ariadne → 登录 Codex…」完成官方登录。
+4. 关闭最后一个 App 窗口或按 **⌘Q**，会停止此 App 启动的本地服务；最小化不会停止。再次打开时，已保存资料仍保留。
+
+当前 App 仅使用 ad-hoc 签名，**尚未经过 Apple 公证**。若首次打开被 macOS 阻止，核对发布来源和校验值后，按「系统设置 → 隐私与安全性 → 仍要打开」的提示操作；无需开发者账户或关闭系统安全保护。另一台 Mac 首次下载后的流程尚未实机验收。
+
+本地资料保存在 `~/Library/Application Support/Ariadne Local/data`。公开网页版与 App 的资料库、连接设置独立，不会自动同步；模型分析需使用你自己的连接，并先确认资料传输。详见[完整安装与数据说明](docs/current/LOCAL_DISTRIBUTION.md)。
+
+## 当前架构
+
+网页版与 Mac App 复用 Candidate/Job 产品逻辑。网页版把资料保存在浏览器 IndexedDB，经 Cloudflare Worker 发起模型请求；Mac App 管理本机 Python 服务和磁盘内容库。两种方式都保留来源，模型提案只有在用户明确保存后才成为确认版本。
+
+[![Ariadne 当前架构：网页版与 macOS App](docs/architecture/archify/2026-09-19-current/ariadne.png)](docs/architecture/archify/2026-09-19-current/ariadne.png)
+
+[可交互 Archify 架构图](docs/architecture/archify/2026-09-19-current/ariadne.html) · [可编辑源文件](docs/architecture/archify/2026-09-19-current/ariadne.architecture.json) · [验收记录](docs/architecture/archify/2026-09-19-current/review.json)。下载 HTML 后本地打开，可缩放、查看源码依据、切换深浅色和导出；GitHub 本身会把 HTML 显示为源码。
+
 ## 它解决什么问题
 
 多数 AI 职业工具优化文字；Ariadne 保护判断。
@@ -128,7 +153,7 @@ Ariadne 可以成为这些工作流的前置层：先形成经本人审阅、有
 
 所以现在的简化并不是“什么边界都不要，只随便放一个简历文件”，而是：**一份内容正文，多种受控视图，一个明确的人工确认边界**。完整证据和实现细节见[可交互 Archify 架构图](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.html)、[完整项目经历](PROJECT_HISTORY.md)及[统一 Markdown 存储契约](docs/current/MARKDOWN_CONTENT_STORAGE.md)。
 
-## 本机启动
+## 从源码启动（开发者）
 
 需要 Python 3.11+；运行回归还需要 Node.js 20+。完整文档路径目前以 macOS 验收为准；部分本地 PDF/OCR 依赖 Swift、PDFKit、Vision 及 Poppler 的 `pdftoppm`。
 
@@ -156,6 +181,6 @@ python3 scripts/check_vi.py
 python3 scripts/check_public_release.py
 ```
 
-这是早期的开源预览版，不是已部署的公共 Web 应用。模型输出需要审阅；测试通过不保证所有真实资料都能被正确理解。
+这是早期的开源预览版，现已提供[公开网页版](https://ariadne.kai-nex.com/)和 macOS App 安装包。模型输出需要审阅；测试通过不保证所有真实资料都能被正确理解。
 
 [贡献指南](CONTRIBUTING.md) · [安全边界](SECURITY.md) · [发布记录](CHANGELOG.md) · [MIT License](LICENSE) · [当前状态](PROJECT_STATUS.md) · [项目约束](PROJECT_CONTEXT.md)

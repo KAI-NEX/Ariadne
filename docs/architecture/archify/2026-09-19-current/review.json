@@ -1,0 +1,22 @@
+{
+  "diagram_type": "architecture",
+  "output": "/Users/kai/Documents/GitKaiNex/Ariadne/docs/architecture/archify/2026-09-19-current/ariadne.html",
+  "specification_sha256": "bfcfe83d521ac7d3898fd4696b1fe75bbbcf1e42abcd85092b0f33f146e59e99",
+  "artifact_sha256": "4ef534150523221d4181a9588724691468847c4f0ae07eb54c837263d53c4b29",
+  "validation": "9/9 showcase, 0 errors, 0 warnings",
+  "browser_evidence": "passed",
+  "visual_review": "passed",
+  "correction_rounds": 1,
+  "manual_review": {
+    "browser": "Ego Lite task space 10",
+    "observations": [
+      "Light 1440x900 and dark 2048x1320 screenshot review: nodes, labels, routes and cards are legible and unobstructed.",
+      "PNG exported through the delivered viewer in Ego Lite; inspected for clean output without viewer controls.",
+      "Automated four-viewport containment passed; artifact was not modified after delivery."
+    ]
+  },
+  "export": {
+    "path": "ariadne.png",
+    "sha256": "799cbe6992720de0f90d9b6de9eece4753ac1e042d7789e378fc2de0a7a8d744"
+  }
+}

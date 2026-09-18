@@ -1,5 +1,11 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-19 — README 安装入口与当前架构图（COMPLETE）
+
+- 中英文 README 首屏加入公开网页、官网下载页、macOS App ZIP 与 Release 校验文件入口；说明 Assets 中正确 ZIP、Applications 安装、Dock 固定、可选 Codex 登录、关闭最后窗口停止服务及资料保留。区分普通用户安装与开发者源码启动，修正“尚无公开网页版”的过期说明；保留未公证、兼容系统未全覆盖及网页/App 不自动同步的实际边界。
+- 新增 `docs/architecture/archify/2026-09-19-current/`：Archify architecture 源文件、交互 HTML、供 README 展示的干净 PNG、交付回执和浏览器证据。图以 `4400d05` 为证据基线，绑定 8 个已核实源码入口，展示网页 IndexedDB/Worker、本机 App/Python/文件库、BYOK 与 Codex，并说明分域、传输确认和人工保存边界。
+- Archify showcase 9/9、0 error、0 warning；四种桌面尺寸（1440×900 至 2048×1320）自动浏览器验收通过。egolite 实际打开并导出 PNG，检查浅色/深色截图与导出可读性；完整 artifact/specification SHA-256 见 delivery.json/review.json。README 本地链接、公开 Release/ZIP、VI、公开文件与 diff 检查通过。本轮只更新文档和架构图，没有执行真实模型调用或变更 App/网站运行代码。
+
 ## 2026-09-19 — 新版 macOS App 公开下载与 GitHub 同步（COMPLETE；已上线）
 
 - 按用户明确要求，发布双手图标的独立窗口 App，并将下载页、首页 Codex 入口和连接页改为 App 安装流程：解压拖入「应用程序」、Dock 固定、菜单登录 Codex、关闭最后窗口或 ⌘Q 停止；说明无需 Apple Developer 账户及未公证首次系统确认。本次包也包含同款网页 favicon 和更新的安装文案。

@@ -6,6 +6,31 @@
 
 [中文说明](README.zh-CN.md) · [Architecture evolution](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.en.html) · [Project history](PROJECT_HISTORY.md) · [Runtime contract](docs/current/ARIADNE_RUNTIME_EXECUTION_CONTRACT.md) · [Codex connector](docs/current/CODEX_RUNTIME_CONNECTOR.md)
 
+## Try Ariadne
+
+[Open the web app](https://ariadne.kai-nex.com/) · [Download page](https://ariadne.kai-nex.com/download.html) · [Download macOS App ZIP](https://github.com/KAI-NEX/Ariadne/releases/download/local-20260918-172135/Ariadne-Local-macOS-arm64-20260918-172135.zip) · [Release & SHA-256](https://github.com/KAI-NEX/Ariadne/releases/tag/local-20260918-172135)
+
+### Install the macOS App
+
+**Apple Silicon · macOS 14+ · no Python, Node.js, or Apple Developer account required.** The current App is an early preview; compatibility has been tested on the build Mac, not every supported macOS version. Intel Mac and Windows packages are not available yet.
+
+1. Download **`Ariadne-Local-macOS-arm64-20260918-172135.zip`** (about 109 MiB). On GitHub Releases, choose this ZIP under **Assets**, rather than the automatically generated **Source code** archives.
+2. Extract the ZIP, drag **Ariadne.app** into **Applications**, and double-click it. To keep it in the Dock, right-click its Dock icon → **Options → Keep in Dock**.
+3. Choose **Local** to keep original materials without model calls, or connect a supported model with your own API key. For optional Codex access, use **Ariadne → 登录 Codex…** in the Mac menu bar and complete the official sign-in flow.
+4. Closing the last App window or pressing **⌘Q** stops the local service started by that App. Minimizing keeps it running; saved materials remain available next time.
+
+The App uses an ad-hoc signature and is **not notarized**. If macOS blocks the first launch, verify the release and checksum, then follow **System Settings → Privacy & Security → Open Anyway**. You do not need an Apple Developer account or to disable system security. First-download behavior on another Mac has not yet been verified.
+
+Local data lives in `~/Library/Application Support/Ariadne Local/data`. The hosted web app and native App have separate workspaces and connection settings; they do not automatically sync. Model analysis requires your own connection and explicit transmission consent. See the [full installation and data guide](docs/current/LOCAL_DISTRIBUTION.md).
+
+## Current architecture
+
+The same Candidate/Job product runs in a browser or a native Mac window. The web app stores documents in IndexedDB and sends model requests through a Cloudflare Worker; the Mac App owns a loopback Python service and a local file repository. Both preserve sources and require explicit human save before confirming model proposals.
+
+[![Ariadne current architecture: web and macOS runtimes](docs/architecture/archify/2026-09-19-current/ariadne.png)](docs/architecture/archify/2026-09-19-current/ariadne.png)
+
+[Interactive Archify diagram](docs/architecture/archify/2026-09-19-current/ariadne.html) · [Editable specification](docs/architecture/archify/2026-09-19-current/ariadne.architecture.json) · [Validation receipt](docs/architecture/archify/2026-09-19-current/review.json). Download the HTML and open it locally for zoom, source links, light/dark themes, and export; GitHub displays HTML as source. Diagram labels are in Chinese.
+
 ## Why Ariadne
 
 Most AI career tools optimize text. Ariadne is built to protect judgment.
@@ -128,7 +153,7 @@ The simplified runtime exposed a remaining problem in the original local storage
 
 The result is deliberately smaller, not boundary-free: **one content body, several controlled views, and one explicit confirmation boundary**. Read the [interactive Archify diagram](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.en.html), the [full project history](PROJECT_HISTORY.md), and the [Markdown storage contract](docs/current/MARKDOWN_CONTENT_STORAGE.md) for evidence and implementation details.
 
-## Run locally
+## Run from source (developers)
 
 Requirements:
 
@@ -171,6 +196,6 @@ python3 scripts/check_public_release.py
 
 ## Project status and contribution
 
-This is an early open-source preview, not a hosted public web application. Model output must be reviewed; passing tests does not guarantee correct interpretation of every real document. Full document-path verification currently focuses on macOS.
+Ariadne is an early open-source preview with a [hosted web app](https://ariadne.kai-nex.com/) and a downloadable macOS App. Model output must be reviewed; passing tests does not guarantee correct interpretation of every real document. Full document-path verification currently focuses on macOS.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CHANGELOG.md](CHANGELOG.md), and the [MIT License](LICENSE). For current implementation status, read [PROJECT_STATUS.md](PROJECT_STATUS.md); for stable product constraints, read [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).

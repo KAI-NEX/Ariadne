@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/Users/kai/Documents/GitKaiNex/Ariadne/docs/architecture/archify/2026-09-19-current/ariadne.architecture.json",
+  "output": "/Users/kai/Documents/GitKaiNex/Ariadne/docs/architecture/archify/2026-09-19-current/ariadne.html",
+  "specification": {
+    "sha256": "bfcfe83d521ac7d3898fd4696b1fe75bbbcf1e42abcd85092b0f33f146e59e99",
+    "bytes": 4999
+  },
+  "artifact": {
+    "sha256": "4ef534150523221d4181a9588724691468847c4f0ae07eb54c837263d53c4b29",
+    "bytes": 810353
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  },
+  "evidence": {
+    "verified": true,
+    "repository": "https://github.com/KAI-NEX/Ariadne",
+    "revision": "4400d0548a66f53a3bf91fc9d1abf3c79948bb12",
+    "references": 8
+  }
+}
