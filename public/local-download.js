@@ -15,7 +15,7 @@
     }
     const link = document.getElementById("local-download");
     link.href = release.url;
-    if (github) link.textContent = "从 GitHub 下载本地部署包";
+    if (github) link.textContent = "从 GitHub 下载 Ariadne App（ZIP）";
     link.classList.remove("hidden");
     status.textContent = `macOS 14+ · Apple 芯片 · ${(release.bytes / 1024 / 1024).toFixed(1)} MB · 本地测试版`;
     document.getElementById("local-download-hash").textContent = `SHA-256：${release.sha256}`;

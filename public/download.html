@@ -15,22 +15,22 @@
     <section class="runtime-connect-shell vi-span-12">
       <a class="runtime-back-link" href="/">返回运行选择</a>
       <p class="runtime-step">Ariadne · 本地版</p>
-      <h1>解压，启动，开始使用。</h1>
-      <p class="runtime-connect-copy">完整的本地部署包，适用于 Apple 芯片 Mac。无需先安装 Python 或开发工具，也不需要安装 Apple App。你可以选择保存原件、使用 Codex 订阅，或连接已接入的 API 模型。</p>
-      <p><a id="local-download" class="runtime-back-link hidden" download>下载本地部署包</a></p>
+      <h1>下载 App，打开即用。</h1>
+      <p class="runtime-connect-copy">独立窗口的 Ariadne App，适用于 macOS 14 及以上的 Apple 芯片 Mac。无需预装 Python 或开发工具，也无需 Apple Developer 账户。可以先保存原件、使用自己的 Codex 订阅，或连接已接入的 API 模型。</p>
+      <p><a id="local-download" class="runtime-back-link hidden" download>下载 Ariadne App（ZIP）</a></p>
       <p id="local-download-status" class="runtime-message" role="status">正在检查可下载版本…</p>
       <p id="local-download-hash" class="runtime-connect-copy"></p>
       <ol class="runtime-connect-copy">
-        <li>解压下载文件，双击「启动 Ariadne.command」。首次自动安装，随后打开浏览器启动页。</li>
-        <li>在网页选择运行方式。使用 API 时无需登录 Codex；各模型以实际能力验证结果为准。</li>
-        <li>使用 Codex 订阅时，首次双击「登录 Codex.command」完成 ChatGPT 登录，再回网页选择 Codex。</li>
-        <li>以后双击启动即可。保持服务终端打开，按 Ctrl+C 停止；资料会保留。</li>
+        <li>解压 ZIP，将「Ariadne.app」拖入「应用程序」，双击打开。可以在 Dock 中选择「选项 → 在程序坞中保留」。</li>
+        <li>在 App 中选择运行方式，再点击继续。本地运行先保存原件；使用 API 时，在连接设置填写自己的 Key 并完成能力验证。</li>
+        <li>使用 Codex 订阅时，从 Mac 菜单「Ariadne → 登录 Codex…」完成 ChatGPT 登录，再回 App 选择 Codex。已有本机登录可以复用。</li>
+        <li>以后点击 App 即可启动。关闭最后一个窗口或按 ⌘Q 会停止本地服务；最小化保持运行，已保存资料保留。</li>
       </ol>
-      <p class="runtime-connect-copy">这是未公证的本地测试包。macOS 可能要求在「隐私与安全性」中确认打开；请核对来源与校验值。当前不提供 Windows 或 Intel Mac 版本。</p>
+      <p class="runtime-connect-copy">这是未经 Apple 公证的本地测试 App。首次打开若提示无法验证开发者，请核对来源与校验值，再按系统「设置 → 隐私与安全性」中的提示允许打开。无需关闭系统安全保护。当前不提供 Windows 或 Intel Mac 版本。</p>
       <p class="runtime-connect-copy">安装包不含你的资料和密钥，也不自动迁移旧开发版资料。端口已被其他版本使用时会提示先停止原服务。首次安装与更新均保留原文件。</p>
-      <p class="runtime-connect-copy">仅在使用公开网页版时，才需要「连接网页版.command」和配对码。本地运行无需配对。</p>
+      <p class="runtime-connect-copy">仅在连接公开网页版时才需要配对：在 Finder 右键 Ariadne.app →「显示包内容」→ Contents/Resources/runtime，运行「连接网页版.command」。本地 App 无需配对。</p>
     </section>
   </main>
-  <script src="/local-download.js"></script>
+  <script src="/local-download.js?v=desktop-app-1"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 {
-  "url": "https://github.com/KAI-NEX/Ariadne/releases/download/local-20260918-104410/Ariadne-Local-macOS-arm64-20260918-104410.zip",
-  "sha256": "2636abcf8b5ab85f2921bc4c557e0deb09f4c5bd0583793faa109d68b28ae6eb",
-  "bytes": 111601193,
-  "release": "20260918-104410",
+  "url": "https://github.com/KAI-NEX/Ariadne/releases/download/local-20260918-172135/Ariadne-Local-macOS-arm64-20260918-172135.zip",
+  "sha256": "e8d88429b9802537ec30e914263187abfafcee6e3b501d34ea59aa42d49918bd",
+  "bytes": 113908957,
+  "release": "20260918-172135",
   "platform": "macOS arm64"
 }

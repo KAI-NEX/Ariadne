@@ -80,6 +80,8 @@ api/node_modules/.bin/wrangler pages deploy pages --project-name ariadne --branc
 
 ## 6. 发布可下载的本地包
 
+2026-09-19 新版 App 发布配置：[20260918-172135](https://github.com/KAI-NEX/Ariadne/releases/tag/local-20260918-172135)，113,908,957 bytes，SHA-256 `e8d88429b9802537ec30e914263187abfafcee6e3b501d34ea59aa42d49918bd`。网页下载入口与安装步骤使用独立窗口 App（拖入「应用程序」、菜单登录 Codex、关闭窗口停止）；旧终端版 Release 保留为历史版本。实际发布验收见 PROJECT_STATUS 最新条目。
+
 2026-09-18 已发布 [Apple 芯片 Mac 安装包](https://github.com/KAI-NEX/Ariadne/releases/tag/local-20260918-104410)，版本 `20260918-104410`，111,601,193 bytes，SHA-256 `2636abcf8b5ab85f2921bc4c557e0deb09f4c5bd0583793faa109d68b28ae6eb`。公开下载信息保存在 [local-download.json](../../deploy/cloudflare/local-download.json)，普通页面更新默认沿用它，不要求本机留有 ZIP，也不会因为省略 `--download-url` 清空线上下载。
 
 当前本地 ZIP 超过 Pages 单文件 25 MiB 限制，不能塞进 Pages。网页 API 不依赖它，因此可以先上线网页。安装包适用范围仍为 **macOS 14+ / Apple 芯片**，不宣称支持 Windows 或 Intel。
