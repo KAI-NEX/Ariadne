@@ -238,8 +238,9 @@
       } catch (error) {
         if (currentAttempt !== attempt) return;
         const code = error.result?.error || error.message;
+        const platformMessage = globalThis.AriadneConnector?.errorCopy(error);
         state.phase = "FAILED";
-        state.error = ({ PROVIDER_PDF_PREPARATION_FAILED: "测试 PDF 未能完整转图，请检查服务端 PDF 工具后重试。",
+        state.error = platformMessage || ({ PROVIDER_PDF_PREPARATION_FAILED: "测试 PDF 未能完整转图，请检查服务端 PDF 工具后重试。",
           PROVIDER_VISUAL_CHECK_FAILED: "模型未完整通过两页读图与 JSON 验证，请重试或检查模型权限。",
           WEB_API_RUNTIME_UNAVAILABLE: "当前网站尚未提供此模型服务，请更新网站部署后重试。" })[code]
           || (error.result?.provider_http_status === 429 ? "服务额度或请求频率受限，请检查余额、配额后重试。" : "验证失败，请检查 API Key、服务地区、模型权限或稍后重试。");

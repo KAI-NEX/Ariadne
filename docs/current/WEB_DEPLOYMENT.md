@@ -1,5 +1,7 @@
 # Ariadne 网页部署
 
+> 2026-09-18 当前首选：[Cloudflare Pages + Python Workers](CLOUDFLARE_DEPLOYMENT.md)，用户自带 Key，网页免安装执行。本页以下描述原 Docker/WSGI 服务器部署路径，其 Poppler、请求上限和重启行为不代表 Cloudflare 预览；暂不购买服务器。
+
 目标入口：`https://ariadne.kai-nex.com`。2026-09-17 用户确认直接进入模型选择与应用；取代此前官网与 `web` 子域拆分方案。DNS 由腾讯管理，目前没有已选服务器。此文档与部署文件不表示已上线。第一次操作请按 [腾讯云逐步部署教程](WEB_FIRST_DEPLOY.md) 执行。
 
 ## 当前网站如何运行

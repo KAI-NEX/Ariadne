@@ -8,6 +8,7 @@ from pathlib import Path
 from src.ai_career_ingestion import AICareerIngestionError
 
 PUBLIC_PDF_LIMITS = ContextVar("ariadne_public_pdf_limits", default=False)
+PDF_RENDERER = ContextVar("ariadne_pdf_renderer", default=None)
 
 def render_complete_pdf_pages(pdf_bytes: bytes) -> list[tuple[str, bytes]]:
     """Render every original PDF page transiently for an account-enabled vision model.
@@ -15,6 +16,9 @@ def render_complete_pdf_pages(pdf_bytes: bytes) -> list[tuple[str, bytes]]:
     This is a transport adapter, not Local Mode entity extraction: no OCR text,
     DocumentBlock or CareerEntity is created before the provider response.
     """
+    renderer = PDF_RENDERER.get()
+    if renderer is not None:
+        return renderer(pdf_bytes)
     with tempfile.TemporaryDirectory(prefix="job-radar-career-pages-") as directory:
         root = Path(directory)
         source = root / "source.pdf"

@@ -24,6 +24,11 @@ const valid = await render(release);
 assert.equal(valid.nodes['local-download'].href, release.url);
 assert.equal(valid.nodes['local-download'].hidden, false);
 assert.equal(valid.requests[1][1].method, 'HEAD');
+const remote = await render({...release, url: 'https://github.com/KAI-NEX/Ariadne/releases/download/v0.1/' + release.url.split('/').pop()});
+assert.equal(remote.nodes['local-download'].hidden, false);
+assert.equal(remote.requests.length, 1, 'GitHub release does not require a CORS-blocked HEAD request');
+const lookalike = await render({...release, url: 'https://github.com.evil.invalid/KAI-NEX/Ariadne/releases/download/v0.1/' + release.url.split('/').pop()});
+assert.equal(lookalike.nodes['local-download'].hidden, true);
 for (const [data, exists] of [[null, true], [release, false], [{ ...release, url: 'https://untrusted.invalid/payload.zip' }, true]]) {
   const result = await render(data, exists);
   assert.equal(result.nodes['local-download'].hidden, true);

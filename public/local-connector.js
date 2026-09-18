@@ -33,6 +33,12 @@
   function errorCopy(error) {
     const code = String(error?.code || error?.message || error || "");
     return ({ WEB_API_RUNTIME_UNAVAILABLE: "网站的 API 服务暂不可用，请稍后重试或使用本地版。",
+      WEB_PDF_SIZE_LIMIT: "网页预览版每份 PDF 最多 5 MB，更大的文件请使用本地版。",
+      WEB_PDF_PAGE_LIMIT: "网页预览版每份 PDF 最多 16 页，更长的文件请使用本地版。",
+      WEB_PDF_IMAGE_LIMIT: "这份 PDF 转图后超过网页预览容量，请使用本地版完整分析。",
+      WEB_PDF_COUNT_LIMIT: "网页预览版一次最多处理 4 份 PDF，请减少本次附件。",
+      WEB_PDF_PREPARATION_FAILED: "PDF 未能完整读取，请使用无密码且可正常打开的 PDF，或使用本地版。",
+      WEB_PREVIEW_REQUEST_SIZE_LIMIT: "本次材料超过网页预览容量，请减少文件数量，或使用本地版。",
       WEB_OWN_API_KEY_REQUIRED: "请先在连接设置中填写并验证你自己的 API Key。",
       WEB_SERVICE_BUSY: "网站正在处理其他请求，请稍后手动重试。",
       WEB_SESSION_BUSY: "本页已有请求正在处理，请等待完成。",
@@ -83,6 +89,10 @@
         if (!localOrigin()) {
           const service = await webRuntime();
           if (provider && !service.byok.includes(provider)) throw new Error("WEB_API_RUNTIME_UNAVAILABLE");
+          if (service.pdf_preparation === "browser_pdfjs_complete_pages_v1" && options.method === "POST" && typeof options.body === "string") {
+            const delivery = await import("/browser-pdf-delivery.js");
+            options = await delivery.prepareRequest(url.pathname, options, service, nativeFetch);
+          }
           if (typeof options.body === "string" && new Blob([options.body]).size > 41000000) throw new Error("WEB_REQUEST_SIZE_INVALID");
           headers.set("X-Ariadne-Web-Session", webSession());
         }

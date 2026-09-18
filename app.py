@@ -6,6 +6,7 @@ from src.runtime_binding import CODEX_MODEL, CODEX_CREDENTIAL, CODEX_PROTOCOL, B
 from src.codex_runtime import CodexTimeoutError, call_codex
 from src.byok_providers import BROWSER_REFERENCES, PROVIDERS as BYOK_PROVIDERS, RequestCredential, call_provider, valid_key, visual_check_payload, visual_check_passed
 from src.pdf_delivery import render_complete_pdf_pages
+from src.runtime_transport import PROVIDER_HTTP_OPEN
 from src.conversation_attachments import CONTRACT as ATTACHMENTS_CONTRACT, REQUEST_LIMIT as ATTACHMENTS_REQUEST_LIMIT
 
 import json
@@ -367,6 +368,10 @@ def call_ariadne_model(credential: str, payload: dict, *, response_limit: int) -
     return call_deepseek_chat_completions(credential, payload, response_limit=response_limit)
 
 
+def provider_urlopen(request, *, timeout):
+    return (PROVIDER_HTTP_OPEN.get() or urlopen)(request, timeout=timeout)
+
+
 def call_deepseek_chat_completions(api_key: str, payload: dict, *, response_limit: int, timeout: int = 240) -> tuple[int, dict]:
     """Shared fixed-endpoint transport; callers own operation-specific normalization."""
     request = Request(
@@ -375,7 +380,7 @@ def call_deepseek_chat_completions(api_key: str, payload: dict, *, response_limi
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         method="POST",
     )
-    with urlopen(request, timeout=timeout) as response:  # noqa: S310 - fixed Provider endpoint
+    with provider_urlopen(request, timeout=timeout) as response:  # fixed Provider endpoint
         response_body = response.read(response_limit + 1)
         if len(response_body) > response_limit:
             raise ValueError("provider_response_too_large")
@@ -391,7 +396,7 @@ def deepseek_runtime_models(api_key: str | None = None) -> dict:
     if not api_key:
         return {"ok": False, "status": HTTPStatus.PRECONDITION_REQUIRED, "error": "deepseek_key_not_configured", "failure_layer": "credential", "network_call_made": False}
     try:
-        with urlopen(Request(DEEPSEEK_MODELS_ENDPOINT, headers={"Authorization": f"Bearer {api_key}"}), timeout=30) as response:  # noqa: S310
+        with provider_urlopen(Request(DEEPSEEK_MODELS_ENDPOINT, headers={"Authorization": f"Bearer {api_key}"}), timeout=30) as response:
             listing = json.loads(response.read(1_000_000).decode("utf-8"))
         models = [str(item.get("id")) for item in listing.get("data") or [] if isinstance(item, dict) and item.get("id")]
         if not models:
@@ -463,7 +468,7 @@ def deepseek_runtime_connection_check(model: str, synthetic_image_data_url: str 
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     try:
         request = Request(test_request.endpoint, data=json.dumps(test_request.payload).encode("utf-8"), headers=headers, method="POST")
-        with urlopen(request, timeout=60) as response:  # noqa: S310 - fixed official provider endpoint
+        with provider_urlopen(request, timeout=60) as response:  # fixed official provider endpoint
             result = json.loads(response.read(1_000_000).decode("utf-8"))
         normalized = normalize_response(test_request.protocol, result)
         if synthetic_image_data_url and not multimodal_smoke_passed(normalized.text):

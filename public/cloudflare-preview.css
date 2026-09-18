@@ -1,0 +1,11 @@
+.cloudflare-preview-notice {
+  color: var(--vi-text-secondary);
+  font-size: var(--vi-text-caption);
+  line-height: var(--vi-leading-body);
+  margin: var(--vi-space-12) 0;
+}
+.cloudflare-preview-notice a { color: var(--vi-ink); }
+.runtime-page:not(.runtime-connect-page) .cloudflare-preview-notice {
+  text-align: center;
+  max-width: 100%;
+}

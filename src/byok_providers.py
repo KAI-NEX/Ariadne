@@ -8,6 +8,7 @@ import copy
 import json
 from urllib.error import HTTPError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
+from src.runtime_transport import PROVIDER_HTTP_OPEN
 
 PROVIDERS = {
     "gemini": {"model": "gemini-3.7-flash", "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"},
@@ -55,7 +56,7 @@ def call_provider(credential, payload, *, response_limit, timeout=240):
     request = Request(PROVIDERS[credential.provider]["endpoint"],
                       data=json.dumps(body, ensure_ascii=False).encode(),
                       headers={"Authorization": f"Bearer {credential.key}", "Content-Type": "application/json"}, method="POST")
-    with HTTP.open(request, timeout=timeout) as response:
+    with (PROVIDER_HTTP_OPEN.get() or HTTP.open)(request, timeout=timeout) as response:
         raw = response.read(response_limit + 1)
         if len(raw) > response_limit:
             raise ValueError("PROVIDER_RESPONSE_TOO_LARGE")

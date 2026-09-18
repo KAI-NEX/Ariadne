@@ -1,5 +1,7 @@
 # 第一次部署 Ariadne：腾讯云 + ariadne.kai-nex.com
 
+> 2026-09-18 新决定：先不购买服务器，使用 [Cloudflare Pages + Workers 免费部署](CLOUDFLARE_DEPLOYMENT.md)。下文保留为自有服务器的备选方法，本轮无需购买。
+
 更新：2026-09-18。目标网址为 **https://ariadne.kai-nex.com**，直接显示模型选择页。当前只完成可部署代码和本机验证，没有购买服务器或修改腾讯 DNS。
 
 下面以新建的 **腾讯云轻量应用服务器、新加坡、Ubuntu 24.04** 为例。新加坡在 [Gemini 官方支持地区](https://ai.google.dev/gemini-api/docs/available-regions) 中；这不替代用户账号资格、配额及实际调用验证。若使用其他云厂商，同样可部署 Docker 包，域名继续留在腾讯解析。

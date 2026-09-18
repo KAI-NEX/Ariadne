@@ -1,0 +1,15 @@
+{
+  "name": "ariadne-api",
+  "main": "runtime/worker.py",
+  "compatibility_date": "2026-09-18",
+  "compatibility_flags": ["python_workers"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "find_additional_modules": true,
+  "rules": [
+    {"type": "Data", "globs": ["data/**/*.json", "public/**/*.json", "public/**/*.pdf", "public/job-radar-multimodal-smoke.jpg"], "fallthrough": true}
+  ],
+  "vars": {"ARIADNE_WEB_ORIGINS": "https://ariadne.kai-nex.com"},
+  "durable_objects": {"bindings": [{"name": "EXECUTIONS", "class_name": "ExecutionSession"}]},
+  "migrations": [{"tag": "v1", "new_sqlite_classes": ["ExecutionSession"]}]
+}

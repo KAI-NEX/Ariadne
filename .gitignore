@@ -43,6 +43,7 @@ apikey.txt
 # Local dependencies, tests, coverage, and editor artifacts
 .pytest_cache/
 node_modules/
+.wrangler/
 .npm/
 .coverage
 .coverage.*

@@ -1,5 +1,16 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-18 — Cloudflare 网页免安装 BYOK（IMPLEMENTATION COMPLETE；未公网部署）
+
+- 用户明确网页也必须免安装调用自己的 API Key；采用 Pages + Python Worker，DNS 继续腾讯，正式入口 `https://ariadne.kai-nex.com`。使用 [Cloudflare 逐步部署](docs/current/CLOUDFLARE_DEPLOYMENT.md)，无须购买 VPS。原腾讯/Docker 教程保留并标为备选，不把纯静态预览冒充可执行 API。
+- Pages 导出保留每次先选模型，增加预览与下载说明；六个领域复用现有 Python 校验/模型处理/人工保存规则。通过 request-local HTTP/PDF hook 适配 workerd，不更换框架或应用模型。PDF.js 按需完整逐页转图；Worker 用原件 hash、pypdf 页数、有序图像 hash 核对交付。预览每份 PDF 5 MiB、16 页、图像 6 MiB，完整请求 12 MiB；本地上限不变。
+- 每个来源/浏览器会话/Provider/Key 摘要隔离 Durable Object，最多 2 个并发、256 个持久操作摘要；仅持久写入 hash，不保存 Key、原件或模型正文。实例缓存丢失后同操作返回 409、内容改变返回冲突，不能自动重复付费。原件、资料和确认版本保存在当前浏览器；Codex 仍走本机登录与配对。
+- 真实 workerd + Pages Service Binding 使用既有 DeepSeek Key，仅发送合成固定图片和两页虚构简历；连接 215 tokens，资料分析 3,950 tokens，`deepseek-flash` 返回 3 条有来源的 `NEEDS_REVIEW` 资料，完整交付 2 页/2 图。重复同请求返回相同结果；无效 Key 返回 Provider 401，模拟实例重载后的摘要拒绝重放/内容冲突均未发起模型调用。没有使用私人简历；Gemini/千问只保留原离线回归与用户连接验证，未宣称真实账号通过。
+- 110/110 离线回归、PDF 真实解析检查、VI、公开文件扫描与 diff 检查通过。新回归覆盖完整/缺页/顺序/hash/来源隔离、缺失服务绑定、请求体限制与 GitHub 下载 URL。pywrangler 官方部署 dry-run 通过，部署源码与 Python 依赖隔离目录，Worker 压缩约 488 KiB，避免把部署虚拟环境打包。
+- egolite 真实 Pages 页面验证桌面/390×844 手机选择入口、无效 Key、浏览器两页 PDF 渲染、Local 原件保存/刷新恢复、根入口再次先选模型。修复 Pages `X-Frame-Options: DENY` 拦住同站导入弹窗，改 SAMEORIGIN；预览说明不重复插入嵌入弹窗。截图、合成材料、失败尝试和运行证据留在 `.cache/pages-preview-20260918/`。Cloudflare 公网 CPU/配额、真实 TLS、跨地区 API 与公网 Codex 配对仍待上线后验收。
+- 发布目录 `.cache/cloudflare-distribution/20260918-151649/`，包含 340 个 Pages 文件、2.69 MiB 页面 ZIP、API 源码/锁文件与部署说明；417 个文件 hash 核对通过，不含私人数据或本地大 ZIP。下载地址未发布，网页诚实显示尚无安装包；教程说明公开 GitHub Release 上传并用实际 URL 重建。
+- 新本地包 `.cache/local-distribution/20260918-071241/Ariadne-Local-macOS-arm64-20260918-071241.zip`，SHA-256 `f30d7e814272536ad7673fabbf82cea9e010e561e3faf78ab6d177da2a109e27`；在独立目录安装启动、版本端点、关键源码/hash 核对通过。未修改原有私人工作区、购买资源、变更 DNS、推送或公网发布；旧文件与无关未提交改动保留。
+
 
 ## 2026-09-18 — Gemini / 千问完整接入与逐步部署教程（IMPLEMENTATION COMPLETE；真实账号及公网待验收）
 
