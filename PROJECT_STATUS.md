@@ -1,5 +1,12 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-18 — 蓝色下载链接与本地安装包公开下载（COMPLETE；已上线）
+
+- 用户反馈正式网站 Codex 浮窗下载链接为黑色、下载页提示没有安装包。下载链接改用既有 VI 交互蓝；此前 ZIP 仅保存在本机且 Pages 下载 metadata 为 `available:false`，现已发布到 [GitHub Release](https://github.com/KAI-NEX/Ariadne/releases/tag/local-20260918-104410)。包版本 `20260918-104410`，111,601,193 bytes，SHA-256 `2636abcf8b5ab85f2921bc4c557e0deb09f4c5bd0583793faa109d68b28ae6eb`。
+- Pages 发布 `74a4f791`，对比上一正式发布仅变更首页、样式和下载元数据三个文件；正式 [下载页](https://ariadne.kai-nex.com/download.html) 已提供真实 ZIP 链接。新增版本控制的 `deploy/cloudflare/local-download.json`，普通网页构建沿用已发布下载，不再因省略参数或缺少本地 ZIP 清空入口；更换包时仍要求名称、大小及 hash 相同。API Worker 未重新部署。
+- 从 ZIP 解压后 1,177 个文件 checksum 一致，无私人数据或凭据；隔离目录独立安装/启动、重复启动复用、自带 Codex 版本及完整两页 PDF 转图通过。egolite 在正式网站验证 1280×900/390×844 蓝色链接、实际点击打开下载页，无横向溢出与相关错误；浏览器实际下载的完整 ZIP 与原包 hash/大小一致，压缩完整性通过。安装器、下载状态、Cloudflare 下载配置/路由回归及 VI/公开文件/diff 检查通过。
+- 证据保存在 `.cache/local-download-publish-20260918/`，源码分发包在 `.cache/local-distribution/20260918-104410/`，Pages 包在 `.cache/cloudflare-distribution/20260918-local-download-public/`。仅支持 macOS 14+ Apple 芯片，仍未公证、未做全新电脑/Gatekeeper 或全部 macOS 版本验收。未调用模型或更改用户资料；公开的是安装包及校验文件，未推送本机分支或纳入其他任务未提交内容。
+
 ## 2026-09-18 — 移除网页全局预览提示（COMPLETE；已上线）
 
 - 按用户要求，Cloudflare 导出不再向页面注入“网页预览 · 自带 API Key · 资料保存在当前浏览器 · 下载本地版”提示行。原提示源码与旧发布包保留；模型连接、传输确认、资料保存和独立下载入口不变。

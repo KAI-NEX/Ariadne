@@ -80,6 +80,8 @@ api/node_modules/.bin/wrangler pages deploy pages --project-name ariadne --branc
 
 ## 6. 发布可下载的本地包
 
+2026-09-18 已发布 [Apple 芯片 Mac 安装包](https://github.com/KAI-NEX/Ariadne/releases/tag/local-20260918-104410)，版本 `20260918-104410`，111,601,193 bytes，SHA-256 `2636abcf8b5ab85f2921bc4c557e0deb09f4c5bd0583793faa109d68b28ae6eb`。公开下载信息保存在 [local-download.json](../../deploy/cloudflare/local-download.json)，普通页面更新默认沿用它，不要求本机留有 ZIP，也不会因为省略 `--download-url` 清空线上下载。
+
 当前本地 ZIP 超过 Pages 单文件 25 MiB 限制，不能塞进 Pages。网页 API 不依赖它，因此可以先上线网页。安装包适用范围仍为 **macOS 14+ / Apple 芯片**，不宣称支持 Windows 或 Intel。
 
 1. 在你的公开 GitHub 仓库创建 Release（可用公开的 Ariadne 仓库；如源码仓库是私有的，可自己新建仅存放下载的公开仓库）。不必为了放安装包公开私人源码或材料。
@@ -91,7 +93,7 @@ npm install --prefix .cache/cloudflare-build --save-exact pdfjs-dist@5.4.624
 python3 scripts/build_cloudflare_release.py --pdfjs .cache/cloudflare-build/node_modules/pdfjs-dist --download-url '这里换成刚发布的完整 GitHub 下载链接'
 ```
 
-构建器会核对本地 ZIP 文件名、大小和 SHA-256，然后更新新发布包的下载元数据。重新部署新 `pages/` 即可；API 代码未变时无需重复部署 Worker。未配置真实下载地址时，网站会诚实显示“尚未发布安装包”，不提供虚假的下载链接。[GitHub Release 资产说明](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases)。
+构建器会核对本地 ZIP 文件名、大小和 SHA-256，然后更新新发布包的下载元数据。替换安装包时，先发布并验证新资产，再将对应 URL、大小、hash 和版本写入 `deploy/cloudflare/local-download.json`，供后续构建默认使用。重新部署新 `pages/` 即可；API 代码未变时无需重复部署 Worker。没有已发布配置且未提供下载 URL 时，网站显示“尚未发布安装包”。[GitHub Release 资产说明](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases)。
 
 ## 实现与验收边界
 

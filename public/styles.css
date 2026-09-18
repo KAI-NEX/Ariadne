@@ -122,6 +122,7 @@ body { margin: 0; }
 .add-model-hint { color: #737a88; font-size: 12px; line-height: 1.55; margin: 9px 0 0; }
 .add-model-key-link { color: var(--vi-runtime-ink); cursor: pointer; display: inline-block; font-size: 13px; margin-top: 12px; opacity: .82; text-decoration: none; transition: opacity 180ms ease; }
 .add-model-key-link:hover, .add-model-key-link:focus-visible { opacity: 1; text-decoration: underline; }
+.add-model-key-link[href="/download.html"] { color: var(--vi-focus); opacity: 1; }
 .add-model-connect { align-items: center; background: var(--vi-runtime-action); border: 0; border-radius: 999px; color: var(--vi-surface); display: flex; font-size: 14px; font-weight: 600; justify-content: center; min-height: 48px; overflow: hidden; transform: scale(1); transition: box-shadow 220ms var(--vi-ease-standard), opacity 180ms ease, background-color 180ms ease, transform 180ms var(--vi-ease-standard); width: 100%; }
 .add-model-connect:not(:disabled):hover, .add-model-connect:not(:disabled):focus-visible { box-shadow: 0 12px 28px rgba(28,31,38,.2), 0 3px 8px rgba(28,31,38,.12); outline: 0; }
 .add-model-connect:not(:disabled):active { box-shadow: 0 5px 12px rgba(28,31,38,.14); transform: scale(.985); }

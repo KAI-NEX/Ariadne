@@ -27,8 +27,10 @@
 
 ## 构建与发布
 
+2026-09-18 公开下载：[下载页](https://ariadne.kai-nex.com/download.html) · [GitHub Release](https://github.com/KAI-NEX/Ariadne/releases/tag/local-20260918-104410)。安装包 `20260918-104410` 为 111,601,193 bytes，SHA-256 `2636abcf8b5ab85f2921bc4c557e0deb09f4c5bd0583793faa109d68b28ae6eb`。正式网页已上线；大型 ZIP 托管于 GitHub，Pages 只发布下载元数据。仍适用上述平台与未公证限制。
+
 `scripts/build_local_package.py --python <独立Python根目录> --codex-dir <已校验的Codex目录> --publish-local` 每次产生独立版本并保留旧产物；`public/downloads/latest.json` 指向本机可下载的 ZIP。大型 ZIP 与运行时不提交 Git；部署公开网站时需要另外发布 ZIP、校验文件和 metadata，未发布时页面明确显示尚无可下载版本。
 
 源代码通过 Git 跟踪文件的目录白名单收集，仅包含 app.py、src、public 和 data 中的公开契约；不复制运行数据。Codex 来源与官方发布 SHA-256 写入 release.json，Python 与 Codex 许可证随包保留。当前包的静态生成与本机验收不等于新电脑、公网下载或所有 Provider 的真实模型验收。
 
-本机与网页的后续发布边界见 [用户自带连接方向](LOCAL_AND_WEB_RUNTIME_DIRECTION.md)。公开网页已有独立执行入口与部署文件，但尚未托管；不能把下载版本机验收当作公网验收。见 [网页部署](WEB_DEPLOYMENT.md)。
+本机与网页的运行边界见 [用户自带连接方向](LOCAL_AND_WEB_RUNTIME_DIRECTION.md)。公开网页已通过 Cloudflare 托管，后续发布按 [Cloudflare 部署](CLOUDFLARE_DEPLOYMENT.md) 执行；[网页部署](WEB_DEPLOYMENT.md) 保留为原有服务器方案。

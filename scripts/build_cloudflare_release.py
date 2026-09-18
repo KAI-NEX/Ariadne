@@ -20,6 +20,28 @@ EXTRA = {"src/runtime_transport.py", "src/browser_pdf_delivery.py", "public/brow
 GITHUB = re.compile(r"https://github\.com/KAI-NEX/[A-Za-z0-9_.-]+/releases/download/[A-Za-z0-9_.-]+/(Ariadne-Local-macOS-arm64-[0-9-]+\.zip)")
 
 
+def download_metadata(download_url=None):
+    published = ROOT / "deploy/cloudflare/local-download.json"
+    if not download_url:
+        if not published.exists():
+            return {"available": False}
+        metadata = json.loads(published.read_text())
+    else:
+        metadata = json.loads((ROOT / "public/downloads/latest.json").read_text())
+        if not re.fullmatch(r"/downloads/Ariadne-Local-macOS-arm64-[0-9-]+\.zip", metadata["url"]):
+            raise ValueError("Invalid local download path")
+        archive = ROOT / "public" / metadata["url"].lstrip("/")
+        match = GITHUB.fullmatch(download_url)
+        if not match or match.group(1) != archive.name or archive.stat().st_size != metadata["bytes"] or hashlib.sha256(archive.read_bytes()).hexdigest() != metadata["sha256"]:
+            raise ValueError("Download URL or local package hash does not match")
+        metadata["url"] = download_url
+    if (not GITHUB.fullmatch(str(metadata.get("url", "")))
+        or not re.fullmatch(r"[a-f0-9]{64}", str(metadata.get("sha256", "")))
+        or type(metadata.get("bytes")) is not int or metadata["bytes"] <= 0):
+        raise ValueError("Invalid published download metadata")
+    return metadata
+
+
 def build(output, pdfjs, download_url=None):
     if json.loads((pdfjs / "package.json").read_text())["version"] != "5.4.624":
         raise ValueError("Expected reviewed pdfjs-dist 5.4.624")
@@ -77,16 +99,8 @@ def build(output, pdfjs, download_url=None):
     shutil.copyfile(ROOT / "docs/current/CLOUDFLARE_DEPLOYMENT.md", output / "部署说明.md")
     downloads = pages / "downloads"
     downloads.mkdir(exist_ok=True)
-    metadata = json.loads((ROOT / "public/downloads/latest.json").read_text())
-    if download_url:
-        match = GITHUB.fullmatch(download_url)
-        archive = ROOT / "public" / metadata["url"].lstrip("/")
-        if not match or match.group(1) != archive.name or archive.stat().st_size != metadata["bytes"] or hashlib.sha256(archive.read_bytes()).hexdigest() != metadata["sha256"]:
-            raise ValueError("Download URL or local package hash does not match")
-        metadata["url"] = download_url
-        (downloads / "latest.json").write_text(json.dumps(metadata))
-    else:
-        (downloads / "latest.json").write_text(json.dumps({"available": False}))
+    metadata = download_metadata(download_url)
+    (downloads / "latest.json").write_text(json.dumps(metadata))
     files = list(pages.rglob("*"))
     if sum(p.is_file() for p in files) > 1000 or any(p.is_file() and p.stat().st_size > 25 * 1024 * 1024 for p in files):
         raise ValueError("Cloudflare Pages upload limit exceeded")
@@ -95,13 +109,13 @@ def build(output, pdfjs, download_url=None):
         for path in files:
             if path.is_file(): z.write(path, str(path.relative_to(pages)))
     manifest = {"created_at": datetime.now().isoformat(), "origin": "https://ariadne.kai-nex.com",
-        "pages_archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(), "local_download_configured": bool(download_url),
+        "pages_archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(), "local_download_configured": bool(metadata.get("url")),
         "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "files": {str(p.relative_to(output)): hashlib.sha256(p.read_bytes()).hexdigest() for p in output.rglob("*") if p.is_file()},
         "deployed": False}
     (output / "release.json").write_text(json.dumps(manifest, indent=2))
     return {"directory": str(output), "pages_zip": str(archive), "pages_files": sum(p.is_file() for p in files),
-        "download_configured": bool(download_url), "worker_directory": str(worker)}
+        "download_configured": bool(metadata.get("url")), "worker_directory": str(worker)}
 
 
 if __name__ == "__main__":
