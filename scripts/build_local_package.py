@@ -101,16 +101,16 @@ fi
     subprocess.run(["swiftc", "-target", "arm64-apple-macos14.0", "-O",
                     str(ROOT / "scripts/desktop_macos.swift"), "-o", str(executable)], check=True)
     shutil.copy2(ROOT / "scripts/desktop_macos.swift", bundle / "desktop_macos.swift")
-    icon_builder = root / "build-icon"
-    subprocess.run(["swiftc", str(ROOT / "scripts/build_desktop_icon.swift"), "-o", str(icon_builder)], check=True)
-    iconset = root / "Ariadne.iconset"
-    subprocess.run([str(icon_builder), str(ROOT / "public/vi/manifest.json"), str(iconset)], check=True)
-    subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o",
-                    str(app_bundle / "Contents/Resources/Ariadne.icns")], check=True)
+    # Compile the layered Icon Composer document; actool supplies both modern
+    # Assets.car appearances and the compatibility ICNS for earlier macOS.
+    subprocess.run(["xcrun", "actool", "--compile", str(app_bundle / "Contents/Resources"),
+                    "--platform", "macosx", "--minimum-deployment-target", "14.0",
+                    "--app-icon", "Ariadne", "--output-partial-info-plist", str(root / "icon-info.plist"),
+                    str(ROOT / "assets/desktop-icon/Ariadne.icon")], check=True, stdout=subprocess.DEVNULL)
     (app_bundle / "Contents/Info.plist").write_bytes(plistlib.dumps({
         "CFBundleExecutable": "Ariadne", "CFBundleIdentifier": "com.kai-nex.ariadne.local",
         "CFBundleName": "Ariadne", "CFBundleDisplayName": "Ariadne · 衡",
-        "CFBundleIconFile": "Ariadne.icns",
+        "CFBundleIconFile": "Ariadne.icns", "CFBundleIconName": "Ariadne",
         "CFBundlePackageType": "APPL", "CFBundleShortVersionString": "1.0",
         "CFBundleVersion": release.replace("-", "."), "LSMinimumSystemVersion": "14.0",
         "NSHighResolutionCapable": True,

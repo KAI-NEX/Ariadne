@@ -1,5 +1,13 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-19 — 双手图标、Dock 安装与 egolite 资料同步（COMPLETE；本机）
+
+- 按用户提供的双手/连接线图像与 Apple WWDC25 361 制作独立 App 图标。原图及 imagegen 前景原地保留；`assets/desktop-icon/Ariadne.icon` 使用 1024 点画布、独立透明前景、系统背景与圆角；复杂纹理关闭前景 glass/specular，Default 保留黑白纹理，Dark/Mono 使用清晰轮廓。Apple `actool` 输出 Assets.car 与兼容 ICNS，默认/深色/染色实际渲染核对。Icon Composer 首次许可由用户明确同意后接受；GUI 菜单操作遇到工具错误，改用已安装的 Apple 编译工具完成。
+- 安装 `/Applications/Ariadne.app`，通过 Finder 固定至 Dock，并读取持久 Dock 项确认仅有该路径一个固定项。资料复制前核对 egolite origin/工作区 ID；源库锁内验证记录、原件和完整逐文件 SHA-256，共 410 文件、22 原件；主库 372 条记录、投递库 3 条、附件库 3 条。旧目录与全部历史保留，无覆盖、合并、Provider 调用或凭据复制。
+- 新增显式资料复制工具与本机 `desktop-workspace.json` 映射；目标已存在、原件损坏或 ID 非法时拒绝。映射仅为无现有资料身份的原生 profile 初始化同一工作区。复制后再次核对源未变化，停止已验证归属本仓库的开发服务 PID，再由 App 管理 8000；egolite 与 App 现在访问同一份 App 数据。两端实际显示 18 张资料卡片、5 个职位对象，原生截图与浏览器截图留存。API Key/模型连接仍各浏览器独立配置。
+- 5 项生命周期回归、4 项安装回归、资料复制边界回归、原有存储回归、VI/diff 检查通过；最终包 1178 个运行文件 hash、ZIP 完整性、安装前后 ad-hoc 签名和 Dock 固定验证通过。保留用户当前打开的 App；本轮未重做上一阶段全部关闭/重开 UI 测试，关闭行为由已有原生验收和本轮生命周期回归覆盖。
+- 最终版本 `20260918-170658`（UTC），产物 `.cache/local-distribution/20260918-170658/`，SHA-256 `ded10ae31c6ce92d4c33a5530ee4d5336696cedac60bea7cbb89058fb41b0b38`；证据 `.cache/desktop-install-20260919/`。不需要 Apple Developer 账户；仍为未公证 App，未验收其他电脑首次 Gatekeeper，未替换公网旧终端包、未 push。
+
 ## 2026-09-19 — 独立窗口 macOS App 与退出即停（COMPLETE；本机验收，未替换公网下载）
 
 - 按用户“像 App 一样点击打开、关闭就停止、安装后可用”的要求，将可分发包升级为 AppKit + WKWebView 的 `Ariadne.app`，自带现有 Python、Codex 和文档工具。每次打开进入运行选择；关闭最后一个窗口或 ⌘Q 停止本次服务和子进程，最小化保持运行。图标复用 VI 色彩和「衡」字标；网页业务界面、Provider/model、传输确认与人工保存边界不改。

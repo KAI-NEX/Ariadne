@@ -1,0 +1,12 @@
+# Ariadne macOS icon
+
+User supplied the two reaching hands and connecting thread on 2026-09-19.
+`reference.png` is preserved unchanged. `hands-foreground.png` is an edited raster foreground produced with the built-in `image_gen` tool, not the API/CLI.
+
+Design reference: [Create icons with Icon Composer, WWDC25 361](https://developer.apple.com/videos/play/wwdc2025/361/). Use a 1024 square canvas, separate foreground and background, and let Icon Composer supply the system mask and dynamic treatment. Complex etched/halftone detail is intentionally a single artwork layer, not many glass edges.
+
+Generation prompt:
+
+> Edit target: attached monochrome image of two reaching hands connected by a fine thread. Create the final foreground artwork for the Ariadne macOS app icon, preserving the exact concept and recognizable hand poses: organic engraved human hand entering from upper-left, digital halftone hand entering from right, both index fingers reach inward and are connected by one short subtle curved thread. Faithful elegant black-and-white editorial artwork, NOT a new symbol. Recompose onto a square 1024x1024 transparent canvas with generous negative space and the fingertip connection centered. Hands should occupy most of the middle 65% of canvas height, wrists reach left/right edges with bleed, fingers stay readable and separated. Simplify the fine engraving and halftone details to fewer, bolder clean shapes so recognizable at 32–64px. Retain a controlled amount of etched texture on the left and geometric pixel/halftone texture on the right, no noisy speckles. Flat opaque near-black foreground on genuinely transparent background, with negative spaces transparent. No white rectangle or rounded-corner tile, no icon mask, no glass effects, no baked shadows, no gradients, no 3D bevel, no frame, no letters, no extra objects. Source layer for Apple's Icon Composer: native system will supply background, rounded-square masking and highlights. Deliver a single square transparent PNG foreground layer.
+
+`Ariadne.icon` is the editable layered source. Its 1254px foreground is positioned at 1024/1254 scale on the system 1024 canvas. Default retains engraving; Dark and monochrome use a contrasting silhouette. The foreground has glass/specular disabled to avoid outlining every etched mark; the system background supplies its treatment. `actool` generates `Assets.car`, all platform appearances, and a backward-compatible ICNS. `build_desktop_icon.swift` remains a compatibility renderer; normal distribution builds now use the Composer document.

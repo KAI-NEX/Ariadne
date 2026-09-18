@@ -1,8 +1,7 @@
-// Render the compatibility ICNS from the user-selected artwork and VI paper color.
+// Generate the app icon from the existing VI palette and Chinese wordmark.
 import AppKit
 let manifestURL = URL(fileURLWithPath: CommandLine.arguments[1])
 let output = URL(fileURLWithPath: CommandLine.arguments[2])
-let artwork = NSImage(contentsOfFile: CommandLine.arguments[3])!
 let manifest = try JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as! [String: Any]
 let tokens = manifest["tokens"] as! [[String: Any]]
 func color(_ name: String) -> NSColor {
@@ -19,12 +18,12 @@ for base in [16, 32, 128, 256, 512] {
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
         let side = CGFloat(size)
-        let tile = NSRect(x: side * 0.06, y: side * 0.06, width: side * 0.88, height: side * 0.88)
-        let mask = NSBezierPath(roundedRect: tile, xRadius: side * 0.20, yRadius: side * 0.20)
-        color("--vi-surface").setFill()
-        mask.fill()
-        mask.addClip()
-        artwork.draw(in: tile, from: .zero, operation: .sourceOver, fraction: 1)
+        color("--vi-action").setFill()
+        NSBezierPath(roundedRect: NSRect(x: side * 0.06, y: side * 0.06, width: side * 0.88, height: side * 0.88), xRadius: side * 0.20, yRadius: side * 0.20).fill()
+        let mark = (manifest["brand"] as! [String: String])["zh"]! as NSString
+        let attributes: [NSAttributedString.Key: Any] = [.font: NSFont(name: "PingFangSC-Semibold", size: side * 0.55) ?? NSFont.systemFont(ofSize: side * 0.55, weight: .semibold), .foregroundColor: color("--vi-surface")]
+        let measured = mark.size(withAttributes: attributes)
+        mark.draw(at: NSPoint(x: (side - measured.width) / 2, y: (side - measured.height) / 2), withAttributes: attributes)
         NSGraphicsContext.restoreGraphicsState()
         let suffix = scale == 2 ? "@2x" : ""
         try bitmap.representation(using: .png, properties: [:])!.write(to: output.appendingPathComponent("icon_\(base)x\(base)\(suffix).png"))

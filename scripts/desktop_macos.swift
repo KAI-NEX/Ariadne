@@ -34,6 +34,7 @@ final class AriadneApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
                 origin = URL(string: "http://127.0.0.1:\(port)")!
             }
             #endif
+            try configureWorkspace(view.configuration)
             try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             if !FileManager.default.fileExists(atPath: logURL.path) { FileManager.default.createFile(atPath: logURL.path, contents: nil, attributes: [.posixPermissions: 0o600]) }
             let log = try FileHandle(forWritingTo: logURL)
@@ -67,6 +68,21 @@ final class AriadneApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
                 self.fail("启动超时。请重新打开 Ariadne。\n日志：\(self.logURL.path)")
             }
         } catch { fail("无法启动 Ariadne：\(error.localizedDescription)") }
+    }
+
+    func configureWorkspace(_ configuration: WKWebViewConfiguration) throws {
+        // This per-user file is never included in the distributable App.
+        let file = home.appendingPathComponent("desktop-workspace.json")
+        guard FileManager.default.fileExists(atPath: file.path) else { return }
+        let settings = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: String]
+        guard let id = settings?["workspace"], id.range(of: "^[a-f0-9]{32}$", options: .regularExpression) != nil,
+              settings?["origin"] == origin.absoluteString,
+              FileManager.default.fileExists(atPath: home.appendingPathComponent("data/workspaces/\(id)/HEAD.json").path) else {
+            throw NSError(domain: "Ariadne", code: 1, userInfo: [NSLocalizedDescriptionKey: "资料库映射无效，未打开其他资料库。"])
+        }
+        // Only seed a new native profile. Existing native workspaces retain their identity.
+        let script = "if(location.origin==='\(origin.absoluteString)'&&!localStorage.getItem('ariadne-content-workspace-v1')){localStorage.setItem('ariadne-content-workspace-v1','\(id)')}"
+        configuration.userContentController.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
     }
 
     func received(_ data: Data, loading: NSTextField, view: WKWebView) {

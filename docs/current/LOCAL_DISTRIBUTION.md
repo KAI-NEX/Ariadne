@@ -19,6 +19,12 @@
 
 资料写入 `~/Library/Application Support/Ariadne Local/data`，版本代码分别保留在 `releases`。下载包不含旧工作区、私人材料、API Key 或 Codex 凭据。App 使用持久的 WebKit 存储；它与原 Chrome/Safari/Codex 内置浏览器的设置和工作区映射独立。首次打开可能是空工作区，需要重新连接模型；旧磁盘资料和浏览器资料原地保留，不自动迁移或混入。以后使用相同 App 标识和地址会恢复该 App 的资料。升级保留旧 release 及共享 data。
 
+### 从已有本地浏览器资料库迁入
+
+用户明确要求同步时，先从该浏览器核对 `ariadne-content-workspace-v1`，再用 `scripts/copy_local_workspace.py --source-root <原资料根目录> --home <App数据目录> --workspace <已核对ID>` 复制。脚本持有源资料锁，校验全部当前记录及原件，再逐文件比较 SHA-256；保留原目录和历史，遇到已有目标或映射立即拒绝覆盖。失败的中间产物保留供诊断，不从旧 IndexedDB 备份覆盖最新磁盘数据。
+
+仅在 App 本机数据目录创建 `desktop-workspace.json`。原生窗口核对 ID、固定 origin 和 HEAD 文件，只为尚无映射的 WebKit profile 初始化该 ID，不覆盖已有原生资料库。完成后退出已核实的旧开发服务，再启动 App；同一 `127.0.0.1:8000` 地址、同一 ID 的浏览器与 App 将访问同一份 App 磁盘库。原开发目录保留为迁入时快照，不执行双向合并。浏览器里的 API Key、Provider 选择和传输确认不复制，App 仍需要单独配置连接。
+
 用户在「连接设置 → 添加新的模型」选择 DeepSeek、Gemini 或千问并填写对应 API Key。DeepSeek 验证固定测试图片；Gemini/千问验证固定两页测试 PDF 的完整页面与 JSON，点击前说明少量 API 费用。Key 分别保存在当前浏览器，实际请求时经本机服务送到所选服务；项目文件与 Codex 连接器不接收该 Key。原有本机 Keychain 配置仍受支持。连通不等于支持完整分析。模型调用仍需既有传输确认，结果由用户保存；不随启动器切换模型或修改推理强度。
 
 ## 可选：连接公开网页版

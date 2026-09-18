@@ -1,0 +1,58 @@
+{
+  "fill": {
+    "solid": "extended-srgb:1.00000,1.00000,1.00000,1.00000"
+  },
+  "fill-specializations": [
+    {
+      "appearance": "dark",
+      "value": {
+        "solid": "extended-srgb:0.12,0.13,0.15,1"
+      }
+    },
+    {
+      "appearance": "tinted",
+      "value": "automatic"
+    }
+  ],
+  "groups": [
+    {
+      "name": "Hands and thread",
+      "layers": [
+        {
+          "image-name": "hands.png",
+          "name": "Hands and thread",
+          "glass": false,
+          "position": {
+            "scale": 0.8165869,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          },
+          "fill-specializations": [
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "extended-srgb:0.95,0.95,0.95,1"
+              }
+            },
+            {
+              "appearance": "tinted",
+              "value": {
+                "solid": "extended-srgb:1,1,1,1"
+              }
+            }
+          ]
+        }
+      ],
+      "specular": false,
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}
