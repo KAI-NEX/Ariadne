@@ -1,5 +1,14 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-18 — Cloudflare 正式发布与腾讯域名绑定（COMPLETE；公网预览）
+
+- 用户明确授权注册/绑定后复用已有 Cloudflare 账号，创建 Pages 项目 `ariadne`，实际主机名为 `ariadne-7pc.pages.dev`。Pages 发布 `5b41fcb0`，Python Worker `ariadne-api` 版本 `6ff8a1d5-3030-4196-ad02-1a1b666e7eba`，通过 `ARIADNE_API` Service Binding 访问，Worker 无独立公网入口。
+- 用户完成 OAuth 和腾讯登录。旧浏览器回调因授权等待超时出现 localhost refused；切换设备授权成功，补齐 `workers_scripts:write`。Wrangler 4.134.0 的 Pages 创建须 `--force` 保持项目类型；教程已按实际过程修正，不要求用户购买服务器或更换平台。
+- 腾讯 DNSPod 新增唯一的 `ariadne CNAME ariadne-7pc.pages.dev`（TTL 600），权威 DNS 返回正确记录；Cloudflare 显示 Active / SSL enabled。正式 HTTPS 根页、`/healthz`、`/api/web-runtime` 均可用；保留原有 6 条 DNS 记录与邮箱配置，不迁移 DNS，不修改另一个个人网站项目。
+- 正式域名通过真实浏览器调用 DeepSeek：固定图片连接 215 tokens；两页虚构简历完整交付 2 页/2 图，3,913 tokens，返回工作经历/项目/教育 3 条有来源的 `NEEDS_REVIEW` 提案。重复同请求 HTTP 200 且结果完全相同；未写入人工确认资料，未使用私人简历。Python urllib 的首次 POST 被 Cloudflare 1010 拒绝，真实浏览器请求成功；原失败保留，不把脚本失败当作模型失败。
+- 浏览器确认无效 Key 显示失败、Local 能进入空工作空间，再次打开根入口仍须选择运行方式。正式来源与预览域名分离；API 仅允许正式来源，pages.dev 的 API 返回 `WEB_ORIGIN_DENIED` 是既定配置。未把测试 Key 留在设置中。
+- 运行证据、合成响应与部署状态保存在忽略目录 `.cache/cloudflare-publish-20260918/`。此前 110/110 离线回归保持为实现基线，本次仅部署与教程/状态更新，不重复声称全部领域已通过公网模型验收。Gemini/千问真实账号、最大文件/并发负载、不同地区网络与公网 Codex 配对仍待验证；本地安装包未上传公开下载。未 push、购买资源或纳入其他任务改动。
+
 ## 2026-09-18 — Cloudflare 网页免安装 BYOK（IMPLEMENTATION COMPLETE；未公网部署）
 
 - 用户明确网页也必须免安装调用自己的 API Key；采用 Pages + Python Worker，DNS 继续腾讯，正式入口 `https://ariadne.kai-nex.com`。使用 [Cloudflare 逐步部署](docs/current/CLOUDFLARE_DEPLOYMENT.md)，无须购买 VPS。原腾讯/Docker 教程保留并标为备选，不把纯静态预览冒充可执行 API。

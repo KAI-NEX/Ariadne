@@ -1,16 +1,18 @@
 # Ariadne：免费托管与腾讯域名部署
 
-更新：2026-09-18。用户已决定不购买服务器，并要求网页免安装使用自己的 API Key。正式入口为 **https://ariadne.kai-nex.com**，每次先选择模型；网页明确标记预览阶段。此文档交付部署方法，不表示已发布。
+更新：2026-09-18。用户已决定不购买服务器，并要求网页免安装使用自己的 API Key。正式入口 **https://ariadne.kai-nex.com** 已发布，每次先选择模型；网页明确标记预览阶段。
+
+当前部署：Pages 项目 `ariadne`，实际默认域名 `ariadne-7pc.pages.dev`；通过 `ARIADNE_API` 绑定 Python Worker `ariadne-api`。腾讯 DNSPod 已添加 `ariadne` CNAME 指向上述 Pages 域名，Cloudflare 自定义域名显示 Active / SSL enabled。未购买 VPS、迁移整个 DNS 或修改原有邮箱记录。以下步骤供后续更新与重新部署使用。
 
 ## 你将得到什么
 
 - Cloudflare Pages 提供网页；Pages 的 Service Binding 将 API 请求交给 Python Worker。普通用户只打开浏览器、填写自己的 Key，无需安装 Python、Codex 或本地连接器。
-- DeepSeek 已在本机真实 Cloudflare workerd + Pages 绑定环境完成图片连接检查和两页合成简历分析，返回 3 条待审阅资料。Gemini/千问保留用户自带 Key 的连接验证；本阶段没有这两家的真实账号执行证据。
+- DeepSeek 已通过正式 HTTPS 网站完成真实图片连接检查和两页合成简历分析，返回 3 条待审阅资料；两页完整交付，重复请求命中相同结果。Gemini/千问保留用户自带 Key 的连接验证；本阶段没有这两家的真实账号执行证据。
 - 浏览器保存原件、资料和确认版本。Key 按请求经过 Cloudflare 转交指定 Provider，不持久保存到服务端。服务器只持久保存操作/内容摘要，防止同一次付费操作在运行实例重启后自动重复；短暂结果缓存会过期，用户须审阅后主动重试。
 - 原有六类领域处理与人工保存规则复用；PDF 在浏览器完整逐页转图，Worker 核对原始 hash、实际页数、顺序和每页 hash。本预览限制每份 PDF 5 MiB / 16 页 / 转图合计 6 MiB，完整请求 12 MiB；超限整次拒绝，不截断。本地包保留原有较大上限。
 - Codex 仍需使用者自己的电脑和登录，通过本地包/配对连接器运行。网页 API 不依赖 Codex。
 
-无需租 VPS。Pages、Workers 与 SQLite Durable Objects 可从免费计划开始，但免费额度和 CPU/存储限制仍适用，超额会影响可用性；模型 API 费用由各用户自己的服务商账号承担。Cloudflare 公网实际 CPU、配额、正式 HTTPS 和跨地区可用性尚需发布后验收，不能把本机测试当作公网验收。[Pages 限制](https://developers.cloudflare.com/pages/platform/limits/)、[Workers 价格](https://developers.cloudflare.com/workers/platform/pricing/)、[Durable Objects 免费额度](https://developers.cloudflare.com/durable-objects/platform/pricing/)。
+无需租 VPS。Pages、Workers 与 SQLite Durable Objects 可从免费计划开始，但免费额度和 CPU/存储限制仍适用，超额会影响可用性；模型 API 费用由各用户自己的服务商账号承担。本次正式 HTTPS 与小样本公网执行通过，不代表高并发、全部文件上限或跨地区网络验收。[Pages 限制](https://developers.cloudflare.com/pages/platform/limits/)、[Workers 价格](https://developers.cloudflare.com/workers/platform/pricing/)、[Durable Objects 免费额度](https://developers.cloudflare.com/durable-objects/platform/pricing/)。
 
 ## 1. 准备账号与部署工具
 
@@ -24,12 +26,12 @@
 ```sh
 cd api
 npm install
-npx wrangler login
+npx wrangler login --device --scopes user:read account:read workers:write pages:write zone:read workers_scripts:write
 uv run pywrangler deploy
 cd ..
 ```
 
-`wrangler login` 会打开浏览器让你确认 Cloudflare 登录；若账户有多个账号，选择你要托管 Ariadne 的那个。不要将令牌或 Key 发给别人。配置已固定 `ariadne-api`、SQLite Durable Object 和允许的正式来源 `https://ariadne.kai-nex.com`；不需要填你的 DeepSeek Key。成功输出应包含 Worker 部署/版本信息；API Worker 没有独立公网入口，通过 Pages 绑定访问。
+设备授权会显示验证网址和一次性代码，打开网址完成授权并等待终端报告成功；它不依赖 localhost 回调。如果旧的普通授权链接出现 localhost refused to connect，重新执行上面的设备授权，不要继续使用已过期的回调链接。若账户有多个账号，选择你要托管 Ariadne 的那个。`workers_scripts:write` 是本次 Worker 上传所需权限；`offline_access` 由工具自动添加，不要手动放入 scopes。不要将令牌或 Key 发给别人。配置已固定 `ariadne-api`、SQLite Durable Object 和允许的正式来源 `https://ariadne.kai-nex.com`；不需要填你的 DeepSeek Key。成功输出应包含 Worker 部署/版本信息；API Worker 没有独立公网入口，通过 Pages 绑定访问。
 
 本发布包固定 Wrangler 4.134.0、workers-py 1.17.3、runtime SDK 1.8.6 和 pypdf 6.1.1，包含依赖 hash 锁文件。`uv run pywrangler deploy --dry-run` 可先检查打包而不发布。[Cloudflare Python WSGI 支持](https://developers.cloudflare.com/workers/languages/python/packages/flask/)。
 
@@ -38,11 +40,11 @@ cd ..
 推荐命令方式，能同时带上 API 绑定，少一次控制台配置：
 
 ```sh
-api/node_modules/.bin/wrangler pages project create ariadne --production-branch main
+api/node_modules/.bin/wrangler pages project create ariadne --production-branch main --force
 api/node_modules/.bin/wrangler pages deploy pages --project-name ariadne --branch main
 ```
 
-已有同名 Pages 项目就跳过创建，直接部署。若你改了项目名，同时修改发布目录根部 `wrangler.jsonc` 的 `name` 以及命令里的 `--project-name`。Pages 自动读取此标准文件名，不接受自定义 `--config` 路径。**记下部署输出的实际 `*.pages.dev` 地址**，域名可能与项目名不同，不要猜。
+已有同名 Pages 项目就跳过创建，直接部署。Wrangler 4.134.0 创建时使用 `--force` 保留 Pages 项目类型，避免自动转向 Workers 创建流程；后续 `pages deploy` 不需要此参数。若你改了项目名，同时修改发布目录根部 `wrangler.jsonc` 的 `name` 以及命令里的 `--project-name`。Pages 自动读取此标准文件名，不接受自定义 `--config` 路径。**记下部署输出的实际 `*.pages.dev` 地址**，域名可能与项目名不同，不要猜；本项目实际分配的是 `ariadne-7pc.pages.dev`。
 
 也可在 Cloudflare 的 **Workers & Pages → Create application → Pages → Direct Upload** 上传 `Ariadne-Pages.zip`。此方式还要在该 Pages 项目的 **Settings → Bindings → Add → Service binding** 添加：变量名 `ARIADNE_API`，服务选 `ariadne-api`，然后重新部署 Pages，使绑定生效。[直接上传](https://developers.cloudflare.com/pages/get-started/direct-upload/)、[Service bindings](https://developers.cloudflare.com/pages/functions/bindings/#service-bindings)。
 
@@ -96,5 +98,5 @@ python3 scripts/build_cloudflare_release.py --pdfjs .cache/cloudflare-build/node
 - Pages：静态页面、合同 JS、按需加载的 PDF.js 5.4.624、API 路由 Worker。非 PDF 请求不加载 PDF.js。无额外前端框架或常驻轮询。
 - Python Worker：复用 WSGI/领域模块；通过请求级传输钩子调用固定官方端点，重定向拒绝跟随；PDF hook 替代该平台不支持的 Poppler 子进程。本机路径仍使用原实现。
 - 每个 origin / 浏览器会话 / Provider / Key 摘要单独一个 Durable Object，最多 2 个并发、256 个持久操作摘要。只写 hash，不写 Key、材料、模型正文。实例丢失内存结果后阻止无声重试；浏览器源材料和确认资料仍在。
-- “完整页数与 hash 通过”是传输完整性验证，不是语义正确或对恶意客户端像素真实性的认证。六领域离线回归、真实 DeepSeek 小样本和 Cloudflare 本机模拟分别记录；公网部署、正式域名 TLS、不同地区 API 可达性及公网 Codex 配对需要上线后检查。
+- “完整页数与 hash 通过”是传输完整性验证，不是语义正确或对恶意客户端像素真实性的认证。六领域离线回归、本机模拟及正式 HTTPS 的 DeepSeek 小样本分别记录；不同地区 API 可达性、负载上限及公网 Codex 配对仍待检查。
 - 旧 [Docker 网页部署](WEB_DEPLOYMENT.md) 与 [腾讯服务器教程](WEB_FIRST_DEPLOY.md) 保留为备选历史路径；不需要照旧教程购买服务器。
