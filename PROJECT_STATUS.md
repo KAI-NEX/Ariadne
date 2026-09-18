@@ -1,5 +1,10 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-18 — 移除网页全局预览提示（COMPLETE；已上线）
+
+- 按用户要求，Cloudflare 导出不再向页面注入“网页预览 · 自带 API Key · 资料保存在当前浏览器 · 下载本地版”提示行。原提示源码与旧发布包保留；模型连接、传输确认、资料保存和独立下载入口不变。
+- Pages 发布 `bce5e48c`，正式域名首页与工作空间经 egolite 验证均无提示节点和脚本引用；导出 HTML 检查、Cloudflare 路由回归、VI 与 diff 检查通过。截图及新发布包位于 `.cache/cloudflare-distribution/20260918-remove-preview-banner/`；未重新部署 API 或调用模型。
+
 ## 2026-09-18 — Cloudflare 正式发布与腾讯域名绑定（COMPLETE；公网预览）
 
 - 用户明确授权注册/绑定后复用已有 Cloudflare 账号，创建 Pages 项目 `ariadne`，实际主机名为 `ariadne-7pc.pages.dev`。Pages 发布 `5b41fcb0`，Python Worker `ariadne-api` 版本 `6ff8a1d5-3030-4196-ad02-1a1b666e7eba`，通过 `ARIADNE_API` Service Binding 访问，Worker 无独立公网入口。

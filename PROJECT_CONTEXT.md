@@ -12,7 +12,7 @@
 
 ## 1. 要解决的问题
 
-2026-09-18 正式发布更新：用户授权后已部署 Cloudflare Pages `ariadne`（`ariadne-7pc.pages.dev`）和绑定的 Python Worker `ariadne-api`；腾讯新增 `ariadne` CNAME，`https://ariadne.kai-nex.com` 已 Active / SSL enabled。公网浏览器真实 DeepSeek 图片连接和两页合成简历分析通过，返回 3 条待审阅资料，重复请求命中缓存。网页保持预览标签，资料按浏览器保存；Gemini/千问真实账号、跨地区网络、公网 Codex 配对和安装包公开下载仍未验收或发布。无须购买服务器，未变更整个域名的 DNS 托管或现有邮箱记录。
+2026-09-18 正式发布更新：用户授权后已部署 Cloudflare Pages `ariadne`（`ariadne-7pc.pages.dev`）和绑定的 Python Worker `ariadne-api`；腾讯新增 `ariadne` CNAME，`https://ariadne.kai-nex.com` 已 Active / SSL enabled。公网浏览器真实 DeepSeek 图片连接和两页合成简历分析通过，返回 3 条待审阅资料，重复请求命中缓存。网页仍属预览阶段，但按用户最新要求不显示全局提示行；资料按浏览器保存；Gemini/千问真实账号、跨地区网络、公网 Codex 配对和安装包公开下载仍未验收或发布。无须购买服务器，未变更整个域名的 DNS 托管或现有邮箱记录。
 
 2026-09-18 发布方向更新：用户不购买服务器，采用 Cloudflare Pages + Python Workers，并明确网页必须免安装使用自带 API Key。已完成可部署预览、浏览器完整 PDF 转图、复用领域处理的 Worker 与防重复付费摘要；真实 DeepSeek 经本机 workerd/Pages 服务绑定验证图片和两页合成简历分析。没有公网部署、DNS 修改或 Gemini/千问真实账号验收。安装包继续作为本地 Codex/较大文件路径；当前范围为 macOS Apple 芯片。执行新的 [Cloudflare 部署教程](docs/current/CLOUDFLARE_DEPLOYMENT.md)，旧腾讯服务器教程只作备选。
 

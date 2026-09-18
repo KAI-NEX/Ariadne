@@ -1,6 +1,6 @@
 # Ariadne：免费托管与腾讯域名部署
 
-更新：2026-09-18。用户已决定不购买服务器，并要求网页免安装使用自己的 API Key。正式入口 **https://ariadne.kai-nex.com** 已发布，每次先选择模型；网页明确标记预览阶段。
+更新：2026-09-18。用户已决定不购买服务器，并要求网页免安装使用自己的 API Key。正式入口 **https://ariadne.kai-nex.com** 已发布，每次先选择模型；产品仍属公网预览阶段；按用户要求，页面不再显示全局预览提示行。
 
 当前部署：Pages 项目 `ariadne`，实际默认域名 `ariadne-7pc.pages.dev`；通过 `ARIADNE_API` 绑定 Python Worker `ariadne-api`。腾讯 DNSPod 已添加 `ariadne` CNAME 指向上述 Pages 域名，Cloudflare 自定义域名显示 Active / SSL enabled。未购买 VPS、迁移整个 DNS 或修改原有邮箱记录。以下步骤供后续更新与重新部署使用。
 
@@ -70,7 +70,7 @@ api/node_modules/.bin/wrangler pages deploy pages --project-name ariadne --branc
 
 ## 5. 首次上线检查
 
-1. 首页有“网页预览”，且先选运行方式。选择本地运行应能进入空工作空间，保存合成材料后刷新可恢复。
+1. 首页先选运行方式，不显示全局预览提示行。选择本地运行应能进入空工作空间，保存合成材料后刷新可恢复。
 2. 打开 `https://ariadne.kai-nex.com/api/web-runtime`，应显示 `mode: web`、三家 BYOK、`preview: true`。若提示 `WEB_API_BINDING_REQUIRED`，检查第 3 步的绑定并重新部署 Pages。
 3. 首页“添加新的模型”→ DeepSeek → 填你自己的有效 Key → 阅读费用/传输说明 → “同意验证并连接”。验证成功后选择并继续。
 4. 先用无隐私的两页测试资料，确认可以分析、出现待审阅内容，并且只有主动保存才生成确认资料。无效 Key 应明确失败，不能显示假回答或切换 Local。

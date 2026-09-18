@@ -57,12 +57,7 @@ def build(output, pdfjs, download_url=None):
         if code != 200:
             raise ValueError("Contract export failed: " + path)
         (pages / path.lstrip("/")).write_bytes(b"".join(chunks))
-    for html in pages.glob("*.html"):
-        value = html.read_text()
-        # Preserve the actual application entry and existing VI; annotate only
-        # the exported preview, including direct links to workspace pages.
-        value = value.replace("</head>", '<link rel="stylesheet" href="/cloudflare-preview.css">\n<script src="/cloudflare-preview.js" defer></script>\n</head>')
-        html.write_text(value)
+    # Export the application pages unchanged, without the former preview banner.
     (pages / "404.html").write_text('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>Ariadne · 页面不存在</title><p>页面不存在。<a href="/">返回 Ariadne</a></p></html>')
     vendor = pages / "vendor/pdfjs"
     vendor.mkdir(parents=True)
