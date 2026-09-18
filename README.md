@@ -1,10 +1,30 @@
 # Ariadne · 衡
 
-> **A bounded AI runtime for career judgment.**
+> **Understand your experience. Make sense of your next role.**
 >
-> Ariadne turns personal materials and job descriptions into reviewable, versioned, source-grounded decisions—without letting an AI silently rewrite who you are.
+> An open-source AI workspace for exploring your experience and target jobs, with original sources, reviewable suggestions, and changes you explicitly save.
 
 [中文说明](README.zh-CN.md) · [Architecture evolution](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.en.html) · [Project history](PROJECT_HISTORY.md) · [Runtime contract](docs/current/ARIADNE_RUNTIME_EXECUTION_CONTRACT.md) · [Codex connector](docs/current/CODEX_RUNTIME_CONNECTOR.md)
+
+[Try the web app](https://ariadne.kai-nex.com/) · [Download the Mac App](https://ariadne.kai-nex.com/download.html)
+
+[![Ariadne · 衡 — Web + macOS App](public/social/ariadne-preview.png)](https://ariadne.kai-nex.com/)
+
+## What you can do
+
+Ariadne helps you understand your experience in relation to a job you care about. Add your résumé, portfolio, or project notes, then add the job description separately. With a connected model, you can discuss which requirements your materials support, what needs more evidence or clarification, and how to describe your work more clearly.
+
+You can keep the original documents, review suggestions, and save the changes you agree with as new versions. The model does not decide your career goal or automatically submit applications.
+
+## Your first session
+
+1. **Open the web app or install the Mac App.** Choose **Local** to save originals without AI analysis, or connect a supported model with your own API key. Codex is optional through the local App or connector.
+2. **Add your materials.** Open **个人资料** (Personal materials), import a résumé, portfolio, or project document, and retain the source. To analyze it with AI, choose an available model and confirm the transmission shown by the app.
+3. **Review the understanding.** Check the proposed content against your original material. Correct or reject unsupported statements, then explicitly save what you accept.
+4. **Add a target role.** Open **职位描述** (Job descriptions), import the role’s requirements, and review them separately from your personal material.
+5. **Discuss that role.** Open its details and ask: “Which requirements are supported by my materials? Where do I need more evidence or a clearer explanation?” Review the answer and decide what to do next. Discussion alone does not update confirmed data.
+
+No model connection yet? You can still archive original materials in Local mode and return to analyze them later. Model output requires review; a missing piece of evidence does not prove a missing ability.
 
 ## Try Ariadne
 

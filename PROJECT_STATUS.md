@@ -1,5 +1,12 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-19 — 传播入口与文字上手说明（COMPLETE；已上线）
+
+- GitHub About 已填入 `https://ariadne.kai-nex.com/`，简介改为直接说明资料/目标岗位理解、来源依据、人工审阅及 Web/macOS 使用；原有 Topics 保留。GitHub Social preview 已上传现有双手 Logo 与真实空工作区组成的 1280×640 封面，并核对公开仓库 og:image 已采用自定义图片。
+- 中英文 README 增加封面、顶部网页/下载入口、产品用途与五步上手说明：连接或 Local 归档、加入个人资料、审阅保存、加入目标岗位、围绕岗位讨论。按用户要求不制作演示视频。保留模型传输确认、缺证据不等于缺能力、普通讨论不改确认数据的边界。
+- 官网首页、介绍页、下载页新增各自 description/canonical、Open Graph 与 Twitter 大图信息，共用 `public/social/ariadne-preview.png`。Pages 发布 `436818e7`，相较上一正式包只改变上述 3 个 HTML 并新增封面；下载 metadata、API Worker 和业务运行代码保持原有发布内容。
+- 分享图来源与 HTML 模板在 `assets/social/`；工作区截图来自独立本机空数据库，不包含私人材料、凭据或模拟模型结果。封面 1280×640 / 87,288 bytes，实际浏览器检查文字、布局及图片；egolite 核对三条正式网页元数据和公开 PNG HTTP 200/MIME/完整 hash。VI、VI 负向回归、公开文件、README 链接、重复 meta/canonical 与 diff 检查通过。证据在 `.cache/social-entry-20260919/`，发布包在 `.cache/cloudflare-distribution/20260919-sharing/`。第三方社交平台缓存刷新时间不由本项目控制，本轮未向社区发布推广消息。
+
 ## 2026-09-19 — README 安装入口与当前架构图（COMPLETE）
 
 - 中英文 README 首屏加入公开网页、官网下载页、macOS App ZIP 与 Release 校验文件入口；说明 Assets 中正确 ZIP、Applications 安装、Dock 固定、可选 Codex 登录、关闭最后窗口停止服务及资料保留。区分普通用户安装与开发者源码启动，修正“尚无公开网页版”的过期说明；保留未公证、兼容系统未全覆盖及网页/App 不自动同步的实际边界。

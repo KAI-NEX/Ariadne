@@ -1,10 +1,30 @@
 # Ariadne · 衡
 
-> **一个用于职业判断的受限 AI 运行时。**
+> **看懂自己的经历，理解想去的岗位。**
 >
-> Ariadne 将个人资料与职位描述转化为可审阅、有版本、可追溯来源的职业判断；模型不能静默改写“你是谁”。
+> 一个开源 AI 工作空间：结合你的资料与目标职位讨论已有支持、未知和下一步，保留原件，由你审阅并保存变化。
 
 [English README](README.md) · [架构演进图](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.html) · [完整项目经历](PROJECT_HISTORY.md) · [运行时契约](docs/current/ARIADNE_RUNTIME_EXECUTION_CONTRACT.md) · [Codex 连接器](docs/current/CODEX_RUNTIME_CONNECTOR.md)
+
+[打开网页版](https://ariadne.kai-nex.com/) · [下载 Mac App](https://ariadne.kai-nex.com/download.html)
+
+[![Ariadne · 衡 — Web + macOS App](public/social/ariadne-preview.png)](https://ariadne.kai-nex.com/)
+
+## 可以用它做什么
+
+Ariadne 帮你结合自己的经历，理解一个真正关心的岗位。你可以加入简历、作品集或项目记录，再单独加入职位描述。连接模型后，围绕这个职位讨论：哪些要求已有资料支持，哪些还需要补充证据或澄清，以及怎样更清楚地表达做过的事。
+
+原始材料会保留；模型提出的内容先供你审阅，只有你明确保存后才生成新的确认版本。目标岗位和下一步行动由你决定，Ariadne 不会自动替你投递。
+
+## 第一次怎么用
+
+1. **打开网页版或安装 Mac App。** 选择「本地运行」可以先保存原件；需要 AI 分析时，使用自己的 API Key 连接已支持的模型。Codex 可通过本地 App 或连接器选用。
+2. **加入个人资料。** 打开「个人资料」，导入简历、作品集或项目文件。需要 AI 理解时，选择可用模型，并确认页面说明的材料传输。
+3. **核对理解结果。** 对照原件检查待审阅内容，纠正或拒绝没有依据的陈述；明确点击保存后，才成为确认资料。
+4. **加入目标岗位。** 打开「职位描述」，导入想了解的岗位要求，单独检查它的理解结果，不把岗位要求写成自己的经历。
+5. **围绕岗位讨论。** 在该职位详情里问：“哪些要求已有我的资料支持？哪里需要补充证据或讲得更清楚？”核对回答，再决定下一步；普通讨论不会自动改写确认资料。
+
+还没连接模型也可以先归档原件，之后再分析。模型输出仍需审阅；缺少材料支持，不等于你没有这项能力。
 
 ## 开始使用
 
