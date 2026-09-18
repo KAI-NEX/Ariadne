@@ -1,5 +1,16 @@
 # AI Job Radar｜Phase 4 Status
 
+
+## 2026-09-18 — Gemini / 千问完整接入与逐步部署教程（IMPLEMENTATION COMPLETE；真实账号及公网待验收）
+
+- 按用户新要求开放 Gemini 3.7 Flash 与千问 Qwen 3.8 Max；此前入口只有保留位置/连接实验，缺少完整领域执行，因此未开放。本次补齐 Candidate/Job 导入、两类对话、个人理解、职位概况六个 adapter 的前后端绑定；共用既有领域契约和 PDF 完整逐页转图，不增加框架或 SDK。千问固定使用百炼北京地域；不改 Codex/DeepSeek 的既有选择。
+- 两家使用固定官方 OpenAI 兼容端点，连接前经用户确认发送固定两页合成 PDF 的完整页面图，验证两页读图与 JSON。只有通过后才加入模型选择；失败不回退其他 Provider。凭据按 Provider 独立保存在当前浏览器，按请求携带；网站执行命名空间加入 Provider，禁止交叉借用 Key、Keychain/环境回退及 HTTP 重定向。实际传输与费用确认保留，私人材料不用于连接测试。
+- 108/108 离线回归通过，新增六个领域 × 两家 Provider 从真实校验、payload 构建、传输到响应正规化的合成检查，覆盖能力/模型/凭据错配、两页验证失败、取消与会话隔离；真实 API HTTP 响应使用替身，不作为业务理解质量证据。VI、公开文件检查、安装脚本语法与 diff 检查通过。
+- egolite 完成连接成功/失败与刷新路径，截图接口超时后按项目规则使用隔离 Chrome/Playwright。桌面 1280×800、手机 390×844 的两家成功/失败、独立 Key、迟到验证丢弃和每次入口先选模型通过，无脚本错误或横向溢出；截图与失败尝试保留 `.cache/providers-20260918/`。合成验证服务使用真实 Poppler 渲染；本地包另用自带 Python/PDFKit 完整渲染两页通过。
+- 8000 本机与 `http://ariadne.localhost:8081/` 网页预览已重启到新代码，Codex 本机优先保持；真实预览列出三家 API，四个未确认连接请求均拒绝且未调用 Provider。合成 QA 8082 已停止，未操作原有私人工作区或真实 API 凭据。
+- 新增 [第一次部署逐步教程](docs/current/WEB_FIRST_DEPLOY.md) 与仅用于新 Ubuntu 24.04 服务器的 Docker 安装脚本；按腾讯新加坡轻量服务器、腾讯 DNSPod `ariadne` A 记录、Docker/Caddy 自动 HTTPS 编排。未购买服务器、变更 DNS、推送或公网发布；本机无 Docker，Linux 镜像/Compose/Caddy、真实账号、正式 HTTPS 和公网 Codex 配对仍需部署后实测。
+- 新部署包 `.cache/web-distribution/20260918-134930.tar.gz`（SHA-256 `0f796ec9fa3b06de88e118b835844d0a2d3f02e41cc38eb7a1253e3060e1092c`）的 200 个源码文件逐项与当前代码核对，包含安装脚本和教程；内置本地 ZIP `20260918-054730`（SHA-256 `54c41e6b9c9e2271e8b460e61d107c217557671cc4b309ba5df9f54e9e986968`），ZIP 源码、测试 PDF 和嵌套下载 hash 核对通过。本地包验收范围仍为 macOS Apple 芯片，旧包和历史 QA 原地保留。
+
 ## 2026-09-17 — 单域名网页执行与部署包（IMPLEMENTATION COMPLETE；未公网部署）
 
 - 用户确认 `https://ariadne.kai-nex.com` 直接进入模型选择与应用，腾讯负责 DNS，尚无服务器；取代历史官网与 `web` 子域分离方案。实现与绑定步骤见 [网页部署](docs/current/WEB_DEPLOYMENT.md)。每次根入口仍先选模型，不自动进入工作空间。

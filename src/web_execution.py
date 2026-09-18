@@ -92,8 +92,8 @@ class Sessions:
         self.states = {}
 
     @contextmanager
-    def acquire(self, session, credential, *, control=False):
-        namespace = hashlib.sha256((session + "\0" + credential).encode()).digest()
+    def acquire(self, session, credential, *, provider="deepseek", control=False):
+        namespace = hashlib.sha256((session + "\0" + provider + "\0" + credential).encode()).digest()
         with self.lock:
             now = self.clock()
             self.states = {key: value for key, value in self.states.items()

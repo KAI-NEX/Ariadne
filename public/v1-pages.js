@@ -233,7 +233,7 @@
       candidate_model_credential_reference_invalid: "模型凭据引用无效；没有发送材料。",
       CONNECTOR_UNREACHABLE: "无法连接本机连接器，请检查它是否运行及浏览器本地网络权限。没有改用其他模型。",
       CONNECTOR_PAIRING_REQUIRED: "本机连接已过期或撤销，请重新配对。",
-      deepseek_key_not_configured: "尚未配置可用的 DeepSeek API 凭据；没有发送材料。",
+      deepseek_key_not_configured: "尚未配置当前模型服务的 API 凭据；没有发送材料。",
       candidate_model_pdf_render_failed: "PDF 页面无法完整渲染；没有发送不完整内容。",
       candidate_model_request_size_invalid: "模型请求超过本地服务允许的大小；没有发送材料。",
       candidate_model_pdf_payload_invalid: "PDF 内容校验失败；没有发送材料。",
@@ -275,7 +275,7 @@
       job_model_credential_reference_invalid: "模型凭据引用无效；没有发送职位内容。",
       CONNECTOR_UNREACHABLE: "无法连接本机连接器，请检查它是否运行及浏览器本地网络权限。没有改用其他模型。",
       CONNECTOR_PAIRING_REQUIRED: "本机连接已过期或撤销，请重新配对。",
-      deepseek_key_not_configured: "尚未配置可用的 DeepSeek API 凭据。",
+      deepseek_key_not_configured: "尚未配置当前模型服务的 API 凭据。",
       deepseek_network_error: "连接模型失败。",
       deepseek_provider_http_error: "模型未能完成这次职位理解。",
       deepseek_response_too_large: "模型返回内容超过安全上限。",
@@ -1876,7 +1876,7 @@
     byId("candidate-review-surface").classList.toggle("hidden", !proposals.length);
     byId("candidate-review-surface").dataset.rawSourceIntegrity = proposals.length ? "verified" : "not-applicable";
     const modelReview = proposals[0]?.payload?.contract_id === CandidateModel?.PAYLOAD_CONTRACT_ID;
-    byId("candidate-review-heading").textContent = modelReview ? "DeepSeek 候选信息提案" : "本地候选信息提案";
+    byId("candidate-review-heading").textContent = modelReview ? "模型候选信息提案" : "本地候选信息提案";
     byId("candidate-review-heading").nextElementSibling.textContent = modelReview ? "这些内容来自所选模型，尚未成为已确认候选信息。" : "这些内容来自本地确定规则，尚未成为已确认候选信息。";
     byId("candidate-review-list").innerHTML = proposals.length ? proposalReviewMarkup(proposals[0], Math.min(candidateReviewSessionResolved + 1, candidateReviewSessionTotal), candidateReviewSessionTotal) : "";
     if (!proposals.length) { candidateReviewSessionTotal = 0; candidateReviewSessionResolved = 0; }

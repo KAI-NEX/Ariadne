@@ -7,6 +7,7 @@
   const WEB_SESSION_KEY = "ariadne-web-api-session-v1";
   let webRuntimePromise;
   const localOrigin = () => ["localhost", "127.0.0.1", "[::1]"].includes(root.location.hostname);
+  const apiProviders = ["deepseek", "gemini", "qwen"];
   function webSession() {
     let value = root.sessionStorage.getItem(WEB_SESSION_KEY);
     if (!/^[a-f0-9]{64}$/.test(value || "")) {
@@ -61,29 +62,35 @@
     let provider;
     try { provider = JSON.parse(options.body || "null")?.runtime_snapshot?.provider; }
     catch (_) { /* The domain endpoint owns malformed-request validation. */ }
-    const check = url.pathname === "/api/runtime-providers/deepseek/connection-check";
+    const checkProvider = /^\/api\/runtime-providers\/(deepseek|gemini|qwen)\/connection-check$/.exec(url.pathname)?.[1];
+    const check = Boolean(checkProvider);
+    if (check) provider = checkProvider;
+    if (url.pathname === "/api/runtime-check") provider = "deepseek";
     if (!provider && ["/api/candidate-conversation-turn/cancel", "/api/candidate-model-operation-state/delete"].includes(url.pathname)) {
       try { provider = JSON.parse(root.localStorage.getItem("job-radar-selected-runtime") || "null")?.provider; }
       catch (_) { /* Keep the existing connector boundary when unavailable. */ }
     }
-    if (!connection || provider === "deepseek" || check) {
+    if (!connection || apiProviders.includes(provider) || check) {
       // Closing a tab discards its pairing session but retains its selected
       // runtime. Never post a Codex request to a hosted server in that state.
       if (provider === "codex" && !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) throw new Error("CONNECTOR_PAIRING_REQUIRED");
       // Own keys go only to the selected same-origin execution service, never
       // to the local Codex connector or an unrelated URL.
-      const ownKeyRoute = (provider === "deepseek" && (operations[url.pathname] || url.pathname === "/api/local-source-read"))
+      const ownKeyRoute = (apiProviders.includes(provider) && (operations[url.pathname] || url.pathname === "/api/local-source-read"))
         || ["/api/runtime-check", "/api/candidate-conversation-turn/cancel", "/api/candidate-model-operation-state/delete"].includes(url.pathname);
       if (ownKeyRoute || check) {
         const headers = new Headers(options.headers || {});
         if (!localOrigin()) {
-          await webRuntime();
+          const service = await webRuntime();
+          if (provider && !service.byok.includes(provider)) throw new Error("WEB_API_RUNTIME_UNAVAILABLE");
           if (typeof options.body === "string" && new Blob([options.body]).size > 41000000) throw new Error("WEB_REQUEST_SIZE_INVALID");
           headers.set("X-Ariadne-Web-Session", webSession());
         }
         let key;
-        try { key = root.localStorage.getItem("job-radar-provider-api-key:deepseek"); }
+        try { key = provider && root.localStorage.getItem(`job-radar-provider-api-key:${provider}`); }
         catch (_) { /* Existing local Keychain remains a supported credential source. */ }
+        headers.delete("X-Ariadne-Provider-Key");
+        if (provider) headers.set("X-Ariadne-Provider", provider);
         if (key && !check) headers.set("X-Ariadne-Provider-Key", key);
         options = { ...options, headers, redirect: "error" };
       }

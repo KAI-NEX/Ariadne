@@ -8,7 +8,7 @@
   const PROVIDERS = Object.freeze([
     { id: "deepseek", name: "DeepSeek", apiKeyUrl: "https://platform.deepseek.com/api_keys", models: [{ id: "deepseek-flash", name: "deepseek-flash" }] },
     { id: "gemini", name: "Gemini", apiKeyUrl: "https://aistudio.google.com/app/apikey", models: [{ id: "gemini-3.7-flash", name: "gemini-3.7-flash" }] },
-    { id: "qwen", name: "Qwen", apiKeyUrl: "https://bailian.console.aliyun.com/", models: [{ id: "qwen3.8-max", name: "qwen3.8-max" }] },
+    { id: "qwen", name: "千问 Qwen", apiKeyUrl: "https://bailian.console.aliyun.com/", models: [{ id: "qwen3.8-max", name: "qwen3.8-max" }] },
   ]);
   const API_KEY_STORAGE_PREFIX = "job-radar-provider-api-key:";
   const LAST_PROVIDER_STORAGE_KEY = "job-radar-add-model-provider";
@@ -53,7 +53,7 @@
     function statusCopy() {
       return {
         IDLE: "未连接",
-        SENDING: "正在发送模型列表请求…",
+        SENDING: "正在准备连接验证…",
         WAITING: `正在等待 ${provider().name} 响应…`,
         VERIFYING: "正在验证图文输入能力…",
         DISCOVERED: `已找到 ${state.models.length} 个图文模型`,
@@ -86,6 +86,10 @@
       byId("key-link").classList.toggle("hidden", !selectedProvider);
       byId("key-link").href = selectedProvider?.apiKeyUrl || "#";
       byId("key-link").textContent = selectedProvider ? `获取 ${selectedProvider.name} API Key` : "";
+      if (byId("transfer-hint")) byId("transfer-hint").textContent = `API Key 保存在当前浏览器。你确认发起请求后，Key 与本次材料经当前 Ariadne 服务转发至 ${selectedProvider.name}；本地版经本机服务，网页版经网站服务器。Key 不在服务端持久保存，上传材料仅作临时处理。请在自己的设备使用。`;
+      if (byId("check-hint")) byId("check-hint").textContent = state.providerId === "deepseek"
+        ? "点击连接将发送一张固定测试图片，可能产生少量 API 费用；不会发送你的个人材料。"
+        : `点击连接将发送固定两页测试 PDF 的完整页面图片，验证读图与 JSON 返回，可能产生少量 API 费用；不会发送你的个人材料。${state.providerId === "qwen" ? "当前使用百炼北京地域的 API Key。" : "需使用 Gemini API Key，服务所在地须支持 Gemini API。"}`;
       for (const id of ["key", "provider", "clear"]) byId(id).disabled = isLoading;
       byId("connect").disabled = !(selectedProvider && state.apiKey) || isLoading || state.phase === "VERIFIED";
       byId("connect").classList.toggle("is-loading", isLoading);
@@ -199,13 +203,14 @@
       byId("key").focus();
     }
     function selectProvider(providerId) {
-      if (providerId !== "deepseek" || loading()) return;
+      if (!providerFor(providerId) || loading()) return;
       state.providerId = providerId;
       safeStorage.set(LAST_PROVIDER_STORAGE_KEY, providerId);
       state.apiKey = safeStorage.get(keyStorageKey(providerId));
       state.providerMenuOpen = false;
       resetDiscovery();
       render();
+      fitPanelToContent();
     }
     async function requestConnection() {
       if (loading()) return;
@@ -214,25 +219,31 @@
       if (!state.apiKey || safeStorage.get(keyStorageKey(state.providerId)) !== state.apiKey) {
         state.phase = "FAILED"; state.error = "浏览器无法保存 API Key，请允许本站存储后重试。"; render(); return;
       }
-      if (state.providerId !== "deepseek") return;
+      if (!providerFor(state.providerId)) return;
       const currentAttempt = ++attempt;
       state.models = []; state.selectedModel = null; state.verified = false; state.error = "";
       state.phase = "SENDING"; render();
       try {
         state.phase = "WAITING"; render();
-        const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/runtime-providers/deepseek/connection-check", {
+        const response = await (globalThis.AriadneConnector || globalThis).fetch(`/api/runtime-providers/${state.providerId}/connection-check`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ api_key: state.apiKey, confirmed: true }),
           redirect: "error",
         });
         const result = await response.json();
         if (currentAttempt !== attempt) return;
-        if (!response.ok) throw new Error(result.error || "deepseek_connection_failed");
+        if (!response.ok) throw Object.assign(new Error(result.error || "provider_connection_failed"), { result });
         state.phase = "VERIFYING"; render();
         acceptDiscoveredModels(result.models, result.verified_model_id);
       } catch (error) {
         if (currentAttempt !== attempt) return;
-        state.phase = "FAILED"; state.error = "验证失败，请检查 API Key、模型权限或稍后重试。"; render();
+        const code = error.result?.error || error.message;
+        state.phase = "FAILED";
+        state.error = ({ PROVIDER_PDF_PREPARATION_FAILED: "测试 PDF 未能完整转图，请检查服务端 PDF 工具后重试。",
+          PROVIDER_VISUAL_CHECK_FAILED: "模型未完整通过两页读图与 JSON 验证，请重试或检查模型权限。",
+          WEB_API_RUNTIME_UNAVAILABLE: "当前网站尚未提供此模型服务，请更新网站部署后重试。" })[code]
+          || (error.result?.provider_http_status === 429 ? "服务额度或请求频率受限，请检查余额、配额后重试。" : "验证失败，请检查 API Key、服务地区、模型权限或稍后重试。");
+        render();
       }
     }
     function acceptDiscoveredModels(returnedModelIds, verifiedModelId) {

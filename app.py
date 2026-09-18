@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from src.runtime_binding import CODEX_MODEL, CODEX_CREDENTIAL, CODEX_PROTOCOL, BROWSER_CREDENTIAL, DEEPSEEK_CREDENTIAL, codex_enabled, local_runtime_preference
 from src.codex_runtime import CodexTimeoutError, call_codex
+from src.byok_providers import BROWSER_REFERENCES, PROVIDERS as BYOK_PROVIDERS, RequestCredential, call_provider, valid_key, visual_check_payload, visual_check_passed
 from src.pdf_delivery import render_complete_pdf_pages
 from src.conversation_attachments import CONTRACT as ATTACHMENTS_CONTRACT, REQUEST_LIMIT as ATTACHMENTS_REQUEST_LIMIT
 
@@ -359,6 +360,8 @@ def candidate_conversation_failure_diagnostics(error: CandidateConversationRunti
 
 
 def call_ariadne_model(credential: str, payload: dict, *, response_limit: int) -> tuple[int, dict]:
+    if isinstance(credential, RequestCredential):
+        return call_provider(credential, payload, response_limit=response_limit)
     if credential == CODEX_CREDENTIAL:
         return call_codex(credential, payload)
     return call_deepseek_chat_completions(credential, payload, response_limit=response_limit)
@@ -859,8 +862,11 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
     def runtime_api_key(self, reference=DEEPSEEK_CREDENTIAL):
         """A browser-supplied key belongs only to this request; never persist it."""
         supplied = self.headers.get("X-Ariadne-Provider-Key")
-        if reference == BROWSER_CREDENTIAL:
-            return supplied if supplied and 12 <= len(supplied) <= 2000 and supplied.isascii() and not any(c.isspace() for c in supplied) else None
+        if reference in BROWSER_REFERENCES:
+            provider = BROWSER_REFERENCES[reference]
+            if not valid_key(supplied) or self.headers.get("X-Ariadne-Provider", "deepseek") != provider:
+                return None
+            return RequestCredential(provider, supplied) if provider in BYOK_PROVIDERS else supplied
         # A changed credential source must not silently fall back to another key.
         if reference != DEEPSEEK_CREDENTIAL or supplied is not None:
             return None
@@ -1072,8 +1078,8 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/model-updates/verify":
             self.verify_model_update()
             return
-        if parsed.path == "/api/runtime-providers/qwen/connection-check":
-            self.qwen_runtime_connection_check()
+        if parsed.path in {f"/api/runtime-providers/{provider}/connection-check" for provider in BYOK_PROVIDERS}:
+            self.connect_external_provider(parsed.path.split("/")[3])
             return
         if parsed.path == "/api/runtime-providers/deepseek/connection-check":
             self.connect_deepseek()
@@ -1243,6 +1249,39 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         if result["ok"]:
             public.update(models=[DEEPSEEK_VISION_MODEL], verified_model_id=DEEPSEEK_VISION_MODEL)
         self.send_json(result["status"], public)
+
+    def connect_external_provider(self, provider) -> None:
+        """Verify the caller's model with a complete synthetic PDF and JSON."""
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= 4000 or self.headers.get_content_type() != "application/json":
+                raise ValueError()
+            body = json.loads(self.rfile.read(length))
+            key = body.get("api_key") if isinstance(body, dict) else None
+            if not valid_key(key) or body.get("confirmed") is not True or provider not in BYOK_PROVIDERS:
+                raise ValueError()
+        except (ValueError, TypeError, UnicodeDecodeError):
+            self.send_json(400, {"error": "API_KEY_AND_CONFIRMATION_REQUIRED", "network_call_made": False})
+            return
+        network = False
+        try:
+            pages = render_complete_pdf_pages((PUBLIC_PATH / "provider-visual-check.pdf").read_bytes())
+            payload = visual_check_payload(provider, pages)
+            network = True
+            status, result = call_provider(RequestCredential(provider, key), payload, response_limit=100_000, timeout=90)
+            if status != 200 or not visual_check_passed(provider, result):
+                self.send_json(422, {"error": "PROVIDER_VISUAL_CHECK_FAILED", "network_call_made": True})
+                return
+        except HTTPError as error:
+            self.send_json(502, {"error": "PROVIDER_HTTP_ERROR", "provider_http_status": error.code, "network_call_made": True})
+            return
+        except (OSError, ValueError, AICareerIngestionError):
+            self.send_json(502, {"error": "PROVIDER_CONNECTION_FAILED" if network else "PROVIDER_PDF_PREPARATION_FAILED", "network_call_made": network})
+            return
+        model = BYOK_PROVIDERS[provider]["model"]
+        self.send_json(200, {"ok": True, "provider": provider, "models": [model], "verified_model_id": model,
+                            "network_call_made": True, "visual_pdf_pages_verified": 2, "structured_output_verified": True,
+                            "career_data_sent": False})
 
     def structure_model_candidate_proposal(self) -> None:
         """Execute the qualified Candidate image/PDF adapter after explicit consent."""

@@ -16,7 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def release_files():
     names = subprocess.check_output(["git", "ls-files", "-z"], cwd=ROOT).decode().split("\0")
     explicit = {"app.py", "web_app.py", "src/web_execution.py", "src/web_source_read.py", "Dockerfile", ".dockerignore", "LICENSE", "deploy/requirements.txt",
-                "deploy/gunicorn.conf.py", "deploy/compose.yaml", "deploy/Caddyfile", "deploy/downloads/.gitkeep"}
+                "deploy/gunicorn.conf.py", "deploy/compose.yaml", "deploy/Caddyfile", "deploy/downloads/.gitkeep",
+                "deploy/install-docker-ubuntu.sh", "src/byok_providers.py", "public/provider-visual-check.pdf"}
     selected = set(explicit)
     for name in filter(None, names):
         if name.startswith(("public/", "src/")) and not name.startswith("public/downloads/"):
@@ -46,6 +47,7 @@ def build(output, include_local_package=False):
         shutil.copyfile(source, target)
         records.append({"file": name, "sha256": hashlib.sha256(target.read_bytes()).hexdigest()})
     shutil.copyfile(ROOT / "docs/current/WEB_DEPLOYMENT.md", output / "README-DEPLOY.md")
+    shutil.copyfile(ROOT / "docs/current/WEB_FIRST_DEPLOY.md", output / "WEB_FIRST_DEPLOY.md")
     download = None
     if include_local_package:
         metadata = json.loads((ROOT / "public/downloads/latest.json").read_text())

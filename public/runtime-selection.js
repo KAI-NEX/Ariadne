@@ -276,6 +276,7 @@ const addModelSheet = window.JobRadarAddModelSheet.mount({
   sheet: byId("add-model-sheet"), panel: byId("add-model-panel"), backdrop: byId("add-model-backdrop"), close: byId("add-model-close"),
   provider: byId("add-model-provider"), "provider-value": byId("add-model-provider-value"), "provider-menu": byId("add-model-provider-menu"),
   key: byId("add-model-key"), clear: byId("add-model-clear"), "key-link": byId("add-model-key-link"), connect: byId("add-model-connect"),
+  "transfer-hint": byId("add-model-transfer-hint"), "check-hint": byId("add-model-check-hint"),
   status: byId("add-model-status"), "models-section": byId("add-model-models-section"), "model-list": byId("add-model-model-list"),
 }, ({ providerId, providerName, model }) => {
   const connected = { provider_id: providerId, provider_name: providerName, model_id: model.id, display_name: `${providerName} · ${model.id}`, connection_verified: true, multimodal_readiness: "VERIFIED" };

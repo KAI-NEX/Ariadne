@@ -2,7 +2,7 @@
 
 系统要求：macOS 14 及以上、Apple 芯片；当前只在构建电脑的 macOS 26.6 上实际验收，未覆盖全部兼容系统。
 
-适用于 Apple 芯片 Mac。本包不是 Apple App，也不要求先安装 Python、Node 或开发工具。包含 Ariadne 网站与后端、独立 Python、Codex CLI 0.153.4、预编译的文档读取与完整 PDF 转图工具。Codex 是可选连接方式，不是默认选择；Local 保存原件，DeepSeek 使用用户自己的 API Key；Gemini/Qwen 暂未开放执行。未完成 adapter 的模型不能执行。
+适用于 Apple 芯片 Mac。本包不是 Apple App，也不要求先安装 Python、Node 或开发工具。包含 Ariadne 网站与后端、独立 Python、Codex CLI 0.153.4、预编译的文档读取与完整 PDF 转图工具。Codex 是可选连接方式，不是默认选择；Local 保存原件，DeepSeek、Gemini 3.7 Flash 和千问 Qwen 3.8 Max 使用用户自己的 API Key（千问当前支持百炼北京地域）。未完成 adapter 的模型不能执行。
 
 ## 开始使用
 
@@ -19,7 +19,7 @@
 
 资料写入 `~/Library/Application Support/Ariadne Local/data`，版本代码分别保留在 `releases`。下载包不含旧工作区、私人材料、API Key 或 Codex 凭据。新安装不自动迁移开发版的磁盘资料；同一个浏览器与 localhost 地址可能保留旧的工作区映射，应保留旧项目并先明确迁移，不把新库的空白误认作删除。
 
-DeepSeek 用户在「连接设置 → 添加新的模型」填写自己的 API Key，点击前会说明固定测试图片和少量 API 费用。Key 保存在当前浏览器，实际请求时经本机服务送到 DeepSeek；项目文件与 Codex 连接器不接收该 Key。原有本机 Keychain 配置仍受支持。连通不等于支持完整分析。模型调用仍需既有传输确认，结果由用户保存；不随启动器切换模型或修改推理强度。
+用户在「连接设置 → 添加新的模型」选择 DeepSeek、Gemini 或千问并填写对应 API Key。DeepSeek 验证固定测试图片；Gemini/千问验证固定两页测试 PDF 的完整页面与 JSON，点击前说明少量 API 费用。Key 分别保存在当前浏览器，实际请求时经本机服务送到所选服务；项目文件与 Codex 连接器不接收该 Key。原有本机 Keychain 配置仍受支持。连通不等于支持完整分析。模型调用仍需既有传输确认，结果由用户保存；不随启动器切换模型或修改推理强度。
 
 ## 可选：连接公开网页版
 

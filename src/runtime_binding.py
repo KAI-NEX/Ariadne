@@ -6,6 +6,7 @@ Codex is opt-in on the machine running the backend and has its own transport.
 import os
 import json
 from pathlib import Path
+from src.byok_providers import PROVIDERS, BROWSER_REFERENCES
 
 CODEX_MODEL = "gpt-5.6-sol"
 CODEX_PROTOCOL = "CODEX_EXEC_JSONL"
@@ -38,7 +39,7 @@ def local_runtime_preference():
 
 
 def adapter_for(provider, domain_adapter):
-    return domain_adapter.replace("deepseek-", "codex-", 1) if provider == "codex" else domain_adapter
+    return domain_adapter.replace("deepseek-", provider + "-", 1) if provider in {"codex", *PROVIDERS} else domain_adapter
 
 
 def valid_binding(snapshot, domain_adapter):
@@ -48,6 +49,8 @@ def valid_binding(snapshot, domain_adapter):
         identity = ("deepseek-flash", "OPENAI_CHAT_COMPLETIONS", snapshot.credential_ref)
     elif snapshot.provider == "codex" and codex_enabled():
         identity = (CODEX_MODEL, CODEX_PROTOCOL, CODEX_CREDENTIAL)
+    elif snapshot.provider in PROVIDERS:
+        identity = (PROVIDERS[snapshot.provider]["model"], "OPENAI_CHAT_COMPLETIONS", f"browser-key://{snapshot.provider}/request")
     else:
         return False
     from src.model_settings import validate
@@ -60,8 +63,8 @@ def valid_binding(snapshot, domain_adapter):
 
 def resolve_runtime_credential(reference, expected, reader, **errors):
     from src.provider_runtime import resolve_credential_reference, ProviderRuntimeError
-    if reference == BROWSER_CREDENTIAL and expected == DEEPSEEK_CREDENTIAL:
-        credential = reader(BROWSER_CREDENTIAL)
+    if reference in BROWSER_REFERENCES and expected == DEEPSEEK_CREDENTIAL:
+        credential = reader(reference)
         if not credential:
             raise ProviderRuntimeError(errors.get("missing_code", "credential_not_configured"), "credential")
         return credential

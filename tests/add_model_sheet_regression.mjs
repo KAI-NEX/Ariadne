@@ -16,8 +16,8 @@ assert.deepEqual(Sheet.compatibleModels("deepseek", ["deepseek-v4-flash", "deeps
 assert.deepEqual(Sheet.compatibleModels("gemini", ["gemini-3.7-flash", "gemini-3.1-flash-lite"]).map((model) => model.id), ["gemini-3.7-flash"]);
 assert.deepEqual(Sheet.compatibleModels("qwen", ["qwen3.8-max", "qwen3.8-text"]).map((model) => model.id), ["qwen3.8-max"]);
 assert.deepEqual(Sheet.compatibleModels("unknown", ["anything"]), []);
-assert.match(source, /api\/runtime-providers\/deepseek\/connection-check/);
-assert.match(source, /正在发送模型列表请求/);
+assert.ok(source.includes('/api/runtime-providers/${state.providerId}/connection-check'));
+assert.match(source, /正在准备连接验证/);
 assert.match(source, /正在等待 \$\{provider\(\)\.name\} 响应/);
 assert.match(source, /正在验证图文输入能力/);
 assert.match(source, /localStorage/);
@@ -45,6 +45,7 @@ assert.match(source, /typeof onReturn === "function"/);
 assert.doesNotMatch(source, /AWAITING_APPROVAL|indexedDB/);
 
 const html = read("index.html"); const runtime = read("runtime-selection.js"); const css = resolveVICSS(read("styles.css"));
+assert.doesNotMatch(html, /data-provider-id="(?:gemini|qwen)" disabled/);
 assert.match(html, /id="add-model-sheet"/); assert.match(html, /id="add-model-close"/); assert.doesNotMatch(html, /id="add-model-complete"/);
 assert.doesNotMatch(html, /id="add-model-close"[^>]*>×</);
 assert.doesNotMatch(html, /id="add-model-drag-handle"/); assert.match(html, /id="add-model-provider"/);

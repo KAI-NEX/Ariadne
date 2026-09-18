@@ -2,6 +2,16 @@
   "version": "model-settings-v1",
   "models": [
     {
+      "provider": "gemini", "model": "gemini-3.7-flash", "protocol": "OPENAI_CHAT_COMPLETIONS",
+      "short_label": "Gemini 3.7 Flash", "compact_label": "3.7 Flash", "connection_id": "gemini-browser-v1",
+      "descriptor_revision": "gemini-37-20260918", "settings_schema_version": "gemini-fixed-v1", "parameters": {}
+    },
+    {
+      "provider": "qwen", "model": "qwen3.8-max", "protocol": "OPENAI_CHAT_COMPLETIONS",
+      "short_label": "千问 3.8 Max", "compact_label": "3.8 Max", "connection_id": "qwen-browser-v1",
+      "descriptor_revision": "qwen-38-20260918", "settings_schema_version": "qwen-fixed-v1", "parameters": {}
+    },
+    {
       "provider": "codex", "model": "gpt-5.6-sol", "protocol": "CODEX_EXEC_JSONL",
       "short_label": "GPT Sol", "compact_label": "Sol", "connection_id": "local-codex-v1",
       "descriptor_revision": "codex-sol-20260910", "settings_schema_version": "codex-effort-v1",

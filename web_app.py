@@ -19,6 +19,7 @@ from wsgiref.util import FileWrapper
 
 import app
 from src.runtime_binding import BROWSER_CREDENTIAL
+from src.byok_providers import BROWSER_REFERENCES, valid_key
 from src.web_execution import Sessions, WebBoundaryError
 from src.web_source_read import read_source
 from src.pdf_delivery import PUBLIC_PDF_LIMITS
@@ -38,7 +39,8 @@ MODEL_PATHS = frozenset({
 })
 CONTROL_PATHS = frozenset({"/api/candidate-conversation-turn/cancel", "/api/candidate-model-operation-state/delete"})
 CHECK_PATH = "/api/runtime-providers/deepseek/connection-check"
-POST_PATHS = MODEL_PATHS | CONTROL_PATHS | {CHECK_PATH, "/api/runtime-check", "/api/local-source-read"}
+CHECK_PATHS = {f"/api/runtime-providers/{provider}/connection-check": provider for provider in BROWSER_REFERENCES.values()}
+POST_PATHS = MODEL_PATHS | CONTROL_PATHS | set(CHECK_PATHS) | {"/api/runtime-check", "/api/local-source-read"}
 PUBLIC_SUFFIXES = {".html", ".js", ".css", ".json", ".svg", ".png", ".jpg", ".jpeg", ".webp", ".ico", ".woff", ".woff2", ".ttf", ".txt", ".zip"}
 
 
@@ -52,6 +54,7 @@ class RequestHandler(app.JobRadarHandler):
         self.headers["Content-Type"] = environ.get("CONTENT_TYPE", "")
         self.headers["Content-Length"] = str(len(body))
         self.headers["X-Ariadne-Provider-Key"] = environ.get("HTTP_X_ARIADNE_PROVIDER_KEY", "")
+        self.headers["X-Ariadne-Provider"] = environ.get("HTTP_X_ARIADNE_PROVIDER", "deepseek")
         self.rfile, self.wfile = io.BytesIO(body), io.BytesIO()
         self._execution_registries = registries
         self.status, self.response_headers = 200, []
@@ -60,9 +63,9 @@ class RequestHandler(app.JobRadarHandler):
         return True  # The WSGI boundary checked origin, method and route first.
 
     def runtime_api_key(self, reference=BROWSER_CREDENTIAL):
-        if reference != BROWSER_CREDENTIAL:
+        if reference not in BROWSER_REFERENCES:
             return None
-        return self.headers.get("X-Ariadne-Provider-Key") or None
+        return super().runtime_api_key(reference)
 
     def send_response(self, code, message=None):
         self.status = int(code)
@@ -147,7 +150,7 @@ class WebApplication:
             if path == "/healthz":
                 return self.json_response(200, {"ok": True, "mode": "web"})
             if path == "/api/web-runtime":
-                return self.json_response(200, {"mode": "web", "byok": ["deepseek"], "storage": "browser", "network_call_made": False})
+                return self.json_response(200, {"mode": "web", "byok": list(BROWSER_REFERENCES.values()), "storage": "browser", "network_call_made": False})
             if path == "/api/runtime-options":
                 return self.json_response(200, {"models": [], "local_preference": None, "network_call_made": False, "career_data_sent": False})
             if path == "/api/model-updates":
@@ -171,7 +174,7 @@ class WebApplication:
             raise WebBoundaryError("WEB_REQUEST_SIZE_INVALID", 400)
         # Public service budget: roughly 30 MB original material per request,
         # including a multi-file batch. Local mode keeps its existing limits.
-        limit = 4000 if path in CONTROL_PATHS | {CHECK_PATH, "/api/runtime-check"} else app.MAX_FILE_REQUEST_BYTES
+        limit = 4000 if path in CONTROL_PATHS | set(CHECK_PATHS) | {"/api/runtime-check"} else app.MAX_FILE_REQUEST_BYTES
         if not 0 < size <= limit:
             raise WebBoundaryError("WEB_REQUEST_SIZE_INVALID", 413)
         session = env.get("HTTP_X_ARIADNE_WEB_SESSION", "")
@@ -190,14 +193,17 @@ class WebApplication:
                 raise WebBoundaryError("WEB_JSON_INVALID", 400)
             if not isinstance(payload, dict):
                 raise WebBoundaryError("WEB_JSON_INVALID", 400)
-            key = payload.get("api_key") if path == CHECK_PATH else env.get("HTTP_X_ARIADNE_PROVIDER_KEY")
-            if not isinstance(key, str) or not 12 <= len(key) <= 2000 or not key.isascii() or any(char.isspace() for char in key):
+            key = payload.get("api_key") if path in CHECK_PATHS else env.get("HTTP_X_ARIADNE_PROVIDER_KEY")
+            if not valid_key(key):
                 raise WebBoundaryError("WEB_OWN_API_KEY_REQUIRED", 428)
+            provider = CHECK_PATHS.get(path, env.get("HTTP_X_ARIADNE_PROVIDER", "deepseek"))
+            if provider not in BROWSER_REFERENCES.values():
+                raise WebBoundaryError("WEB_RUNTIME_NOT_ALLOWED", 422)
             if path in MODEL_PATHS | {"/api/local-source-read"}:
                 snapshot = payload.get("runtime_snapshot")
-                if not isinstance(snapshot, dict) or snapshot.get("provider") != "deepseek" or snapshot.get("credential_ref") != BROWSER_CREDENTIAL:
+                if not isinstance(snapshot, dict) or snapshot.get("provider") != provider or snapshot.get("credential_ref") != f"browser-key://{provider}/request":
                     raise WebBoundaryError("WEB_RUNTIME_NOT_ALLOWED", 422)
-            with self.sessions.acquire(session, key, control=path in CONTROL_PATHS) as state:
+            with self.sessions.acquire(session, key, provider=provider, control=path in CONTROL_PATHS) as state:
                 state.bind_request(path, payload)
                 handler = RequestHandler(env, body, state.registries)
                 token = PUBLIC_PDF_LIMITS.set(True)

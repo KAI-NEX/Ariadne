@@ -9,7 +9,7 @@ function client(origin = 'http://127.0.0.1:8000') {
     location: new URL(origin),
     localStorage: { getItem: key => saved.get(key) ?? null },
     sessionStorage: { getItem: key => session.get(key) ?? null, setItem: (key, value) => session.set(key, value), removeItem: key => session.delete(key) },
-    fetch: async (input, options = {}) => { calls.push({ input: String(input), options }); return { status: 200, ok: true, json: async () => ({mode:'web', byok:['deepseek']}) }; },
+    fetch: async (input, options = {}) => { calls.push({ input: String(input), options }); return { status: 200, ok: true, json: async () => ({mode:'web', byok:['deepseek','gemini','qwen']}) }; },
   };
   vm.runInNewContext(script, context);
   return { fetch: context.AriadneConnector.fetch, calls, saved, session };
@@ -48,3 +48,29 @@ await c.fetch('/api/personal-understanding-turn', body('deepseek'));
 assert.equal(c.calls.at(-1).input, '/api/personal-understanding-turn');
 assert.equal(new Headers(c.calls.at(-1).options.headers).get('X-Ariadne-Connector'), null);
 console.log('PASS BYOK client: six operations, hosted sessions, Codex separation, no external credential forwarding');
+
+for (const provider of ['gemini', 'qwen']) {
+  const ownKey = `synthetic-${provider}-own-key`;
+  for (const current of [c, web]) {
+    current.saved.set(`job-radar-provider-api-key:${provider}`, ownKey);
+    for (const route of ['candidate-model-structure','job-model-structure','candidate-conversation-turn','job-conversation-turn','personal-understanding-turn','job-overview-turn','local-source-read']) {
+      await current.fetch('/api/' + route, body(provider));
+      const sent = current.calls.at(-1), headers = new Headers(sent.options.headers);
+      assert.equal(sent.input, '/api/' + route);
+      assert.equal(headers.get('X-Ariadne-Provider-Key'), ownKey);
+      assert.equal(headers.get('X-Ariadne-Provider'), provider);
+      assert.equal(headers.get('X-Ariadne-Connector'), null);
+    }
+    current.saved.set('job-radar-selected-runtime', JSON.stringify({provider}));
+    await current.fetch('/api/candidate-conversation-turn/cancel', {method:'POST',body:'{}'});
+    assert.equal(new Headers(current.calls.at(-1).options.headers).get('X-Ariadne-Provider-Key'), ownKey);
+    await current.fetch(`/api/runtime-providers/${provider}/connection-check`, {method:'POST',body:JSON.stringify({api_key:ownKey,confirmed:true})});
+    assert.equal(new Headers(current.calls.at(-1).options.headers).get('X-Ariadne-Provider-Key'), null, 'connection uses only the explicit body key');
+    await current.fetch('https://other.example/api/personal-understanding-turn', body(provider));
+    assert.equal(new Headers(current.calls.at(-1).options.headers).get('X-Ariadne-Provider-Key'), null);
+    current.saved.delete(`job-radar-provider-api-key:${provider}`);
+    await current.fetch('/api/personal-understanding-turn', body(provider));
+    assert.equal(new Headers(current.calls.at(-1).options.headers).get('X-Ariadne-Provider-Key'), null, 'missing key does not borrow another provider key');
+  }
+}
+console.log('PASS Gemini/Qwen routing, provider-specific credentials, cancel and paired Codex separation');

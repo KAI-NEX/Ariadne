@@ -133,6 +133,13 @@
   function modelDescriptorForRuntime(runtime, operation = null) {
     const normalized = Contract.normalizeCurrentRuntime(runtime);
     if (normalized.mode !== "model") return null;
+    if ((normalized.provider === "gemini" && normalized.model === "gemini-3.7-flash")
+      || (normalized.provider === "qwen" && normalized.model === "qwen3.8-max")) {
+      const domain = modelDescriptorForRuntime({ mode: "model", provider: "deepseek", model: "deepseek-flash" }, operation);
+      return Object.freeze({ ...domain, provider_id: normalized.provider, model_id: normalized.model,
+        discovery_source: "official_contract_and_shared_adapter_2026-09-18",
+        adapter_version: domain.adapter_version?.replace(/^deepseek-/, `${normalized.provider}-`) ?? null });
+    }
     if (normalized.provider === "codex" && normalized.model === "gpt-5.6-sol") {
       const domain = modelDescriptorForRuntime({ mode: "model", provider: "deepseek", model: "deepseek-flash" }, operation);
       return Object.freeze({ ...domain, provider_id: "codex", model_id: "gpt-5.6-sol", protocol: "CODEX_EXEC_JSONL",
@@ -158,6 +165,7 @@
   }
 
   function credentialFor(runtime) {
+    if (["gemini", "qwen"].includes(runtime?.provider)) return `browser-key://${runtime.provider}/request`;
     if (runtime?.provider === "deepseek") {
       try {
         if (globalThis.localStorage?.getItem("job-radar-provider-api-key:deepseek")) return "browser-key://deepseek/request";

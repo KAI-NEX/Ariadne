@@ -32,7 +32,7 @@ await assert.rejects(Selection.update({scope:'chat',runtime:chosen(sol),expected
 // Synthetic catalog/authority only: every qualified model under a Provider can
 // appear. Neither discovery alone nor a settings descriptor grants admission.
 selectHome(sol);
-const descriptors=['synthetic-vision-a','synthetic-vision-b','synthetic-text-only'].map(model=>({...Settings.catalog.models[0],model}));
+const descriptors=['synthetic-vision-a','synthetic-vision-b','synthetic-text-only'].map(model=>({...Settings.descriptor(sol.provider,sol.model),model}));
 Settings.catalog.models.push(...descriptors);
 const oldGate=globalThis.JobRadarRuntimeGate;
 globalThis.JobRadarRuntimeGate={...Gate,authorityFrom:r=>r,operationGate:(operation,r)=>({allowed:operation==='personal_understanding'&&r.model!=='synthetic-text-only'}),isModelRuntimeEligible:r=>r.model!=='synthetic-text-only'};
