@@ -56,8 +56,25 @@ class LocalPackageTests(unittest.TestCase):
         self.assertEqual(env["ARIADNE_CODEX_BINARY"], "/installed/bin/codex")
         self.assertNotIn("OPENAI_API_KEY", env)
         self.assertNotIn("PYTHONPATH", env)
-        self.assertNotIn("ARIADNE_WORKSPACE_ROOT", env)
+        self.assertEqual(env["ARIADNE_WORKSPACE_ROOT"], "/installed/app/data/workspaces")
         self.assertNotIn("prefer_codex", env)
+
+    def test_installed_workspace_uses_real_shared_root_without_weakening_storage(self):
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        from src.workspace_storage import WorkspaceStorage, WorkspaceError
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            bundle = root / "bundle"
+            (bundle / "app/data").mkdir(parents=True)
+            (bundle / "release.json").write_text('{"release":"workspace-test"}')
+            target = module.install(bundle, root / "home")
+            with self.assertRaises(WorkspaceError):
+                WorkspaceStorage(target / "app/data/workspaces").directory("a" * 32)
+            with patch.dict(os.environ, module.environment(target)):
+                storage = WorkspaceStorage()
+                self.assertEqual(storage.root, (root / "home/data/workspaces").resolve())
+                self.assertEqual(storage.status("a" * 32, "job-radar-local-first-v1"), {"initialized": False})
 
 
 if __name__ == "__main__":

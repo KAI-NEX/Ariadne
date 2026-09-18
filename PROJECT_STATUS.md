@@ -1,5 +1,14 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-19 — 独立窗口 macOS App 与退出即停（COMPLETE；本机验收，未替换公网下载）
+
+- 按用户“像 App 一样点击打开、关闭就停止、安装后可用”的要求，将可分发包升级为 AppKit + WKWebView 的 `Ariadne.app`，自带现有 Python、Codex 和文档工具。每次打开进入运行选择；关闭最后一个窗口或 ⌘Q 停止本次服务和子进程，最小化保持运行。图标复用 VI 色彩和「衡」字标；网页业务界面、Provider/model、传输确认与人工保存边界不改。
+- 原生窗口通过 stdin 管道持有监护进程；父进程丢失同样触发清理。只管理自己创建的子进程树（含另起 session 的模型子进程），不按程序名杀进程、不复用或接管已有端口、不改变固定 8000 origin。端口占用明确提示，旧版与开发服务保留。退出中断未完成操作，已发到 Provider 的请求不保证取消计费。
+- 修复打包安装的资料路径问题：共享 `data/workspaces` 的安装链接被存储层拒绝。启动器传入本安装的真实规范路径，继续拒绝存储内符号链接及越界；不放宽 `WorkspaceStorage`。App 的 WebKit 设置/工作区映射与原浏览器独立，旧资料不自动迁移；新版本继续保留共享 data、旧 release 和原下载包。
+- 原生 CUA 验证选择 Local、系统文件选择、合成 TXT 保存、红色关闭按钮及 ⌘Q 释放监听端口、重新打开保留选择、原件列表恢复和再次读取；磁盘原件 SHA-256 相同。egolite 对同一隔离服务验证正常网页渲染及原件保存/重开，未调用 Provider。原生自动化将窗口后台化，使 WebKit 动画暂停；专用 `DESKTOP_QA` 构建仅完成有限动画以验证交互，正式包不含该运行代码，不把该截图当作前台动画验收。
+- 5 项生命周期回归、4 项安装回归、工作区存储回归及 VI/diff 检查通过；覆盖 EOF、信号、冲突、启动中断、独立 session 子进程清理和无关进程保留。最终 ZIP 解压到独立目录再安装，真实后端身份、工作区读写准备、退出释放端口、1178 个包内文件 hash、ZIP 完整性及 ad-hoc 签名验证通过。首次 CUA 启动未携带测试参数，曾创建默认安装目录中的该测试 release，因 8000 已占用退出，未接管原服务或改写原资料；该产物和日志保留。
+- 最终产物 `.cache/local-distribution/20260918-161228/Ariadne.app` 及同目录 ZIP（111,953,471 bytes），SHA-256 `6feb0fd2061e391f656acec61f8ced53edc0c6922eef5942f74b71acf6f97931`。证据在 `.cache/desktop-app-20260918/`，使用说明见 [本地安装包](docs/current/LOCAL_DISTRIBUTION.md)。仅 Apple 芯片/macOS 14+ 构建并在本机验收；尚未 Apple 公证、另一台 Mac 首次 Gatekeeper 验收、Intel/Windows 或本轮真实模型验收。公网仍为 `20260918-104410` 旧终端包，本阶段未发布、push 或更换下载元数据。
+
 ## 2026-09-18 — 蓝色下载链接与本地安装包公开下载（COMPLETE；已上线）
 
 - 用户反馈正式网站 Codex 浮窗下载链接为黑色、下载页提示没有安装包。下载链接改用既有 VI 交互蓝；此前 ZIP 仅保存在本机且 Pages 下载 metadata 为 `available:false`，现已发布到 [GitHub Release](https://github.com/KAI-NEX/Ariadne/releases/tag/local-20260918-104410)。包版本 `20260918-104410`，111,601,193 bytes，SHA-256 `2636abcf8b5ab85f2921bc4c557e0deb09f4c5bd0583793faa109d68b28ae6eb`。

@@ -4,6 +4,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import plistlib
 from pathlib import Path
 import shutil
 import subprocess
@@ -24,7 +25,8 @@ def build(args):
         raise SystemExit("Build on macOS arm64 with Swift installed.")
     release = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     root = ROOT / ".cache/local-distribution" / release
-    bundle = root / "Ariadne Local"
+    app_bundle = root / "Ariadne.app"
+    bundle = app_bundle / "Contents/Resources/runtime"
     bundle.mkdir(parents=True)
     (bundle / "bin").mkdir()
     (bundle / "licenses").mkdir()
@@ -94,11 +96,33 @@ fi
     shutil.copy2(ROOT / "docs/current/LOCAL_DISTRIBUTION.md", bundle / "使用说明.md")
     # Copy rendering source alongside compiled helpers for provenance.
     shutil.copy2(ROOT / "scripts/portable_pdf.swift", bundle / "portable_pdf.swift")
+    executable = app_bundle / "Contents/MacOS/Ariadne"
+    executable.parent.mkdir(parents=True)
+    subprocess.run(["swiftc", "-target", "arm64-apple-macos14.0", "-O",
+                    str(ROOT / "scripts/desktop_macos.swift"), "-o", str(executable)], check=True)
+    shutil.copy2(ROOT / "scripts/desktop_macos.swift", bundle / "desktop_macos.swift")
+    icon_builder = root / "build-icon"
+    subprocess.run(["swiftc", str(ROOT / "scripts/build_desktop_icon.swift"), "-o", str(icon_builder)], check=True)
+    iconset = root / "Ariadne.iconset"
+    subprocess.run([str(icon_builder), str(ROOT / "public/vi/manifest.json"), str(iconset)], check=True)
+    subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o",
+                    str(app_bundle / "Contents/Resources/Ariadne.icns")], check=True)
+    (app_bundle / "Contents/Info.plist").write_bytes(plistlib.dumps({
+        "CFBundleExecutable": "Ariadne", "CFBundleIdentifier": "com.kai-nex.ariadne.local",
+        "CFBundleName": "Ariadne", "CFBundleDisplayName": "Ariadne · 衡",
+        "CFBundleIconFile": "Ariadne.icns",
+        "CFBundlePackageType": "APPL", "CFBundleShortVersionString": "1.0",
+        "CFBundleVersion": release.replace("-", "."), "LSMinimumSystemVersion": "14.0",
+        "NSHighResolutionCapable": True,
+        "NSAppTransportSecurity": {"NSAllowsLocalNetworking": True},
+    }))
     files = {str(p.relative_to(bundle)): hashlib.sha256(p.read_bytes()).hexdigest()
              for p in bundle.rglob("*") if p.is_file() and not p.is_symlink()}
     (bundle / "SHA256SUMS.json").write_text(json.dumps(files, indent=2) + "\n")
+    # Ad-hoc signing provides bundle integrity on this machine, not notarization.
+    subprocess.run(["codesign", "--force", "--sign", "-", str(app_bundle)], check=True)
     archive = root / f"Ariadne-Local-macOS-arm64-{release}.zip"
-    subprocess.run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", str(bundle), str(archive)], check=True)
+    subprocess.run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", str(app_bundle), str(archive)], check=True)
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     (root / (archive.name + ".sha256")).write_text(digest + "  " + archive.name + "\n")
     if args.publish_local:
@@ -109,7 +133,7 @@ fi
         # Public metadata contains no machine paths or runtime secrets.
         (downloads / "latest.json").write_text(json.dumps({"url": "/downloads/" + archive.name,
             "sha256": digest, "bytes": archive.stat().st_size, "release": release, "platform": "macOS arm64"}) + "\n")
-    print(json.dumps({"bundle": str(bundle), "archive": str(archive), "sha256": digest}))
+    print(json.dumps({"bundle": str(bundle), "app": str(app_bundle), "archive": str(archive), "sha256": digest}))
 
 
 if __name__ == "__main__":

@@ -2,32 +2,32 @@
 
 系统要求：macOS 14 及以上、Apple 芯片；当前只在构建电脑的 macOS 26.6 上实际验收，未覆盖全部兼容系统。
 
-适用于 Apple 芯片 Mac。本包不是 Apple App，也不要求先安装 Python、Node 或开发工具。包含 Ariadne 网站与后端、独立 Python、Codex CLI 0.153.4、预编译的文档读取与完整 PDF 转图工具。Codex 是可选连接方式，不是默认选择；Local 保存原件，DeepSeek、Gemini 3.7 Flash 和千问 Qwen 3.8 Max 使用用户自己的 API Key（千问当前支持百炼北京地域）。未完成 adapter 的模型不能执行。
+适用于 Apple 芯片 Mac。新构建产物为独立窗口的 `Ariadne.app`，不要求先安装 Python、Node 或开发工具。包含 Ariadne 网站与后端、独立 Python、Codex CLI 0.153.4、预编译的文档读取与完整 PDF 转图工具。Codex 是可选连接方式，不是默认选择；Local 保存原件，DeepSeek、Gemini 3.7 Flash 和千问 Qwen 3.8 Max 使用用户自己的 API Key（千问当前支持百炼北京地域）。未完成 adapter 的模型不能执行。
 
 ## 开始使用
 
-1. 解压 ZIP，在 Finder 双击「启动 Ariadne.command」。首次自动安装到 `~/Library/Application Support/Ariadne Local`，随后打开默认浏览器的 `http://127.0.0.1:8000/` 运行选择页。以后每次启动也从此页开始。
+1. 解压新 ZIP，将 `Ariadne.app` 拖到「应用程序」，双击打开。也可以直接双击解压后的 App。首次自动安装运行文件到 `~/Library/Application Support/Ariadne Local`，在独立窗口打开运行选择页；以后每次打开也从此页开始。可将 App 固定到 Dock，不需要保持终端窗口。
 2. 选择已经接入并通过资格检查的模型，或选择「本地运行」先保存原件，再点击继续进入工作空间。已保存的连接配置会保留。启动本身不调用模型，不传输资料、不选择 Provider。
-3. 若使用 ChatGPT/Codex 订阅，首次双击「登录 Codex.command」，完成官方浏览器登录，再回到「连接设置」选择 Codex。已有默认 Codex 登录可以复用；包中没有任何人的登录信息。API 使用者不必执行这个步骤。
-4. 以后直接双击「启动 Ariadne.command」。首次安装后的文件在 Application Support 中，原下载包可以留作启动入口；移动整个解压目录不影响已安装的数据。不要只移动其中的 command 文件。
+3. 若使用 ChatGPT/Codex 订阅，从 Mac 菜单「Ariadne → 登录 Codex…」打开官方登录流程（此首次设置使用终端和系统浏览器），完成后回到「连接设置」选择 Codex。已有默认 Codex 登录可以复用；包中没有任何人的登录信息。API 使用者不必执行这个步骤。
+4. 点击窗口红色关闭按钮、按 ⌘W 关闭最后一个 Ariadne 窗口，或按 ⌘Q 退出，即停止 App 自己启动的本地服务和子进程。最小化窗口只是收起，不停止服务。再次打开时已保存资料保留。
 
-保持服务终端打开；按 Ctrl+C 停止，资料不会删除。重复启动同版本会打开已有服务。8000 若被开发版或另一版本占用，会提示先停止原服务，不自动杀进程、不换端口。
+重复打开同一个 App 会回到原窗口。8000 若被旧终端版、开发版或另一份 App 占用，新 App 提示先退出原服务，不复用、不杀已有进程、不换资料地址。App 崩溃或被强制退出时，监护进程通过管道关闭信号停止本次服务。退出会中断未完成的本机处理，未保存编辑不会自动保存；已经发出的 API 请求可能仍在 Provider 端完成并计费。
 
-这是未公证的本地测试包，macOS 可能提示无法验证开发者。确认下载来源及 SHA-256 后，按系统「隐私与安全性」的提示允许打开；不需要关闭系统安全保护。Windows、Intel Mac 与首次下载后的 Gatekeeper 流程未验收。
+这是未公证的本地测试 App（仅 ad-hoc 签名），macOS 可能提示无法验证开发者。确认下载来源及 SHA-256 后，按系统「隐私与安全性」的提示允许打开；不需要关闭系统安全保护。Windows、Intel Mac 与另一台电脑首次下载后的 Gatekeeper 流程未验收，因此暂不能承诺完全无提示安装。
 
 ## 数据与模型
 
-资料写入 `~/Library/Application Support/Ariadne Local/data`，版本代码分别保留在 `releases`。下载包不含旧工作区、私人材料、API Key 或 Codex 凭据。新安装不自动迁移开发版的磁盘资料；同一个浏览器与 localhost 地址可能保留旧的工作区映射，应保留旧项目并先明确迁移，不把新库的空白误认作删除。
+资料写入 `~/Library/Application Support/Ariadne Local/data`，版本代码分别保留在 `releases`。下载包不含旧工作区、私人材料、API Key 或 Codex 凭据。App 使用持久的 WebKit 存储；它与原 Chrome/Safari/Codex 内置浏览器的设置和工作区映射独立。首次打开可能是空工作区，需要重新连接模型；旧磁盘资料和浏览器资料原地保留，不自动迁移或混入。以后使用相同 App 标识和地址会恢复该 App 的资料。升级保留旧 release 及共享 data。
 
 用户在「连接设置 → 添加新的模型」选择 DeepSeek、Gemini 或千问并填写对应 API Key。DeepSeek 验证固定测试图片；Gemini/千问验证固定两页测试 PDF 的完整页面与 JSON，点击前说明少量 API 费用。Key 分别保存在当前浏览器，实际请求时经本机服务送到所选服务；项目文件与 Codex 连接器不接收该 Key。原有本机 Keychain 配置仍受支持。连通不等于支持完整分析。模型调用仍需既有传输确认，结果由用户保存；不随启动器切换模型或修改推理强度。
 
 ## 可选：连接公开网页版
 
-本地版不需要配对。以后使用公开网站时，可双击「连接网页版.command」，输入准确的 HTTPS 来源（默认 `https://ariadne.kai-nex.com`），将终端配对码填入网站。配对五分钟有效、一次性，连接器退出即撤销；公开 HTTPS 本地网络权限仍需网站实际部署后验收。
+本地版不需要配对。旧包中的「连接网页版.command」仍保留；新 App 的兼容脚本在「显示包内容 → Contents/Resources/runtime」中，不作为日常入口。配对连接器是用户另行启动的服务，不属于 App 生命周期。公开 HTTPS 本地网络权限仍需网站实际部署后验收。
 
 ## 构建与发布
 
-2026-09-18 公开下载：[下载页](https://ariadne.kai-nex.com/download.html) · [GitHub Release](https://github.com/KAI-NEX/Ariadne/releases/tag/local-20260918-104410)。安装包 `20260918-104410` 为 111,601,193 bytes，SHA-256 `2636abcf8b5ab85f2921bc4c557e0deb09f4c5bd0583793faa109d68b28ae6eb`。正式网页已上线；大型 ZIP 托管于 GitHub，Pages 只发布下载元数据。仍适用上述平台与未公证限制。
+2026-09-18 已公开的旧终端版下载：[下载页](https://ariadne.kai-nex.com/download.html) · [GitHub Release](https://github.com/KAI-NEX/Ariadne/releases/tag/local-20260918-104410)。安装包 `20260918-104410` 为 111,601,193 bytes，SHA-256 `2636abcf8b5ab85f2921bc4c557e0deb09f4c5bd0583793faa109d68b28ae6eb`。该版本仍双击 command、关闭终端停止。本次 App 构建不自动替换公网下载；最新发布状态见 PROJECT_STATUS。大型 ZIP 托管于 GitHub，Pages 只发布下载元数据。
 
 `scripts/build_local_package.py --python <独立Python根目录> --codex-dir <已校验的Codex目录> --publish-local` 每次产生独立版本并保留旧产物；`public/downloads/latest.json` 指向本机可下载的 ZIP。大型 ZIP 与运行时不提交 Git；部署公开网站时需要另外发布 ZIP、校验文件和 metadata，未发布时页面明确显示尚无可下载版本。
 
