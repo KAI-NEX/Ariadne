@@ -1,5 +1,13 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-19 — 新版 macOS App 公开下载与 GitHub 同步（COMPLETE；已上线）
+
+- 按用户明确要求，发布双手图标的独立窗口 App，并将下载页、首页 Codex 入口和连接页改为 App 安装流程：解压拖入「应用程序」、Dock 固定、菜单登录 Codex、关闭最后窗口或 ⌘Q 停止；说明无需 Apple Developer 账户及未公证首次系统确认。本次包也包含同款网页 favicon 和更新的安装文案。
+- GitHub Release `local-20260918-172135` 已公开，ZIP 为 113,908,957 bytes，SHA-256 `e8d88429b9802537ec30e914263187abfafcee6e3b501d34ea59aa42d49918bd`，另附 `.sha256`。Release 标签对应安装说明准备提交 `ff9f5e0`，旧终端版及早期本地产物保留。公开包不含本机资料库、workspace 映射或登录凭据；不会把本机同步的私人资料分发给下载用户。
+- Pages 发布 `44179fdc`，与上一正式包比较仅 5 项变化：index.html、codex-connect.html、download.html、local-download.js、downloads/latest.json。下载配置已更新到新 Release；API Worker 未重新部署。egolite 验证正式网页文案与实际点击下载，完整下载 ZIP 与构建包大小/hash 一致且解压完整性通过；桌面和 390px 窄屏预览通过，无横向溢出。
+- 新 ZIP 解压到独立目录后安装/启动/退出、端口释放、签名与 1,183 个包内文件 hash 验证通过；5 项生命周期、下载 metadata/缺失文件/URL 边界、Cloudflare 配置与路由、VI/公开文件/diff 检查通过。出站 Git 的 212 个既有新增 blob 凭据模式检查通过，未提交的个人/其他任务文件继续保留。主分支推送在本阶段收口时核对，不重写历史。
+- 构建包 `.cache/local-distribution/20260918-172135/`；网页包 `.cache/cloudflare-distribution/20260919-desktop-app-public/`；完整发布及浏览器下载证据 `.cache/desktop-publication-20260919/`。本机已安装 App 的资料与正在运行的服务未被替换；未做另一台 Mac 的首次 Gatekeeper 验收或本轮真实模型调用。
+
 ## 2026-09-19 — 双手图标作为正式网站 favicon（COMPLETE；已上线）
 
 - 正式 `ariadne.kai-nex.com` 复用用户选定的 App 双手图标。新增可复现导出脚本，产出 16/32/48 px PNG、多尺寸 ICO 和 180 px Apple touch icon；20 个静态 HTML 与构建生成的 404 页面声明图标及缓存版本。Apple 图标源、原图和页面业务 UI 保留。

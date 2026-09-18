@@ -33,7 +33,7 @@
 
 ## 构建与发布
 
-2026-09-19 新版 App 发布配置：[20260918-172135](https://github.com/KAI-NEX/Ariadne/releases/tag/local-20260918-172135)，113,908,957 bytes，SHA-256 `e8d88429b9802537ec30e914263187abfafcee6e3b501d34ea59aa42d49918bd`。网页下载入口与安装步骤使用独立窗口 App（拖入「应用程序」、菜单登录 Codex、关闭窗口停止）；旧终端版 Release 保留为历史版本。实际发布验收见 PROJECT_STATUS 最新条目。
+2026-09-19 新版 App 已公开发布：[20260918-172135](https://github.com/KAI-NEX/Ariadne/releases/tag/local-20260918-172135)，113,908,957 bytes，SHA-256 `e8d88429b9802537ec30e914263187abfafcee6e3b501d34ea59aa42d49918bd`。网页下载入口与安装步骤使用独立窗口 App（拖入「应用程序」、菜单登录 Codex、关闭窗口停止）；旧终端版 Release 保留为历史版本。实际发布验收见 PROJECT_STATUS 最新条目。
 
 2026-09-18 已公开的旧终端版下载：[下载页](https://ariadne.kai-nex.com/download.html) · [GitHub Release](https://github.com/KAI-NEX/Ariadne/releases/tag/local-20260918-104410)。安装包 `20260918-104410` 为 111,601,193 bytes，SHA-256 `2636abcf8b5ab85f2921bc4c557e0deb09f4c5bd0583793faa109d68b28ae6eb`。该版本仍双击 command、关闭终端停止。本次 App 构建不自动替换公网下载；最新发布状态见 PROJECT_STATUS。大型 ZIP 托管于 GitHub，Pages 只发布下载元数据。
 
