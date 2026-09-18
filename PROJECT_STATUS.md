@@ -1,5 +1,11 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-19 — 双手图标作为正式网站 favicon（COMPLETE；已上线）
+
+- 正式 `ariadne.kai-nex.com` 复用用户选定的 App 双手图标。新增可复现导出脚本，产出 16/32/48 px PNG、多尺寸 ICO 和 180 px Apple touch icon；20 个静态 HTML 与构建生成的 404 页面声明图标及缓存版本。Apple 图标源、原图和页面业务 UI 保留。
+- Pages 发布 `f8b1c110`；与上一正式 Pages 产物比较，仅 21 个 HTML 图标声明和 5 个图标资源发生变化，API Worker、运行配置与已公开安装包下载元数据不变。egolite 在正式 HTTPS 首页核对 icon/touch 链接与实际 HTTP 200、MIME、SHA-256，三项资源与本机发布包完全一致。21 页引用和 ICO 16/32/48 内嵌 PNG 完整性、VI/diff 检查通过，48 px 预览核对。
+- 构建包与证据 `.cache/cloudflare-distribution/20260919-favicon/`；未调用模型、修改资料、重建本机 App 或推送 Git。浏览器可能保留旧 favicon，可刷新或重新打开标签页。
+
 ## 2026-09-19 — 双手图标、Dock 安装与 egolite 资料同步（COMPLETE；本机）
 
 - 按用户提供的双手/连接线图像与 Apple WWDC25 361 制作独立 App 图标。原图及 imagegen 前景原地保留；`assets/desktop-icon/Ariadne.icon` 使用 1024 点画布、独立透明前景、系统背景与圆角；复杂纹理关闭前景 glass/specular，Default 保留黑白纹理，Dark/Mono 使用清晰轮廓。Apple `actool` 输出 Assets.car 与兼容 ICNS，默认/深色/染色实际渲染核对。Icon Composer 首次许可由用户明确同意后接受；GUI 菜单操作遇到工具错误，改用已安装的 Apple 编译工具完成。

@@ -80,7 +80,7 @@ def build(output, pdfjs, download_url=None):
             raise ValueError("Contract export failed: " + path)
         (pages / path.lstrip("/")).write_bytes(b"".join(chunks))
     # Export the application pages unchanged, without the former preview banner.
-    (pages / "404.html").write_text('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>Ariadne · 页面不存在</title><p>页面不存在。<a href="/">返回 Ariadne</a></p></html>')
+    (pages / "404.html").write_text('<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>Ariadne · 页面不存在</title><link rel="icon" href="/favicon.ico?v=hands-1"><link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png?v=hands-1"></head><p>页面不存在。<a href="/">返回 Ariadne</a></p></html>')
     vendor = pages / "vendor/pdfjs"
     vendor.mkdir(parents=True)
     for name in ("pdf.mjs", "pdf.worker.mjs"):
