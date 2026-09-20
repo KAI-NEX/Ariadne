@@ -1,5 +1,11 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-20 — 网页 Skill 引导改为安装优先（COMPLETE；未发布）
+
+- 按用户反馈，首页「通过本地 Agent 使用」说明改为三步：先安装 Skill（立即提供安装页入口与复制/粘贴说明）→ 安装完成后在 Codex 输入调用语句 → 在独立窗口添加资料与提问。旧配对 URL 的说明同步此顺序。
+- 安装页标题明确「先安装 Ariadne Skill」，说明等待安装/依赖检查完成再调用；修正页首残留的“选择运行方式”旧流程。只调整引导内容，不改变安装执行、模型或存储行为。
+- 安装指令与入口回归、VI、diff 检查通过；egolite 验证桌面/390px 三步顺序、安装链接跳转与无横向溢出。证据在 `.cache/skill-guide-order-20260920/`。未发布公网、未更新本机 Skill 运行包，原未提交资料保留。
+
 ## 2026-09-20 — Web / Skill 双端架构与本地直达工作空间（COMPLETE；本机交付，未发布公网）
 
 - 按用户明确决定从组合层拆分：Web 仅 BYOK API + 浏览器内容库，Skill 仅本机 Codex + 文件库。新增产品配置、产品 shell、同源 transport 与 Skill 服务组合器；不再由 hostname、旧配对或旧 API 偏好决定路由。共用 Candidate/Job 页面、来源、上下文、RuntimeSnapshot、Working/Proposal、Human Save 与版本契约。

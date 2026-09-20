@@ -69,10 +69,10 @@
     <dialog id="skill-guide" class="add-model-panel codex-more-dialog skill-guide-dialog" aria-labelledby="skill-guide-title">
       <header class="add-model-header"><button id="skill-guide-close" class="sheet-icon-button" type="button" aria-label="关闭"></button><h2 id="skill-guide-title">通过本地 Agent 使用</h2></header>
       <div class="add-model-scroll-area"><div class="add-model-body codex-more-copy">
-        <p>安装 Ariadne Skill 后，在 Codex 中输入 <code>$ariadne 打开 Ariadne</code>，即可直接进入独立窗口的工作空间。</p>
-        <p>资料保存在这台电脑，分析使用你的 Codex。关闭最后窗口即停止服务，已保存资料保留。</p>
-        <p>网页版使用自己的 API Key；网页资料与 Skill 本地资料各自保存，不自动同步。目前已支持 Codex，其他 Agent 待适配。</p>
-        <a class="add-model-key-link" href="/install.html">查看安装步骤并复制指令</a>
+        <section><p class="add-model-label">1. 先安装 Skill</p><p>打开安装页，复制安装指令，粘贴到 Codex 对话中并发送，让它安装并检查所需依赖。</p><a class="add-model-key-link" href="/install.html">前往安装页 · 复制安装指令</a></section>
+        <section><p class="add-model-label">2. 安装完成后调用</p><p>在 Codex 对话中输入并发送 <code>$ariadne 打开 Ariadne</code>，即可直接进入独立窗口的工作空间。</p></section>
+        <section><p class="add-model-label">3. 在窗口中使用</p><p>添加个人资料或职位材料，再围绕材料提问。分析使用你的 Codex，结果由你审阅保存；关闭最后窗口即停止服务，已保存资料保留。</p></section>
+        <p>网页资料与 Skill 本地资料各自保存，不自动同步。目前已支持 Codex，其他 Agent 待适配。</p>
       </div></div>
     </dialog>
     <script src="/ascii-waves.js?v=runtime-ui-v48"></script>
