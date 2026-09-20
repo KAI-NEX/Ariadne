@@ -176,7 +176,8 @@ def open_local(port=8766, data_dir=None):
             raise KeyboardInterrupt
         previous = {sig: signal.signal(sig, stop) for sig in (signal.SIGINT, signal.SIGTERM)}
         print(json.dumps({"status": "ready", "mode": "local-ui",
-            "url": f"http://127.0.0.1:{server.server_port}/", "pairing_required": False,
+            "url": f"http://127.0.0.1:{server.server_port}/",
+            "origin": f"http://127.0.0.1:{server.server_port}", "pairing_required": False,
             "codex_ready": result["ready"], "checks": result["checks"],
             "data_directory": str(state), "model_call_made": False}), flush=True)
         try:
@@ -194,7 +195,7 @@ def open_local(port=8766, data_dir=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("doctor", "open", "connect"))
+    parser.add_argument("action", choices=("doctor", "open", "window", "desktop", "connect"))
     parser.add_argument("--origin", default="https://ariadne.kai-nex.com")
     parser.add_argument("--port", type=int, default=8766, help="Local UI port; changing it creates a different browser origin.")
     parser.add_argument("--data-dir", type=Path, help="Explicit local UI data directory; defaults outside the Skill install.")
@@ -204,13 +205,24 @@ def main():
         print(json.dumps(result, ensure_ascii=False))
         return 0 if result["ready"] else 1
     try:
+        if args.action in {"window", "desktop"}:
+            from skill_window import open_window, supervise
+            if not 1024 <= args.port <= 65535:
+                raise ValueError("SKILL_PORT_INVALID")
+            state = args.data_dir or Path.home() / "Library/Application Support/Ariadne Skill"
+            if args.action == "window":
+                return open_window(runtime_root(), args.port, state)
+            return supervise(runtime_root(), args.port, state)
         if args.action == "open":
             if not 0 <= args.port <= 65535:
                 raise ValueError("SKILL_PORT_INVALID")
             return open_local(args.port, args.data_dir)
         return connect(args.origin)
-    except (ValueError, OSError):
-        print(json.dumps({"error": "CONNECTOR_SETUP_FAILED", "action": "Check the exact HTTPS origin and Skill installation."}))
+    except (ValueError, OSError, subprocess.SubprocessError) as error:
+        if args.action in {"window", "desktop"}:
+            print(json.dumps({"error": "NATIVE_WINDOW_SETUP_FAILED", "action": str(error)}))
+        else:
+            print(json.dumps({"error": "CONNECTOR_SETUP_FAILED", "action": "Check the exact HTTPS origin and Skill installation."}))
         return 1
 
 

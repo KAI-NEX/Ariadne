@@ -32,18 +32,18 @@
     <section class="runtime-connect-shell vi-span-12">
       <a class="runtime-back-link" href="/">返回运行选择</a>
       <p class="runtime-step">Ariadne · 网页 + Skill</p>
-      <h1>在 Codex 打开 Ariadne。</h1>
-      <p class="runtime-connect-copy">安装 Ariadne Skill，让 Codex 直接打开完整页面：选择运行方式，再进入个人资料、职位和对话。保留原 App 的使用流程，无需安装 Ariadne App。</p>
+      <h1>让 Codex 打开 Ariadne 独立窗口。</h1>
+      <p class="runtime-connect-copy">安装 Ariadne Skill，让 Codex 启动独立窗口中的完整页面：选择运行方式，再进入个人资料、职位和对话。保留原 App 的使用流程，无需安装 Ariadne App。</p>
       <p><a id="skill-download" class="runtime-back-link hidden" download>下载 Ariadne Skill（ZIP）</a></p>
       <p id="skill-download-status" class="runtime-message" role="status">正在检查 Skill 下载…</p>
       <p><a id="skill-download-checksum" class="runtime-back-link hidden" download>下载 SHA-256 校验文件</a></p>
       <ol class="runtime-connect-copy">
         <li>下载并解压 ZIP，将完整的「ariadne」文件夹交给 Codex，告诉它：「把这个文件夹安装为 Ariadne Skill，保留已有文件。」</li>
-        <li>在 Codex 中调用 <code>$ariadne</code>，说「打开 Ariadne」。Skill 检查环境并启动本地页面，在 Codex 浏览器面板打开运行选择页；无需配对码。</li>
+        <li>在 Codex 中调用 <code>$ariadne</code>，说「打开 Ariadne」。Skill 在 Mac 上打开独立窗口，显示运行选择页；无需配对码，也不使用 Codex 内置浏览器。</li>
         <li>选择自己的 Codex、API 模型或本地运行，再点击继续。缺少 Codex 登录或 PDF 工具时，Skill 会说明；仍可先用本地运行保存原件。</li>
-        <li>让本次服务保持运行，在页面中管理资料和职位；发送材料仍需确认，结果由你审阅保存。使用结束后，让 Agent 停止服务。更新 Skill 不会替换独立存放的资料。</li>
+        <li>在窗口中管理资料和职位；发送材料仍需确认，结果由你审阅保存。关闭最后窗口或按 ⌘Q 自动停止 Ariadne，已保存资料保留。</li>
       </ol>
-      <p class="runtime-connect-copy">Skill 包含完整页面和运行代码，不捆绑芯片专用程序。需要 Python 3.9+；使用 Codex 分析还需兼容 CLI、本人登录和 Poppler。首版接入 Codex，其他 Agent 与原生 Windows 尚未验证。</p>
+      <p class="runtime-connect-copy">Skill 包含完整页面和运行代码，不捆绑芯片专用程序。独立窗口需要 macOS 14+、Apple 命令行开发工具和 Python 3.9+，首次按本机芯片编译窗口程序；使用 Codex 分析还需兼容 CLI、本人登录和 Poppler。首版接入 Codex，其他 Agent 与原生 Windows 尚未验证。</p>
       <p class="runtime-connect-copy">也可以直接<a class="runtime-back-link" href="https://ariadne.kai-nex.com/">使用公开网页版</a>和自己的 API Key。要让公开网页版调用本机 Codex，在 Skill 中说「连接公开网页版」，再到<a class="runtime-back-link" href="/codex-connect.html">配对页面</a>确认连接。旧 Mac App、本地 Skill 和公开网页的资料不自动同步。</p>
       <details>
       <summary class="runtime-connect-copy">历史 Mac App 下载（Apple 芯片专用）</summary>

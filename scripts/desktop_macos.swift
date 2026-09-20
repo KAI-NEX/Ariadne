@@ -34,14 +34,44 @@ final class AriadneApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
                 origin = URL(string: "http://127.0.0.1:\(port)")!
             }
             #endif
+            #if SKILL_WINDOW
+            var args = CommandLine.arguments
+            if args.count == 1 {
+                let file = Bundle.main.resourceURL!.appendingPathComponent("skill-launch.json")
+                if let settings = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: String],
+                   let python = settings["python"], let launcher = settings["launcher"],
+                   let state = settings["home"], let port = settings["port"] {
+                    args += [python, launcher, state, port]
+                }
+            }
+            guard args.count == 5, let port = Int(args[4]), (1024...65535).contains(port) else {
+                throw NSError(domain: "Ariadne", code: 2, userInfo: [NSLocalizedDescriptionKey: "Skill 启动参数无效"])
+            }
+            home = URL(fileURLWithPath: args[3])
+            origin = URL(string: "http://127.0.0.1:\(port)")!
+            if let icon = NSImage(contentsOf: Bundle.main.resourceURL!.appendingPathComponent("Ariadne.png")) { NSApp.applicationIconImage = icon }
+            #endif
             try configureWorkspace(view.configuration)
             try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             if !FileManager.default.fileExists(atPath: logURL.path) { FileManager.default.createFile(atPath: logURL.path, contents: nil, attributes: [.posixPermissions: 0o600]) }
             let log = try FileHandle(forWritingTo: logURL)
             try log.seekToEnd()
             let process = Process()
+            #if SKILL_WINDOW
+            process.executableURL = URL(fileURLWithPath: args[1])
+            let launchFile = Bundle.main.resourceURL!.appendingPathComponent("skill-launch.json")
+            if let settings = try JSONSerialization.jsonObject(with: Data(contentsOf: launchFile)) as? [String: String] {
+                var environment = ProcessInfo.processInfo.environment
+                for key in ["PATH", "CODEX_HOME", "ARIADNE_CODEX_BINARY"] {
+                    environment[key] = settings[key]
+                }
+                process.environment = environment
+            }
+            process.arguments = ["-B", args[2], "desktop", "--data-dir", home.path, "--port", String(origin.port!)]
+            #else
             process.executableURL = runtime.appendingPathComponent("python/bin/python3")
             process.arguments = ["-I", "-B", runtime.appendingPathComponent("local_package.py").path, "desktop", "--home", home.path, "--port", String(origin.port!)]
+            #endif
             let parentPipe = Pipe()
             let stdout = Pipe()
             process.standardInput = parentPipe
@@ -92,8 +122,8 @@ final class AriadneApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         while let range = output.range(of: Data([10])) {
             let line = output.subdata(in: output.startIndex..<range.lowerBound)
             output.removeSubrange(output.startIndex..<range.upperBound)
-            if let state = try? JSONSerialization.jsonObject(with: line) as? [String: String],
-               state["status"] == "ready", state["origin"] == origin.absoluteString {
+            if let state = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
+               state["status"] as? String == "ready", state["origin"] as? String == origin.absoluteString {
                 ready = true
                 loading.removeFromSuperview()
                 view.window?.makeKeyAndOrderFront(nil)
@@ -109,8 +139,10 @@ final class AriadneApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "关于 Ariadne", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
+        #if !SKILL_WINDOW
         let login = appMenu.addItem(withTitle: "登录 Codex…", action: #selector(loginCodex), keyEquivalent: "")
         login.target = self
+        #endif
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "隐藏 Ariadne", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(withTitle: "退出 Ariadne", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")

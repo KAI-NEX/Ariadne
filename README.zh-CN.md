@@ -32,6 +32,8 @@ Ariadne 帮你结合自己的经历，理解一个真正关心的岗位。你可
 
 ### 网页 + Ariadne Skill（默认方向）
 
+Mac 默认由 Skill 打开独立窗口，关闭最后窗口即停止服务，保留资料；不使用 Codex 内置浏览器。首次需要 macOS 14+ 与 Apple Command Line Tools，窗口程序在本机按芯片编译。
+
 在 Codex 中调用 `$ariadne`，让 Agent 检查环境并直接打开本地运行选择页；无需配对即可进入资料、职位和对话界面。需要使用公开网页已有资料时，再选择配对连接。无需安装 Mac App，资料和人工保存边界保持。
 
 [安装与构建说明](docs/current/ARIADNE_SKILL.md) · [Skill 源码](skills/ariadne/SKILL.md)。完整 ZIP 随 Pages 构建生成；本阶段已完成本机验收，**新 Skill 下载页尚未发布到公网**。需要 Python 3.9+、兼容 Codex CLI 和 Poppler；不会因安装 Skill 自动支持任意 Agent 或所有操作系统。

@@ -142,6 +142,49 @@ class SkillTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             safe_copy(link, self.directory / "refused", "app.py")
 
+    def test_native_parent_pipe_and_signal_stop_owned_service(self):
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0))
+            port = sock.getsockname()[1]
+        state = self.directory / "native-data"
+        state.mkdir()
+        sentinel = state / "retained-original.txt"
+        sentinel.write_text("synthetic original")
+        command = [sys.executable, str(self.launcher), "desktop", "--port", str(port), "--data-dir", str(state)]
+        for stop in ("pipe", "signal"):
+            proc = subprocess.Popen(command, env=self.env, stdin=subprocess.PIPE,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            try:
+                self.assertTrue(select.select([proc.stdout], [], [], 10)[0])
+                ready = json.loads(proc.stdout.readline())
+                self.assertEqual(ready["origin"], f"http://127.0.0.1:{port}")
+                # A second window fails without stopping the existing listener.
+                conflict = subprocess.Popen(command, env=self.env, stdin=subprocess.PIPE,
+                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                try:
+                    self.assertEqual(conflict.wait(timeout=10), 1)
+                finally:
+                    conflict.communicate(timeout=5)
+                with socket.create_connection(("127.0.0.1", port), timeout=2):
+                    pass
+                if stop == "pipe":
+                    proc.stdin.close(); proc.stdin = None
+                else:
+                    proc.terminate()
+                proc.communicate(timeout=10)
+                self.assertEqual(proc.returncode, 0)
+                with socket.socket() as sock:
+                    self.assertNotEqual(sock.connect_ex(("127.0.0.1", port)), 0)
+                self.assertEqual(sentinel.read_text(), "synthetic original")
+            finally:
+                if proc.poll() is None:
+                    proc.terminate(); proc.communicate(timeout=10)
+
+    def test_native_missing_compiler_does_not_open_browser(self):
+        result = self.run_cli("window", "--data-dir", str(self.directory / "no-native-tools"))
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(json.loads(result.stdout)["error"], "NATIVE_WINDOW_SETUP_FAILED")
+
     def test_lifecycle_pairing_and_port_conflict(self):
         with socket.socket() as listener:
             listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

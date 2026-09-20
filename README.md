@@ -32,7 +32,9 @@ No model connection yet? You can still archive original materials in Local mode 
 
 ### Web + Ariadne Skill (preferred direction)
 
-Invoke `$ariadne` in Codex to check dependencies and open the complete local runtime-selection page in Codex. Local use needs no pairing code. Pairing remains optional when using the public web workspace. No Mac App is required; source tracking and explicit human save remain in place.
+On Mac, the Skill opens a standalone window. Closing its last window stops its service and keeps saved data. First use requires macOS 14+ and Apple Command Line Tools to compile the small window host for this Mac; it does not use Codex’s in-app browser.
+
+Invoke `$ariadne` in Codex to check dependencies and open the complete local runtime-selection page in its own window. Local use needs no pairing code. Pairing remains optional when using the public web workspace. No Mac App is required; source tracking and explicit human save remain in place.
 
 [Setup and build guide](docs/current/ARIADNE_SKILL.md) · [Skill source](skills/ariadne/SKILL.md). Pages builds include the complete Skill ZIP. Local acceptance is complete; **the updated public download page has not been deployed yet**. Python 3.9+, a compatible Codex CLI and Poppler are required. Other Agents and OS environments require their own verification.
 

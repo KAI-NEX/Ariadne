@@ -1,5 +1,12 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-20 — Skill 独立 Mac 窗口与随关随停（COMPLETE；本机）
+
+- 按用户最新要求，Skill 默认 `window` 打开独立 Ariadne 窗口，不使用 Codex 内置浏览器；复用原 App 的 WebKit 窗口、上传、下载和菜单。关闭最后窗口/⌘Q/窗口异常退出时，父管道关闭触发专属服务树停止，最小化保留运行，已保存资料保留。原无窗口 `open` 仅作明确选择的浏览器或开发入口。
+- 首次在本机以 Swift 编译轻量窗口壳，要求 macOS 14+ 与 Apple Command Line Tools，按本机 CPU 编译，源码包不夹带固定架构程序。通过 Launch Services 启动并缓存重新打开配置；仅保存工具路径与可选账户目录路径，不保存凭据。修复从 macOS 重开时 PATH 丢失导致 Codex/PDF 不可用。旧 App、两个已安装 Skill 备份、失败过程与 QA 全部保留。
+- 7 项 Skill 包回归、5 项原生服务生命周期回归、旧 App Swift typecheck、Skill 格式和 VI 正负向检查通过。实际独立窗口运行选择→Local 工作空间、关闭端口释放、重开与原件保留已验收；正式安装后再次实际关闭/重开，8766 当前正常且返回 Codex/DeepSeek 可用选项。截图、进程验收及新版 ZIP（859,445 bytes）在 `.cache/skill-window-20260920/`。
+- 已更新本机 Skill；旧浏览器 profile 与独立窗口 profile 不自动迁移。无真实模型请求、私人材料传输、公网发布或 push；Intel Mac/其他机器未验收。使用说明见 [Ariadne Skill](docs/current/ARIADNE_SKILL.md)。
+
 ## 2026-09-20 — Codex Skill 与完整本地网页（COMPLETE；本机安装，未发布）
 
 - 按用户要求将默认交付调整为网页 + Ariadne Skill。`$ariadne` 在 Codex 打开完整运行选择页面，选择 Codex/API/Local 后进入现有工作空间，本地同源无需配对；保留公开网页的可选短期配对通道和历史 Mac App。

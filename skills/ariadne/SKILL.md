@@ -1,20 +1,24 @@
 ---
 name: ariadne
-description: 打开 Ariadne 个人资料与职位工作空间，显示运行选择页面并使用用户自己的 Codex；也可连接公开网页版。检查依赖、启动本地网页或配对连接器，保留来源与人工保存流程。
+description: 打开 Ariadne 独立 Mac 窗口，显示个人资料与职位工作空间；关闭最后窗口自动停止服务。使用用户自己的 Codex，也可按需连接公开网页版，保留来源与人工保存流程。
 ---
 
 # Ariadne · 衡
 
-默认在 Codex 中直接打开完整的 Ariadne 页面：运行选择 → 工作空间 → 个人资料/职位及对话。它不是只返回分析文字的提示词，也不需要 Ariadne.app。使用当前用户的 Codex 登录，应用模型资格由 Ariadne 自己的契约决定，独立于当前 Agent 的模型设置。
+默认由 Codex 启动独立的 Ariadne Mac 窗口，显示完整页面：运行选择 → 工作空间 → 个人资料/职位及对话。它不是只返回分析文字的提示词，无需安装旧版 Ariadne.app。使用当前用户的 Codex 登录，应用模型资格由 Ariadne 自己的契约决定，独立于当前 Agent 的模型设置。
 
-## 默认：打开本地页面
+## 默认：独立 Mac 窗口
 
 所有脚本路径均相对于本 Skill；使用实际安装路径，不假设固定目录。
 
-1. 在可保留、可中断的终端会话运行 `python3 scripts/ariadne.py open`。启动时自动检查依赖，不发模型请求。若本任务已启动同一服务且仍在运行，直接打开其已有 URL；不要再启动一份。
-2. 等待 JSON 返回 `status: ready`。使用 Codex 的浏览器面板工具打开返回的 `url`（默认 `http://127.0.0.1:8766/`）；其他 Agent 使用其可用浏览器或系统浏览器。用户应直接看到与原 App 相同的运行选择页面。本地同源访问无需配对码；没有浏览器工具时给出可点击链接，不声称已经打开。
-3. 让用户选择 Codex、自己的 API 模型或 Local 并继续。Codex/PDF 依赖不足时，本地页面仍可保存原件，脚本会说明 Codex 尚不可用；不要声称 AI 已就绪。登录需用户本人完成，不读取或复制认证文件。可用 `python3 scripts/ariadne.py doctor` 复查。
-4. 保持服务终端运行。关闭网页不自动停止服务；用户要求停止时只中断本任务启动的终端（Ctrl+C），保留资料。不要安装开机启动、定时任务或按名称结束其他 Python/Codex。
+1. 在可保留终端运行 `python3 scripts/ariadne.py window`。首次用本机 Swift 编译器生成轻量窗口程序，后续复用缓存。需要 macOS 14+、Apple Command Line Tools 和 Python 3.9+；缺依赖明确报告，不自动安装或降级为浏览器。
+2. 脚本返回 `opening_window` 后核对独立窗口实际显示运行选择页。不要调用 Codex 内置浏览器或系统浏览器打开本地 URL。窗口已运行时直接使用它，不再创建一份或接管未知端口。
+3. 用户选择 Codex、自己的 API 模型或 Local 后继续。Codex/PDF 依赖不足仍可保存原件，但不能声称 AI 就绪；`doctor` 可复查。登录需用户本人完成，不读取认证文件。启动不发模型请求。
+4. 关闭最后一个 Ariadne 窗口或按 ⌘Q，即退出本次窗口和其专属本地服务；窗口异常退出也会收回服务。最小化不会退出，已保存资料保留，不安装开机启动或自动化。终端仅等待窗口结束，不需要用户手动结束服务。
+
+独立窗口使用自己的 WebKit profile，旧 Codex/普通浏览器 profile 的工作区身份和 API 连接不自动迁移。缓存窗口程序只用于此 Skill 启动，不替换 `/Applications/Ariadne.app`，不固定 Dock。
+
+仅当用户明确要求浏览器模式或开发验收时，使用 `python3 scripts/ariadne.py open` 启动原本的无窗口服务，再按用户指定的浏览器打开返回 URL；该模式关网页不会退出服务，需中断其终端。非 macOS 不静默使用此替代方式。
 
 本地使用独立稳定 origin 8766 和技能安装目录之外的数据目录：macOS 为 `~/Library/Application Support/Ariadne Skill`，其他 POSIX 为 `~/.local/share/ariadne-skill`。旧 App、旧 8000 和公开网页资料不自动迁移。普通启动不改端口、目录或浏览器 profile；端口冲突时不接管未知服务、不结束它，报告冲突。`--port`/`--data-dir` 仅用于用户明确指定的环境或隔离验收。
 

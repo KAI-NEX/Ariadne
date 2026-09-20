@@ -21,7 +21,7 @@ def runtime_files(root=ROOT):
                   or name.startswith("src/") and name.endswith((".py", ".swift"))
                   or name.startswith("data/") and name.endswith((".json", ".sql")) and not name.startswith("data/evaluation/")
                   or name.startswith("public/") and not name.startswith("public/downloads/")}
-    selected.add("public/skill-download.js")
+    selected.update({"public/skill-download.js", "scripts/desktop_macos.swift", "scripts/local_package.py"})
     return sorted(selected)
 
 
@@ -40,7 +40,7 @@ def safe_copy(source, destination, relative):
 def build(output):
     output.mkdir(parents=True, exist_ok=False)
     skill = output / "ariadne"
-    for name in ("SKILL.md", "agents/openai.yaml", "scripts/ariadne.py"):
+    for name in ("SKILL.md", "agents/openai.yaml", "scripts/ariadne.py", "scripts/skill_window.py"):
         safe_copy(ROOT / "skills/ariadne" / name, skill / name, name)
     hashes = {}
     for name in runtime_files():
