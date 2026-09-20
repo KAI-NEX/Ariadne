@@ -6,8 +6,8 @@ document.addEventListener("DOMContentLoaded", () => {
   message.className = "cloudflare-preview-notice";
   message.append("网页预览 · 自带 API Key · 资料保存在当前浏览器。 ");
   const download = document.createElement("a");
-  download.href = "/download.html";
-  download.textContent = "下载本地版";
+  download.href = "https://ariadne.kai-nex.com/install.html";
+  download.textContent = "安装 Ariadne Skill";
   message.append(download);
   const heading = document.querySelector(".v1-topbar");
   if (heading) heading.after(message);

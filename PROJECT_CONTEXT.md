@@ -1,5 +1,7 @@
 # Ariadne 项目上下文
 
+2026-09-20 最新交付更新：官网已正式改为[安装 Ariadne Skill](https://ariadne.kai-nex.com/install)，复制指令给 Codex 安装，旧下载页跳转；公开包和本机 Skill 同步到当前资料库编辑/删除、独立窗口与原图标版本。按用户要求将本机旧 Ariadne.app 移入废纸篓并移除其 Dock 固定项，旧资料保留、未迁移。日常在 Codex 输入 `$ariadne 打开 Ariadne`，独立窗口显示运行选择页，关闭最后窗口停止服务。其他电脑首次安装仍未实机验收；历史未发布/保留旧 App 描述以本条为准。
+
 2026-09-20 后续交互决定：用户明确不要 Codex 内置浏览器，本地 Skill 默认打开独立 Mac 窗口，关闭最后窗口即停止其专属本地服务，资料保留。已复用现有原生窗口并完成实际关闭/重开验收；首次需要 macOS 14+、Python 和 Apple Command Line Tools，按本机芯片编译缓存窗口。原浏览器入口保留为显式备选，旧 App 和各 profile 的资料不自动迁移。
 
 2026-09-20 用户将本地交付改为 Codex 可直接打开的 Ariadne Skill，并保留完整的运行选择页面。默认 Skill 在固定 8766 启动同源完整网页，资料保存在独立目录；可选配对模式供公开网页版连接本机 Codex。已同步两个资料库的编辑/删除及页头布局，独立包、本机安装与浏览器验收完成，旧 App/源码/资料保留。尚未发布新公网下载包，不自动迁移旧 origin 或账户资料，不声称所有 Agent/操作系统已支持。安装与边界见 [Ariadne Skill](docs/current/ARIADNE_SKILL.md)。

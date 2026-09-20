@@ -269,7 +269,7 @@ function openCodexConnection() {
   const model = directCodexModel();
   if (model) {
     selectVerifiedRuntimeModel(model.model_id, "codex");
-    setMessage("将使用这台电脑的 Codex 登录。首次使用请先在下载包中完成「登录 Codex」；发送材料仍需确认。");
+    setMessage("将使用这台电脑的 Codex 登录。首次使用请让 Codex 检查本机登录状态；发送材料仍需确认。");
   } else window.AriadneCodexConnect.open(byId("runtime-selector"));
 }
 const addModelSheet = window.JobRadarAddModelSheet.mount({

@@ -1,6 +1,6 @@
 # Codex 本机运行与 Web 连接器
 
-更新：2026-09-20。网页已部署；最新本地入口为 [Ariadne Skill](ARIADNE_SKILL.md)，默认打开独立 Mac 窗口中的本地运行选择界面，关闭最后窗口停止服务，另可选择启动本文的网页配对通道。新下载页和 Skill 尚待公网发布，首次 HTTPS 本地网络授权仍需实测。以下保留既有直连与配对协议。
+更新：2026-09-20。网页已部署；最新本地入口为 [Ariadne Skill](ARIADNE_SKILL.md)，默认打开独立 Mac 窗口中的本地运行选择界面，关闭最后窗口停止服务。官网提供[安装 Skill](https://ariadne.kai-nex.com/install.html)指令；需要本文的网页配对通道时，明确调用 `$ariadne 连接公开网页版`。首次 HTTPS 本地网络授权仍需实测。以下保留既有直连与配对协议。
 
 ## 两种运行方式
 

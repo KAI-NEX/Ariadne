@@ -16,7 +16,7 @@ from scripts.build_web_release import release_files
 from scripts.check_public_release import SECRET_PATTERN, FORBIDDEN_DIRS, PRIVATE_DATA_DIRS, SECRET_NAMES
 
 EXTRA = {"src/runtime_transport.py", "src/browser_pdf_delivery.py", "public/browser-pdf-delivery.js",
-         "public/cloudflare-preview.js", "public/cloudflare-preview.css", "public/skill-download.js"}
+         "public/cloudflare-preview.js", "public/cloudflare-preview.css", "public/skill-download.js", "public/skill-install.js", "public/install.html"}
 GITHUB = re.compile(r"https://github\.com/KAI-NEX/[A-Za-z0-9_.-]+/releases/download/[A-Za-z0-9_.-]+/(Ariadne-Local-macOS-arm64-[0-9-]+\.zip)")
 
 

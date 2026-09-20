@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <link rel="icon" href="/favicon.ico?v=hands-1" sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/png" href="/icons/favicon-32.png?v=hands-1" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=hands-1" sizes="180x180" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ariadne · 安装 Skill</title>
+  <link rel="stylesheet" href="/styles.css?vi=1" />
+  <link rel="stylesheet" href="/local-download.css" />
+    <meta name="description" content="在 Codex 中通过 Ariadne Skill 打开完整本地页面，保留资料库与人工审阅，无需安装 Mac App。" />
+    <link rel="canonical" href="https://ariadne.kai-nex.com/install.html" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Ariadne · 衡" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:title" content="安装 Ariadne · 衡 Skill" />
+    <meta property="og:description" content="在 Codex 中通过 Ariadne Skill 打开完整本地页面，保留资料库与人工审阅，无需安装 Mac App。" />
+    <meta property="og:url" content="https://ariadne.kai-nex.com/install.html" />
+    <meta property="og:image" content="https://ariadne.kai-nex.com/social/ariadne-preview.png?v=20260919" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="640" />
+    <meta property="og:image:alt" content="Ariadne 双手 Logo 与个人资料、职位描述工作空间；看懂经历，理解岗位，由你决定下一步。" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="安装 Ariadne · 衡 Skill" />
+    <meta name="twitter:description" content="在 Codex 中通过 Ariadne Skill 打开完整本地页面，保留资料库与人工审阅，无需安装 Mac App。" />
+    <meta name="twitter:image" content="https://ariadne.kai-nex.com/social/ariadne-preview.png?v=20260919" />
+    <meta name="twitter:image:alt" content="Ariadne 双手 Logo 与空工作空间，不含个人资料。" />
+  </head>
+<body class="runtime-page runtime-connect-page local-download-page">
+  <main class="vi-container vi-grid">
+    <section class="runtime-connect-shell vi-span-12">
+      <a class="runtime-back-link" href="/">返回运行选择</a>
+      <p class="runtime-step">Ariadne · 网页 + Skill</p>
+      <h1>让 Codex 打开 Ariadne 独立窗口。</h1>
+      <p class="runtime-connect-copy">安装 Ariadne Skill，让 Codex 启动独立窗口中的完整页面：选择运行方式，再进入个人资料、职位和对话。保留原 App 的使用流程，无需安装 Ariadne App。</p>
+      <div class="runtime-connect-form">
+        <button id="skill-install-copy" type="button" disabled>复制安装指令</button>
+      </div>
+      <p id="skill-install-status" class="runtime-message" role="status">正在检查可安装版本…</p>
+      <details id="skill-install-details" hidden>
+        <summary class="runtime-connect-copy">查看安装指令</summary>
+        <label class="runtime-connect-copy" for="skill-install-prompt">复制后粘贴到 Codex</label>
+        <textarea id="skill-install-prompt" class="skill-install-prompt" rows="7" readonly spellcheck="false"></textarea>
+      </details>
+      <ol class="runtime-connect-copy">
+        <li>点击「复制安装指令」，打开 Codex，将指令粘贴到对话中并发送。Codex 会获取完整 Skill、核对文件并安装；已有版本先备份。</li>
+        <li>首次安装让 Codex 检查所需依赖。安装好后，输入 <code>$ariadne 打开 Ariadne</code>。Skill 在 Mac 上打开独立窗口，显示运行选择页；无需配对码，也不使用 Codex 内置浏览器。</li>
+        <li>选择自己的 Codex、API 模型或本地运行，再点击继续。缺少 Codex 登录或 PDF 工具时，Skill 会说明；仍可先用本地运行保存原件。</li>
+        <li>在窗口中管理资料和职位；发送材料仍需确认，结果由你审阅保存。关闭最后窗口或按 ⌘Q 自动停止 Ariadne，已保存资料保留。</li>
+      </ol>
+      <p class="runtime-connect-copy">Skill 包含完整页面和运行代码，不捆绑芯片专用程序。独立窗口需要 macOS 14+、Apple 命令行开发工具和 Python 3.9+，首次按本机芯片编译窗口程序；使用 Codex 分析还需兼容 CLI、本人登录和 Poppler。首版接入 Codex，其他 Agent 与原生 Windows 尚未验证。</p>
+      <p class="runtime-connect-copy">也可以直接<a class="runtime-back-link" href="https://ariadne.kai-nex.com/">使用公开网页版</a>和自己的 API Key。要让公开网页版调用本机 Codex，在 Skill 中说「连接公开网页版」，再到<a class="runtime-back-link" href="/codex-connect.html">配对页面</a>确认连接。旧 Mac App、本地 Skill 和公开网页的资料不自动同步。</p>
+
+    </section>
+  </main>
+  <script src="/skill-install.js"></script>
+</body>
+</html>

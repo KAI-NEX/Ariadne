@@ -1,5 +1,12 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-20 — 官网安装 Skill 与本机 App 替换（COMPLETE）
+
+- 官网新增 `/install`：复制带公开包地址及 SHA-256 的安装指令给 Codex；复制失败可手动选择，包缺失/metadata 无效时禁用。旧下载页自动跳转，关于页/浮层/连接引导/中英 README 同步，取消日常手动下载 App 的流程。同步此前两个资料库的编辑/删除和页头布局。
+- 已发布 Cloudflare Pages `047f2d8c` 至正式域名；没有发布 API Worker。公网浏览器实际复制成功、旧 URL 跳转、桌面/390px 显示通过。公开 Skill 包 2,793,081 bytes，SHA-256 `37fb2622e94020ce815ea32d04f7f7c643f2ac945a0f844b73ad163d45efca73` 与构建一致。上线发现 HEAD 无 Content-Length，已补齐获取完整包检查大小/hash 的分支及失败回归。
+- 本机 Skill 已同步并通过 doctor。旧 `/Applications/Ariadne.app` 已移入废纸篓（`Ariadne-old-app-20260920.app`），仅移除对应 Dock 固定项；旧资料、安装备份和全部 QA 产物保留，未迁移资料。独立窗口继续使用同一原生图标与随关随停机制。
+- Skill 安装/导航/Codex runtime 回归、Web runtime 8 项、Skill bundle 7 项、VI/负向门禁及发布扫描通过。本轮无真实模型调用、私人材料传输、Git push；其他电脑首次安装及公网连接器首次本地网络授权仍未实机验收。证据在 `.cache/skill-install-publication-20260920/`，原有无关未提交修改原地保留。
+
 ## 2026-09-20 — Skill 沿用原 App 图标尺寸（COMPLETE；本机）
 
 - 修复独立 Skill 窗口直接用网页 180px touch icon 覆盖应用图标导致的尺寸/留白偏差。复用已安装原 App 的同一份 `Ariadne.icns` / `Assets.car` 和 `CFBundleIconFile` / `CFBundleIconName` 配置，去掉运行时 PNG 覆盖，原 Icon Composer 源文件与旧图标资源保留；图标内容变化纳入窗口缓存版本。

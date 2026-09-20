@@ -1,6 +1,12 @@
 # Ariadne 网页 + Skill
 
-更新：2026-09-20。默认交付方向改为网页 + 可在 Codex 直接打开的本地 Skill；保留旧 Mac App、源码和资料。本阶段完成本机安装、独立 ZIP、发布构建与本地浏览器验收；未发布新的公网下载页，未覆盖另一台电脑或公网 HTTPS 的首次本地网络授权。
+更新：2026-09-20。默认交付方向为网页 + Codex Skill 独立 Mac 窗口。官网入口统一为安装 Skill；另一台电脑与公网 HTTPS 首次本地网络授权仍未覆盖。旧 App 历史构建及源码保留；本机旧 App 已按用户要求移入废纸篓，原资料目录保留，不自动迁移到 Skill。
+
+## 官网安装入口上线（2026-09-20）
+
+已发布 Cloudflare Pages `047f2d8c`，正式域名 `/install` 提供复制安装指令，旧 `/download.html` 自动跳转。介绍页、关于浮层、Codex 连接说明与中英 README 统一为 Skill。公网浏览器实际复制成功，完整包 2,793,081 bytes、SHA-256 `37fb2622e94020ce815ea32d04f7f7c643f2ac945a0f844b73ad163d45efca73` 与发布构建一致；修复静态托管 HEAD 缺少 Content-Length 时错误禁用按钮的问题，新增大小/hash 失败回归。桌面和 390px 页面验收通过，证据保留在 `.cache/skill-install-publication-20260920/`。
+
+本机完整 Skill 已同步，doctor 的运行代码、Python、Codex 协议/登录及 PDF 工具检查通过。旧 `/Applications/Ariadne.app` 移至废纸篓的 `Ariadne-old-app-20260920.app`，移除其 Dock 固定项；旧 `Ariadne Local` 资料与安装备份保留。没有迁移旧资料、调用真实模型或发布 API Worker；本次只更新 Pages 及本机 Skill。以下旧阶段中的「未发布」描述保留为当时记录。
 
 ## 用户体验
 
@@ -11,6 +17,8 @@
 Skill 有网页界面，不是仅输出分析文字。网页仍负责来源归档、Working/Proposal、人工确认和保存版本。Skill 启动的本地服务负责将本次确认的请求交给用户自己的 Codex；不把当前 Agent 的历史、工具或文件系统控制权开放给网页。无需安装旧 Ariadne.app，窗口管理服务生命周期；模型推理仍由 OpenAI 提供，使用该用户账号额度。
 
 ## 安装与调用
+
+打开官网 [安装 Skill](https://ariadne.kai-nex.com/install.html)，点击「复制安装指令」并发送给 Codex。Agent 获取完整包、核对 SHA-256、保留原版本备份并安装；网页本身不会写入本机。安装好后输入 `$ariadne 打开 Ariadne`，关闭最后窗口即退出。旧 `/download.html` 跳转到安装页，网页不再展示手动下载 App 的入口。复制受限时展开指令供手动复制；安装包缺失或 metadata 无效时按钮不可用。
 
 发布构建产生 `Ariadne-Skill.zip` 和 SHA-256 文件。解压得到完整 `ariadne/`，内有 `SKILL.md`、`agents/openai.yaml`、启动脚本、含完整页面的 `runtime/`、逐文件 hash 和许可证。将整个文件夹交给 Codex，请它安装为 Ariadne Skill；已有同名技能时保留原件并先核对，不覆盖未知安装。不要只复制 `SKILL.md` 或脚本。
 
@@ -44,7 +52,7 @@ python3 scripts/build_skill_bundle.py
 python3 scripts/build_cloudflare_release.py --pdfjs /path/to/pdfjs-dist-5.4.624 --output /new/output/path
 ```
 
-独立构建在 `.cache/skill-distribution/<时间>/` 保留源码包和 ZIP。Cloudflare 构建从当前公开源码白名单生成同款包，并将 ZIP、SHA-256 和 `downloads/skill.json` 放入 Pages；不复制本机已安装技能。下载页只在 metadata 和实际文件大小有效时显示入口。原 Mac App 下载 metadata 与 Release 保留在历史区。
+独立构建在 `.cache/skill-distribution/<时间>/` 保留源码包和 ZIP。Cloudflare 构建从当前公开源码白名单生成同款包，并将 ZIP、SHA-256 和 `downloads/skill.json` 放入 Pages，供 Agent 获取；不复制本机已安装技能。安装页只在 metadata 和实际文件大小有效时启用复制按钮；静态托管 HEAD 不含大小时获取完整包核对大小及 SHA-256。安装 Agent 仍须核对完整包的 SHA-256。原 Mac App 的历史 metadata 与 Release 保留，但页面不再展示下载引导。
 
 Skill 包只含 Git 跟踪的运行源码、公开契约和完整公开网页资源，附启动脚本；不含 Python/Codex/Poppler 二进制、运行库、私有数据或登录文件。`runtime-files.json` 验证附带运行代码，外部 ZIP 完整性以独立 SHA-256 为准。不是代码签名或发行商身份认证。
 

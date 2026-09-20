@@ -28,7 +28,7 @@ No model connection yet? You can still archive original materials in Local mode 
 
 ## Try Ariadne
 
-[Open the web app](https://ariadne.kai-nex.com/) · [Download page](https://ariadne.kai-nex.com/download.html) · [Download macOS App ZIP](https://github.com/KAI-NEX/Ariadne/releases/download/local-20260918-172135/Ariadne-Local-macOS-arm64-20260918-172135.zip) · [Release & SHA-256](https://github.com/KAI-NEX/Ariadne/releases/tag/local-20260918-172135)
+[Open the web app](https://ariadne.kai-nex.com/) · [Install Ariadne Skill](https://ariadne.kai-nex.com/install.html)
 
 ### Web + Ariadne Skill (preferred direction)
 
@@ -36,20 +36,9 @@ On Mac, the Skill opens a standalone window. Closing its last window stops its s
 
 Invoke `$ariadne` in Codex to check dependencies and open the complete local runtime-selection page in its own window. Local use needs no pairing code. Pairing remains optional when using the public web workspace. No Mac App is required; source tracking and explicit human save remain in place.
 
-[Setup and build guide](docs/current/ARIADNE_SKILL.md) · [Skill source](skills/ariadne/SKILL.md). Pages builds include the complete Skill ZIP. Local acceptance is complete; **the updated public download page has not been deployed yet**. Python 3.9+, a compatible Codex CLI and Poppler are required. Other Agents and OS environments require their own verification.
+[Setup and build guide](docs/current/ARIADNE_SKILL.md) · [Skill source](skills/ariadne/SKILL.md). Pages builds include the complete Skill ZIP. Local acceptance is complete; the [installation page](https://ariadne.kai-nex.com/install.html) provides a prompt to copy into Codex. Python 3.9+, a compatible Codex CLI and Poppler are required. Other Agents and OS environments require their own verification.
 
-### Legacy macOS App (retained)
-
-**Apple Silicon · macOS 14+ · no Python, Node.js, or Apple Developer account required.** The current App is an early preview; compatibility has been tested on the build Mac, not every supported macOS version. Intel Mac and Windows packages are not available yet.
-
-1. Download **`Ariadne-Local-macOS-arm64-20260918-172135.zip`** (about 109 MiB). On GitHub Releases, choose this ZIP under **Assets**, rather than the automatically generated **Source code** archives.
-2. Extract the ZIP, drag **Ariadne.app** into **Applications**, and double-click it. To keep it in the Dock, right-click its Dock icon → **Options → Keep in Dock**.
-3. Choose **Local** to keep original materials without model calls, or connect a supported model with your own API key. For optional Codex access, use **Ariadne → 登录 Codex…** in the Mac menu bar and complete the official sign-in flow.
-4. Closing the last App window or pressing **⌘Q** stops the local service started by that App. Minimizing keeps it running; saved materials remain available next time.
-
-The App uses an ad-hoc signature and is **not notarized**. If macOS blocks the first launch, verify the release and checksum, then follow **System Settings → Privacy & Security → Open Anyway**. You do not need an Apple Developer account or to disable system security. First-download behavior on another Mac has not yet been verified.
-
-Local data lives in `~/Library/Application Support/Ariadne Local/data`. The hosted web app and native App have separate workspaces and connection settings; they do not automatically sync. Model analysis requires your own connection and explicit transmission consent. See the [full installation and data guide](docs/current/LOCAL_DISTRIBUTION.md).
+Historical Mac App builds and data notes remain in the [local distribution record](docs/current/LOCAL_DISTRIBUTION.md). The current local entry point is the Skill.
 
 ## Current architecture
 
@@ -226,6 +215,6 @@ python3 scripts/check_public_release.py
 
 ## Project status and contribution
 
-Ariadne is an early open-source preview with a [hosted web app](https://ariadne.kai-nex.com/) and a downloadable macOS App. Model output must be reviewed; passing tests does not guarantee correct interpretation of every real document. Full document-path verification currently focuses on macOS.
+Ariadne is an early open-source preview with a [hosted web app](https://ariadne.kai-nex.com/) and a Codex Skill that opens a standalone Mac window. Model output must be reviewed; passing tests does not guarantee correct interpretation of every real document. Full document-path verification currently focuses on macOS.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CHANGELOG.md](CHANGELOG.md), and the [MIT License](LICENSE). For current implementation status, read [PROJECT_STATUS.md](PROJECT_STATUS.md); for stable product constraints, read [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).

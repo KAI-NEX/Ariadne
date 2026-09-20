@@ -28,7 +28,7 @@ Ariadne 帮你结合自己的经历，理解一个真正关心的岗位。你可
 
 ## 开始使用
 
-[打开网页版](https://ariadne.kai-nex.com/) · [官网下载页](https://ariadne.kai-nex.com/download.html) · [直接下载 macOS App ZIP](https://github.com/KAI-NEX/Ariadne/releases/download/local-20260918-172135/Ariadne-Local-macOS-arm64-20260918-172135.zip) · [Release 与 SHA-256 校验文件](https://github.com/KAI-NEX/Ariadne/releases/tag/local-20260918-172135)
+[打开网页版](https://ariadne.kai-nex.com/) · [安装 Ariadne Skill](https://ariadne.kai-nex.com/install.html)
 
 ### 网页 + Ariadne Skill（默认方向）
 
@@ -36,20 +36,9 @@ Mac 默认由 Skill 打开独立窗口，关闭最后窗口即停止服务，保
 
 在 Codex 中调用 `$ariadne`，让 Agent 检查环境并直接打开本地运行选择页；无需配对即可进入资料、职位和对话界面。需要使用公开网页已有资料时，再选择配对连接。无需安装 Mac App，资料和人工保存边界保持。
 
-[安装与构建说明](docs/current/ARIADNE_SKILL.md) · [Skill 源码](skills/ariadne/SKILL.md)。完整 ZIP 随 Pages 构建生成；本阶段已完成本机验收，**新 Skill 下载页尚未发布到公网**。需要 Python 3.9+、兼容 Codex CLI 和 Poppler；不会因安装 Skill 自动支持任意 Agent 或所有操作系统。
+[安装与构建说明](docs/current/ARIADNE_SKILL.md) · [Skill 源码](skills/ariadne/SKILL.md)。完整 ZIP 随 Pages 构建生成；本阶段已完成本机验收，官网入口统一为[安装 Skill](https://ariadne.kai-nex.com/install.html)，复制安装指令后交给 Codex 执行。需要 Python 3.9+、兼容 Codex CLI 和 Poppler；不会因安装 Skill 自动支持任意 Agent 或所有操作系统。
 
-### 历史 Mac App（继续保留）
-
-**Apple 芯片 Mac · macOS 14+ · 无需安装 Python、Node.js，也不需要 Apple Developer 账户。** 当前为早期预览版，只在构建电脑上完成验收，尚未覆盖全部兼容系统；暂不提供 Intel Mac 和 Windows 安装包。
-
-1. 下载 **`Ariadne-Local-macOS-arm64-20260918-172135.zip`**（约 109 MiB）。在 GitHub Release 页展开 **Assets**，选择这个 ZIP；自动生成的 **Source code** 是源码，不是 App 安装包。
-2. 解压，将 **Ariadne.app** 拖入「应用程序」，双击打开。在 Dock 图标上右键 →「选项 → 在程序坞中保留」，以后即可点击启动。
-3. 选择「本地运行」先保存原始资料，或填写自己的 API Key 连接已支持的模型。如需 Codex，可从 Mac 菜单「Ariadne → 登录 Codex…」完成官方登录。
-4. 关闭最后一个 App 窗口或按 **⌘Q**，会停止此 App 启动的本地服务；最小化不会停止。再次打开时，已保存资料仍保留。
-
-当前 App 仅使用 ad-hoc 签名，**尚未经过 Apple 公证**。若首次打开被 macOS 阻止，核对发布来源和校验值后，按「系统设置 → 隐私与安全性 → 仍要打开」的提示操作；无需开发者账户或关闭系统安全保护。另一台 Mac 首次下载后的流程尚未实机验收。
-
-本地资料保存在 `~/Library/Application Support/Ariadne Local/data`。公开网页版与 App 的资料库、连接设置独立，不会自动同步；模型分析需使用你自己的连接，并先确认资料传输。详见[完整安装与数据说明](docs/current/LOCAL_DISTRIBUTION.md)。
+旧 Mac App 的历史构建和资料说明保留在[本地分发记录](docs/current/LOCAL_DISTRIBUTION.md)，当前本地入口统一为 Skill。
 
 ## 当前架构
 

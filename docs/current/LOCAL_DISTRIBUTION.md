@@ -1,6 +1,6 @@
 # Ariadne 本地部署包
 
-2026-09-20：默认本地接入改为[网页 + Ariadne Skill](ARIADNE_SKILL.md)，无需安装 App。本文继续保留历史 Mac App 的安装、构建和资料说明；旧 App 与已有资料不删除，不自动迁移。
+2026-09-20：默认本地接入改为[网页 + Ariadne Skill](ARIADNE_SKILL.md)，无需安装旧 App。本文保留历史构建与资料说明；用户随后要求移除本机旧 App，已移入废纸篓并移除原 Dock 固定项。原资料目录保留，不自动迁移到 Skill。
 
 历史 App 系统要求：macOS 14 及以上、Apple 芯片；当前只在构建电脑的 macOS 26.6 上实际验收，未覆盖全部兼容系统。
 

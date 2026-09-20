@@ -1,0 +1,48 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import { createHash, webcrypto } from 'node:crypto';
+const source = fs.readFileSync(new URL('../public/skill-install.js', import.meta.url), 'utf8');
+const release = { url: '/downloads/Ariadne-Skill.zip', sha256: 'a'.repeat(64), bytes: 1000 };
+async function render(data = release, bytes = 1000, clipboardFails = false, body = new Uint8Array(1000), downloadOK = true) {
+  let copied;
+  const nodes = Object.fromEntries(['skill-install-copy', 'skill-install-status', 'skill-install-prompt', 'skill-install-details'].map(id => [id, {
+    disabled: true, hidden: true, value: '', textContent: '',
+    addEventListener(type, fn) { this[type] = fn; },
+    focus() { this.focused = true; }, select() { this.selected = true; },
+  }]));
+  await vm.runInNewContext(source, {
+    crypto: webcrypto,
+    document: { getElementById: id => nodes[id] },
+    navigator: { clipboard: { async writeText(text) { if (clipboardFails) throw Error('denied'); copied = text; } } },
+    fetch: async (url, options) => url.endsWith('.json') ? { ok: data !== null, json: async () => data }
+      : options.method === 'HEAD' ? { ok: true, headers: { get: () => bytes === null ? null : String(bytes) } }
+      : { ok: downloadOK, arrayBuffer: async () => body.buffer },
+  });
+  return { nodes, copied: () => copied };
+}
+const body = new Uint8Array(1000).fill(42);
+const verified = {...release, sha256: createHash('sha256').update(body).digest('hex')};
+assert.equal((await render(verified, null, false, body)).nodes['skill-install-copy'].disabled, false);
+for (const [metadata, content, ok] of [[release, body, true], [verified, new Uint8Array(999), true], [verified, body, false]]) {
+  assert.equal((await render(metadata, null, false, content, ok)).nodes['skill-install-copy'].disabled, true);
+}
+const ready = await render();
+assert.equal(ready.nodes['skill-install-copy'].disabled, false);
+await ready.nodes['skill-install-copy'].click();
+assert.match(ready.copied(), /https:\/\/ariadne\.kai-nex\.com\/downloads\/Ariadne-Skill\.zip/);
+assert.ok(ready.copied().includes(release.sha256));
+assert.match(ready.nodes['skill-install-status'].textContent, /粘贴到 Codex/);
+assert.doesNotMatch(ready.nodes['skill-install-status'].textContent, /安装成功|已安装/);
+const failedCopy = await render(release, 1000, true);
+await failedCopy.nodes['skill-install-copy'].click();
+assert.equal(failedCopy.nodes['skill-install-details'].open, true);
+assert.equal(failedCopy.nodes['skill-install-prompt'].selected, true);
+assert.match(failedCopy.nodes['skill-install-status'].textContent, /未能自动复制/);
+for (const [data, size] of [[null, 1000], [release, 999], [{...release, url:'https://evil.invalid/x'},1000], [{...release,sha256:'bad'},1000]]) {
+  const result = await render(data, size);
+  assert.equal(result.nodes['skill-install-copy'].disabled, true);
+  assert.equal(result.nodes['skill-install-details'].hidden, true);
+  assert.equal(result.copied(), undefined);
+}
+console.log('Skill install: artifact validation, missing HEAD length with size/hash checks, copy success, clipboard fallback, unavailable package PASS');

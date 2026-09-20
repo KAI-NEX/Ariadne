@@ -634,7 +634,7 @@
           <div class="v1-about-copy hidden">
             <h1><span class="v1-about-name">Ariadne</span><span class="v1-about-name-zh">衡</span></h1>
             <p class="v1-about-intro">先理解你，再理解机会。</p>
-            <p><a class="runtime-back-link" href="/download.html" target="_blank" rel="noopener">下载 Ariadne 本地版 · Apple 芯片 Mac</a></p>
+            <p><a class="runtime-back-link" href="https://ariadne.kai-nex.com/install.html" target="_blank" rel="noopener">安装 Ariadne Skill · Mac 独立窗口</a></p>
             <p>Ariadne · 衡是一个帮助你探索职业方向的工具。它理解你的经历与作品，也理解你选择的职位，帮你看清两者的关系。</p>
             <p>在个人资料中点击「了解我」，围绕过去的项目与经历逐步了解你；在职位描述中点击「了解职位概况」，汇总所有 JD 的职责、要求与差异。想讨论自己与某个职位的关系，可以进入该职位详情。</p>
             <p>原件、资料和对话保存在本机或当前浏览器。选择 API 模型并确认发送后，本次材料和 API Key 会经当前 Ariadne 服务转发给模型服务商；网页版经过网站服务器，本地版经过本机服务。Key 不在服务端持久保存，上传材料仅作临时处理；结果会短暂保留在内存中以处理重试。连接 Codex 时，材料由你自己的电脑发送给 OpenAI。</p>
