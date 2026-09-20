@@ -1,5 +1,7 @@
 # Ariadne 项目上下文
 
+2026-09-20 最新内容更新：安装窗口复制按钮保留原坐标与尺寸，改为透明背景、700 字重；三个步骤标题改为纯黑。中英 README 以同一份已核实实现更新 Web/API 与 Skill/Codex 架构图，并说明从本地网页验证业务、独立安装包降低环境门槛，到 Skill 复用 Codex 入口的动机及依赖/同步限制。旧图和历史原地保留，新的 [双语图与回执](docs/architecture/archify/2026-09-20-web-skill/review.json)绑定源码 `a4fc904`。
+
 2026-09-20 最新入口与分发更新：用户要求将安装集成到「通过本地 Agent 使用」窗口，直接「复制安装指令」，不再单独跳安装页。已上线 [同页安装窗口](https://ariadne.kai-nex.com/#skill)，旧链接回到该窗口；完整 Skill 包发布于 [GitHub Release](https://github.com/KAI-NEX/Ariadne/releases/tag/skill-20260920-102511)，源码同步现有仓库。Pages `6062f6c7`，安装指令固定 GitHub 版本与 SHA-256；保留先安装再调用、本机直达工作空间及两端独立存储。
 
 2026-09-20 最新正式发布：按用户要求，Web / Skill 双端架构和「先安装、再调用」引导已上线 [官网](https://ariadne.kai-nex.com) 与 [安装页](https://ariadne.kai-nex.com/install)。Pages `a56a6d36`、API Worker `4ab1078e-7937-4687-a827-ddba54044bc5`；公开 Skill 包包含本机 Codex、直接进入工作空间与本地文件库。网页版仅用 API，本地 Agent 入口只提供说明，两端不配对、不自动同步资料。线上桌面/手机、API 边界、复制指令与公开包完整性已核对；本轮未重新执行真实模型，未 push Git。下列旧条目的“未部署”、Skill 模型选择页或配对描述保留为历史，以本条和 [双端架构](docs/current/TWO_PRODUCT_ARCHITECTURE.md) 为准。

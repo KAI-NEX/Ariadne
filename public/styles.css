@@ -1068,3 +1068,24 @@ button.danger { background: #9c2525; border-color: #9c2525; }
   line-height: var(--vi-leading-reading);
   resize: vertical;
 }
+
+#skill-install-copy {
+  background: transparent;
+  color: var(--vi-text-emphasis);
+  font-weight: 700;
+  box-shadow: none;
+}
+#skill-install-copy:not(:disabled):hover,
+#skill-install-copy:not(:disabled):focus-visible,
+#skill-install-copy:not(:disabled):active {
+  background: transparent;
+  box-shadow: none;
+  text-decoration: underline;
+  text-underline-offset: var(--vi-space-4);
+}
+#skill-install-copy:not(:disabled):focus-visible {
+  outline: 2px solid var(--vi-focus);
+  outline-offset: var(--vi-space-4);
+}
+
+.skill-guide-dialog .add-model-label { color: var(--vi-text-emphasis); }

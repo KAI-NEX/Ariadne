@@ -1,0 +1,245 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Ariadne · 网页与本地 Skill",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1160,
+      740
+    ],
+    "repository": {
+      "url": "https://github.com/KAI-NEX/Ariadne",
+      "revision": "a4fc90417538c3baea08bb195c96d4a92c529c60"
+    }
+  },
+  "components": [
+    {
+      "id": "webWorkspace",
+      "type": "frontend",
+      "label": "网页工作空间",
+      "sublabel": "Pages 页面 / 自带 API Key",
+      "pos": [
+        50,
+        85
+      ],
+      "size": [
+        240,
+        80
+      ],
+      "sources": [
+        {
+          "path": "public/product-config.js"
+        }
+      ]
+    },
+    {
+      "id": "webExecution",
+      "type": "backend",
+      "label": "网页执行服务",
+      "sublabel": "Cloudflare Worker / 领域路由",
+      "pos": [
+        450,
+        85
+      ],
+      "size": [
+        240,
+        80
+      ],
+      "sources": [
+        {
+          "path": "web_app.py"
+        }
+      ]
+    },
+    {
+      "id": "apiProvider",
+      "type": "external",
+      "label": "API 模型服务",
+      "sublabel": "DeepSeek / Gemini / Qwen",
+      "pos": [
+        850,
+        85
+      ],
+      "size": [
+        240,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/product_application.py"
+        }
+      ]
+    },
+    {
+      "id": "browserArchive",
+      "type": "database",
+      "label": "浏览器资料库",
+      "sublabel": "当前 origin / IndexedDB",
+      "pos": [
+        50,
+        275
+      ],
+      "size": [
+        240,
+        80
+      ],
+      "sources": [
+        {
+          "path": "public/content-browser-storage.js"
+        }
+      ]
+    },
+    {
+      "id": "skillWorkspace",
+      "type": "frontend",
+      "label": "Skill 独立窗口",
+      "sublabel": "直接进入工作空间",
+      "pos": [
+        50,
+        450
+      ],
+      "size": [
+        240,
+        80
+      ],
+      "sources": [
+        {
+          "path": "skills/ariadne/scripts/skill_window.py"
+        }
+      ]
+    },
+    {
+      "id": "localExecution",
+      "type": "backend",
+      "label": "本机执行服务",
+      "sublabel": "Python / loopback",
+      "pos": [
+        450,
+        450
+      ],
+      "size": [
+        240,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/product_application.py"
+        }
+      ]
+    },
+    {
+      "id": "codexExecution",
+      "type": "external",
+      "label": "本机 Codex",
+      "sublabel": "本人登录 / 已验证 adapter",
+      "pos": [
+        850,
+        450
+      ],
+      "size": [
+        240,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/runtime_binding.py"
+        }
+      ],
+      "brand": "openai"
+    },
+    {
+      "id": "fileArchive",
+      "type": "database",
+      "label": "本地文件资料库",
+      "sublabel": "固定工作区 / Markdown",
+      "pos": [
+        50,
+        640
+      ],
+      "size": [
+        240,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/workspace_storage.py"
+        }
+      ]
+    }
+  ],
+  "boundaries": [],
+  "connections": [
+    {
+      "id": "webRequest",
+      "from": "webWorkspace",
+      "to": "webExecution",
+      "label": "同源 HTTPS"
+    },
+    {
+      "id": "apiRequest",
+      "from": "webExecution",
+      "to": "apiProvider",
+      "label": "用户 API Key"
+    },
+    {
+      "id": "browserSave",
+      "from": "webWorkspace",
+      "to": "browserArchive",
+      "label": "读写资料",
+      "labelAt": [
+        170,
+        220
+      ]
+    },
+    {
+      "id": "skillRequest",
+      "from": "skillWorkspace",
+      "to": "localExecution",
+      "label": "同源 HTTP"
+    },
+    {
+      "id": "codexRequest",
+      "from": "localExecution",
+      "to": "codexExecution",
+      "label": "Codex CLI"
+    },
+    {
+      "id": "fileSave",
+      "from": "skillWorkspace",
+      "to": "fileArchive",
+      "label": "经本机服务读写",
+      "labelAt": [
+        170,
+        585
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "共用业务契约",
+      "items": [
+        "Candidate / Job 分别理解",
+        "来源、版本与人工保存保持一致"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "独立的数据边界",
+      "items": [
+        "网页浏览器库与本机文件库分开",
+        "不配对，不自动同步资料"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "先安装，再调用",
+      "items": [
+        "GitHub 完整 Skill 包 → Codex 安装",
+        "直接进入工作空间，关窗停止服务"
+      ]
+    }
+  ]
+}

@@ -25,6 +25,12 @@
       "label": "主要文字"
     },
     {
+      "name": "--vi-text-emphasis",
+      "value": "#000",
+      "group": "color",
+      "label": "浅色表面的纯黑强调标题与文字操作"
+    },
+    {
       "name": "--vi-muted",
       "value": "#737b8c",
       "group": "color",

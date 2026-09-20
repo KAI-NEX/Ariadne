@@ -1,0 +1,94 @@
+{
+  "diagrams": [
+    {
+      "language": "zh",
+      "diagram_type": "architecture",
+      "output": "ariadne-zh.html",
+      "specification": {
+        "sha256": "cac878b9dba3ec8b120cebea7d24e153534e0a2539342e2e182e413fc9957a1c",
+        "bytes": 4701
+      },
+      "artifact": {
+        "sha256": "6ee5bf74c11c63f085eb19a29cd39a7a2018f939feb04f55ba3b1bf1469b0624",
+        "bytes": 808289
+      },
+      "validation": "9/9 showcase; 0 errors; 0 warnings",
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 1,
+      "repository_revision": "a4fc90417538c3baea08bb195c96d4a92c529c60",
+      "reviewed_views": [
+        "1440x900 light",
+        "2048x1320 dark"
+      ],
+      "automated_viewports": [
+        [
+          1440,
+          900
+        ],
+        [
+          1600,
+          1000
+        ],
+        [
+          1920,
+          1080
+        ],
+        [
+          2048,
+          1320
+        ]
+      ],
+      "observations": [
+        "Two independent product paths; no pairing or sync edge",
+        "No node overlap, route crossings or clipped labels",
+        "Canonical PNG exported using the delivered viewer"
+      ]
+    },
+    {
+      "language": "en",
+      "diagram_type": "architecture",
+      "output": "ariadne-en.html",
+      "specification": {
+        "sha256": "ec2ccb602dffce712114a2d474b0711f08b494e08aeafcabaa5b7becfd443910",
+        "bytes": 4688
+      },
+      "artifact": {
+        "sha256": "f2f83181e380d0e25ea6cdcc991f12eab48bea5d7b4edeab9d0946c213fec0de",
+        "bytes": 808723
+      },
+      "validation": "9/9 showcase; 0 errors; 0 warnings",
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 1,
+      "repository_revision": "a4fc90417538c3baea08bb195c96d4a92c529c60",
+      "reviewed_views": [
+        "1440x900 light",
+        "2048x1320 dark"
+      ],
+      "automated_viewports": [
+        [
+          1440,
+          900
+        ],
+        [
+          1600,
+          1000
+        ],
+        [
+          1920,
+          1080
+        ],
+        [
+          2048,
+          1320
+        ]
+      ],
+      "observations": [
+        "Two independent product paths; no pairing or sync edge",
+        "No node overlap, route crossings or clipped labels",
+        "Canonical PNG exported using the delivered viewer"
+      ]
+    }
+  ]
+}

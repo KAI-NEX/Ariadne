@@ -7,7 +7,7 @@
 >
 > An open-source AI workspace for exploring your experience and target jobs, with original sources, reviewable suggestions, and changes you explicitly save.
 
-[中文说明](README.zh-CN.md) · [Architecture evolution](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.en.html) · [Project history](PROJECT_HISTORY.md) · [Runtime contract](docs/current/ARIADNE_RUNTIME_EXECUTION_CONTRACT.md) · [Codex connector](docs/current/CODEX_RUNTIME_CONNECTOR.md)
+[中文说明](README.zh-CN.md) · [Architecture evolution](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.en.html) · [Project history](PROJECT_HISTORY.md) · [Runtime contract](docs/current/ARIADNE_RUNTIME_EXECUTION_CONTRACT.md) · [Skill guide](docs/current/ARIADNE_SKILL.md)
 
 [Try the web app](https://ariadne.kai-nex.com/) · [Skill setup](docs/current/ARIADNE_SKILL.md)
 
@@ -31,8 +31,8 @@ You can keep the original documents, review suggestions, and save the changes yo
 
 ## Your first session
 
-1. **Open the web app.** Choose **Local** to save originals without AI analysis, use your own supported API key, or connect your own Codex through the Ariadne Skill.
-2. **Add your materials.** Open **个人资料** (Personal materials), import a résumé, portfolio, or project document, and retain the source. To analyze it with AI, choose an available model and confirm the transmission shown by the app.
+1. **Choose an entry.** Use your API key on the website, or select **暂不连接 AI** to archive originals first. For local Codex, install the Skill and invoke it to open the workspace directly.
+2. **Add your materials.** Open **个人资料** (Personal materials), import a résumé, portfolio, or project document, and retain the source. For AI analysis, confirm the transmission shown by the app; Web uses a verified API model and Skill uses local Codex.
 3. **Review the understanding.** Check the proposed content against your original material. Correct or reject unsupported statements, then explicitly save what you accept.
 4. **Add a target role.** Open **职位描述** (Job descriptions), import the role’s requirements, and review them separately from your personal material.
 5. **Discuss that role.** Open its details and ask: “Which requirements are supported by my materials? Where do I need more evidence or a clearer explanation?” Review the answer and decide what to do next. Discussion alone does not update confirmed data.
@@ -55,13 +55,25 @@ Historical Mac App builds and data notes remain in the [local distribution recor
 
 ## Current architecture
 
-2026-09-20: Web and Skill have separate startup, transport and storage boundaries, with shared pages and domain contracts. Web uses BYOK APIs and browser storage; Skill opens the workspace directly and uses local Codex and files. See the [current two-product architecture](docs/current/TWO_PRODUCT_ARCHITECTURE.md). The diagram below is the historical 2026-09-19 Web/Mac App snapshot.
+Web and Skill share Candidate/Job pages, source tracking, versions and explicit human save, while keeping startup, model execution and storage separate. Web uses your API key and browser storage. Skill uses local Codex and a stable file workspace in its own window. The website’s local Agent entry only explains installation; it does not connect to local ports.
 
-The same Candidate/Job product runs in a browser or a native Mac window. The web app stores documents in IndexedDB and sends model requests through a Cloudflare Worker; the Skill owns a loopback Python service and a local file repository. Both preserve sources and require explicit human save before confirming model proposals.
+[![Ariadne current architecture: Web APIs and local Codex Skill](docs/architecture/archify/2026-09-20-web-skill/ariadne-en.png)](docs/architecture/archify/2026-09-20-web-skill/ariadne-en.png)
 
-[![Ariadne current architecture: web and macOS runtimes](docs/architecture/archify/2026-09-19-current/ariadne.png)](docs/architecture/archify/2026-09-19-current/ariadne.png)
+[English interactive diagram](docs/architecture/archify/2026-09-20-web-skill/ariadne-en.html) · [中文架构图](docs/architecture/archify/2026-09-20-web-skill/ariadne-zh.html) · [Editable source](docs/architecture/archify/2026-09-20-web-skill/ariadne-en.architecture.json) · [Validation record](docs/architecture/archify/2026-09-20-web-skill/review.json) · [Implementation boundaries](docs/current/TWO_PRODUCT_ARCHITECTURE.md). Download the HTML and open it locally for zoom, source evidence, themes and export; GitHub displays HTML as source. The earlier [Web/Mac App diagram](docs/architecture/archify/2026-09-19-current/ariadne.html) remains a historical snapshot.
 
-[Interactive Archify diagram](docs/architecture/archify/2026-09-19-current/ariadne.html) · [Editable specification](docs/architecture/archify/2026-09-19-current/ariadne.architecture.json) · [Validation receipt](docs/architecture/archify/2026-09-19-current/review.json). Download the HTML and open it locally for zoom, source links, light/dark themes, and export; GitHub displays HTML as source. Diagram labels are in Chinese.
+## Why move from a web UI to an installer, then a Skill?
+
+I first focused on how materials could be understood and saved reliably, then on making that workflow easier to access. Each delivery change preserved the document interface and human-save rules.
+
+| Stage | Why I chose it | Cost and subsequent decision |
+| --- | --- | --- |
+| Early local web UI | A browser interface and local service let me validate imports, separate Candidate/Job contexts, review, saving and model conversations, with inspectable sources and state. | It depended on the project environment and a running service. Being runnable by its developer did not make it easy to install elsewhere. A public web version was later retained for API use without local installation. |
+| Standalone package / Mac App | Bundling the UI, backend, Python, Codex and PDF tools provided a dedicated window and service shutdown when the last window closed, without requiring a terminal or developer environment. | Bundled runtimes, platform compatibility and distribution needed maintenance. Web use, local APIs and Codex also crowded the same entry flow. |
+| Web + local Skill | Codex was already my local entry point. I wanted to install, check dependencies and launch Ariadne from that conversation while keeping the full document and review interface. Web now focuses on APIs; Skill focuses on the local Agent and opens the workspace directly. | The Skill bundle is smaller, but depends on local Python, Codex, PDF tools and the window build environment. Data does not synchronize automatically. Only Codex has been verified; another Agent still needs an adapter, capability checks and compatible save boundaries. |
+
+The Skill is an installation and invocation entry with complete runtime code. Materials belong to an independent local workspace, not to a particular Agent conversation; ordinary discussion cannot silently change confirmed records. A future Agent can reuse the same file store only with a verified workspace identity and compatible execution and write contracts. Cross-product synchronization and feedback-update features are not implemented in this change.
+
+Evidence: [installer history](docs/current/LOCAL_DISTRIBUTION.md), [Skill and data boundaries](docs/current/ARIADNE_SKILL.md), and [stage validation records](PROJECT_STATUS.md). These are implementation and delivery decisions, not evidence that independent users save time or achieve better hiring outcomes.
 
 ## Why Ariadne
 

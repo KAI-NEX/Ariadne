@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/Users/kai/Documents/GitKaiNex/Ariadne/docs/architecture/archify/2026-09-20-web-skill/ariadne-en.architecture.json",
+  "output": "/Users/kai/Documents/GitKaiNex/Ariadne/docs/architecture/archify/2026-09-20-web-skill/ariadne-en.html",
+  "specification": {
+    "sha256": "ec2ccb602dffce712114a2d474b0711f08b494e08aeafcabaa5b7becfd443910",
+    "bytes": 4688
+  },
+  "artifact": {
+    "sha256": "f2f83181e380d0e25ea6cdcc991f12eab48bea5d7b4edeab9d0946c213fec0de",
+    "bytes": 808723
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  },
+  "evidence": {
+    "verified": true,
+    "repository": "https://github.com/KAI-NEX/Ariadne",
+    "revision": "a4fc90417538c3baea08bb195c96d4a92c529c60",
+    "references": 8
+  }
+}

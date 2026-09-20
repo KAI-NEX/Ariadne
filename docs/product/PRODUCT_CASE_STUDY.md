@@ -2,7 +2,7 @@
 
 更新：2026-09-20。独立项目，AI 辅助开发；产品处于公开预览阶段。
 
-[网页版](https://ariadne.kai-nex.com/) · [Mac 下载](https://ariadne.kai-nex.com/download.html) · [English overview](../../README.md#product-case--ownership)
+[网页版](https://ariadne.kai-nex.com/) · [安装 Skill](https://ariadne.kai-nex.com/#skill) · [English overview](../../README.md#product-case--ownership)
 
 ## 问题与目标用户
 
@@ -24,6 +24,8 @@
 
 另一次重要收敛是将内容统一到 Markdown 正文，再投影为卡片与模型上下文，减少多个状态来源之间的不一致。技术记录见[内容简化](../current/CONTENT_ARCHITECTURE_SIMPLIFICATION.md)、[存储契约](../current/MARKDOWN_CONTENT_STORAGE.md)与[项目历史](../../PROJECT_HISTORY.md)。
 
+交付形式也从本地网页演变为独立安装包，再收敛为 Web + Skill：先验证业务边界，再解决分发，最后复用已有 Codex 入口、保留完整资料界面并分离 API 与本机执行。具体动机与代价见 [README 的演变说明](../../README.zh-CN.md#为什么从网页走到安装包再到-skill)。
+
 ## 一个真实失败与迭代案例
 
 大作品集在模型调用链路中失败，界面只显示通用错误。项目记录显示：25 页资料的完整复验需要约 425 秒（含转图），超过原统一 180 秒预算。
@@ -34,7 +36,7 @@
 
 ## 已完成与尚未证明
 
-- 已公开网页与 macOS 预览安装包；安装、平台兼容和模型接入范围以 [README](../../README.zh-CN.md) 为准。
+- 已公开网页版与本地 Codex Skill，保留 macOS 安装包历史；安装、平台兼容和模型接入范围以 [README](../../README.zh-CN.md) 为准。
 - 已有合成回归、历史文档处理比较及具体真实调用记录；不同类型的测试分别解释，不合成一个“产品准确率”。
 - 尚未在此案例发布独立用户研究结果、长期使用、收入或求职成功指标，不把维护者自用或发布行为当作这些结果。
 

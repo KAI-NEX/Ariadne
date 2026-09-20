@@ -204,3 +204,5 @@ AI 对话等待使用用户提供的 WavePhysicsLoader 轨迹，由 `wave-physic
 ## 2026-09-09 模型选择页背景预设确认
 
 用户确认当前浏览器效果就是发布预设。核对当前保存值与 `public/ascii-waves.js` 的 `LOCKED_BACKGROUND_SETTINGS` 一致：opacity 0.77、fontSize 6.8、density 1.1、speed 2.8、direction 65、twist 2、tension 0.4；maxCells 70000、maxPixelRatio 2。后续调整从这组参数开始，「恢复预设」也返回此基准；本次不改变背景效果。
+
+2026-09-20 **Skill 安装窗口**：复制按钮保留原位置、全宽与至少 48 px 热区，透明背景、700 字重，悬停下划线、键盘 focus ring；三个步骤标题使用 `--vi-text-emphasis` 纯黑文字，保留原字号与排布。

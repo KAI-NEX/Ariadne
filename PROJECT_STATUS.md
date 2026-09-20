@@ -1,5 +1,14 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-20 — 透明安装按钮、纯黑步骤标题与双语架构说明（COMPLETE）
+
+- 按用户要求保留「复制安装指令」的原位置和尺寸，改透明背景、700 字重；悬停下划线、键盘可见焦点保留。三个步骤标题改纯黑，使用 manifest 新语义 token `--vi-text-emphasis` 并重新生成 CSS，不手改生成资源。实际桌面按钮 630×50.28125 px、390px 页面按钮 314×50.28125 px，变更前后矩形完全一致，三个标题均为 rgb(0,0,0)。
+- 中英 README 更新当前架构与上手说明；加入本地网页 → 独立安装包 → Web + Skill 的动机、各阶段解决的问题及代价。明确 Skill 复用已有 Codex、保留完整窗口和独立数据；仍有本机依赖、无自动同步、其他 Agent 待适配，不宣称用户效果或反馈更新已实现。产品案例保留原贡献与用户验证内容，仅对齐当前交付入口并链接演变说明。
+- 使用 Archify 2.17 交付中文/英文 architecture HTML、可编辑 JSON、干净 PNG 与交付回执，目录 `docs/architecture/archify/2026-09-20-web-skill/`。8 个节点绑定当前仓库来源与 `a4fc904`，明确 Web HTTPS/API/浏览器库与 Skill loopback/Codex/文件库独立；共用契约由说明卡表达，不虚构运行服务或配对通道。旧图和全部历史证据原地保留。
+- 两图均 9/9 showcase、0 error / 0 warning；修正一次储存连线标签与节点重叠后冻结。deliver 记录 source/HTML SHA-256，visual-check 分别完成 1440×900、1600×1000、1920×1080、2048×1320 无溢出检查与双主题截图；另经实际图像审阅和 egolite 官方 PNG 导出核查，review.json 区分结构、浏览器证据和人工视觉结论。
+- 相关 Skill install、VI/负向检查、公开文件扫描、README 链接和 diff 检查通过；egolite 验证桌面/手机几何、透明样式、纯黑标题和复制。官网 Pages `a2c6960c`，仅部署 styles.css 与 vi/tokens.css 的差异；API 与 GitHub Skill ZIP 沿用上一已核验版本，不改业务或资料。QA 和部署日志在 `.cache/skill-readme-20260920/`。
+- 补记上一发布的完整 CI：`35505089964` 为 114/116 suite 通过；desktop_lifecycle 与 skill_bundle 的 CI 服务启动就绪等待失败，本机 Skill bundle 7 项此前通过。此失败早于本次纯 UI/文档修改；本次没有修复或声称完整 CI 已绿，也没有真实模型调用。原有未提交历史记录与资料保持。
+
 ## 2026-09-20 — 同窗口安装与 GitHub Skill 分发（COMPLETE；已上线）
 
 - 用户最新要求已发布：官网 `/#skill` 直接打开「通过本地 Agent 使用」，窗口内复制安装指令；旧 `/install`、download 与 codex-connect 地址回到同一入口。Pages `6062f6c7`，正式域名 https://ariadne.kai-nex.com。API 未再次部署，沿用已通过健康与隔离检查的 `4ab1078e-7937-4687-a827-ddba54044bc5`。

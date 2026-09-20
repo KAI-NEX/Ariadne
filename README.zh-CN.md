@@ -7,7 +7,7 @@
 >
 > 一个开源 AI 工作空间：结合你的资料与目标职位讨论已有支持、未知和下一步，保留原件，由你审阅并保存变化。
 
-[English README](README.md) · [架构演进图](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.html) · [完整项目经历](PROJECT_HISTORY.md) · [运行时契约](docs/current/ARIADNE_RUNTIME_EXECUTION_CONTRACT.md) · [Codex 连接器](docs/current/CODEX_RUNTIME_CONNECTOR.md)
+[English README](README.md) · [架构演进图](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.html) · [完整项目经历](PROJECT_HISTORY.md) · [运行时契约](docs/current/ARIADNE_RUNTIME_EXECUTION_CONTRACT.md) · [Skill 使用指南](docs/current/ARIADNE_SKILL.md)
 
 [打开网页版](https://ariadne.kai-nex.com/) · [Skill 安装说明](docs/current/ARIADNE_SKILL.md)
 
@@ -31,8 +31,8 @@ Ariadne 帮你结合自己的经历，理解一个真正关心的岗位。你可
 
 ## 第一次怎么用
 
-1. **打开网页版。** 选择「本地运行」可以先保存原件；需要 AI 分析时，使用自己的 API Key，或通过 Ariadne Skill 连接自己的 Codex。
-2. **加入个人资料。** 打开「个人资料」，导入简历、作品集或项目文件。需要 AI 理解时，选择可用模型，并确认页面说明的材料传输。
+1. **选择入口。** 网页版使用自己的 API Key，也可选「暂不连接 AI」先保存原件；使用本机 Codex 则先安装 Skill，调用后直接进入独立工作空间。
+2. **加入个人资料。** 打开「个人资料」，导入简历、作品集或项目文件。需要 AI 理解时，确认页面说明的材料传输；网页使用已验证的 API 模型，Skill 使用本机 Codex。
 3. **核对理解结果。** 对照原件检查待审阅内容，纠正或拒绝没有依据的陈述；明确点击保存后，才成为确认资料。
 4. **加入目标岗位。** 打开「职位描述」，导入想了解的岗位要求，单独检查它的理解结果，不把岗位要求写成自己的经历。
 5. **围绕岗位讨论。** 在该职位详情里问：“哪些要求已有我的资料支持？哪里需要补充证据或讲得更清楚？”核对回答，再决定下一步；普通讨论不会自动改写确认资料。
@@ -55,13 +55,25 @@ Mac 默认由 Skill 打开独立窗口，关闭最后窗口即停止服务，保
 
 ## 当前架构
 
-2026-09-20：Web 与 Skill 独立组合启动、连接与存储，共用页面和领域契约。Web 使用 API 与浏览器库；Skill 直接进入工作空间，使用本机 Codex 与文件库。参见[当前双端架构](docs/current/TWO_PRODUCT_ARCHITECTURE.md)。下面架构图为 2026-09-19 的 Web/Mac App 历史快照。
+网页版与 Skill 共用 Candidate/Job 页面、来源、版本和人工保存契约，分别管理启动、模型执行与存储。网页版使用自己的 API Key，资料保存在浏览器；Skill 在独立窗口中使用本机 Codex，资料保存在固定工作区文件库。网页本地 Agent 入口只负责安装引导，不再连接本机端口。
 
-网页版与 Skill 复用 Candidate/Job 产品逻辑。网页版把资料保存在浏览器 IndexedDB，经 Cloudflare Worker 发起模型请求；Skill 管理本机 Python 服务和磁盘内容库。两种方式都保留来源，模型提案只有在用户明确保存后才成为确认版本。
+[![Ariadne 当前架构：网页版 API 与本地 Codex Skill](docs/architecture/archify/2026-09-20-web-skill/ariadne-zh.png)](docs/architecture/archify/2026-09-20-web-skill/ariadne-zh.png)
 
-[![Ariadne 当前架构：网页版与 macOS App](docs/architecture/archify/2026-09-19-current/ariadne.png)](docs/architecture/archify/2026-09-19-current/ariadne.png)
+[中文交互图](docs/architecture/archify/2026-09-20-web-skill/ariadne-zh.html) · [English diagram](docs/architecture/archify/2026-09-20-web-skill/ariadne-en.html) · [可编辑源文件](docs/architecture/archify/2026-09-20-web-skill/ariadne-zh.architecture.json) · [验收记录](docs/architecture/archify/2026-09-20-web-skill/review.json) · [实现边界](docs/current/TWO_PRODUCT_ARCHITECTURE.md)。下载 HTML 后本地打开，可缩放、查看源码依据、切换深浅色和导出；GitHub 会把 HTML 显示为源码。此前 [Web/Mac App 图](docs/architecture/archify/2026-09-19-current/ariadne.html)保留为历史快照。
 
-[可交互 Archify 架构图](docs/architecture/archify/2026-09-19-current/ariadne.html) · [可编辑源文件](docs/architecture/archify/2026-09-19-current/ariadne.architecture.json) · [验收记录](docs/architecture/archify/2026-09-19-current/review.json)。下载 HTML 后本地打开，可缩放、查看源码依据、切换深浅色和导出；GitHub 本身会把 HTML 显示为源码。
+## 为什么从网页走到安装包，再到 Skill？
+
+我先解决“资料怎样被可靠理解和保存”，再逐步降低使用这套工作流的门槛。每次改变交付方式，都保留已有资料页面与人工保存规则。
+
+| 阶段 | 我为什么这样做 | 当时的代价与后续取舍 |
+| --- | --- | --- |
+| 早期本地网页 | 用浏览器界面和本机服务，先跑通资料导入、个人与职位分域、审阅保存和模型对话；便于逐项检查来源与状态。 | 使用依赖项目环境和服务启动；开发者能运行，不等于其他人容易安装。随后保留公开网页版，供用户免安装使用自己的 API。 |
+| 独立安装包 / Mac App | 把页面、后端、Python、Codex 和 PDF 工具一起打包，提供独立窗口与随关随停，让使用者不必手动维持终端和开发环境。 | 需要随包维护运行时、平台适配与分发；网页、本地 API 和 Codex 的选择又集中在一个入口。 |
+| 网页 + 本地 Skill | 我的本机使用入口已经是 Codex，希望在对话中安装、检查依赖和唤起 Ariadne，同时保留适合浏览资料和审阅的完整窗口。因此网页版专注 API，Skill 专注本机 Agent，打开后直接进入工作空间。 | Skill 包更轻，但重新依赖本机 Python、Codex、PDF 工具和窗口编译环境。两端资料不自动同步；目前只验收了 Codex，其他 Agent 还需 adapter、能力与保存边界适配。 |
+
+Skill 是带完整运行代码的安装与调用入口。资料属于独立的本地工作区，不属于某次 Agent 对话；普通讨论也不会直接改写确认资料。未来换 Agent 可以复用已核对身份的同一份文件库，但还必须适配连接协议和读写契约。当前没有实现跨端同步，也没有扩展反馈更新功能。
+
+依据：[本地安装包历史](docs/current/LOCAL_DISTRIBUTION.md)、[Skill 使用与数据边界](docs/current/ARIADNE_SKILL.md)、[阶段验收记录](PROJECT_STATUS.md)。这些是实现与交付上的取舍，尚不能证明独立用户使用更省时或求职效果更好。
 
 ## 它解决什么问题
 
