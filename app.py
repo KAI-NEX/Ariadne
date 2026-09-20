@@ -772,7 +772,7 @@ def connect() -> sqlite3.Connection:
     return connection
 
 
-def initialize_database() -> None:
+def initialize_database(*, seed=True) -> None:
     """Create an empty database; an existing private seed remains optional."""
     with connect() as connection:
         connection.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
@@ -810,7 +810,7 @@ def initialize_database() -> None:
         }.items():
             if column not in analysis_columns:
                 connection.execute(f"ALTER TABLE job_analyses ADD COLUMN {column} {definition}")
-        if not DATA_PATH.is_file():
+        if not seed or not DATA_PATH.is_file():
             return  # A clean open-source checkout contains no private job corpus.
         job = json.loads(DATA_PATH.read_text(encoding="utf-8"))
         job["responsibilities_json"] = json.dumps(job.pop("responsibilities"), ensure_ascii=False)

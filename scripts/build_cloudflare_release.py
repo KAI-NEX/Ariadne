@@ -16,7 +16,7 @@ from scripts.build_web_release import release_files
 from scripts.check_public_release import SECRET_PATTERN, FORBIDDEN_DIRS, PRIVATE_DATA_DIRS, SECRET_NAMES
 
 EXTRA = {"src/runtime_transport.py", "src/browser_pdf_delivery.py", "public/browser-pdf-delivery.js",
-         "public/cloudflare-preview.js", "public/cloudflare-preview.css"}
+         "public/cloudflare-preview.js", "public/cloudflare-preview.css", "public/skill-download.js"}
 GITHUB = re.compile(r"https://github\.com/KAI-NEX/[A-Za-z0-9_.-]+/releases/download/[A-Za-z0-9_.-]+/(Ariadne-Local-macOS-arm64-[0-9-]+\.zip)")
 
 
@@ -101,6 +101,14 @@ def build(output, pdfjs, download_url=None):
     downloads.mkdir(exist_ok=True)
     metadata = download_metadata(download_url)
     (downloads / "latest.json").write_text(json.dumps(metadata))
+    # The Skill carries source, contracts and a launcher, never platform binaries
+    # or a user's installed Skill/runtime. Build from the same reviewed checkout.
+    from build_skill_bundle import build as build_skill
+    skill = build_skill(output / "skill-bundle")
+    shutil.copyfile(skill["archive"], downloads / "Ariadne-Skill.zip")
+    shutil.copyfile(output / "skill-bundle/Ariadne-Skill.zip.sha256", downloads / "Ariadne-Skill.zip.sha256")
+    (downloads / "skill.json").write_text(json.dumps({"url": "/downloads/Ariadne-Skill.zip",
+        "bytes": skill["bytes"], "sha256": skill["sha256"]}))
     files = list(pages.rglob("*"))
     if sum(p.is_file() for p in files) > 1000 or any(p.is_file() and p.stat().st_size > 25 * 1024 * 1024 for p in files):
         raise ValueError("Cloudflare Pages upload limit exceeded")

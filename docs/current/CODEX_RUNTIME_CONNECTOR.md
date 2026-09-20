@@ -1,6 +1,6 @@
 # Codex 本机运行与 Web 连接器
 
-更新：2026-09-09。本阶段实现 Codex Model Provider，以及网页连接本机 Codex 的配对通道。公开域名尚未部署。
+更新：2026-09-20。网页已部署；最新本地入口为 [Ariadne Skill](ARIADNE_SKILL.md)，默认直接打开本地运行选择界面，另可选择启动本文的网页配对通道。新下载页和 Skill 尚待公网发布，首次 HTTPS 本地网络授权仍需实测。以下保留既有直连与配对协议。
 
 ## 两种运行方式
 
@@ -38,7 +38,9 @@ Ariadne 使用所选本机 Codex CLI 的当前登录。可执行文件按 `ARIAD
 
 ## Web 配对
 
-在本机项目目录运行：
+调用 `$ariadne` 并要求「连接公开网页版」：Skill 检查依赖、启动连接器并打开配对页面。默认「打开 Ariadne」使用本地完整界面，无需配对。源码入口为 `python3 skills/ariadne/scripts/ariadne.py connect`，完整安装与边界见 [Skill 指南](ARIADNE_SKILL.md)。原件技术读取复用网页实现，不再要求 Apple OCR；来源 hash、完整 PDF 与人工保存约束保持。
+
+原开发入口继续保留，在本机项目目录运行：
 
 ```sh
 python3 scripts/run_codex_connector.py
@@ -52,7 +54,7 @@ python3 scripts/run_codex_connector.py
 - 配对通道只允许 Codex 模型执行，不允许借用本机其他 Provider 的凭据。断连、过期或撤销明确失败；不自动切到 Local、DeepSeek 或云端后端继续模型请求。
 - 配对后的模型确认框继续显示实际 Provider/model。原始材料先 durable 保存；语义结果仍进入 Working/Proposal，确认版本由人工保存生成。
 
-后续托管 Web 需要独立提供 Ariadne HTML/JS 和公开契约 manifest；本机 app.py 仅允许 loopback Host/Origin，不能直接反向代理为公网服务。本阶段没有创建纯静态导出器、云端中继、账号同步或公网 Codex daemon。HTTPS 网站访问 loopback 的权限仍受浏览器版本、企业策略及用户授权影响，不能通过服务端 CORS 绕过。首次公开部署后需在真实 HTTPS origin 再验收此权限路径。
+托管 Web 已由 Cloudflare Pages/Worker 提供页面和公开契约；本机 app.py 仍仅允许 loopback Host/Origin，不能直接反向代理为公网服务。Skill 不新增云端中继、账号同步或公网 Codex daemon。HTTPS 网站访问 loopback 的权限仍受浏览器版本、企业策略及用户授权影响，不能通过服务端 CORS 绕过；该首次授权路径仍待真实 HTTPS 验收。
 
 ## 领域与传输契约
 

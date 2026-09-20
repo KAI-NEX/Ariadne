@@ -16,11 +16,11 @@
       <a class="runtime-back-link" href="/">返回运行选择</a>
       <p class="runtime-step">Codex · 本机连接</p>
       <h1>连接本机 Codex</h1>
-      <p class="runtime-connect-copy">首次使用可下载 Ariadne App，解压后拖入「应用程序」并打开。从 App 菜单「Ariadne → 登录 Codex…」完成 ChatGPT 登录。本地 App 无需配对；仅连接网页版时，按下载页说明运行「连接网页版.command」，输入当前网站来源，将配对码填入此页。配对码五分钟内有效，仅能使用一次。</p>
-      <p><a class="runtime-back-link" href="/download.html" target="_blank" rel="noopener">下载 Ariadne 本地版 · Apple 芯片 Mac</a></p>
+      <p class="runtime-connect-copy">在 Codex 中调用 <code>$ariadne</code>，让 Skill 检查环境并启动连接器，再把它给出的配对码填入此页。无需安装 Mac App。配对码五分钟内有效，仅能使用一次；连接器须保持运行。</p>
+      <p><a class="runtime-back-link" href="/download.html" target="_blank" rel="noopener">安装 Ariadne Skill</a></p>
       <p class="runtime-connect-copy">配对后，本标签页的资料处理请求会发送到本机连接器；模型分析再由 Codex 发送至 OpenAI，使用本机登录账号的额度。Codex 登录凭据留在本机。图片与 PDF 会按原图或完整逐页图片传送。每次材料发送仍需确认，模型结果仍需人工保存。</p>
       <form id="codex-connect-form" class="runtime-connect-form">
-        <label for="codex-pairing-code">本机终端中的配对码</label>
+        <label for="codex-pairing-code">Agent 或本机终端给出的配对码</label>
         <input id="codex-pairing-code" type="password" autocomplete="off" spellcheck="false" required />
         <button type="submit" id="codex-connect">同意连接本机 Codex</button>
         <button type="button" id="codex-disconnect">断开本页连接</button>

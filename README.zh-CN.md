@@ -6,7 +6,7 @@
 
 [English README](README.md) · [架构演进图](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.html) · [完整项目经历](PROJECT_HISTORY.md) · [运行时契约](docs/current/ARIADNE_RUNTIME_EXECUTION_CONTRACT.md) · [Codex 连接器](docs/current/CODEX_RUNTIME_CONNECTOR.md)
 
-[打开网页版](https://ariadne.kai-nex.com/) · [下载 Mac App](https://ariadne.kai-nex.com/download.html)
+[打开网页版](https://ariadne.kai-nex.com/) · [Skill 安装说明](docs/current/ARIADNE_SKILL.md)
 
 [![Ariadne · 衡 — Web + macOS App](public/social/ariadne-preview.png)](https://ariadne.kai-nex.com/)
 
@@ -18,7 +18,7 @@ Ariadne 帮你结合自己的经历，理解一个真正关心的岗位。你可
 
 ## 第一次怎么用
 
-1. **打开网页版或安装 Mac App。** 选择「本地运行」可以先保存原件；需要 AI 分析时，使用自己的 API Key 连接已支持的模型。Codex 可通过本地 App 或连接器选用。
+1. **打开网页版。** 选择「本地运行」可以先保存原件；需要 AI 分析时，使用自己的 API Key，或通过 Ariadne Skill 连接自己的 Codex。
 2. **加入个人资料。** 打开「个人资料」，导入简历、作品集或项目文件。需要 AI 理解时，选择可用模型，并确认页面说明的材料传输。
 3. **核对理解结果。** 对照原件检查待审阅内容，纠正或拒绝没有依据的陈述；明确点击保存后，才成为确认资料。
 4. **加入目标岗位。** 打开「职位描述」，导入想了解的岗位要求，单独检查它的理解结果，不把岗位要求写成自己的经历。
@@ -30,7 +30,13 @@ Ariadne 帮你结合自己的经历，理解一个真正关心的岗位。你可
 
 [打开网页版](https://ariadne.kai-nex.com/) · [官网下载页](https://ariadne.kai-nex.com/download.html) · [直接下载 macOS App ZIP](https://github.com/KAI-NEX/Ariadne/releases/download/local-20260918-172135/Ariadne-Local-macOS-arm64-20260918-172135.zip) · [Release 与 SHA-256 校验文件](https://github.com/KAI-NEX/Ariadne/releases/tag/local-20260918-172135)
 
-### 安装本地 App
+### 网页 + Ariadne Skill（默认方向）
+
+在 Codex 中调用 `$ariadne`，让 Agent 检查环境并直接打开本地运行选择页；无需配对即可进入资料、职位和对话界面。需要使用公开网页已有资料时，再选择配对连接。无需安装 Mac App，资料和人工保存边界保持。
+
+[安装与构建说明](docs/current/ARIADNE_SKILL.md) · [Skill 源码](skills/ariadne/SKILL.md)。完整 ZIP 随 Pages 构建生成；本阶段已完成本机验收，**新 Skill 下载页尚未发布到公网**。需要 Python 3.9+、兼容 Codex CLI 和 Poppler；不会因安装 Skill 自动支持任意 Agent 或所有操作系统。
+
+### 历史 Mac App（继续保留）
 
 **Apple 芯片 Mac · macOS 14+ · 无需安装 Python、Node.js，也不需要 Apple Developer 账户。** 当前为早期预览版，只在构建电脑上完成验收，尚未覆盖全部兼容系统；暂不提供 Intel Mac 和 Windows 安装包。
 
@@ -44,6 +50,8 @@ Ariadne 帮你结合自己的经历，理解一个真正关心的岗位。你可
 本地资料保存在 `~/Library/Application Support/Ariadne Local/data`。公开网页版与 App 的资料库、连接设置独立，不会自动同步；模型分析需使用你自己的连接，并先确认资料传输。详见[完整安装与数据说明](docs/current/LOCAL_DISTRIBUTION.md)。
 
 ## 当前架构
+
+2026-09-20 新入口：Skill 直接打开完整本地网页，使用独立资料目录和原有运行选择流程；可选 loopback 配对供公开网页调用用户自己的 Codex，公开网页 BYOK 继续经 Worker。下面架构图为 2026-09-19 的 Web/Mac App 快照，保留作历史参考。
 
 网页版与 Mac App 复用 Candidate/Job 产品逻辑。网页版把资料保存在浏览器 IndexedDB，经 Cloudflare Worker 发起模型请求；Mac App 管理本机 Python 服务和磁盘内容库。两种方式都保留来源，模型提案只有在用户明确保存后才成为确认版本。
 

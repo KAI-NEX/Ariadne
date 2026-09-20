@@ -6,7 +6,7 @@
 
 [中文说明](README.zh-CN.md) · [Architecture evolution](docs/architecture/archify/2026-09-12-project-evolution/07-architecture-evolution-six-stages.en.html) · [Project history](PROJECT_HISTORY.md) · [Runtime contract](docs/current/ARIADNE_RUNTIME_EXECUTION_CONTRACT.md) · [Codex connector](docs/current/CODEX_RUNTIME_CONNECTOR.md)
 
-[Try the web app](https://ariadne.kai-nex.com/) · [Download the Mac App](https://ariadne.kai-nex.com/download.html)
+[Try the web app](https://ariadne.kai-nex.com/) · [Skill setup](docs/current/ARIADNE_SKILL.md)
 
 [![Ariadne · 衡 — Web + macOS App](public/social/ariadne-preview.png)](https://ariadne.kai-nex.com/)
 
@@ -18,7 +18,7 @@ You can keep the original documents, review suggestions, and save the changes yo
 
 ## Your first session
 
-1. **Open the web app or install the Mac App.** Choose **Local** to save originals without AI analysis, or connect a supported model with your own API key. Codex is optional through the local App or connector.
+1. **Open the web app.** Choose **Local** to save originals without AI analysis, use your own supported API key, or connect your own Codex through the Ariadne Skill.
 2. **Add your materials.** Open **个人资料** (Personal materials), import a résumé, portfolio, or project document, and retain the source. To analyze it with AI, choose an available model and confirm the transmission shown by the app.
 3. **Review the understanding.** Check the proposed content against your original material. Correct or reject unsupported statements, then explicitly save what you accept.
 4. **Add a target role.** Open **职位描述** (Job descriptions), import the role’s requirements, and review them separately from your personal material.
@@ -30,7 +30,13 @@ No model connection yet? You can still archive original materials in Local mode 
 
 [Open the web app](https://ariadne.kai-nex.com/) · [Download page](https://ariadne.kai-nex.com/download.html) · [Download macOS App ZIP](https://github.com/KAI-NEX/Ariadne/releases/download/local-20260918-172135/Ariadne-Local-macOS-arm64-20260918-172135.zip) · [Release & SHA-256](https://github.com/KAI-NEX/Ariadne/releases/tag/local-20260918-172135)
 
-### Install the macOS App
+### Web + Ariadne Skill (preferred direction)
+
+Invoke `$ariadne` in Codex to check dependencies and open the complete local runtime-selection page in Codex. Local use needs no pairing code. Pairing remains optional when using the public web workspace. No Mac App is required; source tracking and explicit human save remain in place.
+
+[Setup and build guide](docs/current/ARIADNE_SKILL.md) · [Skill source](skills/ariadne/SKILL.md). Pages builds include the complete Skill ZIP. Local acceptance is complete; **the updated public download page has not been deployed yet**. Python 3.9+, a compatible Codex CLI and Poppler are required. Other Agents and OS environments require their own verification.
+
+### Legacy macOS App (retained)
 
 **Apple Silicon · macOS 14+ · no Python, Node.js, or Apple Developer account required.** The current App is an early preview; compatibility has been tested on the build Mac, not every supported macOS version. Intel Mac and Windows packages are not available yet.
 
@@ -44,6 +50,8 @@ The App uses an ad-hoc signature and is **not notarized**. If macOS blocks the f
 Local data lives in `~/Library/Application Support/Ariadne Local/data`. The hosted web app and native App have separate workspaces and connection settings; they do not automatically sync. Model analysis requires your own connection and explicit transmission consent. See the [full installation and data guide](docs/current/LOCAL_DISTRIBUTION.md).
 
 ## Current architecture
+
+2026-09-20: the Skill opens the complete local web UI with its own data directory and the existing model-selection flow. An optional loopback connector lets the public website use the user’s Codex; public BYOK requests continue through the Worker. The diagram below records the 2026-09-19 Web/Mac App architecture and remains as a historical reference.
 
 The same Candidate/Job product runs in a browser or a native Mac window. The web app stores documents in IndexedDB and sends model requests through a Cloudflare Worker; the Mac App owns a loopback Python service and a local file repository. Both preserve sources and require explicit human save before confirming model proposals.
 

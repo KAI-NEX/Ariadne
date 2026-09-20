@@ -1,9 +1,13 @@
 """Loopback pairing, route isolation and Codex transport failure boundaries."""
 import base64
 import copy
+import contextlib
+import hashlib
 import http.client
+import io
 import json
 import os
+import runpy
 from pathlib import Path
 import sys
 import tempfile
@@ -59,6 +63,30 @@ try:
     with patch.object(app,'execute_personal_understanding',return_value={'persistence':'not_written','provider':'codex'}) as execute:
         status,body,_=request_http('POST','/api/personal-understanding-turn',{'runtime_snapshot':{'mode':'model','provider':'codex'}},token=token)
         assert status==200 and body['persistence']=='not_written' and execute.call_count==1
+    # The Skill path reads original images/PDFs without Apple OCR or persisted data.
+    with contextlib.redirect_stdout(io.StringIO()):
+        fixture = runpy.run_path(str(ROOT / 'tests/candidate_model_runtime_regression.py'))
+    snapshot = fixture['request']()['runtime_snapshot']
+    image = (ROOT / 'public/job-radar-multimodal-smoke.jpg').read_bytes()
+    value = {'runtime_snapshot': snapshot, 'material_type': 'CANDIDATE',
+             'source_document_id': 'source-candidate-synthetic', 'media_type': 'image/jpeg',
+             'expected_content_hash': 'sha256:' + hashlib.sha256(image).hexdigest(),
+             'image_data_url': 'data:image/jpeg;base64,' + base64.b64encode(image).decode()}
+    with patch.object(app, 'run_apple_vision_ocr', side_effect=AssertionError('Apple OCR called')):
+        status, body, _ = request_http('POST', '/api/local-source-read', value, token=token)
+        assert status == 200 and body['extraction_method'] == 'original_image_manifest_v1'
+        assert body['writeback'] is False and body['model_call_made'] is False
+    from src.model_updates import synthetic_pdf
+    pdf = synthetic_pdf()
+    value.update(media_type='application/pdf', expected_content_hash='sha256:' + hashlib.sha256(pdf).hexdigest(),
+                 document_data_url='data:application/pdf;base64,' + base64.b64encode(pdf).decode())
+    value.pop('image_data_url')
+    with patch('src.web_source_read.render_complete_pdf_pages', return_value=[('1', b'page1'), ('2', b'page2')]):
+        status, body, _ = request_http('POST', '/api/local-source-read', value, token=token)
+        assert status == 200 and body['visual_page_count'] == 2 and body['extracted_text'] == ''
+    value['expected_content_hash'] = 'sha256:incorrect'
+    with patch('src.web_source_read.render_complete_pdf_pages', side_effect=AssertionError('tampered original rendered')):
+        assert request_http('POST', '/api/local-source-read', value, token=token)[0] == 422
     assert request_http('POST','/api/connector/revoke',token=token)[0]==200
     assert request_http('GET','/api/runtime-options',token=token)[0]==401
 finally:

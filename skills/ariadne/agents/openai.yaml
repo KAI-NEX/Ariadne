@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ariadne · 衡"
+  short_description: "在 Codex 中打开完整 Ariadne 页面，检查环境并使用自己的模型"
+  default_prompt: "使用 $ariadne 直接打开 Ariadne，让我选择运行方式并进入工作空间。"

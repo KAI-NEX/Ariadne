@@ -1,5 +1,13 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-20 — Codex Skill 与完整本地网页（COMPLETE；本机安装，未发布）
+
+- 按用户要求将默认交付调整为网页 + Ariadne Skill。`$ariadne` 在 Codex 打开完整运行选择页面，选择 Codex/API/Local 后进入现有工作空间，本地同源无需配对；保留公开网页的可选短期配对通道和历史 Mac App。
+- Skill ZIP 携带公开运行源码、完整页面、契约及逐文件完整性清单，不含芯片专用二进制、账号或个人材料。本地资料独立写入 `~/Library/Application Support/Ariadne Skill`；默认固定 8766，缺少 Codex/PDF 工具仍可用 Local，端口冲突不接管进程，旧 App/8000/公网资料不自动迁移。
+- 同步 `5063d20` 的资料库卡片编辑/删除、Job 生命周期与存储升级，以及 `4b49193` 的对称页头布局；最终包 846,901 bytes。已安装到本机用户 Skill 目录，在 Codex 内置浏览器打开实际 8766 页面，依赖检查通过。下载页与 Pages 构建同时支持 ZIP/SHA-256，原 App 下载保留。
+- 5 项独立包回归覆盖完整性、缺依赖、CLI 协议/登录、端口冲突、配对撤销、本地页面、独立原件保存、版本冲突、重启保留及 Local 可用；Codex transport/PDF、Web Runtime 8 项、资料磁盘库、runtime 前端、生命周期、下载与 VI 正负向检查通过。独立包在仓库外实际渲染两页合成 PDF；Skill 格式校验通过。
+- 实际浏览器完成 Codex 内运行选择→工作空间→两个资料库编辑态；可选配对的成功/断开/错误码和下载桌面/窄屏已验收。最终 HTTP 下载与 ZIP/hash/大小一致。证据保留在 `.cache/skill-distribution/`；使用说明见 [Ariadne Skill](docs/current/ARIADNE_SKILL.md)。本轮未请求真实模型、发送私人材料、发布公网或 push；另一台电脑和公网 HTTPS 首次本地网络授权仍未验收。
+
 ## 2026-09-20 — 资料库页头对称布局修正（COMPLETE；本地预览）
 
 - 按用户预览反馈，将「编辑 / 完成」移到页头最右侧；「了解我」「了解职位概况」作为独立中列居中，与按钮宽度无关。左侧返回和右侧编辑统一 44 px 热区，保留窄屏导航与现有删除行为。

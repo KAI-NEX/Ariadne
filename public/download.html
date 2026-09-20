@@ -6,24 +6,24 @@
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=hands-1" sizes="180x180" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ariadne · 本地部署</title>
+  <title>Ariadne · 安装 Skill</title>
   <link rel="stylesheet" href="/styles.css?vi=1" />
   <link rel="stylesheet" href="/local-download.css" />
-    <meta name="description" content="Apple 芯片 Mac、macOS 14+。下载解压后打开即用，关闭最后一个窗口停止本地服务；无需 Apple Developer 账户。" />
+    <meta name="description" content="在 Codex 中通过 Ariadne Skill 打开完整本地页面，保留资料库与人工审阅，无需安装 Mac App。" />
     <link rel="canonical" href="https://ariadne.kai-nex.com/download.html" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Ariadne · 衡" />
     <meta property="og:locale" content="zh_CN" />
-    <meta property="og:title" content="下载 Ariadne · 衡 macOS App" />
-    <meta property="og:description" content="Apple 芯片 Mac、macOS 14+。下载解压后打开即用，关闭最后一个窗口停止本地服务；无需 Apple Developer 账户。" />
+    <meta property="og:title" content="安装 Ariadne · 衡 Skill" />
+    <meta property="og:description" content="在 Codex 中通过 Ariadne Skill 打开完整本地页面，保留资料库与人工审阅，无需安装 Mac App。" />
     <meta property="og:url" content="https://ariadne.kai-nex.com/download.html" />
     <meta property="og:image" content="https://ariadne.kai-nex.com/social/ariadne-preview.png?v=20260919" />
     <meta property="og:image:width" content="1280" />
     <meta property="og:image:height" content="640" />
     <meta property="og:image:alt" content="Ariadne 双手 Logo 与个人资料、职位描述工作空间；看懂经历，理解岗位，由你决定下一步。" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="下载 Ariadne · 衡 macOS App" />
-    <meta name="twitter:description" content="Apple 芯片 Mac、macOS 14+。下载解压后打开即用，关闭最后一个窗口停止本地服务；无需 Apple Developer 账户。" />
+    <meta name="twitter:title" content="安装 Ariadne · 衡 Skill" />
+    <meta name="twitter:description" content="在 Codex 中通过 Ariadne Skill 打开完整本地页面，保留资料库与人工审阅，无需安装 Mac App。" />
     <meta name="twitter:image" content="https://ariadne.kai-nex.com/social/ariadne-preview.png?v=20260919" />
     <meta name="twitter:image:alt" content="Ariadne 双手 Logo 与空工作空间，不含个人资料。" />
   </head>
@@ -31,8 +31,22 @@
   <main class="vi-container vi-grid">
     <section class="runtime-connect-shell vi-span-12">
       <a class="runtime-back-link" href="/">返回运行选择</a>
-      <p class="runtime-step">Ariadne · 本地版</p>
-      <h1>下载 App，打开即用。</h1>
+      <p class="runtime-step">Ariadne · 网页 + Skill</p>
+      <h1>在 Codex 打开 Ariadne。</h1>
+      <p class="runtime-connect-copy">安装 Ariadne Skill，让 Codex 直接打开完整页面：选择运行方式，再进入个人资料、职位和对话。保留原 App 的使用流程，无需安装 Ariadne App。</p>
+      <p><a id="skill-download" class="runtime-back-link hidden" download>下载 Ariadne Skill（ZIP）</a></p>
+      <p id="skill-download-status" class="runtime-message" role="status">正在检查 Skill 下载…</p>
+      <p><a id="skill-download-checksum" class="runtime-back-link hidden" download>下载 SHA-256 校验文件</a></p>
+      <ol class="runtime-connect-copy">
+        <li>下载并解压 ZIP，将完整的「ariadne」文件夹交给 Codex，告诉它：「把这个文件夹安装为 Ariadne Skill，保留已有文件。」</li>
+        <li>在 Codex 中调用 <code>$ariadne</code>，说「打开 Ariadne」。Skill 检查环境并启动本地页面，在 Codex 浏览器面板打开运行选择页；无需配对码。</li>
+        <li>选择自己的 Codex、API 模型或本地运行，再点击继续。缺少 Codex 登录或 PDF 工具时，Skill 会说明；仍可先用本地运行保存原件。</li>
+        <li>让本次服务保持运行，在页面中管理资料和职位；发送材料仍需确认，结果由你审阅保存。使用结束后，让 Agent 停止服务。更新 Skill 不会替换独立存放的资料。</li>
+      </ol>
+      <p class="runtime-connect-copy">Skill 包含完整页面和运行代码，不捆绑芯片专用程序。需要 Python 3.9+；使用 Codex 分析还需兼容 CLI、本人登录和 Poppler。首版接入 Codex，其他 Agent 与原生 Windows 尚未验证。</p>
+      <p class="runtime-connect-copy">也可以直接<a class="runtime-back-link" href="https://ariadne.kai-nex.com/">使用公开网页版</a>和自己的 API Key。要让公开网页版调用本机 Codex，在 Skill 中说「连接公开网页版」，再到<a class="runtime-back-link" href="/codex-connect.html">配对页面</a>确认连接。旧 Mac App、本地 Skill 和公开网页的资料不自动同步。</p>
+      <details>
+      <summary class="runtime-connect-copy">历史 Mac App 下载（Apple 芯片专用）</summary>
       <p class="runtime-connect-copy">独立窗口的 Ariadne App，适用于 macOS 14 及以上的 Apple 芯片 Mac。无需预装 Python 或开发工具，也无需 Apple Developer 账户。可以先保存原件、使用自己的 Codex 订阅，或连接已接入的 API 模型。</p>
       <p><a id="local-download" class="runtime-back-link hidden" download>下载 Ariadne App（ZIP）</a></p>
       <p id="local-download-status" class="runtime-message" role="status">正在检查可下载版本…</p>
@@ -46,8 +60,10 @@
       <p class="runtime-connect-copy">这是未经 Apple 公证的本地测试 App。首次打开若提示无法验证开发者，请核对来源与校验值，再按系统「设置 → 隐私与安全性」中的提示允许打开。无需关闭系统安全保护。当前不提供 Windows 或 Intel Mac 版本。</p>
       <p class="runtime-connect-copy">安装包不含你的资料和密钥，也不自动迁移旧开发版资料。端口已被其他版本使用时会提示先停止原服务。首次安装与更新均保留原文件。</p>
       <p class="runtime-connect-copy">仅在连接公开网页版时才需要配对：在 Finder 右键 Ariadne.app →「显示包内容」→ Contents/Resources/runtime，运行「连接网页版.command」。本地 App 无需配对。</p>
+      </details>
     </section>
   </main>
   <script src="/local-download.js?v=desktop-app-1"></script>
+  <script src="/skill-download.js"></script>
 </body>
 </html>

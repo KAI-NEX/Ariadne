@@ -1,6 +1,8 @@
 # Ariadne 本地部署包
 
-系统要求：macOS 14 及以上、Apple 芯片；当前只在构建电脑的 macOS 26.6 上实际验收，未覆盖全部兼容系统。
+2026-09-20：默认本地接入改为[网页 + Ariadne Skill](ARIADNE_SKILL.md)，无需安装 App。本文继续保留历史 Mac App 的安装、构建和资料说明；旧 App 与已有资料不删除，不自动迁移。
+
+历史 App 系统要求：macOS 14 及以上、Apple 芯片；当前只在构建电脑的 macOS 26.6 上实际验收，未覆盖全部兼容系统。
 
 适用于 Apple 芯片 Mac。新构建产物为独立窗口的 `Ariadne.app`，不要求先安装 Python、Node 或开发工具。包含 Ariadne 网站与后端、独立 Python、Codex CLI 0.153.4、预编译的文档读取与完整 PDF 转图工具。Codex 是可选连接方式，不是默认选择；Local 保存原件，DeepSeek、Gemini 3.7 Flash 和千问 Qwen 3.8 Max 使用用户自己的 API Key（千问当前支持百炼北京地域）。未完成 adapter 的模型不能执行。
 
