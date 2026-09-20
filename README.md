@@ -13,6 +13,16 @@
 
 [![Ariadne · 衡 — Web + macOS App](public/social/ariadne-preview.png)](https://ariadne.kai-nex.com/)
 
+## Product case & ownership
+
+**An independent project by [KAI](https://github.com/KAI-NEX), built with AI-assisted development.** I own the product definition, architecture decisions, interaction design, implementation process, validation, and release. Independent ownership describes how I delivered the project; it does not mean every line was written without AI tools.
+
+The product question is whether people can understand the relationship between their experience and a target role without losing the distinction between source facts, model suggestions, and their own decisions. My main design choices are separate Candidate/Job contexts, reviewable proposals, and explicit human save.
+
+**Delivered:** a web app and macOS preview, source-preserving workflows, model integration, and documented failure/iteration cases. **Next to validate:** whether independent target users complete career-evidence tasks more accurately or with less effort than their existing workflow. Internal tests and a public release are not evidence of adoption or hiring outcomes.
+
+[Read the product case / 产品案例与个人贡献](docs/product/PRODUCT_CASE_STUDY.md) · [User-validation protocol / 用户验证方案](docs/product/USER_VALIDATION_PLAN.md)
+
 ## What you can do
 
 Ariadne helps you understand your experience in relation to a job you care about. Add your résumé, portfolio, or project notes, then add the job description separately. With a connected model, you can discuss which requirements your materials support, what needs more evidence or clarification, and how to describe your work more clearly.
