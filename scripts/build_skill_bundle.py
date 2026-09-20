@@ -21,7 +21,8 @@ def runtime_files(root=ROOT):
                   or name.startswith("src/") and name.endswith((".py", ".swift"))
                   or name.startswith("data/") and name.endswith((".json", ".sql")) and not name.startswith("data/evaluation/")
                   or name.startswith("public/") and not name.startswith("public/downloads/")}
-    selected.update({"public/skill-download.js", "scripts/desktop_macos.swift", "scripts/local_package.py"})
+    selected.update({"public/skill-download.js", "scripts/desktop_macos.swift", "scripts/local_package.py",
+                     "assets/desktop-icon/compiled/Ariadne.icns", "assets/desktop-icon/compiled/Assets.car"})
     return sorted(selected)
 
 

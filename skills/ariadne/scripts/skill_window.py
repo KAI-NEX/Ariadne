@@ -26,8 +26,10 @@ def open_window(runtime, port, state):
     for key in ("PATH", "CODEX_HOME", "ARIADNE_CODEX_BINARY"):
         if key in os.environ:
             launch[key] = os.environ[key]
+    icons = [runtime / "assets/desktop-icon/compiled" / name for name in ("Ariadne.icns", "Assets.car")]
     # Each revision gets a new cache directory. Old builds and all data remain.
     revision = hashlib.sha256(source.read_bytes() + Path(__file__).read_bytes()
+                              + b"".join(icon.read_bytes() for icon in icons)
                               + platform.machine().encode() + json.dumps(launch, sort_keys=True).encode()).hexdigest()[:16]
     cache = state / "native" / revision
     app = cache / "Ariadne Skill.app"
@@ -48,11 +50,13 @@ def open_window(runtime, port, state):
             (resources / "skill-launch.json").write_text(json.dumps(launch))
             subprocess.run([compiler, "-D", "SKILL_WINDOW", "-target",
                             platform.machine() + "-apple-macos14.0", str(source), "-o", str(executable)], check=True)
-            shutil.copyfile(runtime / "public/icons/apple-touch-icon.png", resources / "Ariadne.png")
+            for icon in icons:
+                shutil.copyfile(icon, resources / icon.name)
             (stage / "Contents/Info.plist").write_bytes(plistlib.dumps({
                 "CFBundleExecutable": "Ariadne", "CFBundleIdentifier": "com.kai-nex.ariadne.skill",
                 "CFBundleName": "Ariadne Skill", "CFBundleDisplayName": "Ariadne · 衡",
                 "CFBundlePackageType": "APPL", "CFBundleVersion": "1",
+                "CFBundleIconFile": "Ariadne.icns", "CFBundleIconName": "Ariadne",
                 "LSMinimumSystemVersion": "14.0", "NSHighResolutionCapable": True,
                 "NSAppTransportSecurity": {"NSAllowsLocalNetworking": True},
             }))

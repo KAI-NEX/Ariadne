@@ -1,5 +1,11 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-20 — Skill 沿用原 App 图标尺寸（COMPLETE；本机）
+
+- 修复独立 Skill 窗口直接用网页 180px touch icon 覆盖应用图标导致的尺寸/留白偏差。复用已安装原 App 的同一份 `Ariadne.icns` / `Assets.car` 和 `CFBundleIconFile` / `CFBundleIconName` 配置，去掉运行时 PNG 覆盖，原 Icon Composer 源文件与旧图标资源保留；图标内容变化纳入窗口缓存版本。
+- 原 App 与新窗口资源逐字节一致；使用 macOS `NSWorkspace.icon(forFile:)` 分别渲染 256px，新旧 PNG SHA-256 完全相同（`1185ef37ce67d04d60fafc5c29b5048b9f46898765c19820d060790146dad1d1`）。7 项 Skill 包回归、Swift typecheck、VI 与负向门禁通过。Dock 自动化读取超时，未声称取得 Dock 截图；系统图标渲染证据保存在 `.cache/skill-icon-20260920/`。
+- 已更新本机 Skill 并重开窗口；新 ZIP 2,791,346 bytes（增加原生外观资源），原安装另有完整备份。未发布公网或 push，资料和其他未提交内容保留。
+
 ## 2026-09-20 — Skill 独立 Mac 窗口与随关随停（COMPLETE；本机）
 
 - 按用户最新要求，Skill 默认 `window` 打开独立 Ariadne 窗口，不使用 Codex 内置浏览器；复用原 App 的 WebKit 窗口、上传、下载和菜单。关闭最后窗口/⌘Q/窗口异常退出时，父管道关闭触发专属服务树停止，最小化保留运行，已保存资料保留。原无窗口 `open` 仅作明确选择的浏览器或开发入口。

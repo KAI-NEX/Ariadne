@@ -49,7 +49,7 @@ class SkillTests(unittest.TestCase):
 
     def test_standalone_package_and_integrity(self):
         self.assertEqual(hashlib.sha256(Path(self.result["archive"]).read_bytes()).hexdigest(), self.result["sha256"])
-        self.assertLess(self.result["bytes"], 1024 * 1024)
+        self.assertLess(self.result["bytes"], 4 * 1024 * 1024)  # Includes native icon appearances (~2 MB).
         manifest = json.loads((self.skill / "runtime-files.json").read_text())
         self.assertTrue("app.py" in manifest and "src/local_connector.py" in manifest)
         self.assertFalse(any("workspaces" in name or "auth.json" in name or name.endswith(".db") for name in manifest))

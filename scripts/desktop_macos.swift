@@ -49,7 +49,6 @@ final class AriadneApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
             }
             home = URL(fileURLWithPath: args[3])
             origin = URL(string: "http://127.0.0.1:\(port)")!
-            if let icon = NSImage(contentsOf: Bundle.main.resourceURL!.appendingPathComponent("Ariadne.png")) { NSApp.applicationIconImage = icon }
             #endif
             try configureWorkspace(view.configuration)
             try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])

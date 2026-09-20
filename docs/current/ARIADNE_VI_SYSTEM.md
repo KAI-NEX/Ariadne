@@ -20,6 +20,8 @@
 
 2026-09-19 **macOS 独立 App 图标**：按用户指定，使用双手相连的黑白图像，替代早期「衡」字图标。可编辑来源为 `assets/desktop-icon/Ariadne.icon`，用户原图、内置 imagegen 前景和生成说明一并保留。1024 点画布，背景/前景分层，圆角与动态外观由 Apple 编译器处理；细碎版画/网点前景关闭玻璃高光，深色与染色使用高对比轮廓。网页字标、图标 token 与共用控件不变。
 
+2026-09-20 **Skill 原生窗口图标**：沿用上述 App 的 `Ariadne.icns` 与 `Assets.car`，由 bundle 图标配置交给系统渲染；不以网站 180px touch icon 覆盖 Dock 图标。复用资源在 `assets/desktop-icon/compiled/`，原 Icon Composer 文档继续作为设计来源。
+
 2026-09-19 **网站 favicon**：正式网页复用同一双手图标，由 `scripts/build_web_icons.py` 从上述 Icon Composer 文档导出 16/32/48 px PNG、多尺寸 `public/favicon.ico` 及 180 px Apple touch icon；源图片不另行改画。全部静态页面与发布时生成的 404 页面显式声明图标，使用 `hands-1` 查询版本避免沿用旧缓存。
 
 英文固定 **Ariadne**，中文固定 **衡**。不使用音译作为产品中文名。语义：从有来源的资料出发，帮助衡量、判断和取舍。不得用“匹配百分比”、色阶或图标暗示不存在的能力认证。
