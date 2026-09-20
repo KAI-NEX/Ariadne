@@ -80,7 +80,9 @@ api/node_modules/.bin/wrangler pages deploy pages --project-name ariadne --branc
 
 ## 6. 发布 Skill 包
 
-当前构建器自动从同一代码版本生成 `skill-bundle/Ariadne-Skill.zip`，复制到 Pages 的 `/downloads/Ariadne-Skill.zip`，并生成包含完整大小与 SHA-256 的 `/downloads/skill.json`。安装页先提供安装指令，再说明 `$ariadne 打开 Ariadne` 的调用步骤；无需创建新的 GitHub Release。发布后核对正式域名的包字节、hash、安装指令及本地直达工作空间行为。
+当前构建器自动从同一代码版本生成 `skill-bundle/Ariadne-Skill.zip`，复制到 Pages 的 `/downloads/Ariadne-Skill.zip`，并生成包含完整大小与 SHA-256 的 `/downloads/skill.json`。首页「通过本地 Agent 使用」窗口直接提供「复制安装指令」，再说明 `$ariadne 打开 Ariadne`；旧 `/install` 链接回到 `/#skill`。
+
+发布 Skill 时为构建器传入 `--skill-release-tag skill-YYYYMMDD-HHMMSS`，将生成的同一个完整 ZIP 与 `.sha256` 上传到仓库该 tag 的 GitHub Release，确认公开下载 hash 后再部署 Pages。metadata 的 `github_url` 绑定该版本，网页指令引用 GitHub 包；同源 ZIP 保留作完整性检查与已有链接兼容。不把仓库中的单独 `skills/ariadne` 目录误当完整安装包。发布后核对窗口复制、两个下载来源的字节/hash 及本地直达工作空间行为。
 
 ### 历史 Mac App 分发记录
 

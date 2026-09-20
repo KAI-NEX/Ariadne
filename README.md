@@ -31,15 +31,15 @@ No model connection yet? You can still archive original materials in Local mode 
 
 ## Try Ariadne
 
-[Open the web app](https://ariadne.kai-nex.com/) · [Install Ariadne Skill](https://ariadne.kai-nex.com/install.html)
+[Open the web app](https://ariadne.kai-nex.com/) · [Install Ariadne Skill](https://ariadne.kai-nex.com/#skill)
 
 ### Web + Ariadne Skill (preferred direction)
 
 On Mac, the Skill opens a standalone window. Closing its last window stops its service and keeps saved data. First use requires macOS 14+ and Apple Command Line Tools to compile the small window host for this Mac; it does not use Codex’s in-app browser.
 
-First open the installation page, copy its installation prompt into Codex, and wait for installation and dependency checks. Then send `$ariadne 打开 Ariadne` to open the workspace directly. The Skill uses local Codex; the website uses API keys. They do not pair with each other or automatically synchronize data. Source tracking and explicit human save remain in place.
+Open “Use through a local Agent” on the website, click “Copy installation instructions,” paste them into Codex, and wait for installation and dependency checks. Then send `$ariadne 打开 Ariadne` to open the workspace directly. The Skill uses local Codex; the website uses API keys. They do not pair with each other or automatically synchronize data. Source tracking and explicit human save remain in place.
 
-[Setup and build guide](docs/current/ARIADNE_SKILL.md) · [Skill source](skills/ariadne/SKILL.md). Pages builds include the complete Skill ZIP. Local acceptance is complete; the [installation page](https://ariadne.kai-nex.com/install.html) provides a prompt to copy into Codex. Python 3.9+, a compatible Codex CLI and Poppler are required. Other Agents and OS environments require their own verification.
+[Setup and build guide](docs/current/ARIADNE_SKILL.md) · [Skill source](skills/ariadne/SKILL.md). Pages builds include the complete Skill ZIP. Local acceptance is complete; the [installation dialog](https://ariadne.kai-nex.com/#skill) provides a prompt to install the complete package from GitHub Releases. Python 3.9+, a compatible Codex CLI and Poppler are required. Other Agents and OS environments require their own verification.
 
 Historical Mac App builds and data notes remain in the [local distribution record](docs/current/LOCAL_DISTRIBUTION.md). The current local entry point is the Skill.
 

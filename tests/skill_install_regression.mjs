@@ -6,20 +6,30 @@ const source = fs.readFileSync(new URL('../public/skill-install.js', import.meta
 const release = { url: '/downloads/Ariadne-Skill.zip', sha256: 'a'.repeat(64), bytes: 1000 };
 async function render(data = release, bytes = 1000, clipboardFails = false, body = new Uint8Array(1000), downloadOK = true) {
   let copied;
+  let requests = 0;
   const nodes = Object.fromEntries(['skill-install-copy', 'skill-install-status', 'skill-install-prompt', 'skill-install-details'].map(id => [id, {
     disabled: true, hidden: true, value: '', textContent: '',
     addEventListener(type, fn) { this[type] = fn; },
     focus() { this.focused = true; }, select() { this.selected = true; },
   }]));
-  await vm.runInNewContext(source, {
+  const context = vm.createContext({
     crypto: webcrypto,
     document: { getElementById: id => nodes[id] },
     navigator: { clipboard: { async writeText(text) { if (clipboardFails) throw Error('denied'); copied = text; } } },
-    fetch: async (url, options) => url.endsWith('.json') ? { ok: data !== null, json: async () => data }
+    fetch: async (url, options) => { requests++; return url.endsWith('.json') ? { ok: data !== null, json: async () => data }
       : options.method === 'HEAD' ? { ok: true, headers: { get: () => bytes === null ? null : String(bytes) } }
-      : { ok: downloadOK, arrayBuffer: async () => body.buffer },
+      : { ok: downloadOK, arrayBuffer: async () => body.buffer }; },
   });
-  return { nodes, copied: () => copied };
+  vm.runInContext(source, context);
+  assert.equal(requests, 0, 'homepage must not load installer metadata or archive until guide opens');
+  await Promise.all([context.AriadneSkillInstall.prepare(), context.AriadneSkillInstall.prepare()]);
+  const count = requests;
+  if (!nodes['skill-install-copy'].disabled) {
+    await context.AriadneSkillInstall.prepare();
+    assert.equal(requests, count, 'reopening a ready guide reuses the checked version');
+    assert.equal(requests, bytes === null ? 3 : 2, 'concurrent prepare calls share one check');
+  }
+  return { nodes, context, copied: () => copied };
 }
 const body = new Uint8Array(1000).fill(42);
 const verified = {...release, sha256: createHash('sha256').update(body).digest('hex')};
@@ -46,3 +56,12 @@ for (const [data, size] of [[null, 1000], [release, 999], [{...release, url:'htt
   assert.equal(result.copied(), undefined);
 }
 console.log('Skill install: artifact validation, missing HEAD length with size/hash checks, copy success, clipboard fallback, unavailable package PASS');
+
+const githubURL = 'https://github.com/KAI-NEX/Ariadne/releases/download/skill-20260920/Ariadne-Skill.zip';
+const github = await render({...release, github_url:githubURL});
+await github.nodes['skill-install-copy'].click();
+assert.ok(github.copied().includes(githubURL));
+for(const github_url of ['https://evil.invalid/Ariadne-Skill.zip', githubURL+'?redirect=evil', githubURL.replace('KAI-NEX','someone'), githubURL.replace('skill-20260920','latest')]) {
+  assert.equal((await render({...release, github_url})).nodes['skill-install-copy'].disabled, true);
+}
+console.log('Skill install: lazy shared preparation and pinned GitHub release allowlist PASS');

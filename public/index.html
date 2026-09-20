@@ -10,13 +10,13 @@
     <title>Ariadne · 连接设置</title>
     <script src="/entry-navigation.js"></script>
     <link rel="stylesheet" href="/styles.css?v=codex-more-v1&amp;vi=1&amp;ui=local-download-v1" />
-      <meta name="description" content="结合你的简历、作品集与目标岗位，讨论已有依据、需要补充的信息和下一步。支持网页版与 macOS App，使用自己的模型连接，由你审阅并保存。" />
+      <meta name="description" content="结合你的简历、作品集与目标岗位，讨论已有依据、需要补充的信息和下一步。支持网页版与本地 Skill，使用自己的模型连接，由你审阅并保存。" />
     <link rel="canonical" href="https://ariadne.kai-nex.com/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Ariadne · 衡" />
     <meta property="og:locale" content="zh_CN" />
     <meta property="og:title" content="Ariadne · 衡｜看懂经历，理解岗位" />
-    <meta property="og:description" content="结合你的简历、作品集与目标岗位，讨论已有依据、需要补充的信息和下一步。支持网页版与 macOS App，使用自己的模型连接，由你审阅并保存。" />
+    <meta property="og:description" content="结合你的简历、作品集与目标岗位，讨论已有依据、需要补充的信息和下一步。支持网页版与本地 Skill，使用自己的模型连接，由你审阅并保存。" />
     <meta property="og:url" content="https://ariadne.kai-nex.com/" />
     <meta property="og:image" content="https://ariadne.kai-nex.com/social/ariadne-preview.png?v=20260919" />
     <meta property="og:image:width" content="1280" />
@@ -24,7 +24,7 @@
     <meta property="og:image:alt" content="Ariadne 双手 Logo 与个人资料、职位描述工作空间；看懂经历，理解岗位，由你决定下一步。" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Ariadne · 衡｜看懂经历，理解岗位" />
-    <meta name="twitter:description" content="结合你的简历、作品集与目标岗位，讨论已有依据、需要补充的信息和下一步。支持网页版与 macOS App，使用自己的模型连接，由你审阅并保存。" />
+    <meta name="twitter:description" content="结合你的简历、作品集与目标岗位，讨论已有依据、需要补充的信息和下一步。支持网页版与本地 Skill，使用自己的模型连接，由你审阅并保存。" />
     <meta name="twitter:image" content="https://ariadne.kai-nex.com/social/ariadne-preview.png?v=20260919" />
     <meta name="twitter:image:alt" content="Ariadne 双手 Logo 与空工作空间，不含个人资料。" />
   </head>
@@ -43,7 +43,7 @@
           <button id="runtime-add-model" class="runtime-menu-item runtime-add-model" type="button" role="option">
             <span>添加新的模型</span><small>使用自己的 API Key</small>
           </button>
-          <a id="runtime-connect-codex" href="/install.html" class="runtime-menu-item" role="option" aria-haspopup="dialog"><span>通过本地 Agent 使用</span><small>安装 Skill，在独立窗口中使用</small></a>
+          <a id="runtime-connect-codex" href="/#skill" class="runtime-menu-item" role="option" aria-haspopup="dialog"><span>通过本地 Agent 使用</span><small>安装 Skill，在独立窗口中使用</small></a>
           <div class="runtime-divider"></div>
           <button id="runtime-local" class="runtime-menu-item" type="button" role="option">
             <span>暂不连接 AI</span><small>先保存原件，接入 AI 后再分析</small>
@@ -63,13 +63,17 @@
             <section id="add-model-models-section" class="hidden"><p class="add-model-label">可用图文模型</p><div id="add-model-model-list" class="add-model-list"></div></section>
           </div>
         </div>
-        <footer class="add-model-footer"><p id="add-model-status" class="add-model-hint" role="status" aria-live="polite"></p><button id="add-model-connect" class="add-model-connect" type="button" disabled><span class="add-model-connect-content"><svg class="add-model-connect-loader" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9" /></svg><svg class="add-model-connect-check" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="m8.5 12 2.3 2.3 4.8-5" /></svg><span class="add-model-connect-label">同意验证并连接</span></span></button><a id="add-model-codex-link" class="add-model-key-link" href="/install.html" aria-haspopup="dialog">通过本地 Agent 使用</a></footer>
+        <footer class="add-model-footer"><p id="add-model-status" class="add-model-hint" role="status" aria-live="polite"></p><button id="add-model-connect" class="add-model-connect" type="button" disabled><span class="add-model-connect-content"><svg class="add-model-connect-loader" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9" /></svg><svg class="add-model-connect-check" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="m8.5 12 2.3 2.3 4.8-5" /></svg><span class="add-model-connect-label">同意验证并连接</span></span></button><a id="add-model-codex-link" class="add-model-key-link" href="/#skill" aria-haspopup="dialog">通过本地 Agent 使用</a></footer>
       </section>
     </div>
     <dialog id="skill-guide" class="add-model-panel codex-more-dialog skill-guide-dialog" aria-labelledby="skill-guide-title">
       <header class="add-model-header"><button id="skill-guide-close" class="sheet-icon-button" type="button" aria-label="关闭"></button><h2 id="skill-guide-title">通过本地 Agent 使用</h2></header>
       <div class="add-model-scroll-area"><div class="add-model-body codex-more-copy">
-        <section><p class="add-model-label">1. 先安装 Skill</p><p>打开安装页，复制安装指令，粘贴到 Codex 对话中并发送，让它安装并检查所需依赖。</p><a class="add-model-key-link" href="/install.html">前往安装页 · 复制安装指令</a></section>
+        <section><p class="add-model-label">1. 先安装 Skill</p><p>复制安装指令，粘贴到 Codex 对话中并发送，等待安装与依赖检查完成。</p>
+          <button id="skill-install-copy" class="add-model-connect" type="button" disabled>复制安装指令</button>
+          <p id="skill-install-status" class="add-model-hint" role="status" aria-live="polite">正在检查可安装版本…</p>
+          <details id="skill-install-details" hidden><summary>查看安装指令</summary><label class="add-model-hint" for="skill-install-prompt">复制后粘贴到 Codex</label><textarea id="skill-install-prompt" class="skill-install-prompt" rows="5" readonly spellcheck="false"></textarea></details>
+        </section>
         <section><p class="add-model-label">2. 安装完成后调用</p><p>在 Codex 对话中输入并发送 <code>$ariadne 打开 Ariadne</code>，即可直接进入独立窗口的工作空间。</p></section>
         <section><p class="add-model-label">3. 在窗口中使用</p><p>添加个人资料或职位材料，再围绕材料提问。分析使用你的 Codex，结果由你审阅保存；关闭最后窗口即停止服务，已保存资料保留。</p></section>
         <p>网页资料与 Skill 本地资料各自保存，不自动同步。目前已支持 Codex，其他 Agent 待适配。</p>
@@ -84,6 +88,7 @@
     <script src="/model-settings-catalog-data.js"></script><script src="/model-settings.js"></script><script src="/runtime-selection-state.js"></script>
     <script src="/runtime-capabilities.js?v=runtime-routing-v1"></script>
     <script src="/runtime-capability-gate.js?v=runtime-routing-v1"></script>
+    <script src="/skill-install.js"></script>
     <script src="/skill-guide.js"></script>
     <script src="/runtime-selection.js?v=runtime-routing-v1&amp;ui=add-model-return-v2"></script>
   </body>

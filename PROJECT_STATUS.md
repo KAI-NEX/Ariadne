@@ -1,5 +1,11 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-20 — 本地 Agent 窗口内直接安装（COMPLETE；本地验收，待发布）
+
+- 用户要求取消为了复制指令单独跳页。首页「通过本地 Agent 使用」窗口直接提供「复制安装指令」，随后说明安装后调用和独立窗口使用；`/#skill` 可直接打开，旧 install / download / codex-connect 地址兼容跳回同一窗口。复制失败展开并选中原始指令，包不可用禁用按钮，关闭重开可重试；关闭恢复原触发焦点。
+- 安装检查仅在窗口首次打开时执行，并发/再次打开复用成功结果。安装指令支持受限的 KAI-NEX/Ariadne、固定 skill tag GitHub Release 完整 ZIP 与 SHA-256；构建器新增 `--skill-release-tag`，同源包继续作校验与旧地址兼容。完整包包含运行代码，单独 skills/ariadne 目录不能直接替代；本次未改变模型、个人数据或启动权限。
+- Skill install 回归覆盖按需检查、并发去重、复制降级、缺长度时完整 hash/大小、非法 GitHub URL 与包失败；product boundary、Skill bundle 7 tests、VI/负向检查、公开文件扫描和语法检查通过。egolite 实际验证桌面/390px 复制成功、保持原页面、旧安装地址进入同一窗口、Escape 焦点恢复；阻止 metadata 后按钮禁用，解除阻止后重开成功。QA 在 `.cache/skill-inline-github-20260920/`，没有真实模型调用。
+
 ## 2026-09-20 — 双端架构与安装优先内容正式发布（COMPLETE；已上线）
 
 - 按用户「调整好架构和内容，发布」授权，将此前完成的 Web / Skill 架构、Skill 直达工作空间和三步安装优先引导发布至正式域名。中英 README、当前 Skill 指南和部署说明统一 Web API / 浏览器库、Skill Codex / 文件库的职责；旧配对、模型选择与 Mac App 说明保留为明确标注的历史记录。反馈更新和其他 Agent 未扩展。

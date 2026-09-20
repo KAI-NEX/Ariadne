@@ -1054,3 +1054,17 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 
 /* Installation guidance uses the shared dialog at its natural content height. */
 .skill-guide-dialog { --add-model-sheet-height: auto; }
+
+.skill-guide-dialog .skill-install-prompt {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--vi-space-12);
+  color: var(--vi-ink);
+  background: var(--vi-surface);
+  border: 1px solid var(--vi-line);
+  border-radius: var(--vi-radius-small);
+  font-family: var(--vi-font-ui);
+  font-size: var(--vi-text-body);
+  line-height: var(--vi-leading-reading);
+  resize: vertical;
+}

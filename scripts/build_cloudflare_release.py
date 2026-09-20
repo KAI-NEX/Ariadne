@@ -42,7 +42,9 @@ def download_metadata(download_url=None):
     return metadata
 
 
-def build(output, pdfjs, download_url=None):
+def build(output, pdfjs, download_url=None, skill_release_tag=None):
+    if skill_release_tag is not None and not re.fullmatch(r"skill-[A-Za-z0-9.-]+", skill_release_tag):
+        raise ValueError("Invalid Skill release tag")
     if json.loads((pdfjs / "package.json").read_text())["version"] != "5.4.624":
         raise ValueError("Expected reviewed pdfjs-dist 5.4.624")
     output.mkdir(parents=True, exist_ok=False)
@@ -107,8 +109,10 @@ def build(output, pdfjs, download_url=None):
     skill = build_skill(output / "skill-bundle")
     shutil.copyfile(skill["archive"], downloads / "Ariadne-Skill.zip")
     shutil.copyfile(output / "skill-bundle/Ariadne-Skill.zip.sha256", downloads / "Ariadne-Skill.zip.sha256")
-    (downloads / "skill.json").write_text(json.dumps({"url": "/downloads/Ariadne-Skill.zip",
-        "bytes": skill["bytes"], "sha256": skill["sha256"]}))
+    skill_metadata = {"url": "/downloads/Ariadne-Skill.zip", "bytes": skill["bytes"], "sha256": skill["sha256"]}
+    if skill_release_tag:
+        skill_metadata["github_url"] = f"https://github.com/KAI-NEX/Ariadne/releases/download/{skill_release_tag}/Ariadne-Skill.zip"
+    (downloads / "skill.json").write_text(json.dumps(skill_metadata))
     files = list(pages.rglob("*"))
     if sum(p.is_file() for p in files) > 1000 or any(p.is_file() and p.stat().st_size > 25 * 1024 * 1024 for p in files):
         raise ValueError("Cloudflare Pages upload limit exceeded")
@@ -131,6 +135,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path)
     parser.add_argument("--pdfjs", type=Path, required=True, help="Installed pdfjs-dist 5.4.624 directory")
     parser.add_argument("--download-url", help="Published public GitHub Release URL matching the current local ZIP")
+    parser.add_argument("--skill-release-tag", help="GitHub tag for this exact Skill package; upload it before deploying Pages")
     args = parser.parse_args()
     output = args.output or ROOT / ".cache/cloudflare-distribution" / datetime.now().strftime("%Y%m%d-%H%M%S")
-    print(json.dumps(build(output.resolve(), args.pdfjs.resolve(), args.download_url)))
+    print(json.dumps(build(output.resolve(), args.pdfjs.resolve(), args.download_url, args.skill_release_tag)))

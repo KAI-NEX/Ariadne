@@ -31,15 +31,15 @@ Ariadne 帮你结合自己的经历，理解一个真正关心的岗位。你可
 
 ## 开始使用
 
-[打开网页版](https://ariadne.kai-nex.com/) · [安装 Ariadne Skill](https://ariadne.kai-nex.com/install.html)
+[打开网页版](https://ariadne.kai-nex.com/) · [安装 Ariadne Skill](https://ariadne.kai-nex.com/#skill)
 
 ### 网页 + Ariadne Skill（默认方向）
 
 Mac 默认由 Skill 打开独立窗口，关闭最后窗口即停止服务，保留资料；不使用 Codex 内置浏览器。首次需要 macOS 14+ 与 Apple Command Line Tools，窗口程序在本机按芯片编译。
 
-先进入安装页，复制安装指令给 Codex，等待安装与依赖检查完成；再发送 `$ariadne 打开 Ariadne`，直接进入工作空间。Skill 使用本机 Codex，网页版使用 API；两端不配对，资料不自动同步。资料来源和人工保存边界保持。
+在官网打开「通过本地 Agent 使用」，直接点击「复制安装指令」并粘贴给 Codex，等待安装与依赖检查完成；再发送 `$ariadne 打开 Ariadne`，直接进入工作空间。Skill 使用本机 Codex，网页版使用 API；两端不配对，资料不自动同步。资料来源和人工保存边界保持。
 
-[安装与构建说明](docs/current/ARIADNE_SKILL.md) · [Skill 源码](skills/ariadne/SKILL.md)。完整 ZIP 随 Pages 构建生成；本阶段已完成本机验收，官网入口统一为[安装 Skill](https://ariadne.kai-nex.com/install.html)，复制安装指令后交给 Codex 执行。需要 Python 3.9+、兼容 Codex CLI 和 Poppler；不会因安装 Skill 自动支持任意 Agent 或所有操作系统。
+[安装与构建说明](docs/current/ARIADNE_SKILL.md) · [Skill 源码](skills/ariadne/SKILL.md)。完整 ZIP 随 Pages 构建生成；本阶段已完成本机验收，官网入口统一为[安装 Skill](https://ariadne.kai-nex.com/#skill)，窗口内复制指令后由 Codex 从 GitHub Releases 获取完整包并安装。需要 Python 3.9+、兼容 Codex CLI 和 Poppler；不会因安装 Skill 自动支持任意 Agent 或所有操作系统。
 
 旧 Mac App 的历史构建和资料说明保留在[本地分发记录](docs/current/LOCAL_DISTRIBUTION.md)，当前本地入口统一为 Skill。
 
