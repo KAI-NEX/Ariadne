@@ -1,5 +1,7 @@
 # Ariadne 项目上下文
 
+2026-09-20 最新入口与分发更新：用户要求将安装集成到「通过本地 Agent 使用」窗口，直接「复制安装指令」，不再单独跳安装页。已上线 [同页安装窗口](https://ariadne.kai-nex.com/#skill)，旧链接回到该窗口；完整 Skill 包发布于 [GitHub Release](https://github.com/KAI-NEX/Ariadne/releases/tag/skill-20260920-102511)，源码同步现有仓库。Pages `6062f6c7`，安装指令固定 GitHub 版本与 SHA-256；保留先安装再调用、本机直达工作空间及两端独立存储。
+
 2026-09-20 最新正式发布：按用户要求，Web / Skill 双端架构和「先安装、再调用」引导已上线 [官网](https://ariadne.kai-nex.com) 与 [安装页](https://ariadne.kai-nex.com/install)。Pages `a56a6d36`、API Worker `4ab1078e-7937-4687-a827-ddba54044bc5`；公开 Skill 包包含本机 Codex、直接进入工作空间与本地文件库。网页版仅用 API，本地 Agent 入口只提供说明，两端不配对、不自动同步资料。线上桌面/手机、API 边界、复制指令与公开包完整性已核对；本轮未重新执行真实模型，未 push Git。下列旧条目的“未部署”、Skill 模型选择页或配对描述保留为历史，以本条和 [双端架构](docs/current/TWO_PRODUCT_ARCHITECTURE.md) 为准。
 
 2026-09-20 最新架构决定：用户确认拆分 Web 与 Skill 两种产品。Web 只连接 API、使用浏览器内容库，本地 Agent 入口仅提供安装说明；Skill 使用本机 Codex 与固定文件库，直接进入工作空间，不再显示模型选择首页。共用页面与领域/保存契约，独立产品配置、启动、transport 和存储路由；旧网页配对退出当前入口，源码与原资料保留。已更新本机 Skill，完成真实 Codex 对话、两端浏览器与原生窗口验收；未部署公网。详见 [双端架构](docs/current/TWO_PRODUCT_ARCHITECTURE.md)。

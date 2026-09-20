@@ -48,3 +48,5 @@ flowchart LR
 边界回归覆盖：历史配对不转发、Web 在 loopback 仍按 Web 运行、两端 Provider 拒绝、API Key 隔离、旧偏好保留、Skill 首页跳转、缺依赖失败与资料重启保留。真实浏览器验证两端入口、安装说明、导航、窄屏与已有合成资料恢复。阶段实际结果见 `PROJECT_STATUS.md` 最新条目。
 
 2026-09-20 已按用户要求发布至正式域名：Pages `a56a6d36`，API Worker `4ab1078e-7937-4687-a827-ddba54044bc5`，官网提供同版完整 Skill 包。线上桌面/手机引导、API 边界、安装指令与下载完整性已验证；本机 Skill 与真实 Codex 证据见前一阶段记录。本轮未重新执行真实模型，也未 push Git；其他 Agent 与其他电脑仍需各自验收。
+
+2026-09-20 安装入口进一步合并到首页「通过本地 Agent 使用」窗口，直接复制指令；旧 install 地址回到 `/#skill`。完整 Skill 包在仓库 GitHub Releases 分发，网页同源包保持相同字节用于检查和兼容，安装指令绑定固定 tag 与 SHA-256。当前 Pages 为 `6062f6c7`，源码已同步 GitHub；此前未 push / 独立安装页记录为历史。

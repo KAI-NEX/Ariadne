@@ -1,5 +1,13 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-20 — 同窗口安装与 GitHub Skill 分发（COMPLETE；已上线）
+
+- 用户最新要求已发布：官网 `/#skill` 直接打开「通过本地 Agent 使用」，窗口内复制安装指令；旧 `/install`、download 与 codex-connect 地址回到同一入口。Pages `6062f6c7`，正式域名 https://ariadne.kai-nex.com。API 未再次部署，沿用已通过健康与隔离检查的 `4ab1078e-7937-4687-a827-ddba54044bc5`。
+- 已将 Skill 和双端架构源码同步 GitHub main；保留远端 `5251c37` 的产品案例/用户验证内容，合并提交 `0e971c3`，没有覆盖原有贡献说明。发布 [skill-20260920-102511](https://github.com/KAI-NEX/Ariadne/releases/tag/skill-20260920-102511)，完整 ZIP 与 SHA-256 文件公开可下载；安装提示绑定这个固定版本，不引用可漂移的 latest 文件。包源码为合并提交，后续发布记录不改变运行文件。
+- GitHub 和正式官网分别下载核对：均为 2,798,607 bytes、SHA-256 `5caf82de4fc49972b1aec286bdde930d7eae0d8582e49c93bb017e01b17dd4f1`；ZIP 和 214 个运行文件 hash 全部通过，独立包 doctor ready。本轮不覆盖日常 Skill、不迁移资料、不新增反馈更新、其他 Agent 或真实模型调用。
+- 线上实际检查桌面/390px、同窗口复制成功且指令含上述 GitHub URL/hash、旧安装链接自动回到窗口、无横向溢出；健康返回 Web、磁盘 workspace API 仍为预期 404。本地相关回归、失败重试、复制降级与 VI 证据见上一条。全量 GitHub CI 由 main/tag 推送触发，记录时仍在运行，未将其计入通过结论。
+- 发布包、下载、截图、日志与 publication.json 在 `.cache/skill-inline-github-20260920/`。GitHub 首次创建使用短 SHA 被拒，改用完整已推送 SHA 后成功；没有产生额外公开版本。原未提交项目历史条目、旧 App 源码及 QA 产物继续保留。
+
 ## 2026-09-20 — 本地 Agent 窗口内直接安装（COMPLETE；本地验收，待发布）
 
 - 用户要求取消为了复制指令单独跳页。首页「通过本地 Agent 使用」窗口直接提供「复制安装指令」，随后说明安装后调用和独立窗口使用；`/#skill` 可直接打开，旧 install / download / codex-connect 地址兼容跳回同一窗口。复制失败展开并选中原始指令，包不可用禁用按钮，关闭重开可重试；关闭恢复原触发焦点。
