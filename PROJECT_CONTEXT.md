@@ -1,5 +1,7 @@
 # Ariadne 项目上下文
 
+2026-09-20 最新架构决定：用户确认拆分 Web 与 Skill 两种产品。Web 只连接 API、使用浏览器内容库，本地 Agent 入口仅提供安装说明；Skill 使用本机 Codex 与固定文件库，直接进入工作空间，不再显示模型选择首页。共用页面与领域/保存契约，独立产品配置、启动、transport 和存储路由；旧网页配对退出当前入口，源码与原资料保留。已更新本机 Skill，完成真实 Codex 对话、两端浏览器与原生窗口验收；未部署公网。详见 [双端架构](docs/current/TWO_PRODUCT_ARCHITECTURE.md)。
+
 2026-09-20 最新范围决定：用户要求先跑通 Ariadne Skill → Codex → 保留现有页面 → 本地资料保存；反馈更新暂不扩展，通用长期档案契约与其他 Agent 适配不作为本阶段前置条件。同机后续 Agent 可复用资料根目录与明确的工作区身份，但连接 adapter、能力验证、上下文范围及人工保存规则仍须适配；指定目录不等于跨机同步。当前页面调用本机 Codex CLI，不接入唤起它的聊天历史。已完成本机合成 PDF 导入、确认保存、真实对话及服务重启恢复验收，并修复候选人对话保存层的旧 Provider 硬编码；详见 [Skill 指南](docs/current/ARIADNE_SKILL.md)。
 
 2026-09-20 最新交付更新：官网已正式改为[安装 Ariadne Skill](https://ariadne.kai-nex.com/install)，复制指令给 Codex 安装，旧下载页跳转；公开包和本机 Skill 同步到当前资料库编辑/删除、独立窗口与原图标版本。按用户要求将本机旧 Ariadne.app 移入废纸篓并移除其 Dock 固定项，旧资料保留、未迁移。日常在 Codex 输入 `$ariadne 打开 Ariadne`，独立窗口显示运行选择页，关闭最后窗口停止服务。其他电脑首次安装仍未实机验收；历史未发布/保留旧 App 描述以本条为准。

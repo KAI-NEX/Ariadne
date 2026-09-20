@@ -43,10 +43,10 @@
           <button id="runtime-add-model" class="runtime-menu-item runtime-add-model" type="button" role="option">
             <span>添加新的模型</span><small>使用自己的 API Key</small>
           </button>
-          <a id="runtime-connect-codex" href="/codex-connect.html" class="runtime-menu-item" role="option" aria-haspopup="dialog"><span>连接本地 Codex</span><small>连接这台电脑的 Codex 登录</small></a>
+          <a id="runtime-connect-codex" href="/install.html" class="runtime-menu-item" role="option" aria-haspopup="dialog"><span>通过本地 Agent 使用</span><small>安装 Skill，在独立窗口中使用</small></a>
           <div class="runtime-divider"></div>
           <button id="runtime-local" class="runtime-menu-item" type="button" role="option">
-            <span>本地运行</span><small>先保存原件，接入 AI 后再分析</small>
+            <span>暂不连接 AI</span><small>先保存原件，接入 AI 后再分析</small>
           </button>
         </div>
       </section>
@@ -63,43 +63,28 @@
             <section id="add-model-models-section" class="hidden"><p class="add-model-label">可用图文模型</p><div id="add-model-model-list" class="add-model-list"></div></section>
           </div>
         </div>
-        <footer class="add-model-footer"><p id="add-model-status" class="add-model-hint" role="status" aria-live="polite"></p><button id="add-model-connect" class="add-model-connect" type="button" disabled><span class="add-model-connect-content"><svg class="add-model-connect-loader" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9" /></svg><svg class="add-model-connect-check" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="m8.5 12 2.3 2.3 4.8-5" /></svg><span class="add-model-connect-label">同意验证并连接</span></span></button><a id="add-model-codex-link" class="add-model-key-link" href="/codex-connect.html" aria-haspopup="dialog">连接本地 Codex</a></footer>
+        <footer class="add-model-footer"><p id="add-model-status" class="add-model-hint" role="status" aria-live="polite"></p><button id="add-model-connect" class="add-model-connect" type="button" disabled><span class="add-model-connect-content"><svg class="add-model-connect-loader" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9" /></svg><svg class="add-model-connect-check" aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="m8.5 12 2.3 2.3 4.8-5" /></svg><span class="add-model-connect-label">同意验证并连接</span></span></button><a id="add-model-codex-link" class="add-model-key-link" href="/install.html" aria-haspopup="dialog">通过本地 Agent 使用</a></footer>
       </section>
     </div>
-    <div id="codex-connect-sheet" class="add-model-sheet hidden" aria-hidden="true">
-      <button id="codex-connect-backdrop" class="add-model-backdrop" type="button" aria-label="关闭连接本地 Codex"></button>
-      <section id="codex-connect-panel" class="add-model-panel" role="dialog" aria-modal="true" aria-labelledby="codex-connect-title">
-        <header class="add-model-header"><button id="codex-connect-close" class="sheet-icon-button" type="button" aria-label="关闭"></button><h2 id="codex-connect-title">连接本地 Codex</h2></header>
-        <div class="add-model-scroll-area">
-          <form id="codex-connect-form" class="add-model-body">
-            <section><p class="add-model-label">使用自己的 Codex</p><p class="add-model-hint">安装 Skill 后，在 Codex 中输入「$ariadne 连接公开网页版」，让它启动连接器；本地独立窗口无需配对。</p><a class="add-model-key-link" href="https://ariadne.kai-nex.com/install.html" target="_blank" rel="noopener">安装 Ariadne Skill</a><p class="add-model-hint">连接器启动后，将 Agent 给出的配对码填在下面（五分钟有效）。Codex 登录由你在本机完成；连接器需要保持运行。</p></section>
-            <section><label class="add-model-label" for="codex-pairing-code">本机配对码</label><div class="add-model-key-row"><input id="codex-pairing-code" type="password" autocomplete="off" spellcheck="false" placeholder="输入终端中的配对码" required /></div><p class="add-model-hint">无需填写 API Key，Codex 登录凭据留在本机。</p></section>
-            <a id="codex-more-link" class="add-model-key-link" href="#codex-more-dialog" aria-haspopup="dialog">更多</a>
-          </form>
-        </div>
-        <footer class="add-model-footer"><p id="codex-connect-message" class="add-model-hint" aria-live="polite"></p><button id="codex-connect" class="add-model-connect" type="submit" form="codex-connect-form" disabled>同意连接本地 Codex</button><a id="codex-disconnect" class="add-model-key-link hidden" href="#">断开本页连接</a></footer>
-      </section>
-    </div>
-    <dialog id="codex-more-dialog" class="add-model-panel codex-more-dialog" aria-labelledby="codex-more-title">
-      <header class="add-model-header"><button id="codex-more-close" class="sheet-icon-button" type="button" aria-label="关闭更多说明"></button><h2 id="codex-more-title">更多 · 本地 Codex</h2></header>
-      <div class="add-model-scroll-area">
-        <div class="add-model-body codex-more-copy">
-          <section><h3 class="add-model-label">材料、额度与权限</h3><p>模型分析由本机 Codex 发送至 OpenAI，使用登录账号的额度。图片和 PDF 会按原图或完整逐页图片传送；发送材料仍需确认，结果仍由你保存。</p><p>如浏览器询问本地网络访问权限，请允许此站点连接本机。连接器需要保持运行；配对最长八小时，停止连接器即可撤销。</p></section>
-          <section><h3 class="add-model-label">断开网页配对</h3><ol><li>返回运行方式菜单，打开「连接本地 Codex」。</li><li>点击弹窗底部的「断开本页连接」。本页保存的配对信息会清除；连接器在线时，也会撤销此配对授权，共用该授权的其他页面需重新配对。</li><li>如果连接器离线，页面仍会清除本页配对信息。要确保其他页面也无法继续连接，请停止本机连接器。</li></ol></section>
-          <section><h3 class="add-model-label">停止连接器，撤销所有网页访问</h3><p>让启动 Ariadne Skill 的 Agent 停止本次连接器，或在对应终端按 <kbd>Ctrl</kbd> + <kbd>C</kbd>。连接器退出后，所有配对授权立即失效；仅关闭这个说明窗或配对窗不会断开已建立的连接。</p><p>再次连接时，重新运行该命令，并用新显示的配对码配对。旧配对码与旧授权不能继续使用。</p></section>
-          <section><h3 class="add-model-label">这台电脑直接运行 Ariadne 时</h3><p>本机直连无需配对连接器；没有网页配对信息时，不会显示「断开本页连接」。要停止后续使用 Codex，请返回运行方式页，选择「本地运行」（不调用模型）或其他已接入模型。断开网页配对本身不会自动更换当前模型；本机直连仍可能使用已选的 Codex。</p></section>
-          <section><h3 class="add-model-label">断开之后会发生什么</h3><p>已有资料、原件和保存结果会保留，本机 Codex 账号不会退出。已经发送到 OpenAI 的请求不保证能立即停止，可能仍产生额度消耗；网页断连后会明确报错，不会自动切换其他模型。</p></section>
-        </div>
-      </div>
+    <dialog id="skill-guide" class="add-model-panel codex-more-dialog skill-guide-dialog" aria-labelledby="skill-guide-title">
+      <header class="add-model-header"><button id="skill-guide-close" class="sheet-icon-button" type="button" aria-label="关闭"></button><h2 id="skill-guide-title">通过本地 Agent 使用</h2></header>
+      <div class="add-model-scroll-area"><div class="add-model-body codex-more-copy">
+        <p>安装 Ariadne Skill 后，在 Codex 中输入 <code>$ariadne 打开 Ariadne</code>，即可直接进入独立窗口的工作空间。</p>
+        <p>资料保存在这台电脑，分析使用你的 Codex。关闭最后窗口即停止服务，已保存资料保留。</p>
+        <p>网页版使用自己的 API Key；网页资料与 Skill 本地资料各自保存，不自动同步。目前已支持 Codex，其他 Agent 待适配。</p>
+        <a class="add-model-key-link" href="/install.html">查看安装步骤并复制指令</a>
+      </div></div>
     </dialog>
     <script src="/ascii-waves.js?v=runtime-ui-v48"></script>
     <script src="/floating-window.js?v=runtime-ui-v48"></script>
     <script src="/add-model-sheet.js?v=runtime-ui-v48&amp;ui=add-model-return-v2"></script>
-    <script src="/local-connector.js"></script>
+    <script src="/product-config.js"></script>
+    <script src="/product-shell.js"></script>
+    <script src="/product-transport.js"></script>
     <script src="/model-settings-catalog-data.js"></script><script src="/model-settings.js"></script><script src="/runtime-selection-state.js"></script>
     <script src="/runtime-capabilities.js?v=runtime-routing-v1"></script>
     <script src="/runtime-capability-gate.js?v=runtime-routing-v1"></script>
-    <script src="/codex-connect.js?v=codex-more-v1"></script>
+    <script src="/skill-guide.js"></script>
     <script src="/runtime-selection.js?v=runtime-routing-v1&amp;ui=add-model-return-v2"></script>
   </body>
 </html>

@@ -1,3 +1,7 @@
+# Ariadne Skill
+
+2026-09-20 两端架构更新：默认直接进入工作空间，使用本机 Codex，不再提供运行选择首页或网页配对。网页版仅连接 API，Skill 仅连接本地 Agent；具体实现与边界以 [双端架构](TWO_PRODUCT_ARCHITECTURE.md) 和 [Skill 指令](../../skills/ariadne/SKILL.md) 为准。下列记录保留为此前版本的验收历史，涉及运行选择、API 或配对的步骤已被本条取代。
+
 # Ariadne 网页 + Skill
 
 更新：2026-09-20。默认交付方向为网页 + Codex Skill 独立 Mac 窗口。官网入口统一为安装 Skill；另一台电脑与公网 HTTPS 首次本地网络授权仍未覆盖。旧 App 历史构建及源码保留；本机旧 App 已按用户要求移入废纸篓，原资料目录保留，不自动迁移到 Skill。

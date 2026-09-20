@@ -1,5 +1,15 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-20 — Web / Skill 双端架构与本地直达工作空间（COMPLETE；本机交付，未发布公网）
+
+- 按用户明确决定从组合层拆分：Web 仅 BYOK API + 浏览器内容库，Skill 仅本机 Codex + 文件库。新增产品配置、产品 shell、同源 transport 与 Skill 服务组合器；不再由 hostname、旧配对或旧 API 偏好决定路由。共用 Candidate/Job 页面、来源、上下文、RuntimeSnapshot、Working/Proposal、Human Save 与版本契约。
+- Skill 根地址及旧首页直接到工作空间，导航不再有连接设置。沿用已验证 `codex / gpt-5.6-sol` 与相容推理设置，不继承唤起它的聊天模型。服务端拒绝 API Provider/连接设置；缺 Codex 明确返回不可用并提示处理，资料仍可读取，不静默改用 Provider 或 Local。原固定 8766、资料根目录、工作区映射、旧资料不变。
+- 网页「通过本地 Agent 使用」改为安装/使用说明窗口；取消当前页面配对码、连接状态、本机转发。旧 URL 仅显示说明，Skill `connect` 返回 `WEB_PAIRING_RETIRED`；配对源码原地保留但不由当前页面加载。网页可暂不连接 AI 管理原件。安装页、介绍页、Skill 指令及 README 更新；完整责任见 [双端架构](docs/current/TWO_PRODUCT_ARCHITECTURE.md)。
+- 回归：15 项既有 Node suite + 新 product boundary suite、Skill 包 7 tests、Web 8 tests、Codex 六领域身份门禁、旧 connector 原件准备、VI/负向门禁、Skill 格式、语法、diff 检查通过。覆盖旧 token 不转发、loopback 上 Web 仍使用浏览器模式、Provider/凭据隔离、保留旧偏好、首页跳转、缺依赖拒绝与资料重启保留。Python 跨语言回归首次因 PATH 无 Node 失败，指定现有 Node 后通过。
+- egolite 真实验收桌面/390px 安装说明、Escape 焦点恢复、无横向溢出、Web 工作空间零磁盘 API 请求、Skill 缺 Codex 提示。复制此前合成资料到隔离验收目录，明确设定测试工作区身份；保留旧 DeepSeek 偏好仍解析为 Codex，旧卡片/对话恢复。实际执行 1 次 Codex 对话，正确说明原型未上线与无已验证增长；回复落盘并重开恢复，6 个原件/来源/确认版本文件 hash 不变。没有发送私人材料或新增反馈功能。
+- 本机 Skill 更新前完整备份，doctor 通过；真实独立窗口直接显示工作空间且无连接设置，关闭释放 8766、重开可用。Cua 按名字曾命中历史 QA 窗口路径而显示启动参数错误，随后使用已核实的日常缓存路径完成验收，未删除旧产物。
+- 构建 Web Pages + Worker 目录和完整 Skill ZIP，ZIP 完整性及所有业务页产品脚本接线核对通过；本机安装同步。证据、备份、测试资料与中间包均在 `.cache/two-products-20260920/`。不推送 Git、不部署公网；其他电脑/系统、其他 Agent、API 真实账号与完整 Job 业务本轮未重新实测。原无关工作区修改保留。
+
 ## 2026-09-20 — Skill / Codex / 本地资料闭环（COMPLETE；本机合成验收）
 
 - 按用户新范围复用已有完整 Skill、独立窗口、页面及本地库，先跑通 Codex；不启动反馈更新、长期通用档案重构、其他 Agent 适配或旧资料迁移。技能说明新增本地工作区身份与 Agent 连接边界；同机复用资料不等于跨机自动同步。

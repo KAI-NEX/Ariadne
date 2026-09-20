@@ -39,7 +39,7 @@ const state=JSON.parse(storage.getItem('ariadne-local-connector-session-v1'));st
 await assert.rejects(()=>connector.fetch('/api/runtime-options'),/CONNECTOR_PAIRING_REQUIRED/);assert.equal(calls.length,previous);
 await connector.disconnect().catch(()=>{});assert.equal(connector.connected(),false);
 for (const name of fs.readdirSync(new URL('../public/',import.meta.url)).filter(n=>n.endsWith('.html'))) {
- const html=fs.readFileSync(new URL('../public/'+name,import.meta.url),'utf8');if(html.includes('/runtime-capability-gate.js'))assert.match(html,/local-connector\.js/,name);
+ const html=fs.readFileSync(new URL('../public/'+name,import.meta.url),'utf8');if(html.includes('/runtime-capability-gate.js'))assert.match(html,/product-transport\.js/,name);
 }
 const pages=fs.readFileSync(new URL('../public/v1-pages.js',import.meta.url),'utf8');assert.match(pages,/candidate-model-consent-model"\)\.textContent = gate\.authority\.runtime\.model/);assert.match(pages,/job-model-consent-model"\)\.textContent = gate\.authority\.runtime\.model/);
 console.log(JSON.stringify({six_operation_descriptors:'pass',captured_codex_snapshots:'pass',bridge_routing_and_no_fallback:'pass',consent_identity:'pass'}));

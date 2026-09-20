@@ -15,7 +15,7 @@
   const operation = ({ "personal-conversation-form": "personal_understanding", "job-overview-form": "job_overview",
     "candidate-workspace-composer": "candidate_conversation", "candidate-conversation-form": "candidate_conversation",
     "job-workspace-composer": "job_conversation", "job-conversation-form": "job_conversation" })[form?.id];
-  const fetchAPI = (...args) => (root.AriadneConnector || root).fetch(...args);
+  const fetchAPI = (...args) => (root.AriadneTransport || root).fetch(...args);
   const scope = () => Selection.bindings.get(form?.id)?.scope || Selection.scopeFor(operation);
   const active = () => document.querySelector('.v1-conversation-form[aria-busy="true"]');
   const deepseekSelected = () => { const runtime = Selection.homepage(); return runtime.mode === "model" && runtime.provider === "deepseek"; };

@@ -10,7 +10,10 @@
   const connections = new Map();
   let contractPromise;
   const clone = value => value === undefined ? undefined : structuredClone(value);
-  const local = () => ["127.0.0.1", "localhost"].includes(globalThis.location?.hostname);
+  const local = () => {
+    if (!globalThis.AriadneProduct) throw Error("PRODUCT_CONFIG_REQUIRED");
+    return globalThis.AriadneProduct.storage === "filesystem";
+  };
   const canonical = value => JSON.stringify(value, (_key, item) => item && !Array.isArray(item) && typeof item === "object"
     ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
 

@@ -1,4 +1,4 @@
 interface:
   display_name: "Ariadne · 衡"
-  short_description: "由 Codex 打开独立 Ariadne 窗口，关闭即退出，保留资料与模型选择"
-  default_prompt: "使用 $ariadne 打开独立 Ariadne 窗口，让我选择运行方式并进入工作空间。"
+  short_description: "由 Codex 打开独立 Ariadne 窗口，关闭即退出，直接进入本地工作空间"
+  default_prompt: "使用 $ariadne 打开独立 Ariadne 窗口，直接进入工作空间。"

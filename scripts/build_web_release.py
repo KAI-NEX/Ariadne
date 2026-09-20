@@ -19,6 +19,7 @@ def release_files():
                 "deploy/gunicorn.conf.py", "deploy/compose.yaml", "deploy/Caddyfile", "deploy/downloads/.gitkeep",
                 "deploy/install-docker-ubuntu.sh", "src/byok_providers.py", "public/provider-visual-check.pdf"}
     selected = set(explicit)
+    selected.update({'public/product-shell.js', 'public/skill-guide.js', 'public/product-config.js', 'public/product-transport.js', 'src/product_application.py'})
     for name in filter(None, names):
         if name.startswith(("public/", "src/")) and not name.startswith("public/downloads/"):
             selected.add(name)

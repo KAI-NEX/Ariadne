@@ -135,25 +135,15 @@ def open_local(port=8766, data_dir=None):
         print(json.dumps(result, ensure_ascii=False), flush=True)
         return 1
     import app
-    from src.local_connector import read_portable_source
     state = Path(data_dir) if data_dir else Path.home() / (
         "Library/Application Support/Ariadne Skill" if sys.platform == "darwin" else ".local/share/ariadne-skill")
     if state.is_symlink():
         raise ValueError("SKILL_DATA_SYMLINK_REFUSED")
 
-    class Handler(app.JobRadarHandler):
+    from src.product_application import skill_handler
+    class Handler(skill_handler(app.JobRadarHandler)):
         def log_message(self, *args):
             pass
-
-        def read_local_source_for_model(self):
-            return read_portable_source(self)
-
-        def do_GET(self):
-            if self.path == "/api/skill-runtime":
-                if self.local_request_allowed():
-                    self.send_json(200, {"product": "ariadne-skill", "mode": "local-ui"})
-                return
-            super().do_GET()
 
     try:
         server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
@@ -217,7 +207,8 @@ def main():
             if not 0 <= args.port <= 65535:
                 raise ValueError("SKILL_PORT_INVALID")
             return open_local(args.port, args.data_dir)
-        return connect(args.origin)
+        print(json.dumps({"error": "WEB_PAIRING_RETIRED", "action": "Use window for local Codex, or use your API key on the website."}))
+        return 1
     except (ValueError, OSError, subprocess.SubprocessError) as error:
         if args.action in {"window", "desktop"}:
             print(json.dumps({"error": "NATIVE_WINDOW_SETUP_FAILED", "action": str(error)}))

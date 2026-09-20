@@ -1,6 +1,7 @@
 """Portable mechanical source preparation; no local OCR or semantic rules."""
 import base64
 import hashlib
+import json
 
 from src.execution_contract import validate_runtime_snapshot
 from src.material_delivery import DOCX, docx_parts, image_part, MAX_TEXT
@@ -58,3 +59,22 @@ def read_source(payload):
             "extraction_method": method, **({"visual_page_count": count} if count else {}),
             "read_only": True, "writeback": False, "model_call_made": False,
             "network_call_made": False, "runtime_snapshot_id": snapshot.snapshot_id}
+
+
+def read_portable_source(self):
+    # Shared mechanical preparation; never substitutes text for visual PDF input.
+    from src.upload_limits import MAX_FILE_REQUEST_BYTES
+    try:
+        length = int(self.headers.get("Content-Length", "0"))
+        if not 0 < length <= MAX_FILE_REQUEST_BYTES:
+            raise ValueError("invalid_source_read_request_size")
+        payload = json.loads(self.rfile.read(length))
+        if not isinstance(payload, dict):
+            raise ValueError("invalid_source_read_request")
+        result = read_source(payload)
+    except (ValueError, TypeError, KeyError, UnicodeDecodeError):
+        self.send_json(422, {"error": "SOURCE_READ_FAILED", "read_only": True,
+            "writeback": False, "network_call_made": False, "model_call_made": False,
+            "persistence": "not_written"})
+        return
+    self.send_json(200, result)

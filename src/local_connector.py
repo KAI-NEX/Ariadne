@@ -67,25 +67,7 @@ class Pairing:
             self.token_hash = None
 
 
-def read_portable_source(self):
-    # Web + Skill uses the same mechanical original-source reader as the
-    # hosted web runtime. No Apple OCR or text-only PDF substitution.
-    from src.web_source_read import read_source
-    from src.upload_limits import MAX_FILE_REQUEST_BYTES
-    try:
-        length = int(self.headers.get("Content-Length", "0"))
-        if not 0 < length <= MAX_FILE_REQUEST_BYTES:
-            raise ValueError("invalid_source_read_request_size")
-        payload = json.loads(self.rfile.read(length))
-        if not isinstance(payload, dict):
-            raise ValueError("invalid_source_read_request")
-        result = read_source(payload)
-    except (ValueError, TypeError, KeyError, UnicodeDecodeError):
-        self.send_json(422, {"error": "SOURCE_READ_FAILED", "read_only": True,
-            "writeback": False, "network_call_made": False, "model_call_made": False,
-            "persistence": "not_written"})
-        return
-    self.send_json(200, result)
+from src.web_source_read import read_portable_source
 
 
 def connector_handler(base_handler):

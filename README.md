@@ -1,5 +1,8 @@
 # Ariadne · 衡
 
+2026-09-20: Ariadne has two product paths: Web (your API, browser storage) and Skill (local Codex, local files). The Skill opens the workspace directly. The website’s local Agent entry provides installation guidance; website pairing is retired. See [current architecture](docs/current/TWO_PRODUCT_ARCHITECTURE.md).
+
+
 > **Understand your experience. Make sense of your next role.**
 >
 > An open-source AI workspace for exploring your experience and target jobs, with original sources, reviewable suggestions, and changes you explicitly save.

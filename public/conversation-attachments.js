@@ -129,7 +129,7 @@
     state.busy = true;
     state.render();
     try {
-      const check = await (root.AriadneConnector || root).fetch("/api/conversation-attachment-capabilities", { cache: "no-store" });
+      const check = await (root.AriadneTransport || root).fetch("/api/conversation-attachment-capabilities", { cache: "no-store" });
       if (!check.ok || (await check.json()).contract_id !== CONTRACT) throw Error("attachment_contract_invalid");
       const files = [...state.files], records = await Promise.all(files.map(recordFor));
       if (new Set(records.map(r => r.content_hash)).size !== records.length) throw Error("attachment_duplicate_content");

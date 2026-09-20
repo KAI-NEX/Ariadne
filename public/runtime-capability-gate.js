@@ -112,10 +112,11 @@
   }
 
   function readStoredRuntime(storage = globalThis.localStorage) {
+    if (globalThis.AriadneProduct?.kind === "skill") return globalThis.AriadneProduct.runtime();
     if (!storage || typeof storage.getItem !== "function") return { mode: "local" };
     const serialized = storage.getItem(CURRENT_RUNTIME_STORAGE_KEY);
     if (!serialized) return { mode: "local" };
-    try { return JSON.parse(serialized); }
+    try { const saved = JSON.parse(serialized); return globalThis.AriadneProduct?.runtime(saved) || saved; }
     catch (_error) { throw new RuntimeGateError("current_runtime_storage_malformed"); }
   }
 

@@ -86,7 +86,7 @@
       byId("key-link").classList.toggle("hidden", !selectedProvider);
       byId("key-link").href = selectedProvider?.apiKeyUrl || "#";
       byId("key-link").textContent = selectedProvider ? `获取 ${selectedProvider.name} API Key` : "";
-      if (byId("transfer-hint")) byId("transfer-hint").textContent = `API Key 保存在当前浏览器。你确认发起请求后，Key 与本次材料经当前 Ariadne 服务转发至 ${selectedProvider.name}；本地版经本机服务，网页版经网站服务器。Key 不在服务端持久保存，上传材料仅作临时处理。请在自己的设备使用。`;
+      if (byId("transfer-hint")) byId("transfer-hint").textContent = `API Key 保存在当前浏览器。你确认发起请求后，Key 与本次材料经 Ariadne 网站服务转发至 ${selectedProvider.name}。Key 不在服务端持久保存，上传材料仅作临时处理。请在自己的设备使用。`;
       if (byId("check-hint")) byId("check-hint").textContent = state.providerId === "deepseek"
         ? "点击连接将发送一张固定测试图片，可能产生少量 API 费用；不会发送你的个人材料。"
         : `点击连接将发送固定两页测试 PDF 的完整页面图片，验证读图与 JSON 返回，可能产生少量 API 费用；不会发送你的个人材料。${state.providerId === "qwen" ? "当前使用百炼北京地域的 API Key。" : "需使用 Gemini API Key，服务所在地须支持 Gemini API。"}`;
@@ -225,7 +225,7 @@
       state.phase = "SENDING"; render();
       try {
         state.phase = "WAITING"; render();
-        const response = await (globalThis.AriadneConnector || globalThis).fetch(`/api/runtime-providers/${state.providerId}/connection-check`, {
+        const response = await (globalThis.AriadneTransport || globalThis).fetch(`/api/runtime-providers/${state.providerId}/connection-check`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ api_key: state.apiKey, confirmed: true }),
           redirect: "error",
@@ -238,7 +238,7 @@
       } catch (error) {
         if (currentAttempt !== attempt) return;
         const code = error.result?.error || error.message;
-        const platformMessage = globalThis.AriadneConnector?.errorCopy(error);
+        const platformMessage = globalThis.AriadneTransport?.errorCopy(error);
         state.phase = "FAILED";
         state.error = platformMessage || ({ PROVIDER_PDF_PREPARATION_FAILED: "测试 PDF 未能完整转图，请检查服务端 PDF 工具后重试。",
           PROVIDER_VISUAL_CHECK_FAILED: "模型未完整通过两页读图与 JSON 验证，请重试或检查模型权限。",

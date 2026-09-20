@@ -36,7 +36,8 @@
     notify();
   }
   function homepage(storage = root.localStorage) {
-    const stored = read(CURRENT, storage) || { mode: "local" };
+    const saved = read(CURRENT, storage) || { mode: "local" };
+    const stored = root.AriadneProduct?.runtime(saved) || saved;
     return root.AriadneRuntimeExecution?.normalizeCurrentRuntime(stored) || stored;
   }
   function eligibleModels(entries, operation, storage = root.localStorage) {

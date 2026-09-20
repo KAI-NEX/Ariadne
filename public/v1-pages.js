@@ -187,7 +187,7 @@
     return candidateFactLabel(value);
   }
   function personalErrorCopy(error) {
-    const webCopy = window.AriadneConnector?.errorCopy?.(error);
+    const webCopy = window.AriadneTransport?.errorCopy?.(error);
     if (webCopy) return webCopy;
     const storageCopy = window.AriadneContentDatabase?.errorCopy(error);
     if (storageCopy) return storageCopy;
@@ -256,7 +256,7 @@
   }
 
   function jobErrorCopy(error) {
-    const webCopy = window.AriadneConnector?.errorCopy?.(error);
+    const webCopy = window.AriadneTransport?.errorCopy?.(error);
     if (webCopy) return webCopy;
     const storageCopy = window.AriadneContentDatabase?.errorCopy(error);
     if (storageCopy) return storageCopy;
@@ -432,7 +432,7 @@
     if (isEmbeddedDetail) return;
     const activeSection = page === "candidate-detail" || page === "personal-import" || page === "personal-understanding" ? "personal" : page === "job-detail" || page === "job-import" || page === "job-overview" ? "jd" : page;
     const items = [
-      { id: "runtime", label: "连接设置", href: "/index.html", width: 84, base: 8 },
+      ...(globalThis.AriadneProduct?.kind === "skill" ? [] : [{ id: "runtime", label: "连接设置", href: "/index.html", width: 84, base: 8 }]),
       { id: "workspace", label: "工作空间", href: "/workspace.html", width: 106, base: 8 },
       { id: "personal", label: "个人资料", href: "/personal-information.html", width: 104, base: 8 },
       { id: "jd", label: "职位描述", href: "/jd.html", width: 84, base: 8 },
@@ -637,7 +637,7 @@
             <p><a class="runtime-back-link" href="https://ariadne.kai-nex.com/install.html" target="_blank" rel="noopener">安装 Ariadne Skill · Mac 独立窗口</a></p>
             <p>Ariadne · 衡是一个帮助你探索职业方向的工具。它理解你的经历与作品，也理解你选择的职位，帮你看清两者的关系。</p>
             <p>在个人资料中点击「了解我」，围绕过去的项目与经历逐步了解你；在职位描述中点击「了解职位概况」，汇总所有 JD 的职责、要求与差异。想讨论自己与某个职位的关系，可以进入该职位详情。</p>
-            <p>原件、资料和对话保存在本机或当前浏览器。选择 API 模型并确认发送后，本次材料和 API Key 会经当前 Ariadne 服务转发给模型服务商；网页版经过网站服务器，本地版经过本机服务。Key 不在服务端持久保存，上传材料仅作临时处理；结果会短暂保留在内存中以处理重试。连接 Codex 时，材料由你自己的电脑发送给 OpenAI。</p>
+            <p>原件、资料和对话保存在本机或当前浏览器。选择 API 模型并确认发送后，本次材料和 API Key 会经当前 Ariadne 服务转发给模型服务商；网页版经过网站服务器。Key 不在服务端持久保存，上传材料仅作临时处理；结果会短暂保留在内存中以处理重试。本地 Skill 使用 Codex，材料由你自己的电脑发送给 OpenAI。</p>
           </div>
         </div>
       </section>
@@ -1566,7 +1566,7 @@
 
   async function callCandidateConversationRuntime(request, { includeAttachments = true } = {}) {
     const attachments = includeAttachments ? window.AriadneConversationAttachments : null;
-    const signatureResponse = await (globalThis.AriadneConnector || globalThis).fetch("/api/candidate-conversation-runtime-signature", { cache: "no-store" });
+    const signatureResponse = await (globalThis.AriadneTransport || globalThis).fetch("/api/candidate-conversation-runtime-signature", { cache: "no-store" });
     const signaturePayload = await signatureResponse.json().catch(() => null);
     const frontendSignature = CandidateWorkspaceConversationRuntime.runtimeSignature();
     const backendSignature = signaturePayload?.runtime_signature;
@@ -1594,7 +1594,7 @@
     }
     const outboundRequest = attachments ? await attachments.prepare(request, "CANDIDATE") : request;
     let response;
-    try { response = await (globalThis.AriadneConnector || globalThis).fetch("/api/candidate-conversation-turn", {
+    try { response = await (globalThis.AriadneTransport || globalThis).fetch("/api/candidate-conversation-turn", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(outboundRequest),
@@ -2204,7 +2204,7 @@
       });
       setCandidateExtractionState("STRUCTURING", `正在使用模型分析：${source.file.name}`);
       setCandidateWorkspaceProgress(["材料已准备", candidateSourceReadLabel(source), "模型正在理解材料", "整理候选卡片"], 2);
-      const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/candidate-model-structure", {
+      const response = await (globalThis.AriadneTransport || globalThis).fetch("/api/candidate-model-structure", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: abortController.signal,
@@ -2797,7 +2797,7 @@
       const sourceId = sourceIdFor(activeCandidate, canonicalRevision);
       try {
         if (scope === "source" && canonicalRevision && String(sourceId || "").startsWith("source-candidate-")) {
-          const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/candidate-model-operation-state/delete", {
+          const response = await (globalThis.AriadneTransport || globalThis).fetch("/api/candidate-model-operation-state/delete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ source_document_id: sourceId }),
@@ -3161,7 +3161,7 @@
     const resolved = await LocalJob.resolveRawSource(database, sourceDocument);
     const dataUrl = await LocalJob.readAsDataURL(resolved.file || resolved.blob, sourceDocument.mime_type);
     const image = ["image/png", "image/jpeg"].includes(sourceDocument.mime_type);
-    const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/local-source-read", {
+    const response = await (globalThis.AriadneTransport || globalThis).fetch("/api/local-source-read", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal,
@@ -3187,7 +3187,7 @@
   }
 
   async function callJobModelRuntime(request, signal) {
-    const signatureResponse = await (globalThis.AriadneConnector || globalThis).fetch("/api/job-model-import-runtime-signature", { cache: "no-store", signal });
+    const signatureResponse = await (globalThis.AriadneTransport || globalThis).fetch("/api/job-model-import-runtime-signature", { cache: "no-store", signal });
     const signaturePayload = await signatureResponse.json().catch(() => null);
     if (!signatureResponse.ok || !JobModel.runtimeSignaturesMatch(JobModel.runtimeSignature(), signaturePayload?.runtime_signature)) {
       const error = new Error("RUNTIME_CONTRACT_VERSION_MISMATCH");
@@ -3195,7 +3195,7 @@
       error.network_call_made = false;
       throw error;
     }
-    const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/job-model-structure", {
+    const response = await (globalThis.AriadneTransport || globalThis).fetch("/api/job-model-structure", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal,
@@ -3672,7 +3672,7 @@
 
   async function callJobConversationRuntime(request) {
     const attachments = window.AriadneConversationAttachments;
-    const signatureResponse = await (globalThis.AriadneConnector || globalThis).fetch("/api/job-conversation-runtime-signature", { cache: "no-store" });
+    const signatureResponse = await (globalThis.AriadneTransport || globalThis).fetch("/api/job-conversation-runtime-signature", { cache: "no-store" });
     const signaturePayload = await signatureResponse.json().catch(() => null);
     if (!signatureResponse.ok || !JobConversation.runtimeSignaturesMatch(JobConversation.runtimeSignature(), signaturePayload?.runtime_signature)) {
       const error = new Error("RUNTIME_CONTRACT_VERSION_MISMATCH");
@@ -3682,7 +3682,7 @@
     }
     const outboundRequest = attachments ? await attachments.prepare(request, "JOB") : request;
     let response;
-    try { response = await (globalThis.AriadneConnector || globalThis).fetch("/api/job-conversation-turn", {
+    try { response = await (globalThis.AriadneTransport || globalThis).fetch("/api/job-conversation-turn", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(outboundRequest),
@@ -3750,7 +3750,7 @@
           runtime_snapshot: runtimeSnapshot,
           ...(source.mime_type === "image/png" || source.mime_type === "image/jpeg" ? { image_data_url: dataUrl } : { document_data_url: dataUrl }),
         };
-        const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/local-source-read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        const response = await (globalThis.AriadneTransport || globalThis).fetch("/api/local-source-read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
         const result = await response.json().catch(() => null);
         if (!response.ok || !result?.read_only || result.writeback !== false || result.model_call_made !== false) throw new Error(result?.error || "SOURCE_UNAVAILABLE");
         return result;

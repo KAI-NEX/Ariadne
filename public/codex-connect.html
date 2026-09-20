@@ -10,29 +10,4 @@
     <title>Ariadne · 连接本机 Codex</title>
     <link rel="stylesheet" href="/styles.css?vi=1" />
   </head>
-  <body class="runtime-page runtime-connect-page">
-    <main class="vi-container vi-grid">
-    <section class="runtime-connect-shell vi-span-12">
-      <a class="runtime-back-link" href="/">返回运行选择</a>
-      <p class="runtime-step">Codex · 本机连接</p>
-      <h1>连接本机 Codex</h1>
-      <p class="runtime-connect-copy">在 Codex 中输入 <code>$ariadne 连接公开网页版</code>，让 Skill 检查环境并启动连接器，再把它给出的配对码填入此页。无需安装 Mac App。配对码五分钟内有效，仅能使用一次；连接器须保持运行。</p>
-      <p><a class="runtime-back-link" href="https://ariadne.kai-nex.com/install.html" target="_blank" rel="noopener">安装 Ariadne Skill</a></p>
-      <p class="runtime-connect-copy">配对后，本标签页的资料处理请求会发送到本机连接器；模型分析再由 Codex 发送至 OpenAI，使用本机登录账号的额度。Codex 登录凭据留在本机。图片与 PDF 会按原图或完整逐页图片传送。每次材料发送仍需确认，模型结果仍需人工保存。</p>
-      <form id="codex-connect-form" class="runtime-connect-form">
-        <label for="codex-pairing-code">Agent 或本机终端给出的配对码</label>
-        <input id="codex-pairing-code" type="password" autocomplete="off" spellcheck="false" required />
-        <button type="submit" id="codex-connect">同意连接本机 Codex</button>
-        <button type="button" id="codex-disconnect">断开本页连接</button>
-      </form>
-      <p id="codex-connect-message" class="runtime-message" aria-live="polite"></p>
-      <p class="runtime-connect-copy">如浏览器询问本地网络访问权限，请允许此站点连接本机。连接最长保留八小时；停止连接器即可撤销。电脑休眠、断网或连接器退出时，网页会明确报错。</p>
-    </section>
-    </main>
-    <script src="/local-connector.js"></script>
-    <script src="/model-settings-catalog-data.js"></script><script src="/model-settings.js"></script><script src="/runtime-selection-state.js"></script>
-    <script src="/runtime-capabilities.js"></script>
-    <script src="/runtime-capability-gate.js"></script>
-    <script src="/codex-connect.js"></script>
-  </body>
-</html>
+  <body class="runtime-page"><main class="runtime-connect-shell"><h1>通过本地 Agent 使用</h1><p class="runtime-connect-copy">请安装 Ariadne Skill，在 Codex 中输入 <code>$ariadne 打开 Ariadne</code>，直接进入本地工作空间。</p><p class="runtime-connect-copy">网页版仅使用 API；本地资料在 Skill 中保存。原网页配对入口已停止使用。</p><a class="runtime-back-link" href="/install.html">安装 Ariadne Skill</a><a class="runtime-back-link" href="/">返回网页版</a></main></body></html>

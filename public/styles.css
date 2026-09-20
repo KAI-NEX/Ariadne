@@ -1051,3 +1051,6 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .codex-more-copy ol { margin: 0; padding-left: var(--vi-space-20); }
 .codex-more-copy li + li { margin-top: var(--vi-space-8); }
 .codex-more-copy code { overflow-wrap: anywhere; }
+
+/* Installation guidance uses the shared dialog at its natural content height. */
+.skill-guide-dialog { --add-model-sheet-height: auto; }

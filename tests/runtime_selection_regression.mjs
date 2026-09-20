@@ -30,7 +30,7 @@ assert.doesNotMatch([html, geminiConnect, geminiGuide].join(""), /M5 12h14|M19 1
 assert.match(html, /floating-window\.js\?v=runtime-ui-v48/);
 assert.doesNotMatch(html, /<p class="runtime-step">选择运行方式<\/p>/);
 assert.doesNotMatch(html, /01&nbsp;&nbsp;选择运行方式/);
-assert.match(html, /本地运行/);
+assert.match(html, /暂不连接 AI/);
 assert.match(html, /Content-Security-Policy/);
 assert.match(script, /phase: "IDLE"/);
 assert.match(script, /"CHECKING"/);

@@ -72,13 +72,13 @@
       consent: { confirmed: true, purpose: "JOB_OVERVIEW", provider: runtime.provider, model: runtime.model } };
   }
   async function callRuntime(request) {
-    const check = await (globalThis.AriadneConnector || globalThis).fetch("/api/job-overview-signature", { cache: "no-store" }), checked = await check.json();
+    const check = await (globalThis.AriadneTransport || globalThis).fetch("/api/job-overview-signature", { cache: "no-store" }), checked = await check.json();
     if (!check.ok || !same(checked.runtime_signature, signature())) throw new Error("RUNTIME_CONTRACT_VERSION_MISMATCH");
     const attachments = globalThis.AriadneConversationAttachments;
     const outbound = attachments ? await attachments.prepare(request, "JOB_OVERVIEW") : request;
     let response, result;
     try {
-      response = await (globalThis.AriadneConnector || globalThis).fetch("/api/job-overview-turn", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(outbound) });
+      response = await (globalThis.AriadneTransport || globalThis).fetch("/api/job-overview-turn", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(outbound) });
       result = await response.json();
     } catch (error) { attachments?.finish(request, false, error); throw error; }
     attachments?.finish(request, response.ok && !result.error, result.error);

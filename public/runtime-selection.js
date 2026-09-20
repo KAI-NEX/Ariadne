@@ -42,8 +42,7 @@ function persistSelectedRuntime() {
 function selectableModels() {
   const addedIds = new Set(state.addedModels.map((model) => `${model.provider_id}:${model.model_id}`));
   return [...state.addedModels, ...state.models.filter((model) => !addedIds.has(`${model.provider_id}:${model.model_id}`))]
-    .filter((model) => window.JobRadarRuntimeGate?.isModelRuntimeEligible({ mode: "model", provider: model.provider_id, model: model.model_id }))
-    .sort((a, b) => Number(b.provider_id === "codex") - Number(a.provider_id === "codex"));
+    .filter((model) => model.provider_id !== "codex" && window.JobRadarRuntimeGate?.isModelRuntimeEligible({ mode: "model", provider: model.provider_id, model: model.model_id }));
 }
 
 function setMessage(message = "", failed = false) {
@@ -66,7 +65,7 @@ function render() {
   const checking = state.phase === "CHECKING";
   const ready = state.phase === "READY" || state.phase === "OFFICIAL_READY" || state.phase === "LOCAL_READY";
   const hasModels = selectableModels().length > 0;
-  selected.textContent = state.mode === "local" ? "本地运行" : state.model ? labelFor(selectableModels().find((item) => item.model_id === state.model && item.provider_id === state.provider) || state.model) : hasModels ? "选择模型" : "选择运行方式";
+  selected.textContent = state.mode === "local" ? "暂不连接 AI" : state.model ? labelFor(selectableModels().find((item) => item.model_id === state.model && item.provider_id === state.provider) || state.model) : hasModels ? "选择模型" : "选择运行方式";
   action.disabled = !ready;
   action.classList.toggle("checking", checking);
   action.classList.toggle("ready", ready);
@@ -148,7 +147,7 @@ async function checkModel(model) {
   state.mode = "ai"; state.provider = "deepseek"; state.model = model; state.phase = "CHECKING"; state.diagnostics = null;
   setMessage(""); render(); closeMenu();
   try {
-    const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/runtime-check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model }) });
+    const response = await (globalThis.AriadneTransport || globalThis).fetch("/api/runtime-check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model }) });
     const result = await response.json();
     if (!response.ok) throw Object.assign(new Error(result.error || "runtime_check_failed"), { result });
     if (!result.diagnostics?.multimodal_connection_ready
@@ -188,29 +187,12 @@ function renderModels() {
   }));
 }
 
-function applyLocalPreference(preference) {
-  const descriptor = window.AriadneModelSettings?.descriptor(preference?.provider, preference?.model);
-  if (!["127.0.0.1", "localhost"].includes(location.hostname) || !descriptor || preference?.id !== descriptor.connection_id) return;
-  // An explicit in-app default takes precedence over a first-visit machine hint.
-  if (readLocalJson("ariadne-model-selection-v2", null)) return;
-  const key = "ariadne-applied-local-runtime-preference";
-  if (readLocalJson(key, null) === preference.id) return;
-  const model = selectableModels().find((item) => item.provider_id === preference.provider && item.model_id === preference.model);
-  if (model && applyReadyModel(model)) writeLocalJson(key, preference.id);
-}
-
 async function loadModels() {
   try {
-    const response = await (globalThis.AriadneConnector || globalThis).fetch("/api/runtime-options");
+    const response = await (globalThis.AriadneTransport || globalThis).fetch("/api/runtime-options");
     const result = await response.json();
     if (!response.ok) throw Object.assign(new Error(result.error || "runtime_options_failed"), { result });
     state.models = result.models || [];
-    if (directCodexModel()) {
-      const link = byId("runtime-connect-codex");
-      link.querySelector("span").textContent = "使用本机 Codex";
-      link.querySelector("small").textContent = "使用这台电脑已有登录，无需网页配对";
-    }
-    applyLocalPreference(result.local_preference);
     if (!(["READY", "OFFICIAL_READY", "LOCAL_READY"].includes(state.phase) && (state.model || state.mode === "local"))) {
       const restoredModel = selectableModels().find((model) => model.provider_id === state.provider && model.model_id === state.model);
       if (state.mode === "ai") applyReadyModel(restoredModel, false);
@@ -240,7 +222,7 @@ function restoreAddedModels() {
 
 function restoreSelectedRuntime() {
   const saved = readLocalJson(SELECTED_RUNTIME_STORAGE_KEY, null);
-  if (!saved || !["ai", "model", "local"].includes(saved.mode)) return;
+  if (!saved || saved.provider === "codex" || !["ai", "model", "local"].includes(saved.mode)) return;
   if (saved.mode === "local") {
     state.mode = "local"; state.provider = "local"; state.model = null; state.phase = "LOCAL_READY";
     state.diagnostics = { purpose: "LOCAL_RUNTIME", career_data_sent: false, network_call_made: false };
@@ -260,17 +242,8 @@ byId("runtime-local").addEventListener("click", () => {
   persistSelectedRuntime(); setMessage(""); render(); closeMenu();
 });
 let codexLinkPending = false;
-function directCodexModel() {
-  return ["127.0.0.1", "localhost"].includes(location.hostname)
-    && !globalThis.AriadneConnector?.connected()
-    && selectableModels().find(model => model.provider_id === "codex");
-}
 function openCodexConnection() {
-  const model = directCodexModel();
-  if (model) {
-    selectVerifiedRuntimeModel(model.model_id, "codex");
-    setMessage("将使用这台电脑的 Codex 登录。首次使用请让 Codex 检查本机登录状态；发送材料仍需确认。");
-  } else window.AriadneCodexConnect.open(byId("runtime-selector"));
+  window.AriadneSkillGuide.open(byId("runtime-selector"));
 }
 const addModelSheet = window.JobRadarAddModelSheet.mount({
   sheet: byId("add-model-sheet"), panel: byId("add-model-panel"), backdrop: byId("add-model-backdrop"), close: byId("add-model-close"),
@@ -296,12 +269,6 @@ byId("runtime-connect-codex").addEventListener("click", (event) => {
 });
 byId("add-model-codex-link").addEventListener("click", (event) => {
   event.preventDefault(); codexLinkPending = true; byId("add-model-close").click();
-});
-window.addEventListener("ariadne-codex-connected", (event) => {
-  state.models = event.detail.models;
-  renderModels();
-  const selected = event.detail.selected;
-  if (selected) selectVerifiedRuntimeModel(selected.model, selected.provider);
 });
 byId("runtime-add-model").addEventListener("click", () => {
   const originRect = byId("runtime-add-model").getBoundingClientRect();

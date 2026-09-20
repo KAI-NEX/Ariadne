@@ -919,6 +919,15 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         if not self.local_request_allowed():
             return
         parsed = urlparse(self.path)
+        if parsed.path == "/product-config.js":
+            from src.product_application import WEB_CONFIG, config_script
+            body = config_script(WEB_CONFIG)
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if parsed.path == "/workspace-storage-contract.js":
             from src.workspace_storage import CONTRACT
             body = ("globalThis.AriadneWorkspaceStorageContract = " + json.dumps(CONTRACT, ensure_ascii=False) + ";\n").encode("utf-8")
@@ -2553,7 +2562,8 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     initialize_database()
-    server = ThreadingHTTPServer(("127.0.0.1", 8000), JobRadarHandler)
+    from src.product_application import skill_handler
+    server = ThreadingHTTPServer(("127.0.0.1", 8000), skill_handler(JobRadarHandler))
     print("AI Job Radar running at http://127.0.0.1:8000")
     try:
         server.serve_forever()

@@ -66,16 +66,10 @@ class SkillTests(unittest.TestCase):
         finally:
             damaged.write_bytes(previous)
 
-    def test_missing_tools_and_auth_fail_before_listening(self):
+    def test_pairing_retired_without_dependencies_or_listener(self):
         result = self.run_cli("connect", env={**self.env, "PATH": "/nonexistent", "ARIADNE_CODEX_BINARY": "/nonexistent/codex"})
         self.assertEqual(result.returncode, 1)
-        self.assertFalse(json.loads(result.stdout)["ready"])
-        bad = self.bin / "not-logged-in"
-        bad.write_text('#!/bin/sh\nexit 1\n'); bad.chmod(0o755)
-        result = self.run_cli("doctor", env={**self.env, "ARIADNE_CODEX_BINARY": str(bad)})
-        checks = {x["check"]: x["ok"] for x in json.loads(result.stdout)["checks"]}
-        self.assertFalse(checks["codex_login"])
-        self.assertFalse(checks["codex_protocol"])
+        self.assertEqual(json.loads(result.stdout)["error"], "WEB_PAIRING_RETIRED")
 
     def test_local_ui_storage_restart_and_latest_library_contract(self):
         state = self.directory / "local-data"
@@ -103,7 +97,15 @@ class SkillTests(unittest.TestCase):
         proc, ready = start()
         try:
             status, body = request(ready, "/")
-            self.assertEqual(status, 200); self.assertIn(b'id="runtime-selector"', body)
+            self.assertEqual(status, 302)
+            status, body = request(ready, "/workspace.html")
+            self.assertEqual(status, 200); self.assertIn(b'data-v1-page="workspace"', body)
+            self.assertNotIn(b'id="runtime-selector"', body)
+            status, body = request(ready, "/product-config.js")
+            self.assertIn(b'"kind": "skill"', body)
+            self.assertIn(b'"storage": "filesystem"', body)
+            self.assertEqual(request(ready, "/api/runtime-providers/deepseek/connection-check", {"api_key": "synthetic"})[0], 403)
+            self.assertEqual(request(ready, "/api/personal-understanding-turn", {"runtime_snapshot": {"provider": "deepseek"}})[0], 422)
             for page in ("personal-information.html", "jd.html"):
                 status, body = request(ready, "/" + page)
                 self.assertEqual(status, 200); self.assertIn(b'id="library-edit-toggle"', body)
@@ -122,6 +124,7 @@ class SkillTests(unittest.TestCase):
         proc, ready = start({**self.env, "PATH": "/nonexistent", "ARIADNE_CODEX_BINARY": "/missing/codex"})
         try:
             self.assertFalse(ready["codex_ready"])
+            self.assertEqual(request(ready, "/api/personal-understanding-turn", {"runtime_snapshot": {"provider": "codex", "model": "gpt-5.6-sol"}})[0], 503)
             status, body = request(ready, "/api/runtime-options")
             self.assertNotIn("codex", [model["provider_id"] for model in json.loads(body)["models"]])
             status, body = request(ready, "/api/workspace", {**payload, "action": "read", "stores": ["source_documents"]})
@@ -185,46 +188,12 @@ class SkillTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(json.loads(result.stdout)["error"], "NATIVE_WINDOW_SETUP_FAILED")
 
-    def test_lifecycle_pairing_and_port_conflict(self):
+    def test_retired_connect_does_not_touch_existing_port(self):
         with socket.socket() as listener:
-            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            listener.bind(("127.0.0.1", 8765)); listener.listen()
+            listener.bind(("127.0.0.1", 0)); listener.listen()
             result = self.run_cli("connect")
-            self.assertEqual(json.loads(result.stdout)["error"], "CONNECTOR_PORT_UNAVAILABLE")
-        result = self.run_cli("connect", "--origin", "https://ariadne.kai-nex.com/path")
-        self.assertEqual(result.returncode, 1)
-        proc = subprocess.Popen([sys.executable, str(self.launcher), "connect", "--origin", "http://127.0.0.1:18920"],
-                                cwd=self.directory, env=self.env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        def request(path, body=None, token=None, origin="http://127.0.0.1:18920"):
-            c = http.client.HTTPConnection("127.0.0.1", 8765, timeout=5)
-            headers = {"Origin": origin, "Content-Type": "application/json"}
-            if token: headers["X-Ariadne-Connector"] = token
-            c.request("POST" if body is not None else "GET", path, json.dumps(body) if body is not None else None, headers)
-            r = c.getresponse(); value = json.loads(r.read()); code = r.status; c.close()
-            return code, value
-        try:
-            self.assertTrue(select.select([proc.stdout], [], [], 10)[0], "startup timed out")
-            startup = json.loads(proc.stdout.readline())
-            self.assertEqual(startup["status"], "awaiting_pairing")
-            self.assertEqual(request("/api/runtime-options")[0], 401)
-            self.assertEqual(request("/api/connector/pair", {"code": startup["pairing_code"]}, origin="https://evil.invalid")[0], 403)
-            status, payload = request("/api/connector/pair", {"code": startup["pairing_code"]})
-            self.assertEqual(status, 200)
-            token = payload["token"]
-            self.assertEqual(request("/api/connector/pair", {"code": startup["pairing_code"]})[0], 400)
-            status, options = request("/api/runtime-options", token=token)
-            self.assertEqual(status, 200)
-            self.assertEqual([x["provider_id"] for x in options["models"]], ["codex"])
-            self.assertEqual(request("/api/jobs", token=token)[0], 404)
-            self.assertEqual(request("/api/connector/revoke", {}, token=token)[0], 200)
-            self.assertEqual(request("/api/runtime-options", token=token)[0], 401)
-        finally:
-            proc.terminate()
-            stdout, stderr = proc.communicate(timeout=10)
-        self.assertEqual(proc.returncode, 0, stderr)
-        self.assertTrue(json.loads(stdout)["pairing_revoked"])
-        with socket.socket() as client:
-            self.assertNotEqual(client.connect_ex(("127.0.0.1", 8765)), 0)
+            self.assertEqual(json.loads(result.stdout)["error"], "WEB_PAIRING_RETIRED")
+            self.assertEqual(result.returncode, 1)
 
 
 if __name__ == "__main__":
