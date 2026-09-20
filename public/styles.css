@@ -436,8 +436,10 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-library-topbar > div:nth-child(2) { justify-self: start; }
 .v1-library-topbar h1 { font-size: 24px; font-weight: 580; letter-spacing: -0.04em; margin: 4px 0 0; }
 .v1-top-actions { align-items: center; display: flex; gap: 10px; }
-.v1-library-topbar > .v1-library-title-actions:nth-child(2) { align-items: center; display: flex; gap: var(--vi-space-8); justify-self: center; }
-.v1-library-title-actions > button { min-height: var(--vi-target-comfort); min-width: var(--vi-target-comfort); padding-inline: var(--vi-space-8); white-space: nowrap; }
+.v1-library-topbar:has(#library-edit-toggle) > .v1-back { height: var(--vi-target-comfort); width: var(--vi-target-comfort); }
+.v1-library-topbar:has(#library-edit-toggle) > .v1-back::before { left: var(--vi-space-12); top: var(--vi-space-12); }
+.v1-library-topbar:has(#library-edit-toggle) > .v1-top-actions { gap: var(--vi-space-4); }
+#library-edit-toggle { height: var(--vi-target-comfort); min-width: var(--vi-target-comfort); padding: 0; white-space: nowrap; }
 .v1-library-card { position: relative; display: flex; min-width: 0; }
 .v1-library-card > .v1-candidate-card { flex: 1; height: auto; }
 .v1-library-card > .v1-library-delete { position: absolute; top: var(--vi-space-16); right: var(--vi-space-16); min-height: var(--vi-target-comfort); min-width: var(--vi-target-comfort); }
@@ -445,7 +447,7 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-card-grid.is-editing .v1-card-top { padding-right: var(--vi-space-48); }
 .v1-card-grid.is-editing .v1-review-chip { display: none; }
 .v1-card-grid.is-editing .v1-candidate-card { cursor: default; transform: none; }
-.v1-library-title-actions > button:focus-visible, .v1-library-delete:focus-visible { outline: 2px solid var(--vi-focus); outline-offset: 2px; }
+#library-edit-toggle:focus-visible, .v1-library-delete:focus-visible { outline: 2px solid var(--vi-focus); outline-offset: 2px; }
 .v1-add-button { align-items: center; background: var(--ink); border: 1px solid var(--ink); border-radius: 50%; color: var(--vi-surface); display: inline-flex; font-size: 0; font-weight: 300; height: 42px; justify-content: center; padding: 0; width: 42px; }
 .v1-add-button::before { background: currentColor; content: ""; height: 24px; mask: url("/vi/icons/plus.svg") center / 24px 24px no-repeat; width: 24px; -webkit-mask: url("/vi/icons/plus.svg") center / 24px 24px no-repeat; }
 .v1-library-intro { margin: clamp(90px, 15vh, 170px) 0 42px; }
