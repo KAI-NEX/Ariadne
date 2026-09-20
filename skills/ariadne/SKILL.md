@@ -22,6 +22,12 @@ description: 打开 Ariadne 独立 Mac 窗口，显示个人资料与职位工�
 
 本地使用独立稳定 origin 8766 和技能安装目录之外的数据目录：macOS 为 `~/Library/Application Support/Ariadne Skill`，其他 POSIX 为 `~/.local/share/ariadne-skill`。旧 App、旧 8000 和公开网页资料不自动迁移。普通启动不改端口、目录或浏览器 profile；端口冲突时不接管未知服务、不结束它，报告冲突。`--port`/`--data-dir` 仅用于用户明确指定的环境或隔离验收。
 
+## 本地资料与 Agent 连接
+
+当前已实现的路径是「Agent 调用 Skill → 独立窗口 → 本机 Ariadne → Codex CLI」。页面内 AI 操作使用已验证的 Codex adapter，不接入唤起它的那段聊天，也不继承该聊天的历史或工具。用户要求先跑通 Skill 时，复用现有页面、资料库和模型能力，不以反馈学习、通用个人档案或其他 Agent 适配作为前置条件。
+
+资料属于 Ariadne 工作区，独立于 Skill 安装和 Agent。磁盘根目录下的 `workspaces/<workspace-id>/` 保存内容；当前页面的 `ariadne-content-workspace-v1` 映射决定具体工作区。因此同一台电脑换 Agent 时应复用既有目录与已确认的工作区身份，不复制多份资料，也不按目录新旧猜测身份。跨电脑需要显式传输资料，指定路径本身不构成同步。其他 Agent 的页面连接仍需 adapter 与能力验证；直接改写 Markdown 不能替代来源、版本和人工保存流程。
+
 ## 可选：连接公开网页版
 
 仅当用户要求使用公开网页及其中已有资料时：

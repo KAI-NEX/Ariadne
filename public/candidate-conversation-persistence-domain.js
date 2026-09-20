@@ -397,17 +397,17 @@
     const expectedTerminal = action.application_result.status === "NEEDS_CLARIFICATION" ? "NEEDS_CLARIFICATION"
       : action.application_result.status === "NO_CHANGE" ? "NO_CHANGE" : "APPLIED";
     const expectedAssistantText = action.normalized_action.action === "ASK_CLARIFICATION" ? action.normalized_action.clarification : action.normalized_action.message;
-    if (turn.state !== expectedTerminal || assistant.provider !== "deepseek" || assistant.model !== "deepseek-flash" || assistant.text !== expectedAssistantText) {
+    if (turn.state !== expectedTerminal || assistant.text !== expectedAssistantText) {
       return Promise.reject(new CandidateConversationPersistenceError("SUCCESSFUL_TURN_LINKAGE_INVALID"));
     }
     if ((action.application_result.mutation === "NEW_WORKING_STATE") !== Boolean(resulting)
       || (resulting && (action.resulting_working_model_id !== resulting.working_model_id || resulting.previous_working_model_id !== current.working_model_id || resulting.version !== current.version + 1))) {
       return Promise.reject(new CandidateConversationPersistenceError("ACTION_WORKING_LINKAGE_INVALID"));
     }
-    const names = [STORE_NAMES.sessions, STORE_NAMES.messages, STORE_NAMES.turns, STORE_NAMES.actions, STORE_NAMES.working];
+    const names = [STORE_NAMES.sessions, STORE_NAMES.messages, STORE_NAMES.turns, STORE_NAMES.actions, STORE_NAMES.working, "runtime_snapshots"];
     return new Promise((resolve, reject) => {
       const transaction = database.transaction(names, "readwrite");
-      const state = { error: null, pending: 6, session: null, user: null, turn: null, assistant: null, action: null, models: [] };
+      const state = { error: null, pending: 7, session: null, user: null, turn: null, assistant: null, action: null, models: [], snapshot: null };
       const ready = () => {
         state.pending -= 1;
         if (state.pending || state.error) return;
@@ -415,6 +415,12 @@
           if (!state.user || validateMessage(state.user).role !== "USER" || state.user.turn_id !== turn.execution_id) throw new CandidateConversationPersistenceError("SUCCESSFUL_TURN_USER_MISSING");
           if (!state.session || validateSession(state.session).conversation_id !== turn.conversation_id) throw new CandidateConversationPersistenceError("SESSION_NOT_PERSISTED");
           if (!state.turn || Conversation.TERMINAL_STATES.includes(state.turn.state)) throw new CandidateConversationPersistenceError("TURN_NOT_ACTIVE");
+          // Bind the answer to the durable runtime captured before dispatch,
+          // rather than a legacy provider name or the current UI selection.
+          if (!state.snapshot || state.turn.runtime_snapshot_id !== turn.runtime_snapshot_id) throw new CandidateConversationPersistenceError("SUCCESSFUL_TURN_RUNTIME_INVALID");
+          const snapshot = Truth.validateRuntimeSnapshotRecord(state.snapshot);
+          if (snapshot.snapshot_id !== turn.runtime_snapshot_id || snapshot.mode !== "model" || snapshot.operation !== turn.operation
+            || assistant.provider !== snapshot.provider || assistant.model !== snapshot.model) throw new CandidateConversationPersistenceError("SUCCESSFUL_TURN_RUNTIME_INVALID");
           if (state.assistant) throw new CandidateConversationPersistenceError("DUPLICATE_MESSAGE_ID");
           if (state.action) throw new CandidateConversationPersistenceError("DUPLICATE_ACTION_ID");
           const head = state.models.map(Truth.validateCandidateWorkingModel).filter((model) => model.source_document_id === current.source_document_id).sort((left, right) => right.version - left.version)[0];
@@ -426,7 +432,7 @@
           transaction.objectStore(STORE_NAMES.sessions).put({ ...clone(state.session), updated_at: turn.updated_at });
         } catch (error) { abortWith(transaction, state, error); }
       };
-      const reads = [[STORE_NAMES.sessions, "get", turn.conversation_id, "session"], [STORE_NAMES.messages, "get", turn.user_message_id, "user"], [STORE_NAMES.turns, "get", turn.execution_id, "turn"], [STORE_NAMES.messages, "get", assistant.message_id, "assistant"], [STORE_NAMES.actions, "get", action.action_id, "action"], [STORE_NAMES.working, "getAll", null, "models"]];
+      const reads = [[STORE_NAMES.sessions, "get", turn.conversation_id, "session"], [STORE_NAMES.messages, "get", turn.user_message_id, "user"], [STORE_NAMES.turns, "get", turn.execution_id, "turn"], [STORE_NAMES.messages, "get", assistant.message_id, "assistant"], [STORE_NAMES.actions, "get", action.action_id, "action"], [STORE_NAMES.working, "getAll", null, "models"], ["runtime_snapshots", "get", turn.runtime_snapshot_id, "snapshot"]];
       reads.forEach(([name, method, key, field]) => {
         const request = key === null ? transaction.objectStore(name)[method]() : transaction.objectStore(name)[method](key);
         request.onsuccess = () => { state[field] = request.result || (field === "models" ? [] : null); ready(); };

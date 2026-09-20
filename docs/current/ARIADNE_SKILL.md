@@ -2,6 +2,16 @@
 
 更新：2026-09-20。默认交付方向为网页 + Codex Skill 独立 Mac 窗口。官网入口统一为安装 Skill；另一台电脑与公网 HTTPS 首次本地网络授权仍未覆盖。旧 App 历史构建及源码保留；本机旧 App 已按用户要求移入废纸篓，原资料目录保留，不自动迁移到 Skill。
 
+## 本机 Codex 闭环与当前范围（2026-09-20）
+
+当前范围按用户决定收敛为：Skill 唤起独立窗口，保留现有页面，使用自己的 Codex，资料保存在本机。反馈更新暂不扩展；长期档案重构与其他 Agent 不作为先跑通的前提。Skill 是带启动脚本和完整运行代码的技能包，不是单个提示词文件；结构参考 [OpenAI Skill 文档](https://learn.chatgpt.com/docs/build-skills)。
+
+资料与 Agent 安装分离。macOS 默认根目录为 `~/Library/Application Support/Ariadne Skill`，具体库在 `workspaces/<workspace-id>/`；页面保存的 `ariadne-content-workspace-v1` 映射选择工作区。更换 Agent 时需复用同一身份及读写契约，不能只指定根目录便假定已读取同一人。跨电脑需明确导出/复制与身份恢复，本轮没有实现自动同步。Codex 页面请求经独立 CLI 执行，不连接唤起 Skill 的聊天历史和工具。
+
+本次实测补齐此前 Skill 阶段没有真实模型调用的缺口：独立窗口启动/退出/重开；隔离本地库两页合成 PDF 经真实 Codex 分析、人工保存、卡片恢复、真实详情对话。发现并修复候选人对话持久化层写死旧 DeepSeek 型号导致 Codex 回答保存失败的问题；现在按已持久化的本轮 RuntimeSnapshot 核对身份，仍拒绝不一致或缺失记录。
+
+修复后对话成功保存为 `NO_CHANGE`，保留“原型未上线、无验证增长指标”的事实；确认版本未改变。服务停止/重启后卡片与对话恢复，76 个工作区文件 hash 相同。关联回归及 Skill 格式验证通过；本机安装已同步，新 ZIP 与全部运行文件校验通过。证据见 `.cache/skill-codex-e2e-20260920/`，最终结果见其中 `acceptance.json`。没有私人资料传输、旧资料迁移或官网新发布；其他电脑及其他 Agent 尚未验证。
+
 ## 官网安装入口上线（2026-09-20）
 
 已发布 Cloudflare Pages `047f2d8c`，正式域名 `/install` 提供复制安装指令，旧 `/download.html` 自动跳转。介绍页、关于浮层、Codex 连接说明与中英 README 统一为 Skill。公网浏览器实际复制成功，完整包 2,793,081 bytes、SHA-256 `37fb2622e94020ce815ea32d04f7f7c643f2ac945a0f844b73ad163d45efca73` 与发布构建一致；修复静态托管 HEAD 缺少 Content-Length 时错误禁用按钮的问题，新增大小/hash 失败回归。桌面和 390px 页面验收通过，证据保留在 `.cache/skill-install-publication-20260920/`。

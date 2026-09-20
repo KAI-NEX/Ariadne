@@ -1,5 +1,14 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-20 — Skill / Codex / 本地资料闭环（COMPLETE；本机合成验收）
+
+- 按用户新范围复用已有完整 Skill、独立窗口、页面及本地库，先跑通 Codex；不启动反馈更新、长期通用档案重构、其他 Agent 适配或旧资料迁移。技能说明新增本地工作区身份与 Agent 连接边界；同机复用资料不等于跨机自动同步。
+- 真实验收发现 `persistSuccessfulTurn` 写死 `deepseek / deepseek-flash`：Codex 已返回 EXPLAIN，但前端保存报 `SUCCESSFUL_TURN_LINKAGE_INVALID`。现从同一事务读取派发前已保存的 RuntimeSnapshot，校验原 turn、snapshot ID、mode、operation、Provider/model；保留 action/message/Working 关联与原子写入。未放宽模型资格或保存权限。
+- 已安装 Skill 与源码同步。独立窗口真实选择 GPT Sol、进入工作空间、关闭后 8766 释放、重开保留选择。隔离 18766/测试数据目录经 egolite 上传两页虚构 PDF、Codex `gpt-5.6-sol` 分析为 1 张有两页来源的项目卡片、人工保存、重开详情并真实讨论；回答明确不能宣称未上线项目带来增长，成功状态 `NO_CHANGE`，确认版本 hash 未变。服务完整重启后卡片/对话恢复，76 个工作区文件 hash 一致，TXT/PDF 原件 hash 一致。
+- 回归：6 项关联 Node/Python suite（其中 Skill bundle 7 tests）、Codex connector 回归、Skill 格式验证、JS syntax、VI 与 diff 检查通过。新增 Codex/DeepSeek 成功保存与重开、Provider/model/snapshot/operation 不一致、缺失 snapshot、错误文字/action 关联的原子拒绝，以及 Codex EXPLAIN/NO_CHANGE/ASK_CLARIFICATION 全路径；补齐既有资料库测试函数所需的 `libraryEditor` 空依赖。
+- QA 过程保留：3 次自动化未接住延迟确认框而未发送；修复前 1 次真实对话已执行但保存失败；egolite 缓存加载异常经禁用本轮资源缓存并完整重载恢复。最终详情加载/对话无捕获到的页面异常。实际模型调用共 3 次（PDF 导入、修复前对话、修复后对话），全部为合成资料；不把离线回归当作真实模型证明。
+- 证据与新包在 `.cache/skill-codex-e2e-20260920/`；安装前文件、原件、中间包及失败记录保留。只更新本机 Skill，没有推送 Git 或发布官网新包；其他电脑首次安装、其他 Agent、真实私人材料质量及本轮全部 Job 业务未重新实测。
+
 ## 2026-09-20 — 官网安装 Skill 与本机 App 替换（COMPLETE）
 
 - 官网新增 `/install`：复制带公开包地址及 SHA-256 的安装指令给 Codex；复制失败可手动选择，包缺失/metadata 无效时禁用。旧下载页自动跳转，关于页/浮层/连接引导/中英 README 同步，取消日常手动下载 App 的流程。同步此前两个资料库的编辑/删除和页头布局。

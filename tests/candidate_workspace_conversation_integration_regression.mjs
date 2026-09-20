@@ -695,14 +695,14 @@ for (const hasLegacy of [false, true]) {
   const grid = { innerHTML: "" };
   const optionalDb = { objectStoreNames: { contains: () => hasLegacy }, close() {} };
   assert(libraryReader, "library and home share the authoritative collection reader");
-  const readLibrary = new Function("Demo", "localizedCandidateRecords", "Truth", "LocalCandidateReview", "byId", "personalGuideCardMarkup", "candidateCardMarkup", "window", "playPendingCardReturn", `${libraryReader}; ${libraryOwner}; return renderPersonalLibrary;`)(
+  const readLibrary = new Function("Demo", "localizedCandidateRecords", "Truth", "LocalCandidateReview", "byId", "personalGuideCardMarkup", "candidateCardMarkup", "window", "playPendingCardReturn", "libraryEditor", `${libraryReader}; ${libraryOwner}; return renderPersonalLibrary;`)(
     { openDatabase: async () => optionalDb, DEMO_STORES: { candidates: "optional_legacy" } }, async x => x,
     { openDatabase: async () => optionalDb }, {
       getAll: async (_db, store) => {
         if (store === "optional_legacy") { assert(hasLegacy); return [{ title: "legacy retained" }]; }
         return store === "candidate_context_revisions" ? [{context_id:"synthetic",revision_id:"synthetic-v1",payload:{items:[{title:"confirmed retained"}]}}] : [];
       }, activeConfirmedRevisions: x => x,
-    }, () => grid, () => "guide", item => item.title, { requestAnimationFrame() {} }, () => {});
+    }, () => grid, () => "guide", item => item.title, { requestAnimationFrame() {} }, () => {}, null);
   await readLibrary();
   assert.match(grid.innerHTML, /confirmed retained/);
   assert.equal(grid.innerHTML.includes("legacy retained"), hasLegacy);
@@ -770,4 +770,32 @@ const fileOutcome = await Integration.executeListTurn({database:fileDb,session:f
 assert.deepEqual(fileOutcome.assistant_message.deliverable,delivered);
 assert.deepEqual((await Persistence.restoreConversation(fileDb,fileSession.conversation_id)).messages.at(-1).deliverable,delivered);
 assert.equal(fileDb.records.get("candidate_working_models").size,1,"file delivery cannot create a Working revision");
+// Exercise the complete successful-turn path with the qualified Codex runtime.
+const Runtime = require("../public/runtime-capabilities.js");
+const Gate = require("../public/runtime-capability-gate.js");
+const codex = { mode: "model", provider: "codex", model: "gpt-5.6-sol" };
+const descriptor = Gate.modelDescriptorForRuntime(codex, "candidate_conversation");
+for (const action of ["EXPLAIN", "NO_CHANGE", "ASK_CLARIFICATION"]) {
+  const captured = Runtime.createRuntimeSnapshot(codex, {
+    snapshotId: idFactory("runtime-codex"), capturedAt: now().toISOString(),
+    modelDescriptor: descriptor, credentialRef: Gate.credentialFor(codex),
+    adapterVersion: descriptor.adapter_version, promptVersion: Integration.PROMPT_VERSION,
+    schemaVersion: Integration.ACTION_SCHEMA_VERSION, operation: Conversation.OPERATION,
+    capabilityBasis: Integration.CAPABILITY_BASIS, actionSchemaVersion: Integration.ACTION_SCHEMA_VERSION,
+    requestConfigVersion: Integration.REQUEST_CONFIG_VERSION, deliveryMethod: null,
+  });
+  const answer = await Integration.executeListTurn({
+    database: fileDb, session: fileSession, human_message: "Discuss without changing confirmed information.",
+    runtime_snapshot: captured, id_factory: idFactory, now,
+    call_runtime: async r => ({ ...noPatches(r, action, "Synthetic answer.", action === "ASK_CLARIFICATION" ? "Which item?" : null),
+      provider: captured.provider, model: captured.model, protocol: captured.protocol }),
+  });
+  assert.equal(answer.status, "SUCCEEDED");
+  assert.equal(answer.turn.state, action === "ASK_CLARIFICATION" ? "NEEDS_CLARIFICATION" : "NO_CHANGE");
+  const reopened = await Persistence.restoreConversation(fileDb, fileSession.conversation_id);
+  assert.equal(reopened.messages.at(-1).provider, "codex");
+  assert.equal(reopened.messages.at(-1).model, "gpt-5.6-sol");
+  assert.equal(fileDb.records.get("candidate_working_models").size, 1);
+  assert.equal(fileDb.records.get("candidate_context_revisions").size, 0);
+}
 console.log("candidate_workspace_conversation_integration=pass");

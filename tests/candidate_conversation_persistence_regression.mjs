@@ -9,6 +9,9 @@ const Conversation = require("../public/candidate-conversation-domain.js");
 const Persistence = require("../public/candidate-conversation-persistence-domain.js");
 const Compiler = require("../public/candidate-conversation-context-compiler.js");
 const Review = require("../public/local-candidate-review-domain.js");
+const Integration = require("../public/candidate-workspace-conversation-runtime.js");
+const Gate = require("../public/runtime-capability-gate.js");
+const Runtime = require("../public/runtime-capabilities.js");
 
 function memoryDatabase() {
   const specs = new Map(Truth.STORE_SPECS.map((spec) => [spec.name, spec]));
@@ -121,6 +124,8 @@ assert.equal(session.conversation_id, Persistence.createSession({ candidate_cont
 assert.notDeepEqual(itemObservation.focus, candidateObservation.focus); // Focus never enters conversation identity.
 
 const database = memoryDatabase();
+const capturedRuntime = Integration.createRuntimeSnapshot({ snapshot_id: "runtime-snapshot-conversation", captured_at: timestamp(0) });
+database.records.get("runtime_snapshots").set(capturedRuntime.snapshot_id, structuredClone(capturedRuntime));
 database.records.get("candidate_working_models").set(working.working_model_id, structuredClone(working));
 database.records.get("source_documents").set(working.source_document_id, { source_document_id: working.source_document_id });
 await Persistence.ensureSession(database, session);
@@ -174,6 +179,49 @@ const outcome = await Conversation.applyExecutionResult({ execution, generation:
 const actionRecord = await Persistence.createActionRecord({ action_id: "candidate-action-applied", conversation_id: session.conversation_id, turn_id: execution.execution_id, originating_user_message_id: user.message_id, observation: itemObservation, normalized_action: normalizedAction, application: outcome.application, working_model: working, human_message: user.text, created_at: timestamp(4, 4) });
 const terminalTurn = Persistence.turnRecord(outcome.execution, { user_message_id: user.message_id, action_id: actionRecord.action_id, usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 } });
 const assistant = Persistence.createAssistantMessage({ message_id: "message-assistant-applied", conversation_id: session.conversation_id, turn_id: execution.execution_id, text: normalizedAction.message, provider: "deepseek", model: "deepseek-flash", runtime_snapshot_id: terminalTurn.runtime_snapshot_id, candidate_action_id: actionRecord.action_id, created_at: timestamp(4, 4) });
+// Every accepted provider uses the captured runtime; a mismatch or missing
+// snapshot must abort before any assistant/action/new Working is persisted.
+for (const [provider, model] of [["deepseek", "deepseek-flash"], ["codex", "gpt-5.6-sol"]]) {
+  const runtime = { mode: "model", provider, model };
+  const descriptor = Gate.modelDescriptorForRuntime(runtime, "candidate_conversation");
+  const captured = Runtime.createRuntimeSnapshot(runtime, {
+    snapshotId: capturedRuntime.snapshot_id, capturedAt: timestamp(0),
+    modelDescriptor: descriptor, credentialRef: Gate.credentialFor(runtime),
+    adapterVersion: descriptor.adapter_version, promptVersion: Integration.PROMPT_VERSION,
+    schemaVersion: Integration.ACTION_SCHEMA_VERSION, operation: Conversation.OPERATION,
+    capabilityBasis: Integration.CAPABILITY_BASIS, actionSchemaVersion: Integration.ACTION_SCHEMA_VERSION,
+    requestConfigVersion: Integration.REQUEST_CONFIG_VERSION, deliveryMethod: null,
+  });
+  for (const invalid of ["missing", "provider", "model", "operation", "snapshot-id", "text", "action-id", null]) {
+    const isolated = memoryDatabase();
+    for (const [name, records] of database.records) isolated.records.set(name, new Map([...records].map(([key, value]) => [key, structuredClone(value)])));
+    isolated.records.get("runtime_snapshots").set(captured.snapshot_id, structuredClone(captured));
+    const reply = { ...assistant, provider, model };
+    const turn = structuredClone(terminalTurn);
+    if (invalid === "missing") isolated.records.get("runtime_snapshots").delete(captured.snapshot_id);
+    if (invalid === "provider") reply.provider = "wrong-provider";
+    if (invalid === "model") reply.model = "wrong-model";
+    if (invalid === "operation") isolated.records.get("runtime_snapshots").get(captured.snapshot_id).operation = "JOB_CONVERSATION_TURN";
+    if (invalid === "snapshot-id") isolated.records.get("conversation_turn_executions").get(turn.execution_id).runtime_snapshot_id = "different-snapshot";
+    if (invalid === "text") reply.text = "Unrelated output";
+    if (invalid === "action-id") reply.candidate_action_id = "different-action";
+    const bundle = { turn, action: actionRecord, assistant_message: reply, current_working_model: working, resulting_working_model: outcome.application.working_model };
+    if (invalid) {
+      await assert.rejects(Persistence.persistSuccessfulTurn(isolated, bundle));
+      assert.equal(isolated.records.get("conversation_messages").has(reply.message_id), false);
+      assert.equal(isolated.records.get("candidate_actions").has(actionRecord.action_id), false);
+      assert.equal(isolated.records.get("candidate_working_models").has(outcome.application.working_model.working_model_id), false);
+      assert.equal(isolated.records.get("conversation_turn_executions").get(turn.execution_id).state, "SENDING");
+    } else {
+      await Persistence.persistSuccessfulTurn(isolated, bundle);
+      const reopened = await Persistence.restoreConversation(isolated, session.conversation_id);
+      assert.equal(reopened.messages.at(-1).provider, provider);
+      assert.equal(reopened.messages.at(-1).model, model);
+      assert.equal(reopened.turns.at(-1).state, "APPLIED");
+      assert.equal(isolated.records.get("candidate_context_revisions").size, 0);
+    }
+  }
+}
 await Persistence.persistSuccessfulTurn(database, { turn: terminalTurn, action: actionRecord, assistant_message: assistant, current_working_model: working, resulting_working_model: outcome.application.working_model });
 assert(database.records.get("candidate_working_models").has(outcome.application.working_model.working_model_id));
 assert.equal(database.records.get("candidate_actions").get(actionRecord.action_id).resulting_working_model_id, outcome.application.working_model.working_model_id);
