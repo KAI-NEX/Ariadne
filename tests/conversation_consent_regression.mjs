@@ -50,10 +50,22 @@ for(const operation of ['personal_understanding','job_overview']) {
   const changed=Selection.resolve(operation,operation);
   await assert.rejects(Selection.beforeDispatch(changed,operation),/RUNTIME_CONSENT_REQUIRED/);
   box.choose(true);await Selection.beforeDispatch(changed,operation);assert.equal(dialogs,0);
+  const reopened=checkbox();Selection.bindTransferConsent(operation,reopened);
+  assert.equal(reopened.checked,true,'same browser and exact recipient/settings remember prior acceptance');
+  await Selection.beforeDispatch(changed,operation);
+  const back={...sol,execution_settings:Settings.envelope(sol,snapshot.execution_settings.effective_settings)};
+  await Selection.update({scope:operation,runtime:back,expectedRevision:Selection.version()});
+  Selection.syncTransferConsent(operation,reopened);
+  assert.equal(reopened.checked,true,'returning to a previously accepted exact recipient/settings restores consent');
+  await Selection.beforeDispatch(Selection.resolve(operation,operation),operation);
+  reopened.choose(false);
+  const revoked=checkbox();Selection.bindTransferConsent(operation,revoked);
+  assert.equal(revoked.checked,false,'explicit revocation survives page re-entry');
+  revoked.choose(true);
 }
 // Other conversation surfaces without a transfer checkbox keep their disclosure.
 await Selection.beforeDispatch(Selection.resolve('candidate_conversation','candidate-test'),'candidate_conversation');
 assert.equal(dialogs,1);
 storage.setItem(Gate.CURRENT_RUNTIME_STORAGE_KEY,JSON.stringify({mode:'local'}));
 assert.throws(()=>Selection.assertCurrent({...sol,execution_settings:Settings.envelope(sol,{},'old','personal_understanding')},'personal_understanding'));
-console.log('checkbox feedback, explicit scope/model consent, no duplicate dialog, revocation, batches, stale model and fallback PASS');
+console.log('checkbox feedback, persisted exact-recipient consent, no duplicate dialog, revocation, batches, stale model and fallback PASS');

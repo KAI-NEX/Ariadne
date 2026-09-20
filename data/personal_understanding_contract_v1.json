@@ -4,8 +4,8 @@
   "result_contract": "ariadne-personal-understanding-result-v1",
   "operation": "PERSONAL_UNDERSTANDING_TURN",
   "adapter_version": "deepseek-personal-understanding-v1",
-  "prompt_version": "ariadne-personal-understanding-prompt-v5",
-  "request_config_version": "deepseek-personal-understanding-request-v2",
+  "prompt_version": "ariadne-personal-understanding-prompt-v6",
+  "request_config_version": "deepseek-personal-understanding-request-v3",
   "phases": ["DISTILL", "SYNTHESIZE", "DISCUSS"],
   "memory_kinds": ["FACT", "PREFERENCE", "GOAL", "CORRECTION"],
   "memory_operations": ["ADD", "REPLACE", "RETRACT"],
@@ -17,6 +17,7 @@
     "history_turns": 48,
     "summary_characters": 2400,
     "memory_characters": 1200,
-    "proposals_per_turn": 4
+    "proposals_per_turn": 4,
+    "card_proposals_per_turn": 4
   }
 }

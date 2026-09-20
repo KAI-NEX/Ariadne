@@ -3,6 +3,7 @@
 (async function personalUnderstandingPage() {
   const Memory = window.AriadnePersonalMemory, Understanding = window.AriadnePersonalUnderstanding;
   const Candidate = window.AriadneJobCandidateContext, Context = window.AriadnePersonalContext;
+  const CandidateCards = window.AriadnePersonalCandidateCards;
   const Truth = window.AriadneTruthPersistence, Gate = window.JobRadarRuntimeGate, UI = window.AriadneConversationUI;
   const byId = (name) => document.getElementById(name);
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -60,6 +61,14 @@
     intro.update(messages.length > 0);
     UI.renderMessages(byId("personal-conversation-messages"), messages, { empty_text: "这里的对话围绕你已添加的资料展开，可以跨文件讨论，也可以直接补充新的个人信息。" });
     byId("personal-older-messages").classList.toggle("hidden", turns.length <= visibleTurns);
+    const cardTypeOptions = { WORK_EXPERIENCE: "工作经历", PROJECT: "项目经历", EDUCATION: "教育经历", OTHER: "其他资料" };
+    const cardProposals = CandidateCards.pending(state.cardProposals);
+    byId("personal-card-proposals").innerHTML = cardProposals.map((entry) => {
+      const item = entry.payload.items[0], proposalId = esc(entry.proposal_id);
+      const optionMarkup = Object.entries(cardTypeOptions).map(([value, label]) => `<option value="${value}"${item.item_type === value ? " selected" : ""}>${label}</option>`).join("");
+      const facts = (item.facts || []).map((fact) => `${fact.label}：${fact.value}`).join("\n");
+      return `<article class="personal-proposal personal-card-proposal" data-card-proposal="${proposalId}"><h3>${entry.payload.operation === "CREATE" ? "待确认的新资料卡" : "待确认的资料卡修改"}</h3><p class="personal-meta">${esc(entry.payload.reason)} · 保存前可以修改；确认后生成新的资料版本，原版本和对话依据保留。</p><blockquote>${esc(entry.payload.source_quotes.join("\n"))}</blockquote><div class="personal-card-fields"><label>类型<select data-card-field="item_type">${optionMarkup}</select></label><label>标题<input type="text" maxlength="300" data-card-field="title" value="${esc(item.title)}"></label><label>分类标签<input type="text" maxlength="120" data-card-field="category" value="${esc(item.category || "")}"></label><label>副标题<input type="text" maxlength="600" data-card-field="subtitle" value="${esc(item.subtitle || "")}"></label><label>时间<input type="text" maxlength="300" data-card-field="time" value="${esc(item.time || "")}"></label><label class="personal-card-wide">摘要<textarea maxlength="4000" data-card-field="summary">${esc(item.summary || "")}</textarea></label><label class="personal-card-wide">负责内容<textarea maxlength="2000" data-card-field="ownership">${esc(item.ownership || "")}</textarea></label><label class="personal-card-wide">事实（每行“标签：内容”）<textarea data-card-field="facts">${esc(facts)}</textarea></label></div><div class="personal-proposal-actions v1-edit-actions"><button type="button" class="v1-edit-text-action" data-card-save="${proposalId}">确认保存资料卡</button><button type="button" class="v1-edit-text-action" data-card-reject="${proposalId}">暂不采纳</button></div></article>`;
+    }).join("");
     const decided = new Set(state.decisions.map((entry) => entry.proposal_id));
     const pending = state.proposals.filter((entry) => !decided.has(entry.proposal_id));
     byId("personal-proposals").innerHTML = pending.map((entry) => `<article class="personal-proposal" data-proposal="${esc(entry.proposal_id)}"><h3>${entry.operation === "RETRACT" ? "确认停止使用这条补充" : "待确认的个人补充"} · ${esc(labels[entry.kind])}</h3><p class="personal-meta">${esc(entry.reason)}</p><blockquote>你的原话：${esc(entry.human_quote)}</blockquote>${entry.before_text ? `<p class="personal-meta">原有内容：${esc(entry.before_text)}</p>` : ""}<label for="proposal-${esc(entry.proposal_id)}">${entry.operation === "RETRACT" ? "将停止用于之后的分析；历史仍保留" : "确认内容，可在保存前修改"}</label><textarea id="proposal-${esc(entry.proposal_id)}" maxlength="1200" ${entry.operation === "RETRACT" ? "readonly" : ""}>${esc(entry.text)}</textarea><div class="personal-proposal-actions v1-edit-actions"><button type="button" class="v1-edit-text-action" data-memory-save="${esc(entry.proposal_id)}">${entry.operation === "RETRACT" ? "确认停止使用" : "确认保存"}</button><button type="button" class="v1-edit-text-action" data-memory-reject="${esc(entry.proposal_id)}">暂不采纳</button></div></article>`).join("");
@@ -70,8 +79,8 @@
   async function load() {
     const db = await Truth.openDatabase();
     try {
-      const [snapshot, memories, proposals, decisions, turns] = await Promise.all([Candidate.buildSnapshotFromDatabase(db), ...["personal_memory_revisions", "personal_memory_proposals", "personal_memory_decisions", "personal_conversation_turns"].map((name) => Memory.getAll(db, name))]);
-      state = { snapshot, memories, proposals, decisions, turns };
+      const [snapshot, memories, proposals, decisions, turns, cardProposals] = await Promise.all([Candidate.buildSnapshotFromDatabase(db), ...["personal_memory_revisions", "personal_memory_proposals", "personal_memory_decisions", "personal_conversation_turns", "context_proposals"].map((name) => Memory.getAll(db, name))]);
+      state = { snapshot, memories, proposals, decisions, turns, cardProposals };
       if (!draftLoaded) {
         const draftId = new URLSearchParams(location.search).get("draft");
         const draft = turns.find((entry) => entry.turn_id === draftId && entry.kind === "INTAKE");
@@ -154,7 +163,27 @@
     } catch (error) { status(errorCopy(error), true); }
     finally { db?.close(); busy = false; await load(); }
   });
-  Gate.subscribe(() => { byId("personal-model-consent").checked = false; runtimeMode(); });
+  byId("personal-card-proposals").addEventListener("click", async (event) => {
+    const button = event.target.closest("button"); if (!button || busy) return;
+    const proposalId = button.dataset.cardSave || button.dataset.cardReject; if (!proposalId) return;
+    const article = button.closest("[data-card-proposal]");
+    const value = (name) => article.querySelector(`[data-card-field="${name}"]`).value;
+    const facts = () => value("facts").split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
+      const separator = Math.max(line.indexOf("："), line.indexOf(":"));
+      return separator > 0 ? { label: line.slice(0, separator).trim(), value: line.slice(separator + 1).trim() } : { label: "补充信息", value: line };
+    }).filter((fact) => fact.value);
+    busy = true; button.disabled = true; runtimeMode(); let db;
+    try {
+      db = await Truth.openDatabase();
+      const outcome = await CandidateCards.decide(db, proposalId, button.dataset.cardSave ? "SAVE" : "REJECT", button.dataset.cardSave ? {
+        item_type: value("item_type"), title: value("title"), category: value("category"), subtitle: value("subtitle"), time: value("time"),
+        summary: value("summary"), ownership: value("ownership"), facts: facts(),
+      } : null);
+      status(outcome.revision ? `资料卡已保存为确认版本 ${outcome.revision.version}；原版本和对话依据仍保留。` : "已暂不采纳，个人资料卡没有变化。");
+    } catch (error) { status(errorCopy(error), true); }
+    finally { db?.close(); busy = false; await load(); }
+  });
+  Gate.subscribe(() => { window.AriadneRuntimeSelection.syncTransferConsent("personal_understanding", byId("personal-model-consent")); runtimeMode(); });
   window.addEventListener("focus", () => { if (!busy) load().catch((error) => status(errorCopy(error), true)); });
   try { await load(); } catch (error) { status(errorCopy(error), true); }
 }());

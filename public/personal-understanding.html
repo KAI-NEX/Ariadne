@@ -8,7 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ariadne · 了解我</title>
     <link rel="stylesheet" href="/styles.css?v=personal-understanding-v1&amp;vi=1&amp;composer=4&amp;consent-hint=1&amp;wave=1">
-    <link rel="stylesheet" href="/personal-understanding.css?v=memory-actions-1">
+    <link rel="stylesheet" href="/personal-understanding.css?v=card-proposals-1">
     <link rel="stylesheet" href="/understanding-chat.css?v=3&amp;composer=4">
     <link rel="stylesheet" href="/wave-physics-loader.css?v=2">
   </head>
@@ -48,6 +48,7 @@
           </div>
           <button id="personal-older-messages" type="button" class="personal-text-button hidden">查看更早对话</button>
           <div id="personal-conversation-messages" class="v1-conversation-messages v1-conversation-thread" aria-live="polite"></div>
+          <section id="personal-card-proposals" aria-label="待确认的资料卡变更"></section>
           <section id="personal-proposals" aria-label="待确认的个人补充"></section>
           <div id="personal-processing" class="v1-conversation-status hidden" aria-live="polite"></div>
           <form id="personal-conversation-form" class="v1-conversation-form">
@@ -63,7 +64,7 @@
     </main>
     <script src="/conversation-output.js?v=2"></script>
     <script src="/local-connector.js"></script>
-    <script src="/model-settings-catalog-data.js"></script><script src="/model-settings.js"></script><script src="/runtime-selection-state.js"></script>
+    <script src="/model-settings-catalog-data.js"></script><script src="/model-settings.js"></script><script src="/runtime-selection-state.js?consent=2"></script>
     <script src="/runtime-capabilities.js"></script>
     <script src="/runtime-capability-gate.js"></script>
     <script src="/workspace-storage-contract.js"></script>
@@ -71,17 +72,19 @@
     <script src="/content-browser-storage.js?v=1"></script>
     <script src="/content-database.js?v=2"></script>
     <script src="/truth-persistence-domain.js?storage=1"></script>
+    <script src="/raw-source-storage-domain.js?storage=1"></script>
     <script src="/personal-memory-domain.js?storage=1"></script>
     <script src="/personal-context-domain.js?v=context-direct-1"></script>
+    <script src="/personal-candidate-card-domain.js?v=1"></script>
     <script src="/job-intelligence-contract-manifest.js"></script>
     <script src="/personal-understanding-contract.js"></script>
     <script src="/job-candidate-context-domain.js?storage=1"></script>
-    <script src="/personal-understanding-domain.js?v=context-direct-1"></script>
+    <script src="/personal-understanding-domain.js?v=card-proposals-1"></script>
     <script src="/wave-physics-loader.js?v=1"></script><script src="/processing-indicator-domain.js?v=wave-1"></script>
     <script src="/conversation-ui-domain.js?composer=3&amp;intro=1&amp;reply=2&amp;consent-hint=1"></script>
     <script src="/v1-demo-domain.js?storage=1"></script>
     <script src="/v1-pages.js?storage=2"></script>
-    <script src="/personal-understanding.js?v=memory-actions-1"></script>
+    <script src="/personal-understanding.js?v=card-proposals-1"></script>
     <script src="/conversation-model-selector.js?v=compact-menu-1"></script>
     <script src="/conversation-attachments.js?v=inline-composer-3&amp;composer=3&amp;storage=1"></script>
   </body>

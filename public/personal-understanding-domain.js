@@ -4,10 +4,11 @@
   const dep = (name, file) => root[name] || (typeof module === "object" ? require(file) : null);
   const api = factory(dep("AriadnePersonalUnderstandingContract", "../data/personal_understanding_contract_v1.json"),
     dep("AriadnePersonalMemory", "./personal-memory-domain.js"), dep("AriadnePersonalContext", "./personal-context-domain.js"),
-    dep("AriadneJobCandidateContext", "./job-candidate-context-domain.js"), dep("AriadneRuntimeExecution", "./runtime-capabilities.js"), dep("JobRadarRuntimeGate", "./runtime-capability-gate.js"));
+    dep("AriadneJobCandidateContext", "./job-candidate-context-domain.js"), dep("AriadneRuntimeExecution", "./runtime-capabilities.js"), dep("JobRadarRuntimeGate", "./runtime-capability-gate.js"),
+    dep("AriadnePersonalCandidateCards", "./personal-candidate-card-domain.js"));
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.AriadnePersonalUnderstanding = api;
-}(typeof globalThis !== "undefined" ? globalThis : this, function create(Contract, Memory, Context, Candidate, Runtime, Gate) {
+}(typeof globalThis !== "undefined" ? globalThis : this, function create(Contract, Memory, Context, Candidate, Runtime, Gate, CandidateCards) {
   const clone = (value) => structuredClone(value);
   const Delivery = globalThis.AriadneConversationOutput || (typeof module === "object" ? require("./conversation-output.js") : null);
   function signature() {
@@ -180,7 +181,7 @@
       const request = requestFor("DISCUSS", compiled.context, humanMessage, runtime_snapshot, consent);
       const result = await call(request); const output = validateResult(result, request);
       Memory.text(output.message, 6000);
-      if (!Array.isArray(output.proposals) || output.proposals.length > 4) throw new Error("PERSONAL_OUTPUT_INVALID");
+      if (!Array.isArray(output.proposals) || output.proposals.length > 4 || !Array.isArray(output.card_proposals) || output.card_proposals.length > Contract.limits.card_proposals_per_turn) throw new Error("PERSONAL_OUTPUT_INVALID");
       const fresh = await Candidate.buildSnapshotFromDatabase(database);
       if (!Candidate.observationsMatch(snapshot, fresh)) throw new Error("PERSONAL_CONTEXT_CHANGED");
       const selectedRefs = new Set(Context.records(compiled.selected).map((entry) => entry.ref));
@@ -189,16 +190,24 @@
         // Provider excerpts are bounded, but Save must bind the complete local
         // evidence version, not compare an excerpt to the full source later.
         evidence: Context.records(snapshot).filter((item) => selectedRefs.has(item.ref) && item.semantic.item_type !== "PERSONAL_MEMORY") }));
+      const preparedCards = await CandidateCards.prepare(database, { raw_proposals: output.card_proposals, human_message: humanMessage,
+        context: compiled.context, snapshot, runtime_snapshot, turn_id: turn.turn_id });
       const completed = { ...turn, runtime_snapshot: clone(runtime_snapshot), status: "SUCCEEDED", output: { message: output.message, deliverable: Delivery.fromResult(result) }, source_fingerprint: snapshot.aggregate_fingerprint,
         context_coverage: compiled.selected.context_coverage, context_bytes: Context.bytes(compiled.context),
-        calls: 1, refresh_usage: {}, usage: result.usage || {}, proposal_ids: proposals.map((entry) => entry.proposal_id) };
+        calls: 1, refresh_usage: {}, usage: result.usage || {}, proposal_ids: proposals.map((entry) => entry.proposal_id), card_proposal_ids: preparedCards.proposals.map((entry) => entry.proposal_id) };
       await new Promise((resolve, reject) => {
-        const tx = database.transaction(["personal_conversation_turns", "personal_memory_proposals"], "readwrite");
+        const cardStores = preparedCards.proposals.length ? [...(preparedCards.runtime_snapshot ? ["runtime_snapshots"] : []), "processing_runs", "context_proposals"] : [];
+        const tx = database.transaction(["personal_conversation_turns", "personal_memory_proposals", ...cardStores], "readwrite");
         tx.objectStore("personal_conversation_turns").put(completed);
         proposals.forEach((entry) => tx.objectStore("personal_memory_proposals").add(entry));
+        if (preparedCards.proposals.length) {
+          if (preparedCards.runtime_snapshot) tx.objectStore("runtime_snapshots").add(clone(preparedCards.runtime_snapshot));
+          tx.objectStore("processing_runs").add(clone(preparedCards.processing_run));
+          preparedCards.proposals.forEach((entry) => tx.objectStore("context_proposals").add(clone(entry)));
+        }
         tx.oncomplete = resolve; tx.onerror = tx.onabort = () => reject(tx.error || new Error("personal_turn_write_failed"));
       });
-      return { turn: completed, proposals, snapshot: fresh };
+      return { turn: completed, proposals, card_proposals: preparedCards.proposals, snapshot: fresh };
     } catch (error) {
       await Memory.write(database, "personal_conversation_turns", { ...turn, status: "FAILED", error_code: String(error?.message || "PERSONAL_FAILED").slice(0, 100) }, { replace: true });
       throw error;

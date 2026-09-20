@@ -6,6 +6,8 @@
   root.AriadneRuntimeSelection = api;
 }(globalThis, function (root, Settings) {
   const KEY = "ariadne-model-selection-v2", CURRENT = "job-radar-selected-runtime", LEGACY = "ariadne-operation-runtimes-v1";
+  const TRANSFER_CONSENT_KEY = "ariadne-model-transfer-consents-v1";
+  const TRANSFER_DISCLOSURE_VERSION = "conversation-context-and-cost-v1";
   const bindings = new Map();
   const transferConsents = new Map();
   if (root.document?.createElement && root.document?.head) {
@@ -114,16 +116,53 @@
       fail("RUNTIME_SELECTION_CHANGED");
     }
   }
-  const consentFingerprint = snapshot => JSON.stringify([Settings.identity(snapshot), snapshot.execution_settings?.selection_revision]);
+  const consentFingerprint = snapshot => JSON.stringify([TRANSFER_DISCLOSURE_VERSION, Settings.identity(snapshot)]);
+  function consentStore(storage = root.localStorage) {
+    try {
+      const value = read(TRANSFER_CONSENT_KEY, storage);
+      return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    } catch (_error) { return {}; }
+  }
+  function rememberedConsent(operation, scope, fingerprint, storage = root.localStorage) {
+    const values = consentStore(storage)[`${operation}:${scope}`];
+    return Array.isArray(values) && values.includes(fingerprint);
+  }
+  function updateRememberedConsent(operation, scope, fingerprint, accepted, storage = root.localStorage) {
+    if (!storage || !fingerprint) return;
+    const state = consentStore(storage), key = `${operation}:${scope}`;
+    const values = new Set(Array.isArray(state[key]) ? state[key] : []);
+    if (accepted) values.add(fingerprint); else values.delete(fingerprint);
+    if (values.size) state[key] = [...values].slice(-12); else delete state[key];
+    storage.setItem(TRANSFER_CONSENT_KEY, JSON.stringify(state));
+  }
+  function syncTransferConsent(operation, checkbox, storage = root.localStorage) {
+    const scope = scopeFor(operation), entry = transferConsents.get(`${operation}:${scope}`);
+    if (!entry || entry.checkbox !== checkbox) return false;
+    const runtime = resolve(operation, scope, storage);
+    if (runtime.mode !== "model" || !runtime.execution_settings) {
+      checkbox.checked = false; entry.fingerprint = null; return false;
+    }
+    const fingerprint = consentFingerprint(runtime);
+    const accepted = rememberedConsent(operation, scope, fingerprint, storage);
+    checkbox.checked = accepted;
+    entry.fingerprint = accepted ? fingerprint : null;
+    checkbox.setCustomValidity("");
+    return accepted;
+  }
   function bindTransferConsent(operation, checkbox) {
     // A visible, explicit checkbox replaces the generic confirmation for this
-    // scope only. Keep consent in page memory, tied to the chosen model/settings.
+    // scope. Remember an accepted disclosure for the same browser origin and
+    // exact model/settings identity; a different recipient or settings revision
+    // remains unchecked until the Human accepts it.
     const scope = scopeFor(operation), entry = { checkbox, fingerprint: null };
     transferConsents.set(`${operation}:${scope}`, entry);
-    checkbox.checked = false;
+    syncTransferConsent(operation, checkbox);
     checkbox.addEventListener("change", () => {
       checkbox.setCustomValidity("");
-      entry.fingerprint = checkbox.checked ? consentFingerprint(resolve(operation, scope)) : null;
+      const runtime = resolve(operation, scope);
+      const fingerprint = runtime.mode === "model" && runtime.execution_settings ? consentFingerprint(runtime) : null;
+      entry.fingerprint = checkbox.checked ? fingerprint : null;
+      updateRememberedConsent(operation, scope, fingerprint, checkbox.checked);
     });
   }
   async function beforeDispatch(snapshot, operation) {
@@ -148,5 +187,5 @@
     const raw = read(CURRENT), old = read(LEGACY)?.[operation];
     return old && old.provider === homepage().provider && old.model !== raw?.model;
   }
-  return Object.freeze({ KEY, errorCopy, bind, bindings, scopeFor, homepage, eligibleModels, resolve, version, update, assertCurrent, beforeDispatch, bindTransferConsent, hasOverride, legacyDifference });
+  return Object.freeze({ KEY, TRANSFER_CONSENT_KEY, errorCopy, bind, bindings, scopeFor, homepage, eligibleModels, resolve, version, update, assertCurrent, beforeDispatch, bindTransferConsent, syncTransferConsent, hasOverride, legacyDifference });
 }));

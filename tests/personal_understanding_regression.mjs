@@ -5,6 +5,7 @@ const Truth = require("../public/truth-persistence-domain.js");
 const Memory = require("../public/personal-memory-domain.js");
 const Context = require("../public/personal-context-domain.js");
 const Candidate = require("../public/job-candidate-context-domain.js");
+const CandidateCards = require("../public/personal-candidate-card-domain.js");
 const Understanding = require("../public/personal-understanding-domain.js");
 
 function databaseFor(input = {}) {
@@ -21,6 +22,7 @@ function databaseFor(input = {}) {
         abort() { aborted = true; clearTimeout(timer); queueMicrotask(() => tx.onabort?.()); },
         objectStore(name) {
           return {
+            get(key) { const request = {}; count++; queueMicrotask(() => { request.result = pending.get(name).get(key); request.onsuccess?.(); count--; schedule(); }); return request; },
             getAll() { const request = {}; count++; queueMicrotask(() => { request.result = [...pending.get(name).values()].map((entry) => structuredClone(entry)); request.onsuccess?.(); count--; schedule(); }); return request; },
             add(entry) { if (pending.get(name).has(entry[specs.get(name)])) { tx.error = Object.assign(new Error("duplicate"), { name: "ConstraintError" }); tx.abort(); return; } pending.get(name).set(entry[specs.get(name)], structuredClone(entry)); schedule(); },
             put(entry) { pending.get(name).set(entry[specs.get(name)], structuredClone(entry)); schedule(); },
@@ -49,7 +51,7 @@ if (process.argv.includes("--request")) {
 assert.throws(() => Understanding.runtimeSnapshot({ getItem: () => JSON.stringify({ mode: "local" }) }), /runtime_capability/);
 assert.throws(() => Understanding.requestFor("DISCUSS", {}, "x", runtime, false), /CONSENT_REQUIRED/);
 const calls = [];
-let discussionOutput = { message: "这是可审阅的补充，确认保存后才会用于之后的分析。", proposals: [] };
+let discussionOutput = { message: "这是可审阅的补充，确认保存后才会用于之后的分析。", proposals: [], card_proposals: [] };
 async function stub(request) {
   calls.push(structuredClone(request));
   let output;
@@ -142,6 +144,40 @@ await assert.rejects(Memory.decide(db, concurrent.proposal_id, "SAVE"), /evidenc
 assert(!(await Candidate.buildSnapshotFromDatabase(db)).provider_view.confirmed.some((entry) => entry.memory_kind === "CORRECTION"), "a memory grounded in changed evidence must become inactive until re-reviewed");
 assert.throws(() => Memory.createProposal({ ...correction, human_quote: "not actually said" }, { human_message: correction.text, origin: {}, evidence }), /quote_not_in_user_message/);
 assert.throws(() => Memory.createProposal({ ...correction, related_refs: ["invented-evidence"] }, { human_message: correction.text, origin: {}, evidence }), /evidence_invalid/);
+
+const cardDb = databaseFor();
+const cardStatement = "请把 Ariadne 新增为项目资料卡；这是我负责产品设计和实现的个人项目。";
+discussionOutput = { message: "我已整理出一张待审阅的项目资料卡。", proposals: [], card_proposals: [{
+  operation: "CREATE", target_candidate_ref: null, item_type: "PROJECT", category: "个人项目", title: "Ariadne", subtitle: null, time: null,
+  summary: "帮助理解个人资料与目标职位。", ownership: "产品设计和实现", facts: [{ label: "项目性质", value: "个人项目" }], uncertainties: [],
+  reason: "用户明确要求新增项目资料卡。", source_quotes: [cardStatement], related_refs: [],
+}] };
+const cardTurn = await Understanding.discuss(cardDb, { ...options, human_message: cardStatement });
+assert.equal(cardTurn.card_proposals.length, 1);
+assert.equal(cardDb.data.get("candidate_context_revisions").size, 0, "model card proposal must remain non-authoritative before Human Save");
+assert.equal(CandidateCards.pending([...cardDb.data.get("context_proposals").values()]).length, 1);
+const cardProposal = cardTurn.card_proposals[0];
+const cardItem = cardProposal.payload.items[0];
+await CandidateCards.decide(cardDb, cardProposal.proposal_id, "SAVE", { ...cardItem, facts: cardItem.facts });
+const cardSnapshot = await Candidate.buildSnapshotFromDatabase(cardDb);
+assert(cardSnapshot.provider_view.confirmed.some((entry) => entry.item_type === "PROJECT" && entry.title === "Ariadne"));
+assert.equal(CandidateCards.pending([...cardDb.data.get("context_proposals").values()]).length, 0);
+const savedSource = [...cardDb.data.get("source_documents").values()].find((entry) => entry.contract_id === "ariadne-source-document-v1");
+assert.equal(savedSource.provenance.captured_via, "PERSONAL_UNDERSTANDING_CONVERSATION");
+const updateStatement = "把 Ariadne 项目卡的负责内容改为产品定义、交互设计和核心实现。";
+discussionOutput = { message: "我已生成待审阅的资料卡修改。", proposals: [], card_proposals: [{
+  operation: "UPDATE", target_candidate_ref: "confirmed-candidate-1", item_type: "PROJECT", category: "个人项目", title: "Ariadne", subtitle: null, time: null,
+  summary: "帮助理解个人资料与目标职位。", ownership: "产品定义、交互设计和核心实现", facts: [{ label: "项目性质", value: "个人项目" }], uncertainties: [],
+  reason: "用户明确修改负责内容。", source_quotes: [updateStatement], related_refs: ["confirmed-candidate-1"],
+}] };
+const updateTurn = await Understanding.discuss(cardDb, { ...options, human_message: updateStatement });
+assert.equal(updateTurn.card_proposals[0].payload.operation, "UPDATE");
+const updateItem = updateTurn.card_proposals[0].payload.items[0];
+const updatedOutcome = await CandidateCards.decide(cardDb, updateTurn.card_proposals[0].proposal_id, "SAVE", { ...updateItem, facts: updateItem.facts });
+assert.equal(updatedOutcome.revision.version, 2);
+assert.equal(updatedOutcome.revision.payload.items[0].ownership, "产品定义、交互设计和核心实现");
+assert.equal(cardDb.data.get("candidate_context_revisions").size, 2, "card update appends a revision and preserves the original");
+discussionOutput = { message: "这是可审阅的补充，确认保存后才会用于之后的分析。", proposals: [], card_proposals: [] };
 const forget = Memory.createProposal({ ...rawChange, operation: "RETRACT", target_memory_ref: "memory-current" }, { ...proposalOptions, memories: [{ ...updated.revision, ref: "memory-current" }] });
 await Memory.write(db, "personal_memory_proposals", forget); await Memory.decide(db, forget.proposal_id, "SAVE");
 assert(!(await Candidate.buildSnapshotFromDatabase(db)).provider_view.confirmed.some((entry) => entry.memory_kind === "PREFERENCE"));
@@ -210,7 +246,7 @@ assert.equal(unavailable.data.get("personal_memory_revisions").size,0);
 assert.equal([...unavailable.data.get("personal_conversation_turns").values()][0].status,"FAILED");
 const delivered = {kind:"PDF",title:"合成介绍文件",body:"来自本轮对话的草稿内容。",nodes:[],edges:[]};
 const fileDb = databaseFor();
-discussionOutput = {message:"文件如下。",proposals:[]};
+discussionOutput = {message:"文件如下。",proposals:[],card_proposals:[]};
 const fileTurn = await Understanding.discuss(fileDb,{...options,human_message:"制作介绍文件",call:async request=>({...await stub(request),deliverable:delivered,delivery_version:"ariadne-conversation-delivery-v1"})});
 assert.deepEqual(fileTurn.turn.output.deliverable,delivered);
 assert.deepEqual([...fileDb.data.get("personal_conversation_turns").values()][0].output.deliverable,delivered);

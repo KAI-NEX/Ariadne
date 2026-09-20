@@ -32,7 +32,7 @@ def provider(delivery, malformed_domain=False):
         calls.append(payload)
         assert payload["model"] == request["runtime_snapshot"]["model"]
         assert "deliverable" in payload["tools"][0]["function"]["parameters"]["properties"]
-        output = {"message": "文件将在下方生成。", "proposals": [], "deliverable": delivery}
+        output = {"message": "文件将在下方生成。", "proposals": [], "card_proposals": [], "deliverable": delivery}
         if malformed_domain: output["proposals"] = "invalid"
         return 200, {"model": payload["model"], "choices": [{"finish_reason": "tool_calls", "message": {"tool_calls": [{"function": {"name": "deliver_personal_understanding", "arguments": json.dumps(output)}}]}}]}
     return call

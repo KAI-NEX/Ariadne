@@ -23,7 +23,7 @@ assert "credential_ref" not in json.dumps(outbound)
 assert "runtime_snapshot" not in json.dumps(outbound)
 assert outbound["tools"][0]["function"]["strict"] is True
 proposal = dict(operation="ADD", kind="PREFERENCE", text="更喜欢远程协作。", reason="用户明确陈述了偏好。", human_quote="我更喜欢远程协作。", target_memory_ref=None, related_refs=[])
-output = {"message": "请查看并确认这条补充。", "proposals": [proposal]}
+output = {"message": "请查看并确认这条补充。", "proposals": [proposal], "card_proposals": []}
 validate_output(output, request)
 
 
@@ -81,6 +81,14 @@ invalid_output = copy.deepcopy(output); invalid_output["proposals"][0]["related_
 expect("PERSONAL_GROUNDING_INVALID", lambda: validate_output(invalid_output, request))
 invalid_output = copy.deepcopy(output); invalid_output["proposals"][0].update(operation="REPLACE", target_memory_ref="invented-memory")
 expect("PERSONAL_TARGET_INVALID", lambda: validate_output(invalid_output, request))
+card = {"operation": "CREATE", "target_candidate_ref": None, "item_type": "PROJECT", "category": None,
+        "title": "Ariadne", "subtitle": None, "time": None, "summary": "个人职业资料理解工具。", "ownership": "产品与实现",
+        "facts": [{"label": "项目", "value": "Ariadne"}], "uncertainties": [], "reason": "用户明确要求建立项目资料卡。",
+        "source_quotes": ["我更喜欢远程协作。"], "related_refs": []}
+card_output = {"message": "已生成待审阅资料卡。", "proposals": [], "card_proposals": [card]}
+validate_output(card_output, request)
+invalid_card = copy.deepcopy(card_output); invalid_card["card_proposals"][0]["source_quotes"] = ["并不存在的用户原话"]
+expect("PERSONAL_CARD_QUOTE_INVALID", lambda: validate_output(invalid_card, request))
 
 distill = copy.deepcopy(request); distill.update(phase="DISTILL", human_message="", context={"evidence": [{"ref": "fragment-1", "text": "Synthetic research"}, {"ref": "fragment-2", "text": "Synthetic portfolio"}]})
 validate_request(distill)

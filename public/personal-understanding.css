@@ -33,7 +33,10 @@
 .personal-proposal h3 { font-size: 14px; margin: 0 0 10px; }
 .personal-proposal blockquote { font-size: 12px; line-height: 1.8; margin: 12px 0; padding-left: 12px; border-left: 2px solid #b6c2d4; white-space: pre-wrap; overflow-wrap: anywhere; }
 .personal-proposal label { display: block; font-size: 12px; color: #5e687a; }
-.personal-proposal textarea { display: block; width: 100%; box-sizing: border-box; min-height: 90px; resize: vertical; border: 1px solid #d5dce7; border-radius: 9px; background: white; font: inherit; font-size: 13px; line-height: 1.75; color: var(--ink); padding: 10px; margin-top: 7px; }
+.personal-proposal :is(input[type="text"], select, textarea) { display: block; width: 100%; box-sizing: border-box; border: 1px solid var(--vi-line); border-radius: 9px; background: var(--vi-surface); font: inherit; font-size: 13px; line-height: 1.75; color: var(--ink); padding: 10px; margin-top: 7px; }
+.personal-proposal textarea { min-height: 90px; resize: vertical; }
+.personal-card-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.personal-card-fields .personal-card-wide { grid-column: 1 / -1; }
 .personal-proposal-actions { display: flex; gap: 12px; margin-top: 12px; }
 .personal-proposal-actions .v1-edit-text-action { padding: 9px 14px; font-size: var(--vi-text-caption); }
 .personal-proposal-actions [data-memory-reject] { color: var(--vi-muted); }
@@ -47,6 +50,8 @@
   .personal-dialogue.v1-conversation-pane { border-left: 0; border-top: 1px solid #e3e7ee; padding: 24px 0 0; }
   .personal-knowledge { max-height: none; }
   .personal-dialogue .v1-conversation-thread { max-height: 60vh; }
+  .personal-card-fields { grid-template-columns: minmax(0, 1fr); }
+  .personal-card-fields .personal-card-wide { grid-column: auto; }
 }
 
 .v1-conversation-message:has(.personal-memory-bridge) { flex-direction: column; align-items: flex-start; }

@@ -69,7 +69,7 @@
   el("job-overview-consent").addEventListener("change", runtime);
   el("job-overview-older").addEventListener("click", () => { visible += 20; render(); });
   document.querySelectorAll("[data-job-overview-prompt]").forEach((button) => button.addEventListener("click", () => { el("job-overview-message").value = button.dataset.jobOverviewPrompt; el("job-overview-message").focus(); }));
-  Gate.subscribe(() => { el("job-overview-consent").checked = false; runtime(); });
+  Gate.subscribe(() => { window.AriadneRuntimeSelection.syncTransferConsent("job_overview", el("job-overview-consent")); runtime(); });
   window.addEventListener("focus", () => { if (!busy) load().catch(() => status("暂时无法读取职位，请重试。", true)); });
   try { await load(); } catch (_error) { status("暂时无法读取职位，请重试。", true); }
 }());
