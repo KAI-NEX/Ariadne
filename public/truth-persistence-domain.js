@@ -10,7 +10,7 @@
 
   const CONTRACT_ID = "ariadne-truth-persistence-v1";
   const DB_NAME = "job-radar-local-first-v1";
-  const DB_VERSION = 17;
+  const DB_VERSION = 18;
   const STORE_SPECS = Object.freeze([
     Object.freeze({ name: "source_documents", keyPath: "source_document_id", lifecycle: "reused" }),
     Object.freeze({ name: "runtime_snapshots", keyPath: "snapshot_id", lifecycle: "new" }),
@@ -24,6 +24,7 @@
     Object.freeze({ name: "candidate_context_revisions", keyPath: "revision_id", lifecycle: "new" }),
     Object.freeze({ name: "candidate_context_lifecycle", keyPath: "lifecycle_id", lifecycle: "new" }),
     Object.freeze({ name: "job_context_revisions", keyPath: "revision_id", lifecycle: "new" }),
+    Object.freeze({ name: "job_context_lifecycle", keyPath: "lifecycle_id", lifecycle: "new" }),
     Object.freeze({ name: "conversation_sessions", keyPath: "conversation_id", lifecycle: "reused" }),
     Object.freeze({ name: "conversation_messages", keyPath: "message_id", lifecycle: "reused" }),
     Object.freeze({ name: "conversation_turn_executions", keyPath: "execution_id", lifecycle: "new" }),
@@ -65,6 +66,7 @@
     "candidate_context_revisions",
     "candidate_context_lifecycle",
     "job_context_revisions",
+    "job_context_lifecycle",
     "conversation_messages",
     "candidate_actions",
     "job_analyses",
@@ -556,6 +558,24 @@
     });
   }
 
+  function validateJobContextLifecycle(record) {
+    const value = prepare(record, FIELDS.lifecycle.filter((field) => field !== "item_id"), "job_context_lifecycle");
+    if (value.contract_id !== "ariadne-job-context-lifecycle-v1") throw new TruthPersistenceError("job_context_lifecycle_contract_invalid");
+    if (value.state !== "REMOVED") throw new TruthPersistenceError("job_context_lifecycle_state_invalid");
+    if (value.reason !== "USER_REMOVED") throw new TruthPersistenceError("job_context_lifecycle_reason_invalid");
+    if (value.authority !== AUTHORITY.lifecycle) throw new TruthPersistenceError("job_context_lifecycle_authority_invalid");
+    return Object.freeze({
+      contract_id: value.contract_id,
+      lifecycle_id: requiredString(value.lifecycle_id, "job_context_lifecycle_id_invalid"),
+      context_id: requiredString(value.context_id, "job_context_lifecycle_context_id_invalid"),
+      state: value.state,
+      removed_from_revision_id: requiredString(value.removed_from_revision_id, "job_context_lifecycle_revision_id_invalid"),
+      removed_at: validIso(value.removed_at, "job_context_lifecycle_removed_at_invalid"),
+      reason: value.reason,
+      authority: value.authority,
+    });
+  }
+
   function validateRuntimeSnapshotRecord(snapshot) {
     if (!RuntimeExecution || typeof RuntimeExecution.validateRuntimeSnapshot !== "function") throw new TruthPersistenceError("runtime_snapshot_validator_unavailable");
     try { return RuntimeExecution.validateRuntimeSnapshot(snapshot); }
@@ -684,6 +704,7 @@
       candidate_context_revisions: validateContextRevision,
       candidate_context_lifecycle: validateCandidateContextLifecycle,
       job_context_revisions: validateContextRevision,
+      job_context_lifecycle: validateJobContextLifecycle,
     };
     const validator = validators[storeName];
     if (!validator) throw new TruthPersistenceError("persistence_store_unsupported");
@@ -943,6 +964,7 @@
     validateCandidateWorkspaceAcceptance,
     validateContextRevision,
     validateCandidateContextLifecycle,
+    validateJobContextLifecycle,
     validateRuntimeSnapshotRecord,
     validateExecutionChain,
     applyReviewDecision,

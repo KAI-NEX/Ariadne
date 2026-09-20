@@ -44,7 +44,7 @@ if(process.argv.includes("--request")){console.log(JSON.stringify(Domain.request
 if(process.argv.includes("--seed")){console.log(JSON.stringify(input));process.exit(0);}
 assert.equal(snapshot.records.length,3); assert.equal(snapshot.working_count,1);
 assert.equal((await Domain.buildSnapshot({...input, candidate_context_revisions:[{private:"Candidate must stay out"}],personal_memory_revisions:[{text:"private memory"}],demo_job_contexts:[{title:"demo must stay out"}]})).fingerprint,snapshot.fingerprint);
-assert.deepEqual(Domain.INPUT_STORES,["job_context_revisions","context_proposals","context_review_decisions","source_documents"]);
+assert.deepEqual(Domain.INPUT_STORES,["job_context_lifecycle","job_context_revisions","context_proposals","context_review_decisions","source_documents"]);
 assert.throws(()=>Domain.runtimeSnapshot({getItem:()=>JSON.stringify({mode:"local"})}),/runtime_capability/);
 assert.throws(()=>Domain.requestFor("DISCUSS",{},"x",runtime,false),/CONSENT_REQUIRED/);
 const next={...a,revision_id:"job-revision-new",version:2,previous_revision_id:a.revision_id,payload:{...a.payload,title:"更新后的研究岗位"}};
@@ -125,3 +125,27 @@ assert.deepEqual(fileTurn.output.deliverable,delivered);
 assert.deepEqual(db.data.get("job_overview_turns").get(fileTurn.turn_id).output.deliverable,delivered);
 assert.equal(JSON.stringify([...db.data.get("job_context_revisions").values()]),beforeDelivery);
 console.log(JSON.stringify({job_only_scope:"pass",versions_and_review:"pass",incremental_cache:"pass",read_only_and_failure:"pass",bounded_context:"pass",provider_calls:0}));
+
+// Removing a confirmed card retains immutable history and changes current scope/cache.
+const removalDb = databaseFor({...input, context_proposals: [{...proposal(1), proposal_id: a.confirmed_from_proposal_id}, pending]});
+const originalRevisions = structuredClone([...removalDb.data.get("job_context_revisions").values()]);
+const originalSources = structuredClone([...removalDb.data.get("source_documents").values()]);
+const removal = await Job.persistRemoval(removalDb, a);
+assert.equal(Truth.validateForStore("job_context_lifecycle", removal).context_id, a.context_id);
+assert.throws(() => Truth.validateJobContextLifecycle({...removal, authority: "MODEL"}));
+assert.throws(() => Truth.validateJobContextLifecycle({...removal, item_id: "foreign"}));
+assert.deepEqual([...removalDb.data.get("job_context_revisions").values()], originalRevisions);
+assert.deepEqual([...removalDb.data.get("source_documents").values()], originalSources);
+assert.deepEqual(Job.activeRevisions(originalRevisions, [removal]).map(r => r.context_id), [b.context_id]);
+const afterRemoval = await Domain.snapshotFromDatabase(removalDb);
+assert.equal(afterRemoval.confirmed_count, 1);
+assert.notEqual(afterRemoval.fingerprint, snapshot.fingerprint);
+assert(!afterRemoval.records.some(r => r.context_id === a.context_id));
+assert.equal(afterRemoval.working_count, 1, "removed accepted proposal must not return as Working");
+await assert.rejects(Job.persistRemoval(removalDb, a), /job_context_already_removed/);
+const conflictDb = databaseFor({job_context_revisions: [a, {...a, revision_id: "newer-revision", version: a.version + 1}]});
+await assert.rejects(Job.persistRemoval(conflictDb, a), /context_version_conflict/);
+assert.equal(conflictDb.data.get("job_context_lifecycle").size, 0);
+const failureDb = {transaction() { throw Error("storage unavailable"); }};
+await assert.rejects(Job.persistRemoval(failureDb, b), /storage unavailable/);
+console.log("job card removal: history/source preservation, current scope, duplicate/conflict and failure PASS");

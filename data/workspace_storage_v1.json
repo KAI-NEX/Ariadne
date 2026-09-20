@@ -30,6 +30,7 @@
       "candidate_context_revisions": "revision_id",
       "candidate_context_lifecycle": "lifecycle_id",
       "job_context_revisions": "revision_id",
+      "job_context_lifecycle": "lifecycle_id",
       "conversation_sessions": "conversation_id",
       "conversation_messages": "message_id",
       "conversation_turn_executions": "execution_id",

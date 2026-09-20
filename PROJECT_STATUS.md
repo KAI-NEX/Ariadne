@@ -1,5 +1,12 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-20 — 个人与职位资料库编辑删除（COMPLETE；本地验收，未发布）
+
+- 两个资料库在「了解我」「了解职位概况」右侧新增「编辑 / 完成」，编辑态卡片右上角显示「删除」。复用文字按钮、danger token 与共用确认 dialog；取消/Escape 不写入，忙态防重复，失败保留卡片并允许重试，持久化成功但重绘失败明确要求刷新。
+- Candidate 复用逐卡片 lifecycle；已确认 Job 新增仅追加的 `job_context_lifecycle`，核对当前版本并拒绝重复删除。原始材料、确认版本与对话/投递历史保留；资料库、工作空间计数和职位概况使用当前有效 Job 范围，旧概况指纹失效，已移除的确认 proposal 不回流 Working。契约版本 18，网页 Markdown 旧库增量补 store，不重新迁移或覆盖既有内容。
+- 16 项相关 Node 回归、3 项 Python 回归（含 VI 负向检查）、VI 与 diff 检查通过。egolite 在隔离本机服务/合成资料验证 1440×900 和 390×844、取消与焦点恢复、删除后刷新、投递状态恢复、连续删除至空态、减少动效、注入存储失败重试及保存成功/重绘失败分支；真实浏览器另验证旧 Markdown 库升级、原历史字节保留、移除记录重开与失败回滚。没有真实模型调用。
+- 范围与契约见 [资料库卡片编辑与删除](docs/current/CARD_LIBRARY_EDITING.md)；截图和合成数据在 `.cache/library-edit-20260920/`。本次仅本地代码和验收，不发布网站、不重建安装包、不 push；用户实际资料及其他任务未提交内容保留。
+
 ## 2026-09-19 — 传播入口与文字上手说明（COMPLETE；已上线）
 
 - GitHub About 已填入 `https://ariadne.kai-nex.com/`，简介改为直接说明资料/目标岗位理解、来源依据、人工审阅及 Web/macOS 使用；原有 Topics 保留。GitHub Social preview 已上传现有双手 Logo 与真实空工作区组成的 1280×640 封面，并核对公开仓库 og:image 已采用自定义图片。

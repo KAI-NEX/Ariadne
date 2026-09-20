@@ -7,7 +7,7 @@
   if (typeof module === "object" && module.exports) module.exports = api; else root.AriadneJobOverview = api;
 }(globalThis, function create(Contract, Truth, Job, Context, Runtime, Gate) {
   const STORES = ["job_overview_fragments", "job_overview_snapshots", "job_overview_turns"];
-  const INPUT_STORES = ["job_context_revisions", "context_proposals", "context_review_decisions", "source_documents"];
+  const INPUT_STORES = ["job_context_lifecycle", "job_context_revisions", "context_proposals", "context_review_decisions", "source_documents"];
   const id = (prefix) => `${prefix}-${crypto.randomUUID()}`, now = () => new Date().toISOString();
   const clone = (value) => structuredClone(value);
   const Delivery = globalThis.AriadneConversationOutput || (typeof module === "object" ? require("./conversation-output.js") : null);
@@ -28,14 +28,14 @@
       source_availability: sourceIds.length && sourceIds.every((sourceId) => sources.some((entry) => entry.source_document_id === sourceId)) ? "SOURCE_SAVED" : "SOURCE_UNAVAILABLE" };
   }
   async function buildSnapshot(input) {
-    const sources = input.source_documents || [], revisions = Job.latestRevisions(input.job_context_revisions || []), records = [];
+    const sources = input.source_documents || [], allRevisions = Job.latestRevisions(input.job_context_revisions || []), revisions = Job.activeRevisions(allRevisions, input.job_context_lifecycle || []), records = [];
     for (const revision of revisions) {
       const checked = Truth.validateContextRevision(revision);
       records.push({ identity: `job:${checked.context_id}`, context_id: checked.context_id, version: checked.version, revision_id: checked.revision_id,
         semantic: semantic(checked.payload, "CONFIRMED", checked.provenance.source_document_ids, sources) });
     }
     const decided = new Set((input.context_review_decisions || []).filter((entry) => entry.authority === Truth.AUTHORITY.review).map((entry) => entry.proposal_id));
-    const accepted = new Set(revisions.map((entry) => entry.confirmed_from_proposal_id)), pending = new Map();
+    const accepted = new Set(allRevisions.map((entry) => entry.confirmed_from_proposal_id)), pending = new Map();
     for (const entry of input.context_proposals || []) {
       if (entry.proposal_type !== "JOB_CONTEXT" || entry.authority !== Truth.AUTHORITY.proposal || entry.status !== "AWAITING_REVIEW" || decided.has(entry.proposal_id) || accepted.has(entry.proposal_id)) continue;
       const checked = Truth.validateProposal(entry);

@@ -216,6 +216,39 @@
     return [...heads.values()];
   }
 
+  function activeRevisions(revisions, lifecycle = []) {
+    const removed = new Set(lifecycle.map(Truth.validateJobContextLifecycle).map((entry) => entry.context_id));
+    return latestRevisions(revisions).filter((entry) => !removed.has(entry.context_id));
+  }
+
+  function persistRemoval(database, currentRevision) {
+    const current = Truth.validateContextRevision(currentRevision);
+    if (current.context_type !== "JOB") throw new Error("job_context_removal_type_invalid");
+    const removal = Truth.validateJobContextLifecycle({
+      contract_id: "ariadne-job-context-lifecycle-v1", lifecycle_id: `job-removal-${crypto.randomUUID()}`,
+      context_id: current.context_id, state: "REMOVED", removed_from_revision_id: current.revision_id,
+      removed_at: new Date().toISOString(), reason: "USER_REMOVED", authority: Truth.AUTHORITY.lifecycle,
+    });
+    return new Promise((resolve, reject) => {
+      const tx = database.transaction(["job_context_revisions", "job_context_lifecycle"], "readwrite");
+      let revisions, lifecycle, failure;
+      const write = () => {
+        if (!revisions || !lifecycle) return;
+        const head = latestRevision(revisions, current.context_id);
+        if (!head || head.revision_id !== current.revision_id || head.version !== current.version) failure = new Error("context_version_conflict");
+        else if (!activeRevisions(revisions, lifecycle).some((entry) => entry.context_id === current.context_id)) failure = new Error("job_context_already_removed");
+        if (failure) { tx.abort(); return; }
+        tx.objectStore("job_context_lifecycle").add(removal);
+      };
+      const revisionRequest = tx.objectStore("job_context_revisions").getAll();
+      revisionRequest.onsuccess = () => { revisions = revisionRequest.result; write(); };
+      const lifecycleRequest = tx.objectStore("job_context_lifecycle").getAll();
+      lifecycleRequest.onsuccess = () => { lifecycle = lifecycleRequest.result; write(); };
+      tx.oncomplete = () => resolve(removal);
+      tx.onerror = tx.onabort = () => reject(failure || tx.error || new Error("job_context_removal_failed"));
+    });
+  }
+
   function acceptedPayload(proposal, edits = {}) {
     const payload = clone(validateJobPayload(proposal.payload));
     for (const field of EDITABLE_FIELDS) {
@@ -509,7 +542,7 @@
   return Object.freeze({
     PAYLOAD_CONTRACT, CHANGE_PROPOSAL_CONTRACT, CONTENT_ORIGINS, EDITABLE_FIELDS, JobContextError,
     validateRequirement, validateJobPayload, normalizedLines, deriveJobPayload, proposalFor, structuringRunFor,
-    contextIdForProposal, latestRevision, latestRevisions, acceptedPayload, workingPayload, workingSubjectFor, reviewOutcome, getAll, persistReview,
+    contextIdForProposal, latestRevision, latestRevisions, activeRevisions, persistRemoval, acceptedPayload, workingPayload, workingSubjectFor, reviewOutcome, getAll, persistReview,
     directEditProposal, persistDirectEdit,
     validateChangeProposal, createChangeProposal, persistChangeProposal, revisionFromChangeProposal,
     changeDecision, persistAcceptedChange, persistRejectedChange, recordForUi,

@@ -52,7 +52,7 @@ from src.truth_persistence import (  # noqa: E402
 
 assert CONTRACT_ID == SCHEMA["x-contract-id"]
 assert DB_NAME == SCHEMA["x-indexeddb-name"]
-assert DB_VERSION == SCHEMA["x-indexeddb-version"] == 17
+assert DB_VERSION == SCHEMA["x-indexeddb-version"] == 18
 assert STORE_SPECS == tuple((item["name"], item["keyPath"], item["lifecycle"]) for item in SCHEMA["x-stores"])
 assert NEW_STORE_SPECS == tuple(item for item in STORE_SPECS if item[2] == "new")
 assert SOURCE_TYPES == tuple(SCHEMA["$defs"]["sourceDocument"]["properties"]["source_type"]["enum"])
@@ -509,3 +509,15 @@ assert proposal["proposal_id"] == "proposal-candidate-1"
 source_text = (ROOT / "src" / "truth_persistence.py").read_text(encoding="utf-8")
 assert "requests." not in source_text and "urlopen" not in source_text
 print("truth_persistence_python_contract=pass")
+
+job_removal = {
+    "contract_id": "ariadne-job-context-lifecycle-v1", "lifecycle_id": "job-removal-test",
+    "context_id": "job-context-1", "state": "REMOVED", "removed_from_revision_id": "job-context-1-v1",
+    "removed_at": "2026-09-20T00:00:00Z", "reason": "USER_REMOVED", "authority": "AUTHORITATIVE_USER_DECISION",
+}
+assert validate_for_store("job_context_lifecycle", job_removal) == job_removal
+try:
+    validate_for_store("job_context_lifecycle", {**job_removal, "authority": "MODEL"})
+    raise AssertionError("model cannot authorize card removal")
+except TruthPersistenceError:
+    pass

@@ -7,7 +7,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ariadne · 职位描述</title>
-    <link rel="stylesheet" href="/styles.css?v=lifecycle-final-v1&amp;vi=1&amp;top-edit=1&amp;library-spacing=1">
+    <link rel="stylesheet" href="/styles.css?v=lifecycle-final-v1&amp;vi=1&amp;top-edit=1&amp;library-spacing=1&amp;library-edit=1">
     <link rel="stylesheet" href="/understanding-chat.css?v=1">
     <link rel="stylesheet" href="/job-application.css?v=5">
   </head>
@@ -15,7 +15,10 @@
     <main class="v1-page-shell v1-library-shell">
       <header class="v1-topbar v1-library-topbar">
         <a class="v1-back" href="/workspace.html" aria-label="返回工作空间"></a>
-        <a class="v1-wordmark understanding-title-entry" href="/job-overview.html">了解职位概况</a>
+        <div class="v1-library-title-actions">
+          <a class="v1-wordmark understanding-title-entry" href="/job-overview.html">了解职位概况</a>
+          <button id="library-edit-toggle" class="v1-detail-edit-button" type="button" aria-pressed="false" aria-controls="job-card-grid">编辑</button>
+        </div>
         <div class="v1-top-actions">
           <details class="v1-menu">
             <summary aria-label="打开导航菜单"><span></span><span></span></summary>
@@ -49,6 +52,6 @@
     <script src="/job-stage-menu.js?v=1"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33&amp;storage=1"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>
-    <script src="/v1-pages.js?v=job-intelligence-v1&amp;job-stage-chip=5&amp;storage=2"></script>
+    <script src="/v1-pages.js?v=job-intelligence-v1&amp;job-stage-chip=5&amp;storage=2&amp;library-edit=1"></script>
   </body>
 </html>

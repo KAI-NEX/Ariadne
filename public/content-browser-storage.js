@@ -3,6 +3,25 @@
   const ready = new Map();
   const Content = root.AriadneContentDocument;
 
+  async function openSchemaDatabase(name, schema, version) {
+    const db = await new Promise((resolve, reject) => {
+      const request = version ? indexedDB.open(`ariadne-markdown::${name}`, version) : indexedDB.open(`ariadne-markdown::${name}`);
+      request.onupgradeneeded = () => {
+        for (const [store, keyPath] of Object.entries(schema)) {
+          if (!request.result.objectStoreNames.contains(store)) request.result.createObjectStore(store, { keyPath });
+        }
+        if (!request.result.objectStoreNames.contains("__workspace")) request.result.createObjectStore("__workspace", { keyPath: "id" });
+      };
+      request.onsuccess = () => { request.result.onversionchange = () => request.result.close(); resolve(request.result); };
+      request.onerror = () => reject(request.error);
+      request.onblocked = () => reject(Error("WORKSPACE_MIGRATION_BLOCKED"));
+    });
+    if (Object.keys(schema).every(store => db.objectStoreNames.contains(store))) return db;
+    const nextVersion = db.version + 1;
+    db.close();
+    return openSchemaDatabase(name, schema, nextVersion);
+  }
+
   async function initialize(name, nativeOpen) {
     const original = await nativeOpen();
     const schema = root.AriadneWorkspaceStorageContract?.databases?.[name], snapshot = {};
@@ -20,15 +39,7 @@
       });
 
     } finally { original.close(); }
-    const db = await new Promise((resolve, reject) => {
-      const open = indexedDB.open(`ariadne-markdown::${name}`, 1);
-      open.onupgradeneeded = () => {
-        for (const [store, keyPath] of Object.entries(schema)) open.result.createObjectStore(store, { keyPath });
-        open.result.createObjectStore("__workspace", { keyPath: "id" });
-      };
-      open.onsuccess = () => { open.result.onversionchange = () => open.result.close(); resolve(open.result); };
-      open.onerror = () => reject(open.error); open.onblocked = () => reject(Error("WORKSPACE_MIGRATION_BLOCKED"));
-    });
+    const db = await openSchemaDatabase(name, schema);
     try {
       await new Promise((resolve, reject) => {
         const tx = db.transaction([...Object.keys(schema), "__workspace"], "readwrite");
@@ -96,11 +107,7 @@
       ready.set(name, (navigator.locks ? navigator.locks.request(`ariadne-markdown:${name}`, run) : run()).catch(error => { ready.delete(name); throw error; }));
     }
     await ready.get(name);
-    const database = await new Promise((resolve, reject) => {
-      const request = indexedDB.open(`ariadne-markdown::${name}`, 1);
-      request.onsuccess = () => { request.result.onversionchange = () => request.result.close(); resolve(request.result); };
-      request.onerror = () => reject(request.error);
-    });
+    const database = await openSchemaDatabase(name, root.AriadneWorkspaceStorageContract.databases[name]);
     return wrap(database);
   }
   root.AriadneContentBrowserStorage = Object.freeze({ open });

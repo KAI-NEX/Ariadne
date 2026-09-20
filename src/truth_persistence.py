@@ -580,6 +580,28 @@ def validate_candidate_context_lifecycle(record: Any) -> dict[str, Any]:
     }
 
 
+def validate_job_context_lifecycle(record: Any) -> dict[str, Any]:
+    value = _prepare(record, tuple(SCHEMA["$defs"]["jobContextLifecycle"]["required"]), "job_context_lifecycle")
+    if value["contract_id"] != "ariadne-job-context-lifecycle-v1":
+        raise TruthPersistenceError("job_context_lifecycle_contract_invalid")
+    if value["state"] != "REMOVED":
+        raise TruthPersistenceError("job_context_lifecycle_state_invalid")
+    if value["reason"] != "USER_REMOVED":
+        raise TruthPersistenceError("job_context_lifecycle_reason_invalid")
+    if value["authority"] != AUTHORITY["lifecycle"]:
+        raise TruthPersistenceError("job_context_lifecycle_authority_invalid")
+    return {
+        "contract_id": value["contract_id"],
+        "lifecycle_id": _required_string(value["lifecycle_id"], "job_context_lifecycle_id_invalid"),
+        "context_id": _required_string(value["context_id"], "job_context_lifecycle_context_id_invalid"),
+        "state": value["state"],
+        "removed_from_revision_id": _required_string(value["removed_from_revision_id"], "job_context_lifecycle_revision_id_invalid"),
+        "removed_at": _valid_iso(value["removed_at"], "job_context_lifecycle_removed_at_invalid"),
+        "reason": value["reason"],
+        "authority": value["authority"],
+    }
+
+
 def validate_runtime_snapshot_record(snapshot: RuntimeSnapshot | Mapping[str, Any]) -> dict[str, Any]:
     try:
         return validate_runtime_snapshot(snapshot).to_dict()
@@ -732,6 +754,7 @@ def validate_for_store(store_name: str, value: Any) -> dict[str, Any]:
         "candidate_context_revisions": validate_context_revision,
         "candidate_context_lifecycle": validate_candidate_context_lifecycle,
         "job_context_revisions": validate_context_revision,
+        "job_context_lifecycle": validate_job_context_lifecycle,
     }
     validator = validators.get(store_name)
     if validator is None:

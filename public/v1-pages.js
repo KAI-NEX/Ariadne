@@ -1114,6 +1114,111 @@
     return values.map((value) => String(value ?? "").trim()).filter(Boolean).join(" ");
   }
 
+  let libraryEditor = null;
+  async function removePersonalLibraryCard(item) {
+    if (item.data_class !== "CANONICAL_CONFIRMED") return LocalCandidateReview.removeLegacyContext(Demo, Demo.DEMO_STORES.candidates, item.item_id);
+    const database = await Truth.openDatabase();
+    try {
+      const revision = LocalCandidateReview.latestRevision(await LocalCandidateReview.getAll(database, "candidate_context_revisions"), item.context_id);
+      if (revision?.revision_id !== item.revision_id) throw new Error("context_version_conflict");
+      await LocalCandidateReview.persistRemoval(database, revision, item.item_id);
+    } finally { database.close(); }
+  }
+
+  async function removeJobLibraryCard(job) {
+    if (job.data_class !== "CANONICAL_CONFIRMED") return LocalJobLifecycle.removeCard(Demo, Demo.DEMO_STORES.jobs, job.job_context_id);
+    const database = await Truth.openDatabase();
+    try {
+      const revision = JobContext.latestRevision(await JobContext.getAll(database, "job_context_revisions"), job.job_context_id);
+      if (revision?.revision_id !== job.revision_id) throw new Error("context_version_conflict");
+      await JobContext.persistRemoval(database, revision);
+    } finally { database.close(); }
+  }
+
+  function createLibraryEditor(gridId, messageId, remove, render) {
+    const grid = byId(gridId), toggle = byId("library-edit-toggle"), message = byId(messageId);
+    let editing = false, busy = false, selected = null, opener = null;
+    const dialog = document.createElement("dialog");
+    dialog.className = "v1-model-consent-dialog";
+    dialog.id = "library-delete-dialog";
+    dialog.setAttribute("aria-labelledby", "library-delete-title");
+    dialog.setAttribute("aria-describedby", "library-delete-copy");
+    dialog.innerHTML = `<h2 id="library-delete-title">删除这张卡片？</h2><p id="library-delete-copy"></p><p>仅移除当前卡片，原始材料与历史记录仍然保留。</p><p class="v1-inline-message error" role="alert" data-delete-error></p><div class="v1-button-row v1-edit-actions"><button type="button" class="v1-edit-text-action" data-edit-cancel autofocus>取消</button><button type="button" class="v1-edit-text-action" data-edit-destructive>确认删除</button></div>`;
+    document.body.append(dialog);
+    const cancel = dialog.querySelector("[data-edit-cancel]"), confirm = dialog.querySelector("[data-edit-destructive]");
+    const setEditing = (value) => {
+      editing = value;
+      grid.classList.toggle("is-editing", editing);
+      toggle.textContent = editing ? "完成" : "编辑";
+      toggle.setAttribute("aria-pressed", String(editing));
+      grid.querySelectorAll(".v1-candidate-card, .v1-job-stage-select, .v1-job-source-link").forEach((link) => {
+        if (editing) link.setAttribute("tabindex", "-1"); else link.removeAttribute("tabindex");
+      });
+      grid.querySelectorAll("[data-library-delete]").forEach((button) => { button.hidden = !editing; button.disabled = busy; });
+    };
+    toggle.addEventListener("click", () => { if (!busy) { jobStageMenu?.close(); setEditing(!editing); } });
+    grid.addEventListener("click", (event) => {
+      if (editing && event.target.closest(".v1-candidate-card, .v1-job-stage-select, .v1-job-source-link")) { event.preventDefault(); event.stopPropagation(); }
+    }, true);
+    cancel.addEventListener("click", () => dialog.close());
+    dialog.addEventListener("cancel", (event) => { if (busy) event.preventDefault(); });
+    dialog.addEventListener("close", () => { if (opener?.isConnected) opener.focus(); else toggle.focus(); selected = null; });
+    confirm.addEventListener("click", async () => {
+      if (busy || !selected) return;
+      busy = true;
+      toggle.disabled = cancel.disabled = confirm.disabled = true;
+      dialog.setAttribute("aria-busy", "true");
+      confirm.textContent = "正在删除…";
+      dialog.querySelector("[data-delete-error]").textContent = "";
+      let removed = false;
+      try {
+        await remove(selected);
+        removed = true;
+        await render();
+        message.classList.remove("error");
+        message.textContent = "已删除卡片，原始材料与历史记录仍然保留。";
+        dialog.close();
+      } catch (error) {
+        if (removed) {
+          dialog.close();
+          message.classList.add("error");
+          message.textContent = "卡片已删除，但列表更新失败，请刷新页面。";
+        } else {
+          const conflict = ["context_version_conflict", "candidate_item_already_removed", "job_context_already_removed"].includes(error.message);
+          dialog.querySelector("[data-delete-error]").textContent = conflict ? "卡片已发生变化，请取消并刷新页面后重试。" : `无法删除：${personalErrorCopy(error)}`;
+        }
+      } finally {
+        busy = false;
+        toggle.disabled = cancel.disabled = confirm.disabled = false;
+        dialog.removeAttribute("aria-busy");
+        confirm.textContent = "确认删除";
+        setEditing(editing);
+      }
+    });
+    return { decorate(records) {
+      grid.querySelectorAll(".v1-candidate-card").forEach((card, index) => {
+        let wrapper = card.closest(".v1-job-tracked-card");
+        if (!wrapper) { wrapper = document.createElement("article"); card.before(wrapper); wrapper.append(card); }
+        wrapper.classList.add("v1-library-card");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "v1-detail-edit-button v1-detail-remove-button v1-library-delete";
+        button.dataset.libraryDelete = "";
+        button.textContent = "删除";
+        button.setAttribute("aria-label", `删除${records[index].title}`);
+        button.addEventListener("click", () => {
+          if (!editing || busy) return;
+          selected = records[index]; opener = button;
+          dialog.querySelector("#library-delete-copy").textContent = selected.title;
+          dialog.querySelector("[data-delete-error]").textContent = "";
+          dialog.showModal();
+        });
+        wrapper.append(button);
+      });
+      setEditing(editing);
+    } };
+  }
+
   function candidateCardMarkup(item) {
     const facts = (item.facts || []).slice(0, 4).map((fact) => `<li>${escapeHtml(fact.value)}</li>`).join("");
     const canonical = item.data_class === "CANONICAL_CONFIRMED";
@@ -1177,6 +1282,7 @@
     const items = [...canonical, ...await localizedCandidateRecords(legacy)];
     const grid = byId("candidate-card-grid");
     grid.innerHTML = personalGuideCardMarkup() + items.map(candidateCardMarkup).join("");
+    libraryEditor?.decorate(items);
     window.requestAnimationFrame(playPendingCardReturn);
   }
 
@@ -2177,6 +2283,7 @@
   }
 
   function initPersonal() {
+    libraryEditor = createLibraryEditor("candidate-card-grid", "personal-page-message", removePersonalLibraryCard, renderPersonalLibrary);
     renderPersonalLibrary().catch(showPersonalError);
   }
 
@@ -2815,7 +2922,8 @@
     const db = database || await Truth.openDatabase();
     try {
       const revisions = await JobContext.getAll(db, "job_context_revisions");
-      return JobContext.latestRevisions(revisions).map(JobContext.recordForUi);
+      const lifecycle = await JobContext.getAll(db, "job_context_lifecycle");
+      return JobContext.activeRevisions(revisions, lifecycle).map(JobContext.recordForUi);
     } finally { if (owned) db.close(); }
   }
 
@@ -2824,7 +2932,8 @@
     const owned = !database;
     const db = database || await Truth.openDatabase();
     try {
-      return JobContext.latestRevision(await JobContext.getAll(db, "job_context_revisions"), jobContextId);
+      const [revisions, lifecycle] = await Promise.all([JobContext.getAll(db, "job_context_revisions"), JobContext.getAll(db, "job_context_lifecycle")]);
+      return JobContext.activeRevisions(revisions, lifecycle).find((entry) => entry.context_id === jobContextId) || null;
     } finally { if (owned) db.close(); }
   }
 
@@ -2833,7 +2942,10 @@
     const canonical = await canonicalJobRecords();
     const legacy = LocalJobLifecycle ? LocalJobLifecycle.libraryJobs(records) : records;
     const canonicalIds = new Set(canonical.map((job) => job.job_context_id));
-    return { canonical, legacy: legacy.filter((job) => !canonicalIds.has(job.job_context_id)) };
+    const database = await Truth.openDatabase();
+    let removed;
+    try { removed = new Set((await JobContext.getAll(database, "job_context_lifecycle")).map((entry) => entry.context_id)); } finally { database.close(); }
+    return { canonical, legacy: legacy.filter((job) => !canonicalIds.has(job.job_context_id) && !removed.has(job.job_context_id)) };
   }
 
   async function renderJobLibrary() {
@@ -2847,6 +2959,7 @@
     const grid = byId("job-card-grid");
     jobStageMenu?.close();
     grid.innerHTML = jobGuideCardMarkup() + visible.map(jobCardMarkup).join("");
+    libraryEditor?.decorate(visible);
     window.requestAnimationFrame(playPendingCardReturn);
   }
 
@@ -3303,6 +3416,7 @@
   }
 
   function initJobLibrary() {
+    libraryEditor = createLibraryEditor("job-card-grid", "job-page-message", removeJobLibraryCard, renderJobLibrary);
     const showLibraryError = error => {
       byId("job-page-message").textContent = error.message || "职位列表更新失败，请重试。";
       byId("job-page-message").classList.add("error");

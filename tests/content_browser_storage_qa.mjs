@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { checkBrowserStorageUpgrade } from "./helpers/browser-storage-upgrade.mjs";
 import { createRequire } from "node:module";
 const { chromium } = createRequire(import.meta.url)("playwright");
 const base = process.argv[2];
@@ -38,6 +39,7 @@ try {
     db.close(); return { record, rolledBack, absent };
   });
   assert.deepEqual(reloaded.record, first.changed); assert(reloaded.rolledBack && reloaded.absent);
+  console.log(await page.evaluate(checkBrowserStorageUpgrade));
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ checks: ["native IndexedDB Markdown migration", "one body", "untouched original backup", "unknown prose", "write and reload", "native transaction rollback"], errors }));
 } finally { await browser.close(); }
