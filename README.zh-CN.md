@@ -37,7 +37,7 @@ Ariadne 帮你结合自己的经历，理解一个真正关心的岗位。你可
 
 Mac 默认由 Skill 打开独立窗口，关闭最后窗口即停止服务，保留资料；不使用 Codex 内置浏览器。首次需要 macOS 14+ 与 Apple Command Line Tools，窗口程序在本机按芯片编译。
 
-在 Codex 中调用 `$ariadne`，让 Agent 检查环境并直接打开本地运行选择页；无需配对即可进入资料、职位和对话界面。需要使用公开网页已有资料时，再选择配对连接。无需安装 Mac App，资料和人工保存边界保持。
+先进入安装页，复制安装指令给 Codex，等待安装与依赖检查完成；再发送 `$ariadne 打开 Ariadne`，直接进入工作空间。Skill 使用本机 Codex，网页版使用 API；两端不配对，资料不自动同步。资料来源和人工保存边界保持。
 
 [安装与构建说明](docs/current/ARIADNE_SKILL.md) · [Skill 源码](skills/ariadne/SKILL.md)。完整 ZIP 随 Pages 构建生成；本阶段已完成本机验收，官网入口统一为[安装 Skill](https://ariadne.kai-nex.com/install.html)，复制安装指令后交给 Codex 执行。需要 Python 3.9+、兼容 Codex CLI 和 Poppler；不会因安装 Skill 自动支持任意 Agent 或所有操作系统。
 
@@ -45,9 +45,9 @@ Mac 默认由 Skill 打开独立窗口，关闭最后窗口即停止服务，保
 
 ## 当前架构
 
-2026-09-20 新入口：Skill 直接打开完整本地网页，使用独立资料目录和原有运行选择流程；可选 loopback 配对供公开网页调用用户自己的 Codex，公开网页 BYOK 继续经 Worker。下面架构图为 2026-09-19 的 Web/Mac App 快照，保留作历史参考。
+2026-09-20：Web 与 Skill 独立组合启动、连接与存储，共用页面和领域契约。Web 使用 API 与浏览器库；Skill 直接进入工作空间，使用本机 Codex 与文件库。参见[当前双端架构](docs/current/TWO_PRODUCT_ARCHITECTURE.md)。下面架构图为 2026-09-19 的 Web/Mac App 历史快照。
 
-网页版与 Mac App 复用 Candidate/Job 产品逻辑。网页版把资料保存在浏览器 IndexedDB，经 Cloudflare Worker 发起模型请求；Mac App 管理本机 Python 服务和磁盘内容库。两种方式都保留来源，模型提案只有在用户明确保存后才成为确认版本。
+网页版与 Skill 复用 Candidate/Job 产品逻辑。网页版把资料保存在浏览器 IndexedDB，经 Cloudflare Worker 发起模型请求；Skill 管理本机 Python 服务和磁盘内容库。两种方式都保留来源，模型提案只有在用户明确保存后才成为确认版本。
 
 [![Ariadne 当前架构：网页版与 macOS App](docs/architecture/archify/2026-09-19-current/ariadne.png)](docs/architecture/archify/2026-09-19-current/ariadne.png)
 
@@ -109,11 +109,11 @@ Ariadne 可以成为这些工作流的前置层：先形成经本人审阅、有
 - 分别讨论个人资料、具体职位、个人理解或全部职位概况，各自拥有明确上下文和写入边界。
 - 对已有、同来源的 Candidate 卡片进行受限自然语言修改；系统校验身份、版本、允许字段与实际执行，并生成回执。
 - 对话附件需逐轮确认传输，且不自动成为确认的个人或职位资料。
-- 支持本机 Codex 直连，或让网页经本机 loopback 配对连接器使用 Codex。
+- 通过 Skill 使用本机 Codex；网页的本地 Agent 入口仅说明如何安装与调用，不连接本机。
 
 内容现已接入[统一 Markdown 内容库](docs/current/MARKDOWN_CONTENT_STORAGE.md)：本机保存真实文件，网页端在浏览器内保存同格式文档；卡片从同一文档生成视图，原件、审阅状态和历史保留。既有浏览器数据在首次访问时迁移，旧数据库原地留作备份。
 
-当前已验证的 Codex 组合为 `codex-cli 0.153.4` / `gpt-5.6-sol`。连接器只监听 loopback、使用短期配对，并只开放 Ariadne 定义的领域路由；细节见 [Codex 运行指南](docs/current/CODEX_RUNTIME_CONNECTOR.md)。
+当前已验证的 Codex 组合为 `codex-cli 0.153.4` / `gpt-5.6-sol`。Skill 服务只监听 loopback，保留领域与人工保存边界；当前步骤见 [Skill 指南](docs/current/ARIADNE_SKILL.md)，[旧 Codex 连接器指南](docs/current/CODEX_RUNTIME_CONNECTOR.md) 仅作历史参考。
 
 ## 明确不做什么
 

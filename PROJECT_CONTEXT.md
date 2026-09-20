@@ -1,5 +1,7 @@
 # Ariadne 项目上下文
 
+2026-09-20 最新正式发布：按用户要求，Web / Skill 双端架构和「先安装、再调用」引导已上线 [官网](https://ariadne.kai-nex.com) 与 [安装页](https://ariadne.kai-nex.com/install)。Pages `a56a6d36`、API Worker `4ab1078e-7937-4687-a827-ddba54044bc5`；公开 Skill 包包含本机 Codex、直接进入工作空间与本地文件库。网页版仅用 API，本地 Agent 入口只提供说明，两端不配对、不自动同步资料。线上桌面/手机、API 边界、复制指令与公开包完整性已核对；本轮未重新执行真实模型，未 push Git。下列旧条目的“未部署”、Skill 模型选择页或配对描述保留为历史，以本条和 [双端架构](docs/current/TWO_PRODUCT_ARCHITECTURE.md) 为准。
+
 2026-09-20 最新架构决定：用户确认拆分 Web 与 Skill 两种产品。Web 只连接 API、使用浏览器内容库，本地 Agent 入口仅提供安装说明；Skill 使用本机 Codex 与固定文件库，直接进入工作空间，不再显示模型选择首页。共用页面与领域/保存契约，独立产品配置、启动、transport 和存储路由；旧网页配对退出当前入口，源码与原资料保留。已更新本机 Skill，完成真实 Codex 对话、两端浏览器与原生窗口验收；未部署公网。详见 [双端架构](docs/current/TWO_PRODUCT_ARCHITECTURE.md)。
 
 2026-09-20 最新范围决定：用户要求先跑通 Ariadne Skill → Codex → 保留现有页面 → 本地资料保存；反馈更新暂不扩展，通用长期档案契约与其他 Agent 适配不作为本阶段前置条件。同机后续 Agent 可复用资料根目录与明确的工作区身份，但连接 adapter、能力验证、上下文范围及人工保存规则仍须适配；指定目录不等于跨机同步。当前页面调用本机 Codex CLI，不接入唤起它的聊天历史。已完成本机合成 PDF 导入、确认保存、真实对话及服务重启恢复验收，并修复候选人对话保存层的旧 Provider 硬编码；详见 [Skill 指南](docs/current/ARIADNE_SKILL.md)。

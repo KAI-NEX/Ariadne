@@ -37,7 +37,7 @@ No model connection yet? You can still archive original materials in Local mode 
 
 On Mac, the Skill opens a standalone window. Closing its last window stops its service and keeps saved data. First use requires macOS 14+ and Apple Command Line Tools to compile the small window host for this Mac; it does not use Codex’s in-app browser.
 
-Invoke `$ariadne` in Codex to check dependencies and open the complete local runtime-selection page in its own window. Local use needs no pairing code. Pairing remains optional when using the public web workspace. No Mac App is required; source tracking and explicit human save remain in place.
+First open the installation page, copy its installation prompt into Codex, and wait for installation and dependency checks. Then send `$ariadne 打开 Ariadne` to open the workspace directly. The Skill uses local Codex; the website uses API keys. They do not pair with each other or automatically synchronize data. Source tracking and explicit human save remain in place.
 
 [Setup and build guide](docs/current/ARIADNE_SKILL.md) · [Skill source](skills/ariadne/SKILL.md). Pages builds include the complete Skill ZIP. Local acceptance is complete; the [installation page](https://ariadne.kai-nex.com/install.html) provides a prompt to copy into Codex. Python 3.9+, a compatible Codex CLI and Poppler are required. Other Agents and OS environments require their own verification.
 
@@ -45,9 +45,9 @@ Historical Mac App builds and data notes remain in the [local distribution recor
 
 ## Current architecture
 
-2026-09-20: the Skill opens the complete local web UI with its own data directory and the existing model-selection flow. An optional loopback connector lets the public website use the user’s Codex; public BYOK requests continue through the Worker. The diagram below records the 2026-09-19 Web/Mac App architecture and remains as a historical reference.
+2026-09-20: Web and Skill have separate startup, transport and storage boundaries, with shared pages and domain contracts. Web uses BYOK APIs and browser storage; Skill opens the workspace directly and uses local Codex and files. See the [current two-product architecture](docs/current/TWO_PRODUCT_ARCHITECTURE.md). The diagram below is the historical 2026-09-19 Web/Mac App snapshot.
 
-The same Candidate/Job product runs in a browser or a native Mac window. The web app stores documents in IndexedDB and sends model requests through a Cloudflare Worker; the Mac App owns a loopback Python service and a local file repository. Both preserve sources and require explicit human save before confirming model proposals.
+The same Candidate/Job product runs in a browser or a native Mac window. The web app stores documents in IndexedDB and sends model requests through a Cloudflare Worker; the Skill owns a loopback Python service and a local file repository. Both preserve sources and require explicit human save before confirming model proposals.
 
 [![Ariadne current architecture: web and macOS runtimes](docs/architecture/archify/2026-09-19-current/ariadne.png)](docs/architecture/archify/2026-09-19-current/ariadne.png)
 
@@ -109,9 +109,9 @@ Ariadne can sit before any of these workflows: it prepares a reviewed, source-gr
 - Discuss Candidate material, a specific Job, personal understanding, or an overview of all current jobs—each with its own context and write boundary.
 - Make bounded natural-language edits to existing, same-source Candidate cards; Ariadne validates identity, versions, allowed fields, and actual execution before showing a receipt.
 - Attach materials to a conversation turn with an explicit transmission confirmation. Attachments stay separate from confirmed Candidate and Job data.
-- Use the verified local Codex runtime, or pair a web page to a local Codex connector without exposing Codex credentials to the page backend.
+- Use local Codex through the Skill. The website’s local Agent entry explains installation and invocation; it does not connect to the local machine.
 
-The verified Codex combination is `codex-cli 0.153.4` with `gpt-5.6-sol`. The connector runs on loopback, uses short-lived pairing, and only exposes Ariadne's listed domain routes. Details and limitations are in the [Codex connector guide](docs/current/CODEX_RUNTIME_CONNECTOR.md).
+The verified Codex combination is `codex-cli 0.153.4` with `gpt-5.6-sol`. The Skill service runs on loopback and preserves Ariadne’s domain and save boundaries. Current setup is in the [Skill guide](docs/current/ARIADNE_SKILL.md); the [connector guide](docs/current/CODEX_RUNTIME_CONNECTOR.md) records the retired pairing design.
 
 Content now uses a [shared Markdown repository](docs/current/MARKDOWN_CONTENT_STORAGE.md): real files for the local app, the same document format in browser storage for the web app. Cards are views of those documents; original files, review states, and history remain separate and traceable. Existing browser data migrates on first access, with the old database retained as a backup.
 

@@ -1,3 +1,31 @@
+# Ariadne Skill：安装与使用
+
+当前产品分为网页版（自己的 API、浏览器资料库）和 Skill（本机 Codex、本地文件库）。两者共用业务页面，不自动同步资料，也不进行网页配对。
+
+## 首次安装
+
+1. 打开[官网安装页](https://ariadne.kai-nex.com/install)，点击「复制安装指令」。
+2. 将指令粘贴到 Codex 对话中并发送，等待包校验、安装和依赖检查完成。已有同名 Skill 先备份，资料目录不删除。
+3. 安装完成后，在 Codex 中发送 `$ariadne 打开 Ariadne`。独立窗口直接进入工作空间，不需要模型选择首页。
+4. 在窗口添加个人资料或职位材料，再围绕材料提问；发送需确认，结果由用户审阅保存。关闭最后窗口或 ⌘Q 停止本次服务，已保存资料保留。
+
+独立窗口要求 macOS 14+、Python 3.9+ 和 Apple 命令行开发工具；Codex 分析还需兼容 CLI、本人登录和 Poppler。缺依赖时明确提示，不切换到 API 或生成本地替代回答。当前仅 Codex adapter 已验收，其他 Agent 与操作系统不自动视为支持。
+
+## 数据和维护
+
+默认地址 `http://127.0.0.1:8766`，资料位于 `~/Library/Application Support/Ariadne Skill/workspaces/<workspace-id>/`。页面的 `ariadne-content-workspace-v1` 映射决定具体工作区；保持既有目录与身份，不按最新目录猜测。Skill 安装目录不保存个人资料，更新运行代码不迁移旧 App 或浏览器的数据。
+
+启动命令为 `python3 scripts/ariadne.py window`，诊断为 `python3 scripts/ariadne.py doctor`；路径相对于实际安装的 Skill。`open` 仅用于明确选择的浏览器或开发验收，`connect` 已停用。完整包由 `python3 scripts/build_skill_bundle.py` 构建，包含页面、契约、启动器和完整性清单，不包含凭据或用户资料。
+
+使用与运行边界以 [Skill 指令](../../skills/ariadne/SKILL.md) 和 [双端架构](TWO_PRODUCT_ARCHITECTURE.md) 为准。阶段发布与验收结果见 [项目状态](../../PROJECT_STATUS.md)。
+
+## 历史交付记录
+
+以下内容原地保留用于追溯；涉及运行选择页、API、本机网页配对的旧步骤不再适用于当前 Skill。
+
+<details>
+<summary>展开此前交付与验收记录</summary>
+
 # Ariadne Skill
 
 2026-09-20 两端架构更新：默认直接进入工作空间，使用本机 Codex，不再提供运行选择首页或网页配对。网页版仅连接 API，Skill 仅连接本地 Agent；具体实现与边界以 [双端架构](TWO_PRODUCT_ARCHITECTURE.md) 和 [Skill 指令](../../skills/ariadne/SKILL.md) 为准。下列记录保留为此前版本的验收历史，涉及运行选择、API 或配对的步骤已被本条取代。
@@ -87,3 +115,5 @@ Skill 包只含 Git 跟踪的运行源码、公开契约和完整公开网页资
 本机实际打开连接页、点击窗口关闭并核对端口释放、资料保留、再次打开；独立包回归增加父管道断开、信号停止、端口冲突不接管和缺编译器明确失败。原生截图和 QA 数据保存在 `.cache/skill-window-20260920/`。未调用真实模型、未迁移原浏览器资料、未发布公网；首次启动错误及旧 QA 构建保留，不作为成功证据。
 
 2026-09-20 图标修正：独立窗口沿用原 App 的 ICNS 与 Assets.car，保持系统图标的尺寸、留白与多外观；不再用网站 180px 图标覆盖。源码包约 2.7 MB，新增部分是 CPU 无关图标资源；原图及旧安装保留。
+
+</details>

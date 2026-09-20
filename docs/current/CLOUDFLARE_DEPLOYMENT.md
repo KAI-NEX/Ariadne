@@ -1,6 +1,6 @@
 # Ariadne：免费托管与腾讯域名部署
 
-更新：2026-09-18。用户已决定不购买服务器，并要求网页免安装使用自己的 API Key。正式入口 **https://ariadne.kai-nex.com** 已发布，每次先选择模型；产品仍属公网预览阶段；按用户要求，页面不再显示全局预览提示行。
+更新：2026-09-20。正式入口 **https://ariadne.kai-nex.com** 已发布 Web / Skill 双端架构：网页版免安装使用自己的 API Key，本地 Agent 入口按先安装、再调用说明使用 Skill。网页版保留运行选择，Skill 直接进入工作空间。当前 Pages 为 `a56a6d36`，绑定 API Worker 版本 `4ab1078e-7937-4687-a827-ddba54044bc5`；产品仍属公网预览阶段，页面不显示全局预览提示行。
 
 当前部署：Pages 项目 `ariadne`，实际默认域名 `ariadne-7pc.pages.dev`；通过 `ARIADNE_API` 绑定 Python Worker `ariadne-api`。腾讯 DNSPod 已添加 `ariadne` CNAME 指向上述 Pages 域名，Cloudflare 自定义域名显示 Active / SSL enabled。未购买 VPS、迁移整个 DNS 或修改原有邮箱记录。以下步骤供后续更新与重新部署使用。
 
@@ -10,7 +10,7 @@
 - DeepSeek 已通过正式 HTTPS 网站完成真实图片连接检查和两页合成简历分析，返回 3 条待审阅资料；两页完整交付，重复请求命中相同结果。Gemini/千问保留用户自带 Key 的连接验证；本阶段没有这两家的真实账号执行证据。
 - 浏览器保存原件、资料和确认版本。Key 按请求经过 Cloudflare 转交指定 Provider，不持久保存到服务端。服务器只持久保存操作/内容摘要，防止同一次付费操作在运行实例重启后自动重复；短暂结果缓存会过期，用户须审阅后主动重试。
 - 原有六类领域处理与人工保存规则复用；PDF 在浏览器完整逐页转图，Worker 核对原始 hash、实际页数、顺序和每页 hash。本预览限制每份 PDF 5 MiB / 16 页 / 转图合计 6 MiB，完整请求 12 MiB；超限整次拒绝，不截断。本地包保留原有较大上限。
-- Codex 仍需使用者自己的电脑和登录，通过本地包/配对连接器运行。网页 API 不依赖 Codex。
+- Codex 通过使用者电脑上的 Ariadne Skill 运行，直接进入工作空间。网页本地 Agent 入口仅提供安装与调用说明；网页不连接 Codex，API 不依赖本地 Skill。
 
 无需租 VPS。Pages、Workers 与 SQLite Durable Objects 可从免费计划开始，但免费额度和 CPU/存储限制仍适用，超额会影响可用性；模型 API 费用由各用户自己的服务商账号承担。本次正式 HTTPS 与小样本公网执行通过，不代表高并发、全部文件上限或跨地区网络验收。[Pages 限制](https://developers.cloudflare.com/pages/platform/limits/)、[Workers 价格](https://developers.cloudflare.com/workers/platform/pricing/)、[Durable Objects 免费额度](https://developers.cloudflare.com/durable-objects/platform/pricing/)。
 
@@ -70,7 +70,7 @@ api/node_modules/.bin/wrangler pages deploy pages --project-name ariadne --branc
 
 ## 5. 首次上线检查
 
-1. 首页先选运行方式，不显示全局预览提示行。选择本地运行应能进入空工作空间，保存合成材料后刷新可恢复。
+1. 首页先选运行方式，不显示全局预览提示行。选择「暂不连接 AI」应能进入空工作空间，保存合成材料后刷新可恢复。
 2. 打开 `https://ariadne.kai-nex.com/api/web-runtime`，应显示 `mode: web`、三家 BYOK、`preview: true`。若提示 `WEB_API_BINDING_REQUIRED`，检查第 3 步的绑定并重新部署 Pages。
 3. 首页“添加新的模型”→ DeepSeek → 填你自己的有效 Key → 阅读费用/传输说明 → “同意验证并连接”。验证成功后选择并继续。
 4. 先用无隐私的两页测试资料，确认可以分析、出现待审阅内容，并且只有主动保存才生成确认资料。无效 Key 应明确失败，不能显示假回答或切换 Local。
@@ -78,7 +78,14 @@ api/node_modules/.bin/wrangler pages deploy pages --project-name ariadne --branc
 
 正式域名、本机 `127.0.0.1`、预览域名的数据相互独立，不会自动迁移；请使用现有导出/导入能力搬运所需资料。清除浏览器站点数据会删除该浏览器的本地资料。
 
-## 6. 发布可下载的本地包
+## 6. 发布 Skill 包
+
+当前构建器自动从同一代码版本生成 `skill-bundle/Ariadne-Skill.zip`，复制到 Pages 的 `/downloads/Ariadne-Skill.zip`，并生成包含完整大小与 SHA-256 的 `/downloads/skill.json`。安装页先提供安装指令，再说明 `$ariadne 打开 Ariadne` 的调用步骤；无需创建新的 GitHub Release。发布后核对正式域名的包字节、hash、安装指令及本地直达工作空间行为。
+
+### 历史 Mac App 分发记录
+
+下列 App 发布步骤和资产保留用于追溯；当前安装入口使用上述 Skill 包。
+
 
 2026-09-19 新版 App 已公开发布：[20260918-172135](https://github.com/KAI-NEX/Ariadne/releases/tag/local-20260918-172135)，113,908,957 bytes，SHA-256 `e8d88429b9802537ec30e914263187abfafcee6e3b501d34ea59aa42d49918bd`。网页下载入口与安装步骤使用独立窗口 App（拖入「应用程序」、菜单登录 Codex、关闭窗口停止）；旧终端版 Release 保留为历史版本。实际发布验收见 PROJECT_STATUS 最新条目。
 
@@ -102,5 +109,5 @@ python3 scripts/build_cloudflare_release.py --pdfjs .cache/cloudflare-build/node
 - Pages：静态页面、合同 JS、按需加载的 PDF.js 5.4.624、API 路由 Worker。非 PDF 请求不加载 PDF.js。无额外前端框架或常驻轮询。
 - Python Worker：复用 WSGI/领域模块；通过请求级传输钩子调用固定官方端点，重定向拒绝跟随；PDF hook 替代该平台不支持的 Poppler 子进程。本机路径仍使用原实现。
 - 每个 origin / 浏览器会话 / Provider / Key 摘要单独一个 Durable Object，最多 2 个并发、256 个持久操作摘要。只写 hash，不写 Key、材料、模型正文。实例丢失内存结果后阻止无声重试；浏览器源材料和确认资料仍在。
-- “完整页数与 hash 通过”是传输完整性验证，不是语义正确或对恶意客户端像素真实性的认证。六领域离线回归、本机模拟及正式 HTTPS 的 DeepSeek 小样本分别记录；不同地区 API 可达性、负载上限及公网 Codex 配对仍待检查。
+- “完整页数与 hash 通过”是传输完整性验证，不是语义正确或对恶意客户端像素真实性的认证。六领域离线回归、本机模拟及正式 HTTPS 的 DeepSeek 小样本分别记录；不同地区 API 可达性、负载上限仍待检查；旧公网 Codex 配对已退出当前产品入口。
 - 旧 [Docker 网页部署](WEB_DEPLOYMENT.md) 与 [腾讯服务器教程](WEB_FIRST_DEPLOY.md) 保留为备选历史路径；不需要照旧教程购买服务器。

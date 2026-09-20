@@ -1,5 +1,14 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-20 — 双端架构与安装优先内容正式发布（COMPLETE；已上线）
+
+- 按用户「调整好架构和内容，发布」授权，将此前完成的 Web / Skill 架构、Skill 直达工作空间和三步安装优先引导发布至正式域名。中英 README、当前 Skill 指南和部署说明统一 Web API / 浏览器库、Skill Codex / 文件库的职责；旧配对、模型选择与 Mac App 说明保留为明确标注的历史记录。反馈更新和其他 Agent 未扩展。
+- API Worker `ariadne-api` 版本 `4ab1078e-7937-4687-a827-ddba54044bc5`；Pages `a56a6d36`（https://a56a6d36.ariadne-7pc.pages.dev），正式入口 https://ariadne.kai-nex.com。沿用既有 Service Binding、域名和数据隔离，未修改 DNS。上一 Pages `047f2d8c` 记录保留。
+- 公开 `/downloads/Ariadne-Skill.zip` 为 2,797,991 bytes，SHA-256 `95eeff5f2ff595812758161a1905cfa9ff7f4fc9aa6cbb8064e3a83f783084b2`。从正式网页下载后与构建包逐字节 hash 一致，ZIP 完整性及 214 个运行文件清单校验通过；解包后 doctor 所需 Python、Codex、协议、登录与 PDF 工具检查均 ready。运行源码来自 `75cf2ef`；不包含个人资料或凭据。本轮未覆盖日常安装目录，已安装 Skill 的架构更新见上一阶段。
+- 发布前 product boundary、Skill install、Web runtime 8 tests、VI、公开文件扫描、文档链接与 Worker 打包检查通过。首次 Worker dry-run 缺少 PATH 中的 npx，改用现有完整 Node 22 工具链后通过并完成部署；失败日志保留。
+- 正式域名浏览器验证健康、Web Runtime、运行选项与六类领域 signature 接口正常，本地 `/api/workspace` 返回预期 404 / WEB_ROUTE_DENIED。桌面与 390px 实际检查先安装 → 安装后调用 → 窗口使用，无配对字段、旧桥接脚本或横向溢出；安装按钮复制成功，指令含公开包最新 hash，旧 Codex URL 仅显示引导。普通 urllib 下载返回 403，使用正常浏览器下载成功并完成上述完整校验。
+- 证据、发布包、部署日志、截图及线上下载包保存在 `.cache/two-products-publication-20260920/`。本轮不执行真实模型或发送私人材料；真实 Codex 与原生窗口证据沿用本机架构阶段，不据此声称其他电脑、其他 Agent、完整 API 业务或负载上限已验收。未 push Git、未迁移资料；无关未提交文件原地保留。
+
 ## 2026-09-20 — 网页 Skill 引导改为安装优先（COMPLETE；未发布）
 
 - 按用户反馈，首页「通过本地 Agent 使用」说明改为三步：先安装 Skill（立即提供安装页入口与复制/粘贴说明）→ 安装完成后在 Codex 输入调用语句 → 在独立窗口添加资料与提问。旧配对 URL 的说明同步此顺序。
