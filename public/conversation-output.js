@@ -6,7 +6,7 @@
   else root.AriadneConversationOutput = api;
 }(typeof globalThis !== "undefined" ? globalThis : this, function create(root) {
   const MAX_TEXT = 40000, MAX_PAGES = 32;
-  const clocks = new WeakMap(), labels = new WeakMap(), exports = new WeakMap();
+  const exports = new WeakMap();
   const utf8 = text => new TextEncoder().encode(text);
   const VERSION = "ariadne-conversation-delivery-v1";
   function validate(value) {
@@ -241,23 +241,10 @@
     });
   }
 
-  function execution({ form, active }) {
-    if (!form?.ownerDocument || !form.isConnected) return;
-    let state = clocks.get(form);
-    if (active && !state) {
-      labels.get(form)?.remove();
-      const label = form.ownerDocument.createElement("small"); label.className = "v1-conversation-elapsed";
-      form.after(label); labels.set(form, label);
-      state = { start: root.performance.now(), label, timer: null }; clocks.set(form, state);
-      const paint = () => {
-        if (!form.isConnected) { root.clearInterval(state.timer); clocks.delete(form); return; }
-        label.textContent = `已等待 ${Math.floor((root.performance.now() - state.start) / 1000)} 秒 · 完整回复校验后显示`;
-      };
-      paint(); state.timer = root.setInterval(paint, 1000);
-    } else if (!active && state) {
-      root.clearInterval(state.timer); clocks.delete(form);
-      state.label.textContent = `本轮处理耗时 ${Math.max(.1, (root.performance.now() - state.start) / 1000).toFixed(1)} 秒`;
-    }
+  function execution({ form }) {
+    // Waiting state already lives beside the conversation. Keep the composer
+    // dock compact instead of leaving a permanent per-turn timer underneath it.
+    form?.parentElement?.querySelectorAll?.(".v1-conversation-elapsed").forEach((label) => label.remove());
   }
   function historyText(message, limit = 1200) {
     const text = message.content ?? message.text ?? message.message ?? "";

@@ -183,13 +183,15 @@ final class AriadneApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         // animation clock. Finish finite animations only in this test build.
         configuration.userContentController.addUserScript(WKUserScript(source: "setInterval(()=>document.getAnimations().forEach(a=>{if(a.effect?.getTiming().iterations!==Infinity){try{a.finish()}catch(e){}}}),100)", injectionTime: .atDocumentEnd, forMainFrameOnly: false))
         #endif
-        let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 1180, height: 800), configuration: configuration)
+        // Preserve the original 1180:800 canvas ratio while giving embedded
+        // detail/workspace views enough width to keep information and chat side by side.
+        let view = WKWebView(frame: NSRect(x: 0, y: 0, width: 1392, height: 944), configuration: configuration)
         view.navigationDelegate = self
         view.uiDelegate = self
         view.allowsBackForwardNavigationGestures = true
         let window = NSWindow(contentRect: view.frame, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "Ariadne · 衡"
-        window.minSize = NSSize(width: 760, height: 560)
+        window.minSize = NSSize(width: 1080, height: 720)
         let controller = NSViewController()
         controller.view = view
         window.contentViewController = controller

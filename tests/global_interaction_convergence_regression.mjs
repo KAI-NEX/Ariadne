@@ -72,6 +72,9 @@ const candidateImport = read("public/personal-import.html");
 const jobImport = read("public/jd-import.html");
 const candidateDetail = read("public/candidate-detail.html");
 const jobDetail = read("public/job-detail.html");
+const conversationUi = read("public/conversation-ui-domain.js");
+const conversationOutput = read("public/conversation-output.js");
+const memoryBridge = read("public/personal-memory-bridge.js");
 assert.equal((pages.match(/SourceInput\.bind\(/g) || []).length, 2);
 assert.equal((pages.match(/SourceInput\.renderBundlePreview\(/g) || []).length, 2);
 assert.equal((pages.match(/SourceInput\.persistDurableBundle\(/g) || []).length, 3);
@@ -98,6 +101,14 @@ assert.doesNotMatch(`${candidateImport}\n${jobImport}`, /data-(?:candidate|job)-
 assert.match(read("public/styles.css"), /\.v1-conversation-message\.is-entering, \.is-working-ready/);
 assert.match(read("public/styles.css"), /prefers-reduced-motion[\s\S]*\.v1-processing-loop[\s\S]*animation: none/);
 assert.doesNotMatch(pages.slice(pages.indexOf("async function executeJobModelProcessing"), pages.indexOf("async function runJobProcessing")), /job_model_single_source_required/);
+assert.match(conversationUi, /insertBefore\(scroll, pane\.firstElementChild\)/);
+assert.match(conversationUi, /ariadne-conversation-execution-state/);
+assert.doesNotMatch(conversationOutput, /本轮处理耗时|完整回复校验后显示/);
+assert.doesNotMatch(read("public/conversation-output.css"), /v1-conversation-elapsed/);
+assert.match(memoryBridge, /ariadne-open-personal-supplement/);
+assert.match(pages, /let frameConversationActive = false/);
+assert.match(pages, /if \(!frameConversationActive\) \{[\s\S]*frame\.src = "about:blank"/);
+assert.match(pages, /function renderJobConversationMessages\(messages, \{ include_pending_user: includePendingUser = true \}/);
 
 console.log(JSON.stringify({
   shared_source_input: "pass",
@@ -109,4 +120,5 @@ console.log(JSON.stringify({
   runtime_driven_import: "pass",
   pasted_text_durable_bundle: "pass",
   reduced_motion_contract: "pass",
+  conversation_continuity_and_compact_layout: "pass",
 }));

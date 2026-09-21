@@ -11,7 +11,8 @@ for (const property of ["fontSize", "fontWeight", "letterSpacing", "lineHeight"]
 }
 assert.match(overlay, /content\.style\.width = `\$\{content\.offsetWidth\}px`/);
 assert.match(overlay, /aboutFadeAnimation = surface\.animate\([\s\S]*?opacity: 0[\s\S]*?duration: aboutCloseDuration/);
-assert.match(overlay, /if \(aboutWorkspace\) \{\s*overlay\.classList\.add\("is-content-ready"\);\s*\} else frame.src/);
+assert.match(overlay, /if \(aboutWorkspace\) \{\s*overlay\.classList\.add\("is-content-ready"\);\s*\} else if \(reuseRetainedFrame\)/);
+assert.match(overlay, /else \{\s*retainedFrameUrl = detailUrl\.href;[\s\S]*?frame\.src = detailUrl\.href;/);
 assert.match(overlay, /frame.onload = aboutWorkspace \? null/);
 assert.match(overlay, /transform: aboutTransform\(destinationRect, sourceRect\)/);
 assert.match(overlay, /transform: currentTransform/);

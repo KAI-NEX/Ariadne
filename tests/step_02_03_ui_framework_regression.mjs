@@ -290,7 +290,7 @@ assert.match(pages, /page === "jd"[\s\S]*title: "添加职位描述"[\s\S]*close
 assert.match(pages, /title: "添加个人材料"[\s\S]*close: "关闭添加个人材料"[\s\S]*workspace: "候选人信息"/);
 assert.match(pages, /title\.textContent = workspace \? importCopy\.workspace : importCopy\.title/);
 assert.match(pages, /isEmbeddedDetail = new URLSearchParams/);
-assert.match(pages, /viewportWidth \* \(compact \? 0\.94 : 0\.8\)/);
+assert.match(pages, /viewportWidth \* \(compact \? 0\.94 : skillWorkspace \? 0\.92 : 0\.8\)/);
 assert.match(pages, /viewportHeight \* \(compact \? 0\.9 : 0\.8\)/);
 assert.match(pages, /duration: 540, easing: "cubic-bezier\(\.16,1,\.3,1\)"/);
 assert.match(pages, /duration: 480, easing: "cubic-bezier\(\.16,1,\.3,1\)"/);

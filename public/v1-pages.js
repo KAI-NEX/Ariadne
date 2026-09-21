@@ -83,6 +83,7 @@
   let jobModelConsentId = null;
   let jobModelConsentBundle = null;
   let activeJobModelOperation = null;
+  let jobModelWaitTimer = null;
   let jobReviewSessionTotal = 0;
   let jobReviewSessionResolved = 0;
   let activeJobRevision = null;
@@ -702,6 +703,9 @@
     let aboutKeyboardInteraction = false;
     let aboutReturnWordmark = null;
     let aboutFadeAnimation = null;
+    let frameConversationActive = false;
+    let retainedFrameUrl = null;
+    let personalSupplementReturnUrl = null;
     const aboutMotion = getComputedStyle(overlay);
     const aboutOpenDuration = parseFloat(aboutMotion.getPropertyValue("--vi-motion-about-open")) || 900;
     const aboutCloseDuration = parseFloat(aboutMotion.getPropertyValue("--vi-motion-about-close")) || 800;
@@ -766,7 +770,8 @@
         const height = Math.min(480, viewportHeight * 0.86);
         return { left: (viewportWidth - width) / 2, top: (viewportHeight - height) / 2, width, height };
       }
-      const width = viewportWidth * (compact ? 0.94 : 0.8);
+      const skillWorkspace = globalThis.AriadneProduct?.kind === "skill";
+      const width = viewportWidth * (compact ? 0.94 : skillWorkspace ? 0.92 : 0.8);
       const height = viewportHeight * (compact ? 0.9 : 0.8);
       return { left: (viewportWidth - width) / 2, top: (viewportHeight - height) / 2, width, height };
     }
@@ -824,6 +829,7 @@
       const detailUrl = new URL(card.href, window.location.href);
       detailUrl.searchParams.set("embed", "1");
       detailUrl.searchParams.delete("v");
+      const reuseRetainedFrame = !aboutWorkspace && retainedFrameUrl === detailUrl.href && frame.src === detailUrl.href;
       frame.onload = aboutWorkspace ? null : () => {
         window.clearTimeout(revealTimer);
         revealTimer = window.setTimeout(() => {
@@ -832,7 +838,14 @@
       };
       if (aboutWorkspace) {
         overlay.classList.add("is-content-ready");
-      } else frame.src = detailUrl.href;
+      } else if (reuseRetainedFrame) {
+        overlay.classList.add("is-content-ready");
+      } else {
+        retainedFrameUrl = detailUrl.href;
+        personalSupplementReturnUrl = null;
+        frameConversationActive = false;
+        frame.src = detailUrl.href;
+      }
       backdrop.animate([{ opacity: 0 }, { opacity: 1 }], { duration: aboutWorkspace ? aboutOpenDuration : 320, easing: aboutWorkspace ? aboutEasing : "ease", fill: "both" });
       surfaceAnimation = aboutWorkspace ? surface.animate([
         { transform: aboutTransform(destinationRect, sourceRect) },
@@ -863,11 +876,15 @@
       aboutCopy.querySelector("h1").style.visibility = "";
       backdrop.getAnimations().forEach((animation) => animation.cancel());
       frame.onload = null;
-      frame.src = "about:blank";
+      if (!frameConversationActive) {
+        frame.src = "about:blank";
+        retainedFrameUrl = null;
+        personalSupplementReturnUrl = null;
+      }
       preview.replaceChildren();
       overlay.classList.add("hidden");
       overlay.classList.remove("is-content-ready", "is-closing");
-      overlay.classList.remove("is-import-workspace");
+      overlay.classList.remove("is-import-workspace", "is-personal-supplement");
       delete overlay.dataset.overlayKind;
       overlay.setAttribute("aria-hidden", "true");
       document.body.classList.remove("v1-detail-overlay-open");
@@ -937,6 +954,21 @@
         frame.contentWindow?.postMessage({ type: "job-radar-v1-workspace-back" }, window.location.origin);
         return;
       }
+      if (personalSupplementReturnUrl) {
+        const destination = personalSupplementReturnUrl;
+        personalSupplementReturnUrl = null;
+        overlay.classList.remove("is-personal-supplement");
+        title.textContent = sourceCard?.querySelector("h3, b")?.textContent || "资料详情";
+        editButton.classList.remove("hidden");
+        editButton.disabled = false;
+        closeButton.setAttribute("aria-label", "关闭详情");
+        frame.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: "ease", fill: "both" }).finished.then(() => {
+          retainedFrameUrl = destination;
+          frame.onload = () => frame.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: "ease", fill: "both" });
+          frame.src = destination;
+        }).catch(() => { frame.src = destination; });
+        return;
+      }
       closeOverlay();
     });
     workspaceCloseButton.addEventListener("click", () => frame.contentWindow?.postMessage({ type: "job-radar-v1-workspace-close" }, window.location.origin));
@@ -959,6 +991,26 @@
     });
     window.addEventListener("message", (event) => {
       if (event.origin !== window.location.origin || event.source !== frame.contentWindow) return;
+      if (event.data?.type === "ariadne-conversation-execution-state") {
+        frameConversationActive = event.data.active === true;
+        return;
+      }
+      if (event.data?.type === "ariadne-open-personal-supplement") {
+        const destination = new URL(event.data.destination, window.location.origin);
+        if (destination.origin !== window.location.origin || destination.pathname !== "/personal-understanding.html") return;
+        personalSupplementReturnUrl = retainedFrameUrl || frame.src;
+        overlay.classList.add("is-personal-supplement");
+        title.textContent = "关于我 · 个人补充";
+        editButton.classList.add("hidden");
+        editButton.disabled = true;
+        closeButton.setAttribute("aria-label", "返回原对话");
+        frameConversationActive = false;
+        frame.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: "ease", fill: "both" }).finished.then(() => {
+          frame.onload = () => frame.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: "ease", fill: "both" });
+          frame.src = destination.href;
+        }).catch(() => { frame.src = destination.href; });
+        return;
+      }
       if (event.data?.type === "job-radar-v1-import-view-state") {
         if (overlay.dataset.overlayKind === "import") setImportOverlayView(event.data.view);
         return;
@@ -2992,6 +3044,33 @@
     ModelWorkspaceUI.renderProgress(byId("job-understanding-events"), steps, currentIndex);
   }
 
+  function jobModelWaitCopy(startedAt) {
+    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+    if (elapsedSeconds < 15) return "ARIADNE AI 正在理解职位 · 请求已发送";
+    const minutes = Math.floor(elapsedSeconds / 60);
+    const seconds = elapsedSeconds % 60;
+    const elapsed = minutes ? `${minutes} 分${seconds ? ` ${seconds} 秒` : ""}` : `${seconds} 秒`;
+    return `ARIADNE AI 正在理解职位 · 已等待 ${elapsed}`;
+  }
+
+  function startJobModelWaitStatus() {
+    if (jobModelWaitTimer) window.clearInterval(jobModelWaitTimer);
+    const startedAt = Date.now();
+    const update = () => ProcessingIndicator.set(byId("job-workspace-processing"), {
+      active: true,
+      copy: jobModelWaitCopy(startedAt),
+      boundary: "原件已安全保存在本机；长文本或图片可能需要几分钟，等待期间不会改用本地结果。",
+      state: "MODEL_PROCESSING",
+    });
+    update();
+    jobModelWaitTimer = window.setInterval(update, 15_000);
+  }
+
+  function stopJobModelWaitStatus() {
+    if (jobModelWaitTimer) window.clearInterval(jobModelWaitTimer);
+    jobModelWaitTimer = null;
+  }
+
   function setJobProcessingState(state, copy) {
     const modelMode = refreshJobImportGate().authority.runtime.mode === "model";
     ProcessingIndicator.set(byId("job-processing"), {
@@ -3009,6 +3088,7 @@
     ProcessingIndicator.clear(byId("job-workspace-conversation-status"));
     ProductShell.showWorkspace(jobSharedWorkspace(), { source_name: sourceName || "当前职位来源", processing: true, model_workspace_ui: ModelWorkspaceUI, embedded: isEmbeddedDetail });
     setJobWorkspaceProgress(["正在读取职位材料", "正在理解职位内容", "正在提取职位要求", "正在生成职位信息"], 0);
+    startJobModelWaitStatus();
   }
 
   async function showJobWorkingWorkspace(proposal) {
@@ -3328,6 +3408,7 @@
     } finally {
       database?.close?.();
       if (attemptGeneration === jobModelAttemptGeneration) {
+        stopJobModelWaitStatus();
         jobBatchAbortController = null;
         jobProcessingInProgress = false;
         byId("replace-job-file").textContent = "替换";
@@ -3630,7 +3711,7 @@
     }
   }
 
-  function renderJobConversationMessages(messages, { include_pending_user: includePendingUser = false } = {}) {
+  function renderJobConversationMessages(messages, { include_pending_user: includePendingUser = true } = {}) {
     const target = byId("job-workspace-conversation") || byId("job-conversation-messages");
     if (!target) return;
     const visible = JobConversation.connectedHistory(messages);

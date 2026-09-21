@@ -835,7 +835,7 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-chat-viewport > :not(.v1-conversation-scroll) { flex-shrink: 0; }
 .v1-conversation-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px; scrollbar-gutter: stable; }
 .v1-conversation-scroll > .v1-conversation-thread { display: grid; align-content: start; min-height: 0; max-height: none; overflow: visible; }
-.v1-composer-dock { background: var(--vi-conversation); bottom: 0; flex: none; min-width: 0; padding-top: 18px; position: sticky; z-index: 2; }
+.v1-composer-dock { background: var(--vi-conversation); bottom: 0; flex: none; min-width: 0; padding-top: 12px; position: sticky; z-index: 2; }
 .v1-ariadne-pane:has(.v1-composer-dock) { grid-template-columns: minmax(0, 1fr); }
 .personal-dialogue > .v1-composer-dock { background: var(--vi-canvas); }
 .v1-ariadne-pane > .v1-composer-dock { background: inherit; }
@@ -864,7 +864,7 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-detail-overlay-workspace-close:active { scale: .985; transform: none; }
 .v1-detail-overlay-workspace-close:focus-visible { outline: 2px solid var(--vi-focus); outline-offset: 2px; }
 .v1-detail-overlay-workspace-close.hidden { display: none; }
-.v1-detail-overlay.is-import-workspace .v1-detail-overlay-close::before { mask-image: url("/vi/icons/chevron-left.svg"); -webkit-mask-image: url("/vi/icons/chevron-left.svg"); }
+:is(.v1-detail-overlay.is-import-workspace,.v1-detail-overlay.is-personal-supplement) .v1-detail-overlay-close::before { mask-image: url("/vi/icons/chevron-left.svg"); -webkit-mask-image: url("/vi/icons/chevron-left.svg"); }
 .v1-detail-overlay-close { align-items: center; background: transparent; border: 0; color: var(--ink); display: inline-flex; font-size: 0; height: 36px; justify-content: center; justify-self: start; line-height: 1; padding: 0; width: 36px; }
 .v1-detail-overlay-close::before { background: currentColor; content: ""; height: 24px; mask: url("/vi/icons/close.svg") center / 24px 24px no-repeat; width: 24px; -webkit-mask: url("/vi/icons/close.svg") center / 24px 24px no-repeat; }
 .v1-detail-overlay-close:hover, .v1-sheet-close:hover { scale: 1.04; transform: none; }
@@ -898,6 +898,7 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-embedded-detail.v1-ai-capable .v1-split-view { grid-template-columns: minmax(0, 1.08fr) minmax(340px, .92fr) !important; }
 .v1-embedded-detail .v1-structured-pane { background: var(--paper); border: 0; border-radius: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: clamp(26px, 3vw, 48px) clamp(26px, 3vw, 48px) max(28px, env(safe-area-inset-bottom)); scrollbar-color: rgba(112,119,132,.48) transparent; scrollbar-gutter: stable; scrollbar-width: thin; }
 .v1-embedded-detail .v1-conversation-pane { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: clamp(26px, 3vw, 48px) clamp(22px, 2.5vw, 40px) max(52px, env(safe-area-inset-bottom)); scrollbar-color: rgba(112,119,132,.48) transparent; scrollbar-gutter: stable; scrollbar-width: thin; }
+.v1-embedded-detail .v1-conversation-pane.v1-chat-viewport { padding-bottom: max(18px, env(safe-area-inset-bottom)); }
 .v1-embedded-detail .v1-structured-pane::-webkit-scrollbar, .v1-embedded-detail[data-v1-page="personal-import"] .v1-page-shell::-webkit-scrollbar, .v1-embedded-detail[data-v1-page="job-import"] .v1-page-shell::-webkit-scrollbar { height: 10px; width: 10px; }
 .v1-embedded-detail .v1-structured-pane::-webkit-scrollbar-track, .v1-embedded-detail[data-v1-page="personal-import"] .v1-page-shell::-webkit-scrollbar-track, .v1-embedded-detail[data-v1-page="job-import"] .v1-page-shell::-webkit-scrollbar-track { background: transparent; margin-block: 20px; }
 .v1-embedded-detail .v1-structured-pane::-webkit-scrollbar-thumb, .v1-embedded-detail[data-v1-page="personal-import"] .v1-page-shell::-webkit-scrollbar-thumb, .v1-embedded-detail[data-v1-page="job-import"] .v1-page-shell::-webkit-scrollbar-thumb { background: rgba(112,119,132,.48); background-clip: padding-box; border: 3px solid transparent; border-radius: 999px; }

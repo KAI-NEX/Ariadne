@@ -24,6 +24,9 @@
   const SOURCE_BUNDLE_CONTRACT = "ariadne-source-bundle-v1";
   const id = (prefix) => `${prefix}-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
   const nowIso = () => new Date().toISOString();
+  const unicodeCharacters = (value) => Array.from(String(value ?? ""));
+  const characterCount = (value) => unicodeCharacters(value).length;
+  const sliceCharacters = (value, limit) => unicodeCharacters(value).slice(0, Math.max(0, limit)).join("");
 
   function abortError() {
     if (typeof DOMException === "function") return new DOMException("job_model_import_cancelled", "AbortError");
@@ -107,7 +110,7 @@
       return Object.freeze({ contract_id: PREPARATION_CONTRACT, source_document_id: source.source_document_id,
         content_hash: source.content_hash, source_type: source.source_type, mime_type: source.mime_type,
         extraction_method: "complete_pdf_page_manifest_v1", read_only: true, writeback: false, semantic_structuring: false,
-        blocks, character_count: blocks.reduce((total, block) => total + block.text.length, 0) });
+        blocks, character_count: blocks.reduce((total, block) => total + characterCount(block.text), 0) });
     }
     const lines = String(sourceReadResult.extracted_text || "").normalize("NFKC").split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
     if (!lines.length) throw new Error("job_model_source_text_required");
@@ -119,16 +122,16 @@
     let startLine = 1;
     let totalCharacters = 0;
     const flush = (endLine) => {
-      const text = current.join("\n").slice(0, Math.min(1200, maxCharacters - totalCharacters));
+      const text = sliceCharacters(current.join("\n"), Math.min(1200, maxCharacters - totalCharacters));
       if (text && blocks.length < maxBlocks && totalCharacters < maxCharacters) {
         const prefix = sourceIndex === null ? "job-source-block" : `job-source-${sourceIndex}-block`;
         blocks.push({ source_ref: `${prefix}-${blocks.length + 1}`, location: `lines ${startLine}-${endLine}`, text });
-        totalCharacters += text.length;
+        totalCharacters += characterCount(text);
       }
       current = [];
     };
     lines.forEach((line, index) => {
-      if (current.length && current.join("\n").length + line.length + 1 > 1100) { flush(index); startLine = index + 1; }
+      if (current.length && characterCount(current.join("\n")) + characterCount(line) + 1 > 1100) { flush(index); startLine = index + 1; }
       current.push(line);
     });
     flush(lines.length);
@@ -144,7 +147,7 @@
       writeback: false,
       semantic_structuring: false,
       blocks,
-      character_count: blocks.reduce((total, block) => total + block.text.length, 0),
+      character_count: blocks.reduce((total, block) => total + characterCount(block.text), 0),
     });
   }
 

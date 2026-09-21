@@ -177,6 +177,8 @@ class SkillTests(unittest.TestCase):
         swift = (self.skill / "runtime/scripts/desktop_macos.swift").read_text()
         self.assertIn('home.appendingPathComponent("workspaces")', swift)
         self.assertIn('settings?["binding"] == "explicit"', swift)
+        self.assertIn('width: 1392, height: 944', swift)
+        self.assertIn('width: 1080, height: 720', swift)
 
         corrupt_workspace = "f" * 32
         WorkspaceStorage(source_root).commit(

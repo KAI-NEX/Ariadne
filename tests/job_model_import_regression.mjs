@@ -81,7 +81,7 @@ const jobText = [
   "工作地点：上海 / Remote",
   "负责建立证据驱动的 AI 产品系统。",
   "任职要求",
-  "- 能设计 Human-in-the-loop 工作流",
+  "- 能设计 Human-in-the-loop 工作流 🚀",
   "- 有 AI 产品评估经验",
 ].join("\n");
 const source = await LocalJob.preparePastedText(jobText, "job-batch-model-regression");
@@ -104,6 +104,9 @@ const preparation = JobModel.sourcePreparationFor(sourceDocument, {
 assert.equal(preparation.semantic_structuring, false);
 assert.equal(preparation.source_document_id, sourceDocument.source_document_id);
 assert(preparation.blocks.some((block) => block.text.includes("Human-in-the-loop")));
+const preparedText = preparation.blocks.map((block) => block.text).join("");
+assert.equal(preparation.character_count, Array.from(preparedText).length, "astral Unicode characters use backend-compatible code point counts");
+assert.notEqual(preparation.character_count, preparedText.length, "regression fixture must exercise a UTF-16 surrogate pair");
 
 const consent = JobModel.consentFor(source, snapshot, "2026-09-04T04:00:02.000Z", "consent-job-model-regression");
 const operationIdentity = await JobModel.operationIdentityFor(source, snapshot, consent);
@@ -172,6 +175,7 @@ const modelFlow = pages.slice(pages.indexOf("async function executeJobModelProce
 assert.match(modelFlow, /readJobSourceForModel/);
 assert.match(modelFlow, /callJobModelRuntime|JobModel\.proposalFor|persistSuccessfulResult/);
 assert.match(modelFlow, /showJobModelProcessingWorkspace|setJobWorkspaceProgress|showJobWorkingWorkspace/);
+assert.match(modelFlow, /stopJobModelWaitStatus/);
 assert.match(modelFlow, /ModelImportLifecycle\.STATES\.WORKING/);
 assert.doesNotMatch(modelFlow, /renderAwaitingJobReviews|resolveJobProposalLifecycle/);
 assert.doesNotMatch(modelFlow, /processJobSource|JobContext\.proposalFor|local-job-extract|local-job-image-ocr/);
@@ -183,6 +187,7 @@ assert.match(modelFailure, /打开运行方式/);
 assert.match(modelFailure, /id="job-ai-workspace" class="v1-workspace-layer hidden"/);
 assert.match(modelFailure, /NON_AUTHORITATIVE WORKING JOB/);
 assert.match(modelFailure, /id="job-workspace-save"[^>]*>保存职位</);
+assert.match(pages, /原件已安全保存在本机；长文本或图片可能需要几分钟/);
 assert.match(pages, /const assistantMessage = \{ \.\.\.JobConversation\.createMessage\(session, "ASSISTANT", result\.output\.message\), deliverable: globalThis\.AriadneConversationOutput\.fromResult\(result\) \};/);
 assert.match(pages, /const visible = JobConversation\.connectedHistory\(messages\)/);
 assert.match(pages, /include_pending_user: true/);

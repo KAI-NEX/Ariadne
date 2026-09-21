@@ -1,5 +1,13 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-21 — Skill 粘贴职位、对话连续性与宽屏布局（COMPLETE；本机）
+
+- 修复粘贴职位包含 Emoji/Unicode 扩展字符时的前后端长度歧义：前端统一按 Unicode code point 分块、截断和生成 `character_count`，与 Python 校验一致；失败原因为请求进入模型前的 source preparation 校验，不是模型拒绝。职位模型导入增加持续等待文案，明确原件已保存在本机且不会静默改用 Local。
+- 独立窗口由 1180×800 等比扩大为 1392×944，最小尺寸提高至 1080×720；Skill 详情窗口使用 92% 可视宽度。实际打开「AI 产品伙伴」验证资料与对话保持左右双栏，没有因嵌入宽度跌破断点而变成上下结构。
+- Candidate、Job、关于我的共用对话把标题、Runtime 和首次说明纳入对话滚动区：看过后会随消息上移；移除「本轮处理耗时」和永久等待计时，压缩 composer 与底部留白。Job 待回复的用户消息默认恢复显示；嵌入对话在生成中关闭时不销毁 iframe，返回同一卡片继续显示原界面，完成后的历史仍由既有持久化恢复。
+- 「整理为个人补充」先写入既有 DRAFT 边界，再由详情容器在同一浮层内淡出切换到「关于我 · 个人补充」；左上按钮返回原对话，避免顶层页面硬跳转。该共享实现覆盖职位、候选人和个人资料相关 AI 对话，不改变 Working/Proposal 与人工保存权限。
+- 全部 71 个 JavaScript 回归、Skill bundle 8 项、相关 Python 回归、VI 检查、ZIP/doctor 与语法/差异检查通过；完整 Python discover 另有一个既存测试在 Codex Skill 环境仍硬编码默认 Provider 为 DeepSeek，本轮未改运行契约。最终本机包 2,835,543 bytes，SHA-256 `4f7765dd15b5f7a8b4d82236a81fea34be2b7083c89ec43575311b214afa6a08`，已同步并重启精确 Skill App。未发起真实模型请求、未发布公网、未 push，用户资料目录未参与覆盖。
+
 ## 2026-09-21 — Ariadne Skill 修复、浏览器资料迁移与清理（COMPLETE；本机）
 
 - 修复同 bundle identifier 的旧 QA/缓存 App 可能被按名称误选的问题：启动前向 Launch Services 注册当前精确构建，启动回执返回完整 App 路径与 bundle id，使用说明要求按路径核对。修正 Skill 原生窗口的工作区根目录，并以 `ariadne-desktop-workspace-binding-v1` 显式绑定经校验的导入工作区；保留旧目录，不以目录新旧猜测身份。

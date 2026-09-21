@@ -25,6 +25,7 @@
 .personal-history p { padding: 8px 0; border-bottom: 1px solid #e6e9ef; overflow-wrap: anywhere; }
 .personal-dialogue.v1-conversation-pane { border-left: 1px solid #e3e7ee; padding: 0 0 0 40px; }
 .personal-dialogue .v1-conversation-thread { min-height: 180px; max-height: 50vh; overflow-y: auto; overflow-wrap: anywhere; padding-right: 8px; }
+.personal-dialogue.v1-chat-viewport .v1-conversation-scroll > .v1-conversation-thread { min-height: 0; max-height: none; overflow: visible; padding-right: 0; }
 .personal-dialogue .v1-conversation-form { margin-top: 18px; }
 .personal-prompts { display: flex; gap: 8px; flex-wrap: wrap; margin: 20px 0; }
 .personal-prompts button { background: #f4f6f9; border: 1px solid #e1e5ed; border-radius: 999px; color: #536075; padding: 8px 12px; font: inherit; font-size: 11px; cursor: pointer; }

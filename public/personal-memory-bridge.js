@@ -18,7 +18,13 @@
           const draft = { turn_id: Memory.id("personal-intake"), kind: "INTAKE", status: "DRAFT", created_at: Memory.now(), human_message: content,
             origin: { ...origin, message_id: message.message_id || null }, output: null };
           await Memory.write(database, "personal_conversation_turns", draft);
-          root.top.location.assign(`/personal-understanding.html?draft=${encodeURIComponent(draft.turn_id)}`);
+          const destination = `/personal-understanding.html?draft=${encodeURIComponent(draft.turn_id)}&embed=1`;
+          if (root.parent !== root) {
+            root.parent.postMessage({ type: "ariadne-open-personal-supplement", destination }, root.location.origin);
+          } else {
+            root.document.body.classList.add("v1-route-leaving");
+            root.setTimeout(() => root.location.assign(destination.replace("&embed=1", "")), 320);
+          }
         } catch (_error) { button.textContent = "暂时无法打开个人补充，请重试"; button.disabled = false; }
         finally { database?.close(); }
       });

@@ -366,7 +366,7 @@ assert.match(html, /id="candidate-card-back"[^>]*aria-label="返回全部卡片"
 assert.doesNotMatch(html, /← 返回全部卡片/);
 assert.doesNotMatch(html, /返回导入/);
 assert.match(styles, /\.v1-workspace-content-pane\.is-detail \.v1-workspace-content-footer \{ display: none; \}/);
-assert.match(styles, /\.v1-detail-overlay\.is-import-workspace \.v1-detail-overlay-close::before/);
+assert.match(styles, /:is\(\.v1-detail-overlay\.is-import-workspace,\.v1-detail-overlay\.is-personal-supplement\)[^{]*\.v1-detail-overlay-close::before/);
 assert.match(styles, /:is\(\.v1-embedded-detail\[data-v1-page="personal-import"\],\.v1-embedded-detail\[data-v1-page="job-import"\]\)\.v1-workspace-view \.v1-workspace-shell \{[^}]*background: transparent;[^}]*box-shadow: none;/);
 assert.match(styles, /\.v1-workspace-pane-header \{ padding: 22px 24px 14px; \}/);
 assert.doesNotMatch(styles, /\.v1-workspace-pane-header \{ border-bottom:/);

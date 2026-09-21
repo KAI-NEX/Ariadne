@@ -15,6 +15,8 @@
 
 默认地址 `http://127.0.0.1:8766`，资料位于 `~/Library/Application Support/Ariadne Skill/workspaces/<workspace-id>/`。页面的 `ariadne-content-workspace-v1` 映射决定具体工作区；保持既有目录与身份，不按最新目录猜测。Skill 安装目录不保存个人资料，更新运行代码不迁移旧 App 或浏览器的数据。
 
+独立窗口默认 1392×944、最小 1080×720，保持原 1180:800 长宽比并为嵌入详情保留左右双栏。Candidate、Job 与关于我的共用对话会把标题和首次说明作为可滚动历史，消息增多后自然上移；不显示每轮耗时。生成中的详情即使暂时关闭也保留当前 iframe，返回同一卡片继续显示；已完成历史仍按各领域既有持久化恢复。「整理为个人补充」在当前详情浮层内淡出切换，返回按钮回到原对话，个人补充继续遵守 DRAFT/人工保存边界。
+
 用户明确要求迁移且已经核实来源工作区身份时，可运行 `python3 scripts/ariadne.py import-workspace --source-root <workspaces-root> --workspace <workspace-id>`。工具锁定源库，校验所有被索引的 Markdown、JSON 和原件 hash，完整复制到 Skill 数据目录并写入 `ariadne-desktop-workspace-binding-v1` 显式绑定；源目录与旧 Skill 工作区保留，不做合并或覆盖，也不复制浏览器 API Key、Cookie 或其他网站数据。重新打开 Skill 并核对实际资料后，才可另行清理对应浏览器 origin。
 
 启动命令为 `python3 scripts/ariadne.py window`，诊断为 `python3 scripts/ariadne.py doctor`；路径相对于实际安装的 Skill。窗口核对使用 `opening_window.application` 返回的完整 App 路径，避免同名旧构建或 QA 缓存被误认成当前 Skill。`open` 仅用于明确选择的浏览器或开发验收，`connect` 已停用。完整包由 `python3 scripts/build_skill_bundle.py` 构建，包含页面、契约、启动器和完整性清单，不包含凭据或用户资料。

@@ -157,7 +157,10 @@
           scroll.tabIndex = 0;
           scroll.setAttribute("role", "region");
           scroll.setAttribute("aria-label", "对话记录");
-          pane.insertBefore(scroll, messages);
+          // The title, runtime note and first-use guidance belong to the
+          // conversation history. Once messages arrive they scroll away,
+          // leaving the available height to the actual dialogue.
+          pane.insertBefore(scroll, pane.firstElementChild);
           while (scroll.nextElementSibling && scroll.nextElementSibling !== form) scroll.append(scroll.nextElementSibling);
           pane.classList.add("v1-chat-viewport");
         }
@@ -282,6 +285,10 @@
     else if (submit) submit.classList.toggle("is-loading", Boolean(active));
     if (submit) submit.disabled = Boolean(active);
     if (textarea) textarea.setAttribute("aria-busy", String(Boolean(active)));
+    const view = form?.ownerDocument?.defaultView;
+    if (view?.parent && view.parent !== view) {
+      view.parent.postMessage({ type: "ariadne-conversation-execution-state", active: Boolean(active) }, view.location.origin);
+    }
   }
 
   function settle({ form, messages, focus = true }) {
