@@ -21,4 +21,6 @@
 - `tests/i18n_regression.mjs` 覆盖共用脚本接线、核心固定/计数翻译、未知个人内容不改写、Web/Skill 显示边界及无网络调用。
 - 相关 Runtime、ProductShell、附件、个人理解、职位概况、投递状态与全局交互回归通过；VI 检查及负向门禁通过。
 - egolite 实际检查 Web 中文→英文→中文、跨页偏好、添加模型弹窗、模型菜单及主要页面英文空状态；390 px 下 9 个主要页面无横向溢出，按钮保持 44 px 点击高度。桌面与窄屏截图保存在 `.cache/i18n-20260921/`。
-- 本阶段未部署公网、未调用真实模型、未发送个人材料；英文模型回答语言仍由当前问题、上下文和模型行为决定，不改写既有回复。
+- 2026-09-21 已从源码提交 `74b1f9d` 发布 Cloudflare Pages 生产部署 `5a893081-8199-4309-a896-bb967e77fa07`（`https://5a893081.ariadne-7pc.pages.dev`），正式域名继续使用 `https://ariadne.kai-nex.com`。本次只更新 Pages，API Worker、Service Binding 和 DNS 未变更。
+- 正式域名检查根页、`/i18n.js?v=1`、`/healthz` 与 `/api/web-runtime` 均为 HTTP 200；egolite 完成中英往返、跨页保持，并在 390 px 下检查 16 个当前 Web 页面，英文标题、语言属性、切换按钮和横向布局均通过。证据保存在 `.cache/web-i18n-publication-20260921/`。
+- 本阶段未调用真实模型、未发送个人材料；英文模型回答语言仍由当前问题、上下文和模型行为决定，不改写既有回复。
