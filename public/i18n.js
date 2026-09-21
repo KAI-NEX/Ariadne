@@ -984,6 +984,10 @@
 
   function renderSwitch() {
     let button = document.querySelector("[data-ariadne-language-switch]");
+    if (!document.body?.hasAttribute("data-ariadne-language-entry")) {
+      button?.remove();
+      return;
+    }
     if (!button) {
       button = document.createElement("button");
       button.type = "button";

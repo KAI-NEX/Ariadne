@@ -36,11 +36,15 @@ const pages = [
 for (const page of pages) {
   const html = fs.readFileSync(new URL(`../public/${page}.html`, import.meta.url), "utf8");
   assert.match(html, /<script src="\/i18n\.js\?v=1"><\/script>/, `${page} must load the shared language layer`);
+  if (page === "index") assert.match(html, /<body[^>]*data-ariadne-language-entry/, "entry page owns the language switch");
+  else assert.doesNotMatch(html, /data-ariadne-language-entry/, `${page} must not show the language switch`);
 }
 
 const css = fs.readFileSync(new URL("../public/styles.css", import.meta.url), "utf8");
 assert.match(css, /\.ariadne-language-switch\s*\{/);
+assert.match(css, /\.ariadne-language-switch\s*\{[^}]*left: 50%;[^}]*translateX\(-50%\)/s);
 assert.match(css, /\[data-ariadne-product="skill"\] \.ariadne-language-switch \{ display: none; \}/);
+assert.match(source, /hasAttribute\("data-ariadne-language-entry"\)/);
 assert.doesNotMatch(source, /fetch\s*\(/, "language switching must remain local and must not send content anywhere");
 
 console.log("i18n regression PASS");

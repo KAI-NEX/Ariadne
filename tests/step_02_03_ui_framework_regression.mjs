@@ -174,6 +174,8 @@ assert.match(pages, /function installMiniSidebar/);
 for (const label of ["连接设置", "工作空间", "个人资料", "职位描述"]) assert.match(pages, new RegExp(`label: "${label}"`));
 assert.ok(pages.indexOf('id: "runtime"') < pages.indexOf('id: "workspace"'));
 assert.match(pages, /tooltipText\.animate/);
+assert.match(pages, /const translatedWidth = Math\.ceil\(tooltipText\.scrollWidth\) \+ 28/);
+assert.match(pages, /Math\.max\(Number\(item\.dataset\.miniWidth\), translatedWidth\)/);
 assert.match(pages, /pointermove/);
 assert.match(pages, /Math\.exp\(-0\.5/);
 assert.match(pages, /requestAnimationFrame\(renderSpringFrame\)/);
@@ -185,6 +187,7 @@ assert.match(pages, /restOpacity = item\.getAttribute\("aria-current"\) === "pag
 assert.match(pages, /states\[index\]\.restWidth \+ \(38 - states\[index\]\.restWidth\) \* influence/);
 assert.match(styles, /will-change: width, opacity, transform/);
 assert.match(styles, /\.v1-mini-tooltip\[data-visible="true"\]/);
+assert.match(styles, /\.v1-mini-tooltip \{[^}]*min-width: var\(--mini-tip-width\)[^}]*width: max-content/s);
 assert.match(styles, /\.v1-mini-sidebar \{[^}]*height: 53px[^}]*right: 18px[^}]*top: 50%[^}]*translateY\(-50%\)/s);
 assert.match(styles, /\.v1-mini-rail \{[^}]*gap: 0[^}]*left: 50%[^}]*top: 50%[^}]*translate\(-50%, -50%\)/s);
 assert.match(styles, /\.v1-mini-item > span \{[^}]*width: 8px/s);

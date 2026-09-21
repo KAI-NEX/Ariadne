@@ -369,7 +369,7 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-mini-item > span { background: var(--vi-action); border-radius: 999px; display: block; height: 2px; opacity: .2; transform: scaleY(.76); transform-origin: right center; width: 8px; will-change: width, opacity, transform; }
 .v1-mini-item[aria-current="page"] > span { height: 3px; opacity: .96; width: 18px; }
 .v1-mini-item:focus-visible { outline-offset: 1px; }
-.v1-mini-tooltip { align-items: center; backdrop-filter: blur(18px); background: rgba(255,255,255,.92); border: 1px solid rgba(220,225,233,.82); border-radius: 13px; box-shadow: 0 12px 30px rgba(31,34,42,.12), 0 2px 7px rgba(31,34,42,.05); color: #23262d; display: flex; font-size: 12px; font-weight: 590; height: 37px; opacity: 0; overflow: hidden; padding: 0 13px; pointer-events: none; position: absolute; right: 46px; top: var(--mini-tip-y); transform: translate(-8px, -50%) scale(.96); transform-origin: right center; transition: top 220ms cubic-bezier(.16,.84,.24,1), width 260ms cubic-bezier(.16,.84,.24,1), opacity 140ms ease, transform 220ms cubic-bezier(.16,.84,.24,1); white-space: nowrap; width: var(--mini-tip-width); }
+.v1-mini-tooltip { align-items: center; backdrop-filter: blur(18px); background: rgba(255,255,255,.92); border: 1px solid rgba(220,225,233,.82); border-radius: 13px; box-shadow: 0 12px 30px rgba(31,34,42,.12), 0 2px 7px rgba(31,34,42,.05); color: #23262d; display: flex; font-size: 12px; font-weight: 590; height: 37px; min-width: var(--mini-tip-width); opacity: 0; overflow: hidden; padding: 0 13px; pointer-events: none; position: absolute; right: 46px; top: var(--mini-tip-y); transform: translate(-8px, -50%) scale(.96); transform-origin: right center; transition: top 220ms cubic-bezier(.16,.84,.24,1), min-width 260ms cubic-bezier(.16,.84,.24,1), opacity 140ms ease, transform 220ms cubic-bezier(.16,.84,.24,1); white-space: nowrap; width: max-content; }
 .v1-mini-tooltip[data-visible="true"] { opacity: 1; transform: translate(0, -50%) scale(1); }
 .v1-mini-tooltip > span { display: block; }
 .v1-route-leaving .v1-page-shell { animation: none; opacity: 0; transform: translateY(0); }
@@ -1093,8 +1093,9 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 /* Web-only bilingual control; the Skill keeps its existing single-language shell. */
 .ariadne-language-switch {
   position: fixed;
-  right: var(--vi-space-16);
-  bottom: var(--vi-space-16);
+  bottom: max(var(--vi-space-16), env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 15;
   min-width: var(--vi-target-comfort);
   min-height: var(--vi-target-comfort);
@@ -1112,5 +1113,5 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 [data-ariadne-product="skill"] .ariadne-language-switch { display: none; }
 
 @media (max-width: 700px) {
-  .ariadne-language-switch { right: var(--vi-space-12); bottom: var(--vi-space-12); }
+  .ariadne-language-switch { bottom: max(var(--vi-space-12), env(safe-area-inset-bottom)); }
 }

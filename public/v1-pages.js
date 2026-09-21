@@ -468,8 +468,9 @@
       if (activeItem === item && tooltip.dataset.visible === "true") return;
       activeItem = item;
       rail.style.setProperty("--mini-tip-y", `${item.offsetTop + item.offsetHeight / 2}px`);
-      rail.style.setProperty("--mini-tip-width", `${item.dataset.miniWidth}px`);
       tooltipText.textContent = item.dataset.miniLabel;
+      const translatedWidth = Math.ceil(tooltipText.scrollWidth) + 28;
+      rail.style.setProperty("--mini-tip-width", `${Math.max(Number(item.dataset.miniWidth), translatedWidth)}px`);
       tooltip.dataset.visible = "true";
       navItems.forEach((entry) => entry.classList.toggle("is-nearest", entry === item));
       tooltipText.getAnimations?.().forEach((animation) => animation.cancel());
