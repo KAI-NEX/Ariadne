@@ -24,4 +24,5 @@
 - 2026-09-21 后续修复英文 minibar：tooltip 同时采用翻译后文字测量和内容固有宽度，避免 `Personal Profile`、`Connection Settings` 等较长英文被裁切或侵入导航 rail；701 px 与 920 px 检查四个英文标签完整，390 px 首页按钮水平居中且内页按钮数量为零。证据保存在 `.cache/i18n-minibar-20260921/`。
 - 2026-09-21 已从源码提交 `74b1f9d` 发布 Cloudflare Pages 生产部署 `5a893081-8199-4309-a896-bb967e77fa07`（`https://5a893081.ariadne-7pc.pages.dev`），正式域名继续使用 `https://ariadne.kai-nex.com`。本次只更新 Pages，API Worker、Service Binding 和 DNS 未变更。
 - 正式域名检查根页、`/i18n.js?v=1`、`/healthz` 与 `/api/web-runtime` 均为 HTTP 200；egolite 完成中英往返、跨页保持，并在 390 px 下检查 16 个当前 Web 页面，英文标题、语言属性、切换按钮和横向布局均通过。证据保存在 `.cache/web-i18n-publication-20260921/`。
+- 2026-09-21 minibar 与按钮位置修复从提交 `c2c3a3b` 发布为 Pages 生产部署 `38b616f1-4923-49a9-b39b-8bbf808fa5f3`（`https://38b616f1.ariadne-7pc.pages.dev`）。正式域名再次验证中文→英文切换、390 px 首页按钮中心偏差为 0、内页按钮数量为 0，920 px 下 `Connection Settings` 与 `Personal Profile` 文字均完整留在 tooltip 内且不覆盖 rail；静态资源与隔离发布包逐字节一致。API Worker 与 DNS 未变更。
 - 本阶段未调用真实模型、未发送个人材料；英文模型回答语言仍由当前问题、上下文和模型行为决定，不改写既有回复。
