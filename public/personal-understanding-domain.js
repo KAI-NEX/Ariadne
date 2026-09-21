@@ -36,16 +36,10 @@
     const check = await (globalThis.AriadneTransport || globalThis).fetch("/api/personal-understanding-signature", { cache: "no-store" });
     const payload = await check.json();
     if (!check.ok || !Memory.same(payload.runtime_signature, signature())) throw new Error("RUNTIME_CONTRACT_VERSION_MISMATCH");
-    const attachments = globalThis.AriadneConversationAttachments;
-    const outbound = attachments ? await attachments.prepare(request, "PERSONAL") : request;
-    let response, result;
-    try {
-      response = await (globalThis.AriadneTransport || globalThis).fetch("/api/personal-understanding-turn", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(outbound) });
-      result = await response.json();
-    } catch (error) { attachments?.finish(request, false, error); throw error; }
-    attachments?.finish(request, response.ok && !result.error, result.error);
-    if (!response.ok) throw new Error(result.error || "PERSONAL_PROVIDER_FAILED");
-    return result;
+    const transport = globalThis.AriadneConversationTurnTransport;
+    if (!transport) throw new Error("CONVERSATION_TURN_TRANSPORT_UNAVAILABLE");
+    return transport.execute({ request, domain: "PERSONAL", endpoint: "/api/personal-understanding-turn",
+      fallback_error: "PERSONAL_PROVIDER_FAILED" });
   }
   function validateResult(result, request) {
     if (result?.contract_id !== Contract.result_contract || result.request_id !== request.request_id || result.phase !== request.phase

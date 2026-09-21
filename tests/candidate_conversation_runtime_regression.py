@@ -754,7 +754,8 @@ assert captured["model"] == MODEL_ID
 pages_source = (ROOT / "public" / "v1-pages.js").read_text(encoding="utf-8")
 assert "applyCandidateWorkspaceCorrection" not in pages_source
 assert "CandidateModel.editedCandidateWorkingModel" in pages_source
-assert 'fetch("/api/candidate-conversation-turn"' in pages_source
+assert 'AriadneConversationTurnTransport' in pages_source
+assert 'endpoint: "/api/candidate-conversation-turn"' in pages_source
 assert "CandidateWorkspaceConversationRuntime.executeListTurn" in pages_source
 assert 'Object.freeze({ type: "ITEM", item_id: activeCandidateWorkspaceItemId })' in pages_source
 truth_source = (ROOT / "public" / "truth-persistence-domain.js").read_text(encoding="utf-8")

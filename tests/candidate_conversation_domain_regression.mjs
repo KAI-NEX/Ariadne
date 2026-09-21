@@ -187,7 +187,7 @@ assert.equal(Conversation.canonicalDisplayLabel("ROLE"), "角色");
 assert.equal(Conversation.canonicalDisplayLabel("ROLE"), byFact("synthetic-role").canonical_display_label);
 
 const source = fs.readFileSync(path.join(root, "public", "v1-pages.js"), "utf8");
-assert.match(source, /fetch\("\/api\/candidate-conversation-turn"/); // Workspace List and Detail share the real conversation route.
+assert.match(source, /AriadneConversationTurnTransport[\s\S]*endpoint: "\/api\/candidate-conversation-turn"/); // Workspace List and Detail share the real conversation route through the shared turn transport.
 assert.doesNotMatch(source, /applyCandidateWorkspaceCorrection/);
 assert.equal(typeof Conversation.validateSemanticAction, "undefined"); // Provider semantics are server-owned; browser keeps canonical validation.
 console.log("candidate_conversation_domain=pass");

@@ -1,5 +1,7 @@
 # Ariadne 项目上下文
 
+2026-09-21 最新对话附件架构整合：用户看到 DOCX 与总 spinner 后误以为文件未发送；实际该轮在约 67 秒后 `SUCCEEDED`，原件已写入当前 Skill 工作区，并生成 5 页可下载 PDF。根因是附件准备、落盘、请求、解析与收尾分散在四个领域调用中，界面无法表达真实阶段。现新增共用 Turn Transport，Candidate、Job、个人理解和职位概况统一走「能力检查 → 读取校验 → 本机保存 → 发送并等待模型 → 完成/失败」，页面不再各自调用附件 `prepare/finish`；领域 schema、Working/Proposal、只读范围与人工保存仍独立。架构见 [共用对话 Turn 架构](docs/current/CONVERSATION_TURN_ARCHITECTURE.md)。
+
 2026-09-21 最新 Skill 对话与职位导入修复：粘贴职位中含 Emoji 等 Unicode 扩展字符时，浏览器原按 UTF-16 code unit 计数、Python 后端按 Unicode code point 校验，导致请求在模型调用前误报 `MODEL_FAILED`；现已统一为 code point 计数与切片，并补充明确的长时间等待状态。Skill 原生窗口改为 1392×944、最小 1080×720，保持既有长宽比；Skill 详情浮层使用 92% 宽度，资料与对话保持左右双栏。Candidate、Job、关于我的共用对话将说明区纳入可滚动历史、移除每轮耗时和底部多余留白，保存待回复用户消息；进行中的嵌入对话关闭后继续保留，返回同一卡片恢复原界面。「整理为个人补充」改在同一详情浮层内淡出切换，可返回原对话，不再硬跳转清空界面。
 
 2026-09-21 最新本机资料迁移：已修复 Ariadne Skill 同名旧构建可能被 Launch Services 误选及 Skill 工作区绑定路径不一致的问题，新增校验原件 hash、逐文件 SHA-256 和目标冲突拒绝的显式工作区导入。已确认的浏览器工作区 `cb3634b814d142b2a45f7f093397d092` 完整复制到独立 Skill 文件库，源目录与旧 Skill 工作区保留；Skill 显示 18 张个人卡片和 5 个职位。随后仅清理 egolite/Chrome 的 Ariadne 本地与公网 origin，未处理浏览历史、密码或其他网站数据。

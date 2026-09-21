@@ -1618,7 +1618,6 @@
   }
 
   async function callCandidateConversationRuntime(request, { includeAttachments = true } = {}) {
-    const attachments = includeAttachments ? window.AriadneConversationAttachments : null;
     const signatureResponse = await (globalThis.AriadneTransport || globalThis).fetch("/api/candidate-conversation-runtime-signature", { cache: "no-store" });
     const signaturePayload = await signatureResponse.json().catch(() => null);
     const frontendSignature = CandidateWorkspaceConversationRuntime.runtimeSignature();
@@ -1645,24 +1644,18 @@
       };
       throw error;
     }
-    const outboundRequest = attachments ? await attachments.prepare(request, "CANDIDATE") : request;
-    let response;
-    try { response = await (globalThis.AriadneTransport || globalThis).fetch("/api/candidate-conversation-turn", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(outboundRequest),
-    }); } catch (error) { attachments?.finish(request, false, error); throw error; }
-    const result = await response.json().catch(() => ({ error: "MALFORMED_RESPONSE" }));
-    attachments?.finish(request, response.ok && !result.error, result.error);
-    if (!response.ok) {
+    const transport = window.AriadneConversationTurnTransport;
+    if (!transport) throw new Error("CONVERSATION_TURN_TRANSPORT_UNAVAILABLE");
+    return transport.execute({ request, domain: "CANDIDATE", endpoint: "/api/candidate-conversation-turn",
+      fallback_error: "CANDIDATE_CONVERSATION_FAILED", include_attachments: includeAttachments,
+      create_error: ({ result }) => {
       const error = new Error(result.error || "CANDIDATE_CONVERSATION_FAILED");
       error.code = result.error || "CANDIDATE_CONVERSATION_FAILED";
       error.failure_layer = result.failure_layer || "runtime";
       error.network_call_made = result.network_call_made === true;
       error.diagnostics = result.diagnostics;
-      throw error;
-    }
-    return result;
+      return error;
+    } });
   }
 
   async function submitCandidateWorkspaceConversation(content, options = {}) {
@@ -3753,7 +3746,6 @@
   }
 
   async function callJobConversationRuntime(request) {
-    const attachments = window.AriadneConversationAttachments;
     const signatureResponse = await (globalThis.AriadneTransport || globalThis).fetch("/api/job-conversation-runtime-signature", { cache: "no-store" });
     const signaturePayload = await signatureResponse.json().catch(() => null);
     if (!signatureResponse.ok || !JobConversation.runtimeSignaturesMatch(JobConversation.runtimeSignature(), signaturePayload?.runtime_signature)) {
@@ -3762,23 +3754,15 @@
       error.network_call_made = false;
       throw error;
     }
-    const outboundRequest = attachments ? await attachments.prepare(request, "JOB") : request;
-    let response;
-    try { response = await (globalThis.AriadneTransport || globalThis).fetch("/api/job-conversation-turn", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(outboundRequest),
-    }); } catch (error) { attachments?.finish(request, false, error); throw error; }
-    const result = await response.json().catch(() => ({ error: "MALFORMED_RESPONSE" }));
-    if (!response.ok) {
-      attachments?.finish(request, false, result.error);
+    const transport = window.AriadneConversationTurnTransport;
+    if (!transport) throw new Error("CONVERSATION_TURN_TRANSPORT_UNAVAILABLE");
+    return transport.execute({ request, domain: "JOB", endpoint: "/api/job-conversation-turn",
+      fallback_error: "JOB_CONVERSATION_FAILED", create_error: ({ result }) => {
       const error = new Error(result.error || "JOB_CONVERSATION_FAILED");
       error.code = result.error || "JOB_CONVERSATION_FAILED";
       error.network_call_made = result.network_call_made === true;
-      throw error;
-    }
-    attachments?.finish(request, true);
-    return result;
+      return error;
+    } });
   }
 
   function previousCandidateSnapshot(analysis) {

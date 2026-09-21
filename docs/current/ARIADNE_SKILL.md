@@ -17,6 +17,8 @@
 
 独立窗口默认 1392×944、最小 1080×720，保持原 1180:800 长宽比并为嵌入详情保留左右双栏。Candidate、Job 与关于我的共用对话会把标题和首次说明作为可滚动历史，消息增多后自然上移；不显示每轮耗时。生成中的详情即使暂时关闭也保留当前 iframe，返回同一卡片继续显示；已完成历史仍按各领域既有持久化恢复。「整理为个人补充」在当前详情浮层内淡出切换，返回按钮回到原对话，个人补充继续遵守 DRAFT/人工保存边界。
 
+对话附件统一由 [共用 Turn Transport](CONVERSATION_TURN_ARCHITECTURE.md) 编排。页面会分别显示能力检查、文件读取校验、本机安全保存、发送并等待模型、完成或失败；DOCX 等附件在等待时出现 spinner 不表示传输失败。完成后生成文件位于对应回复下方，重启时可从已保存 deliverable 在本机重新生成下载链接。附件仍只供本轮使用，不自动成为确认资料。
+
 用户明确要求迁移且已经核实来源工作区身份时，可运行 `python3 scripts/ariadne.py import-workspace --source-root <workspaces-root> --workspace <workspace-id>`。工具锁定源库，校验所有被索引的 Markdown、JSON 和原件 hash，完整复制到 Skill 数据目录并写入 `ariadne-desktop-workspace-binding-v1` 显式绑定；源目录与旧 Skill 工作区保留，不做合并或覆盖，也不复制浏览器 API Key、Cookie 或其他网站数据。重新打开 Skill 并核对实际资料后，才可另行清理对应浏览器 origin。
 
 启动命令为 `python3 scripts/ariadne.py window`，诊断为 `python3 scripts/ariadne.py doctor`；路径相对于实际安装的 Skill。窗口核对使用 `opening_window.application` 返回的完整 App 路径，避免同名旧构建或 QA 缓存被误认成当前 Skill。`open` 仅用于明确选择的浏览器或开发验收，`connect` 已停用。完整包由 `python3 scripts/build_skill_bundle.py` 构建，包含页面、契约、启动器和完整性清单，不包含凭据或用户资料。

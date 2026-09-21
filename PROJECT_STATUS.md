@@ -1,5 +1,13 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-21 — 对话附件 Turn Transport 架构整合（COMPLETE；本机）
+
+- 诊断用户截图对应的真实执行：`产品经理final.docx` 记录为 `SOURCE_INPUT_ONLY`、66,333 bytes，06:59:39 创建，07:00:46 结束，状态 `SUCCEEDED`；约 67 秒内文件并未被拒绝。结果包含 PDF deliverable，重启 Skill 后历史恢复并在本地重新生成 5 页 PDF，实际界面显示下载链接。
+- 确认基础问题不是某一个 DOCX 特例，而是附件组件虽然共用，`prepare → fetch → parse → finish` 仍分别散落在 Candidate、Job、个人理解和职位概况四处。新增 `conversation-turn-transport.js` 作为唯一前端网络生命周期编排层；四个领域只提供 endpoint、domain identity 和领域错误，保留各自 Runtime signature、结果校验、语义权限与持久化。
+- `conversation-attachments.js` 收敛为 Composer/Attachment Controller，明确展示 `CHECKING_CAPABILITY → READING_AND_HASHING → SAVED_LOCALLY → MODEL_REQUEST → COMPLETED/FAILED`。原件仍先在本机保存，失败保留选择；成功文案区分普通回复和生成文件，不重新引入每轮耗时，也不声称未知的 Provider 上传百分比。
+- 六个对话入口均加载同一 Turn Transport，中英文动态状态同步；架构职责、不变量和新增领域接入规则记录在 [共用对话 Turn 架构](docs/current/CONVERSATION_TURN_ARCHITECTURE.md)。本轮未改变后端附件完整性、模型资格、Candidate/Job 隔离、Working/Proposal 或人工保存边界。
+- 72/72 JavaScript 回归、DOCX 与四领域后端附件传输回归、相关领域 Python 回归、Skill bundle 8 项、VI、ZIP/doctor、语法和差异检查通过。最终包 2,836,958 bytes，SHA-256 `49efa6eb19ddab88d2ba7af6c0c375c5d6b187a299622387bd5431cd480aa3ee`，216 个运行文件；已同步并重启本机 Skill。本轮修复未重新发送用户附件、未部署公网、未 push。
+
 ## 2026-09-21 — Skill 粘贴职位、对话连续性与宽屏布局（COMPLETE；本机）
 
 - 修复粘贴职位包含 Emoji/Unicode 扩展字符时的前后端长度歧义：前端统一按 Unicode code point 分块、截断和生成 `character_count`，与 Python 校验一致；失败原因为请求进入模型前的 source preparation 校验，不是模型拒绝。职位模型导入增加持续等待文案，明确原件已保存在本机且不会静默改用 Local。

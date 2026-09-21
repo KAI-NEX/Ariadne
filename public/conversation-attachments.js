@@ -6,6 +6,11 @@
   const controllers = new Map(), pending = new Map();
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const requestId = (r) => r.turn?.execution_id || r.request_id;
+  const providerName = (runtime) => runtime?.provider === "codex" ? "Codex" : runtime?.provider || "当前模型";
+  function setStatus(state, stage, copy) {
+    state.status.dataset.stage = stage;
+    state.status.textContent = copy;
+  }
   function errorCopy(error) {
     const code = String(error?.code || error?.message || error);
     if (/docx_complex/.test(code)) return "这个 Word 文件含暂不能完整读取的图表或嵌入对象，请导出为 PDF 后重试。";
@@ -128,28 +133,42 @@
     const runtime = request.runtime_snapshot;
     if (state.runtime !== state.identityFor(runtime)) throw Error("attachment_runtime_invalid");
     state.busy = true;
+    setStatus(state, "CHECKING_CAPABILITY", "正在检查附件格式与模型能力…");
     state.render();
     try {
       const check = await (root.AriadneTransport || root).fetch("/api/conversation-attachment-capabilities", { cache: "no-store" });
       if (!check.ok || (await check.json()).contract_id !== CONTRACT) throw Error("attachment_contract_invalid");
+      setStatus(state, "READING_AND_HASHING", "正在读取并校验附件完整性…");
       const files = [...state.files], records = await Promise.all(files.map(recordFor));
       if (new Set(records.map(r => r.content_hash)).size !== records.length) throw Error("attachment_duplicate_content");
       if (!state.consent.checked) throw Error("attachment_consent_required");
       await persist(request, files, records, domain);
       if (!state.consent.checked || state.runtime !== state.identityFor(runtime)) throw Error("attachment_consent_required");
       pending.set(requestId(request), { state, files });
+      setStatus(state, "SAVED_LOCALLY", `附件已安全保存在本机；准备发送给 ${providerName(runtime)}…`);
       return { ...request, attachments: { contract_id: CONTRACT, request_id: requestId(request), files: records,
         consent: { confirmed: true, provider: runtime.provider, model: runtime.model, purpose: "CURRENT_CONVERSATION_TURN" } } };
     } catch (error) { state.busy = false; state.status.textContent = errorCopy(error) || error.message; state.render(); throw error; }
   }
-  function finish(request, ok, error = null) {
+  function stage(request, value) {
+    const active = pending.get(requestId(request));
+    if (!active) return;
+    if (value === "MODEL_REQUEST") {
+      setStatus(active.state, value, `附件已安全保存在本机；正在发送给 ${providerName(request.runtime_snapshot)} 并等待模型理解与回复…`);
+      active.state.render();
+    }
+  }
+  function finish(request, ok, error = null, result = null) {
     const active = pending.get(requestId(request)); if (!active) return;
     pending.delete(requestId(request)); const { state, files } = active; state.busy = false;
-    if (ok) { state.files = state.files.filter(f => !files.includes(f)); state.consent.checked = false; state.status.textContent = `本轮已发送：${files.map(f => f.name).join("、")}。原件已保存在此工作区；再次查看请重新添加，不自动纳入确认资料。`; }
-    else state.status.textContent = errorCopy(error) || "本轮未完成，附件保留，可以重试。";
+    if (ok) {
+      state.files = state.files.filter(f => !files.includes(f)); state.consent.checked = false;
+      const next = result?.deliverable ? "生成文件正在本轮回复中准备，可直接下载。" : "本轮回复已生成。";
+      setStatus(state, "COMPLETED", `${files.map(f => f.name).join("、")} 已发送并处理完成；${next}`);
+    } else setStatus(state, "FAILED", errorCopy(error) || "本轮未完成，附件保留，可以重试。");
     state.render();
   }
-  root.AriadneConversationAttachments = { prepare, finish, errorCopy, validateFiles, recordFor, CONTRACT };
+  root.AriadneConversationAttachments = { prepare, stage, finish, errorCopy, validateFiles, recordFor, CONTRACT };
   if (typeof module === "object") module.exports = root.AriadneConversationAttachments;
   if (root.document) document.addEventListener("DOMContentLoaded", () => {
     const link = document.createElement("link"); link.rel = "stylesheet"; link.href = "/conversation-attachments.css?v=inline-composer-3"; document.head.append(link);

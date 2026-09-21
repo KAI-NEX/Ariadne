@@ -23,6 +23,7 @@
 
 ## 传输与保存
 
+- 四个 Model 对话领域统一通过 [共用对话 Turn 架构](CONVERSATION_TURN_ARCHITECTURE.md) 编排附件准备、发送、响应解析与收尾。页面和领域模块不再分别调用附件 `prepare/finish`；可见状态按「能力检查 → 读取校验 → 本机保存 → 发送并等待模型 → 完成/失败」推进，领域结果校验与保存权限不合并。
 - 现有文字上下文契约保持，增加可选且独立版本化的 `ariadne-conversation-attachments-v1` 当前轮通道。前端先检查专用能力端点；后端核对模型资格、执行 ID、显式 Provider/model 确认、文件类型/字节数/hash、总量和解码结果。
 - 选中文件不会立即发送。发送前在独立浏览器 IndexedDB `ariadne-conversation-attachments-v1/turns` 保存原件和当前领域/会话/执行关联，标记 `SOURCE_INPUT_ONLY`；保存失败则不发送。不会把二进制塞入文字上下文、个人记忆或已确认资料。
 - Provider 只接收必要文件名、正文、图片和页码，不接收本地凭据、文件路径或附件存储键。附件中的文字不是用户指令；修改权限不因附件而提升。结果仍由各领域既有校验与保存路径处理。
