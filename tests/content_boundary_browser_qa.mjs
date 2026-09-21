@@ -33,15 +33,17 @@ try {
  const consentError=await page.evaluate(()=>AriadneConversationAttachments.prepare({request_id:'new-attachment',runtime_snapshot:window.__qaRuntime},'PERSONAL').then(()=>null,e=>e.message));
  assert.equal(consentError,'attachment_consent_required');
  await page.locator('#personal-conversation-form .v1-attachment-consent input').check();
- const prepared=await page.evaluate(async()=>{const request={request_id:'new-attachment',runtime_snapshot:window.__qaRuntime};const prepared=await AriadneConversationAttachments.prepare(request,'PERSONAL');AriadneConversationAttachments.finish(request,false);const db=await AriadneContentDatabase.open('ariadne-conversation-attachments-v1');try{const saved=await new Promise((resolve,reject)=>{const q=db.transaction('turns').objectStore('turns').get(request.request_id);q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);});return {domain:saved.domain,authority:saved.authority,text:await saved.files[0].file.text(),files:prepared.attachments.files.length,consent:prepared.attachments.consent.confirmed};}finally{db.close();}});
- assert.deepEqual(prepared,{domain:'PERSONAL',authority:'SOURCE_INPUT_ONLY',text:'  本轮新附件\n',files:1,consent:true});
+ const prepared=await page.evaluate(async()=>{const request={request_id:'new-attachment',runtime_snapshot:window.__qaRuntime};const prepared=await AriadneConversationAttachments.prepare(request,'PERSONAL');AriadneConversationAttachments.stage(request,'MODEL_REQUEST');AriadneConversationAttachments.dispatch(request);const dispatched={cards:document.querySelectorAll('#personal-conversation-form [data-attachment-list] li').length,status:document.querySelector('#personal-conversation-form .v1-attachment-status').textContent};AriadneConversationAttachments.finish(request,false);const db=await AriadneContentDatabase.open('ariadne-conversation-attachments-v1');try{const saved=await new Promise((resolve,reject)=>{const q=db.transaction('turns').objectStore('turns').get(request.request_id);q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);});return {domain:saved.domain,authority:saved.authority,text:await saved.files[0].file.text(),files:prepared.attachments.files.length,consent:prepared.attachments.consent.confirmed,dispatched};}finally{db.close();}});
+ assert.deepEqual(prepared,{domain:'PERSONAL',authority:'SOURCE_INPUT_ONLY',text:'  本轮新附件\n',files:1,consent:true,dispatched:{cards:0,status:'本轮已发送 1 个附件给 Codex；正在等待模型理解与回复…'}});
  assert.equal(await page.locator('#personal-conversation-form [data-attachment-list] li').count(),1,'failed turn retains selected attachment');
+ assert.equal(await page.locator('#personal-conversation-form .v1-attachment-consent input').isChecked(),false,'restored attachment requires fresh transfer confirmation');
  const pages=[];
  for(const url of ['local-first.html','local-jobs.html','career-evidence.html','career-profile.html']){
   await page.goto(base+'/'+url);await page.waitForFunction(()=>window.AriadneContentDatabase);
+  await page.evaluate(()=>{window.AriadneProduct ||= {kind:'skill',storage:'filesystem'};});
   const info=await page.evaluate(async()=>{const db=await AriadneContentDatabase.open('job-radar-local-first-v1');const storage=db.storage;db.close();return {storage,title:document.title};});assert.equal(info.storage,'MARKDOWN_FILES');pages.push({url,...info});
  }
  assert.deepEqual(errors,[]);assert.deepEqual(modelRequests,[]);
- const report={checks:['historical application and nested attachment migration','real attachment controls, consent, durable file, failed turn retention','four historical pages use shared Markdown boundary'],pages,errors,modelRequests};
+ const report={checks:['historical application and nested attachment migration','real attachment controls, immediate dispatch receipt, durable file, failed turn restoration','four historical pages use shared Markdown boundary'],pages,errors,modelRequests};
  await fs.writeFile(path.join(output,'results.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));await context.close();
 }finally{await browser.close();}

@@ -29,6 +29,8 @@ assert.match(component,/addButton.disabled = state.busy/);
 assert.match(component,/state.urls.get\(file\) \|\| URL.createObjectURL\(file\)/);
 for (const stage of ['CHECKING_CAPABILITY','READING_AND_HASHING','SAVED_LOCALLY','MODEL_REQUEST','COMPLETED','FAILED']) assert.ok(component.includes(stage));
 assert.match(component,/已安全保存在本机/);
+assert.match(component,/本轮已发送.*正在等待模型理解与回复/);
+assert.match(component,/附件已恢复；请重新确认后重试/);
 assert.match(component,/已发送并处理完成/);
 assert.match(css,/\.v1-attachment-add::before[^}]+plus\.svg/);
 assert.match(css,/\.v1-attachment-remove::before[^}]+close\.svg/);
@@ -41,6 +43,9 @@ assert.match(pages,/\["PDF", "IMAGE", "DOCX"\]\.includes\(source.source_type\)/)
 assert.match(pages,/\["PDF", "IMAGE", "DOCX"\]\.includes\(selectedCandidateSources\[0\]\?\.source_type\)/);
 assert.match(turnTransport,/attachments \? await attachments\.prepare\(request, domain\) : request/);
 assert.match(turnTransport,/attachments\?\.stage\(request, "MODEL_REQUEST"\)/);
+assert.match(turnTransport,/const responsePromise = .*\.fetch\(endpoint/);
+assert.match(turnTransport,/attachments\?\.dispatch\(request\)/);
+assert.ok(turnTransport.indexOf('attachments?.dispatch(request)') < turnTransport.indexOf('await responsePromise'));
 assert.match(turnTransport,/attachments\?\.finish\(request, true, null, result\)/);
 assert.match(turnTransport,/attachments\?\.finish\(request, false, error\)/);
 for(const domain of ['CANDIDATE','JOB']) assert.ok(pages.includes(`domain: "${domain}"`));

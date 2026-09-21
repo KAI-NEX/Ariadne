@@ -684,6 +684,7 @@
     ,"请先选择模型，并勾选本轮附件的传输确认。": "Choose a model and select the attachment-transfer confirmation for this turn."
     ,"请解读本轮附件。": "Please interpret the attachments in this turn."
     ,"本轮未完成，附件保留，可以重试。": "This turn did not finish. Attachments remain available; you can retry."
+    ,"本轮未完成，附件已恢复；请重新确认后重试。": "This turn did not finish. The attachments were restored; confirm the transfer again and retry."
     ,"项目材料": "Project material"
     ,"项目说明": "Project description"
     ,"其他材料": "Other material"
@@ -886,9 +887,10 @@
     ,[/^正在检查附件格式与模型能力…$/u, () => "Checking attachment formats and model capability…"]
     ,[/^正在读取并校验附件完整性…$/u, () => "Reading attachments and verifying their integrity…"]
     ,[/^附件已安全保存在本机；准备发送给 (.*)…$/su, (_, provider) => `Attachments are safely stored on this device; preparing to send them to ${provider}…`]
-    ,[/^附件已安全保存在本机；正在发送给 (.*) 并等待模型理解与回复…$/su, (_, provider) => `Attachments are safely stored on this device; sending them to ${provider} and waiting for the model to understand and reply…`]
-    ,[/^(.*) 已发送并处理完成；生成文件正在本轮回复中准备，可直接下载。$/su, (_, files) => `${files} were sent and processed. The generated file is being prepared in this reply and can be downloaded directly.`]
-    ,[/^(.*) 已发送并处理完成；本轮回复已生成。$/su, (_, files) => `${files} were sent and processed. This turn's reply is ready.`]
+    ,[/^附件已安全保存在本机；正在发送给 (.*)…$/su, (_, provider) => `Attachments are safely stored on this device; sending them to ${provider}…`]
+    ,[/^本轮已发送 (.*)给 (.*)；正在等待模型理解与回复…$/su, (_, files, provider) => `${files} were sent to ${provider} for this turn; waiting for the model to understand them and reply…`]
+    ,[/^本轮 (.*) 已发送并处理完成；生成文件正在本轮回复中准备，可直接下载。$/su, (_, files) => `${files} were sent and processed in this turn. The generated file is being prepared in this reply and can be downloaded directly.`]
+    ,[/^本轮 (.*) 已发送并处理完成；本轮回复已生成。$/su, (_, files) => `${files} were sent and processed in this turn. This turn's reply is ready.`]
     ,[/^正在读取(图片|PDF|材料)$/u, (_, kind) => `Reading ${translate(kind).toLowerCase()}`]
     ,[/^(图片|PDF|材料)已读取$/u, (_, kind) => `${translate(kind)} read`]
     ,[/^当前所选模型的(.*)能力尚未真实接通；操作已停用，不会生成模型样例，也不会静默改用本地结果。$/su, (_, subject) => `The selected model's ${subject} capability is not actually connected. This action is disabled; it will not generate a model sample or silently use a local substitute.`]

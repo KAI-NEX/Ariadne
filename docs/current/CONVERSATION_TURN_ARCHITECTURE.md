@@ -11,12 +11,12 @@
 ## 当前管线
 
 1. **Composer / Attachment Controller**：`conversation-attachments.js` 只负责选择、格式与大小检查、明确传输确认、本机 `SOURCE_INPUT_ONLY` 原件记录，以及可见阶段状态。
-2. **Turn Transport**：`conversation-turn-transport.js` 是唯一的前端网络编排入口，按顺序准备附件、标记模型请求、发送 JSON、解析统一错误，并且恰好一次完成或失败附件状态。
+2. **Turn Transport**：`conversation-turn-transport.js` 是唯一的前端网络编排入口，按顺序准备附件、标记模型请求、发起 JSON 请求、确认 composer dispatch、解析统一错误，并且恰好一次完成或失败附件状态。
 3. **Domain Contract**：Candidate、Job、个人理解、职位概况继续分别创建请求、检查 Runtime signature、校验结果和执行各自的 Working/Proposal/只读权限；共用传输不解释领域语义。
 4. **Backend Attachment Adapter**：`src/conversation_attachments.py` 集中核对执行 ID、Provider/model 同意、文件名/MIME/大小/hash 和完整解码，再把本轮材料作为低权限 source material 放入对应领域 payload。
 5. **Persistence / Delivery**：领域持久化只保存已校验的对话与 Working 结果；附件不会自动成为确认资料。模型选择 PDF/图解 deliverable 时，`conversation-output.js` 在本地生成下载文件。
 
-可见阶段固定为：检查模型能力 → 读取并校验 → 本机安全保存 → 发送并等待模型理解 → 完成/失败。它们描述实际边界，不伪造 Provider 侧的上传百分比，也不重新引入每轮耗时计时。
+可见阶段固定为：检查模型能力 → 读取并校验 → 本机安全保存 → 请求已发出并等待模型理解 → 完成/失败。网络请求成功创建后，dispatch 会立即把本轮附件从 composer 移出并显示数量回执，避免长时间生成过程中把已发送缩略图误认为待发送；若网络或模型失败，原附件恢复到 composer，用户重新确认后可以重试。它们描述实际边界，不伪造 Provider 侧的上传百分比，也不重新引入每轮耗时计时。
 
 ## 不变量
 

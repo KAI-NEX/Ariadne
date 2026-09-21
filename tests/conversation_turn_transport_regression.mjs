@@ -11,6 +11,7 @@ try {
   globalThis.AriadneConversationAttachments = {
     async prepare(request, domain) { events.push(["prepare", request.request_id, domain]); return { ...request, attachments: { files: [1] } }; },
     stage(request, stage) { events.push(["stage", request.request_id, stage]); },
+    dispatch(request) { events.push(["dispatch", request.request_id]); },
     finish(request, ok, error, result) { events.push(["finish", request.request_id, ok, error?.message || null, result?.answer || null]); },
   };
   globalThis.AriadneTransport = {
@@ -25,6 +26,7 @@ try {
     ["prepare", "turn-1", "JOB"],
     ["stage", "turn-1", "MODEL_REQUEST"],
     ["fetch", "/api/job-conversation-turn", 1],
+    ["dispatch", "turn-1"],
     ["finish", "turn-1", true, null, "ready"],
   ]);
 
@@ -34,7 +36,17 @@ try {
     Transport.execute({ request, domain: "JOB", endpoint: "/api/job-conversation-turn", fallback_error: "JOB_FAILED" }),
     (error) => error.code === "provider_failed" && error.failure_layer === "transport",
   );
+  assert.deepEqual(events.slice(0, 3), [["prepare", "turn-1", "JOB"], ["stage", "turn-1", "MODEL_REQUEST"], ["dispatch", "turn-1"]]);
   assert.deepEqual(events.at(-1), ["finish", "turn-1", false, "provider_failed", null]);
+
+  events.length = 0;
+  globalThis.AriadneTransport.fetch = () => { throw new Error("fetch_not_created"); };
+  await assert.rejects(
+    Transport.execute({ request, domain: "JOB", endpoint: "/api/job-conversation-turn" }),
+    /fetch_not_created/,
+  );
+  assert.equal(events.some(([event]) => event === "dispatch"), false, "composer dispatch requires a created request");
+  assert.deepEqual(events.at(-1), ["finish", "turn-1", false, "fetch_not_created", null]);
 
   events.length = 0;
   globalThis.AriadneTransport.fetch = async (_endpoint, options) => {

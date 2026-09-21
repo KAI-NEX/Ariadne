@@ -7,6 +7,7 @@
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const requestId = (r) => r.turn?.execution_id || r.request_id;
   const providerName = (runtime) => runtime?.provider === "codex" ? "Codex" : runtime?.provider || "当前模型";
+  const attachmentLabel = (files) => files.every((file) => /\.(png|jpe?g)$/i.test(file.name)) ? `${files.length} 张图片` : `${files.length} 个附件`;
   function setStatus(state, stage, copy) {
     state.status.dataset.stage = stage;
     state.status.textContent = copy;
@@ -154,9 +155,19 @@
     const active = pending.get(requestId(request));
     if (!active) return;
     if (value === "MODEL_REQUEST") {
-      setStatus(active.state, value, `附件已安全保存在本机；正在发送给 ${providerName(request.runtime_snapshot)} 并等待模型理解与回复…`);
+      setStatus(active.state, value, `附件已安全保存在本机；正在发送给 ${providerName(request.runtime_snapshot)}…`);
       active.state.render();
     }
+  }
+  function dispatch(request) {
+    const active = pending.get(requestId(request));
+    if (!active || active.dispatched) return;
+    const { state, files } = active;
+    active.dispatched = true;
+    state.files = state.files.filter((file) => !files.includes(file));
+    state.consent.checked = false;
+    setStatus(state, "MODEL_REQUEST", `本轮已发送 ${attachmentLabel(files)}给 ${providerName(request.runtime_snapshot)}；正在等待模型理解与回复…`);
+    state.render();
   }
   function finish(request, ok, error = null, result = null) {
     const active = pending.get(requestId(request)); if (!active) return;
@@ -164,14 +175,21 @@
     if (ok) {
       state.files = state.files.filter(f => !files.includes(f)); state.consent.checked = false;
       const next = result?.deliverable ? "生成文件正在本轮回复中准备，可直接下载。" : "本轮回复已生成。";
-      setStatus(state, "COMPLETED", `${files.map(f => f.name).join("、")} 已发送并处理完成；${next}`);
-    } else setStatus(state, "FAILED", errorCopy(error) || "本轮未完成，附件保留，可以重试。");
+      setStatus(state, "COMPLETED", `本轮 ${attachmentLabel(files)} 已发送并处理完成；${next}`);
+    } else {
+      if (active.dispatched) {
+        const selected = new Set(state.files.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
+        state.files = [...files.filter((file) => !selected.has(`${file.name}:${file.size}:${file.lastModified}`)), ...state.files];
+        state.consent.checked = false;
+      }
+      setStatus(state, "FAILED", errorCopy(error) || "本轮未完成，附件已恢复；请重新确认后重试。");
+    }
     state.render();
   }
-  root.AriadneConversationAttachments = { prepare, stage, finish, errorCopy, validateFiles, recordFor, CONTRACT };
+  root.AriadneConversationAttachments = { prepare, stage, dispatch, finish, errorCopy, validateFiles, recordFor, CONTRACT };
   if (typeof module === "object") module.exports = root.AriadneConversationAttachments;
   if (root.document) document.addEventListener("DOMContentLoaded", () => {
-    const link = document.createElement("link"); link.rel = "stylesheet"; link.href = "/conversation-attachments.css?v=inline-composer-3"; document.head.append(link);
+    const link = document.createElement("link"); link.rel = "stylesheet"; link.href = "/conversation-attachments.css?v=inline-composer-4"; document.head.append(link);
     Object.entries(FORMS).forEach(([id, domain]) => { const form = document.getElementById(id); if (form) mount(form, domain); });
   }, { once: true });
 }(typeof globalThis === "undefined" ? this : globalThis));

@@ -32,11 +32,13 @@
     try {
       const outbound = attachments ? await attachments.prepare(request, domain) : request;
       attachments?.stage(request, "MODEL_REQUEST");
-      const response = await (root.AriadneTransport || root).fetch(endpoint, {
+      const responsePromise = (root.AriadneTransport || root).fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(outbound),
       });
+      attachments?.dispatch(request);
+      const response = await responsePromise;
       const result = await response.json().catch(() => ({ error: malformed }));
       if (!response.ok || result?.error) {
         throw createError ? createError({ response, result }) : fallbackError(result, fallback);
