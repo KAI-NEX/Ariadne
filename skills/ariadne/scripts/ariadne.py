@@ -10,9 +10,11 @@ import shutil
 import signal
 import subprocess
 import sys
+import uuid
 from http.server import ThreadingHTTPServer
 
 SKILL = Path(__file__).resolve().parents[1]
+WORKSPACE_BINDING_CONTRACT = "ariadne-desktop-workspace-binding-v1"
 
 
 def runtime_root():
@@ -47,6 +49,85 @@ def executable(name, override=None):
 def clean_environment():
     return {key: value for key, value in os.environ.items()
             if not key.startswith(("CODEX_", "OPENAI_", "MCP_")) or key == "CODEX_HOME"}
+
+
+def workspace_inventory(directory):
+    result = {}
+    for path in sorted(directory.rglob("*")):
+        if path.is_symlink():
+            raise ValueError("WORKSPACE_IMPORT_SYMLINK_REFUSED")
+        if path.is_file() and path.name != ".lock":
+            result[str(path.relative_to(directory))] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return result
+
+
+def import_workspace(runtime, source_root, state, workspace, port=8766):
+    """Copy one verified workspace and explicitly bind the native Skill profile."""
+    sys.path.insert(0, str(runtime))
+    from src.workspace_storage import WorkspaceStorage, CONTRACT
+
+    state = state.expanduser()
+    source_root = source_root.expanduser()
+    if state.is_symlink() or source_root.is_symlink():
+        raise ValueError("WORKSPACE_IMPORT_SYMLINK_REFUSED")
+    state = state.resolve()
+    source_root = source_root.resolve()
+    source = WorkspaceStorage(source_root)
+    source_directory = source.directory(workspace)
+    if not (source_directory / "HEAD.json").is_file():
+        raise ValueError("WORKSPACE_IMPORT_SOURCE_UNINITIALIZED")
+    target_root = state / "workspaces"
+    target = WorkspaceStorage(target_root).directory(workspace)
+    mapping = state / "desktop-workspace.json"
+    expected_mapping = {
+        "contract_id": WORKSPACE_BINDING_CONTRACT,
+        "workspace": workspace,
+        "origin": f"http://127.0.0.1:{port}",
+        "binding": "explicit",
+    }
+
+    with source._locked(workspace):
+        head = source._head(source_directory)
+        if not head["databases"]:
+            raise ValueError("WORKSPACE_IMPORT_SOURCE_EMPTY")
+        for database, stores in head["databases"].items():
+            for store, records in stores.items():
+                for key, entry in records.items():
+                    source._load_record(source_directory, entry, CONTRACT["databases"][database][store], key)
+        before = workspace_inventory(source_directory)
+        if target.exists() or mapping.exists():
+            try:
+                current_mapping = json.loads(mapping.read_text())
+            except (OSError, ValueError):
+                current_mapping = None
+            if target.is_dir() and current_mapping == expected_mapping and workspace_inventory(target) == before:
+                return {
+                    "status": "already_imported", "workspace": workspace, "files": len(before),
+                    "original_files": sum(name.startswith("originals/") for name in before),
+                    "verified_sha256": True,
+                }
+            raise FileExistsError("Destination workspace or binding already exists; nothing overwritten")
+
+        target_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        temporary = target_root / (".import-" + uuid.uuid4().hex)
+        shutil.copytree(source_directory, temporary, ignore=shutil.ignore_patterns(".lock"))
+        if workspace_inventory(temporary) != before or workspace_inventory(source_directory) != before:
+            raise ValueError("WORKSPACE_IMPORT_COPY_VERIFICATION_FAILED")
+        if target.exists():
+            raise FileExistsError("Destination workspace appeared during import")
+        os.rename(temporary, target)
+        state.mkdir(parents=True, exist_ok=True, mode=0o700)
+        with mapping.open("x") as output:
+            json.dump(expected_mapping, output)
+            output.write("\n")
+        mapping.chmod(0o600)
+    return {
+        "status": "imported", "workspace": workspace, "files": len(before),
+        "original_files": sum(name.startswith("originals/") for name in before),
+        "records": {database: {store: len(rows) for store, rows in stores.items()}
+                    for database, stores in head["databases"].items()},
+        "verified_sha256": True,
+    }
 
 
 def probe(command):
@@ -185,16 +266,24 @@ def open_local(port=8766, data_dir=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("doctor", "open", "window", "desktop", "connect"))
+    parser.add_argument("action", choices=("doctor", "open", "window", "desktop", "connect", "import-workspace"))
     parser.add_argument("--origin", default="https://ariadne.kai-nex.com")
     parser.add_argument("--port", type=int, default=8766, help="Local UI port; changing it creates a different browser origin.")
     parser.add_argument("--data-dir", type=Path, help="Explicit local UI data directory; defaults outside the Skill install.")
+    parser.add_argument("--source-root", type=Path, help="Workspace root to import from; requires import-workspace.")
+    parser.add_argument("--workspace", help="Exact 32-character workspace identity to import.")
     args = parser.parse_args()
     if args.action == "doctor":
         result = doctor()
         print(json.dumps(result, ensure_ascii=False))
         return 0 if result["ready"] else 1
     try:
+        if args.action == "import-workspace":
+            if not args.source_root or not args.workspace or not 1024 <= args.port <= 65535:
+                raise ValueError("WORKSPACE_IMPORT_ARGUMENTS_INVALID")
+            state = args.data_dir or Path.home() / "Library/Application Support/Ariadne Skill"
+            print(json.dumps(import_workspace(runtime_root(), args.source_root, state, args.workspace, args.port), ensure_ascii=False))
+            return 0
         if args.action in {"window", "desktop"}:
             from skill_window import open_window, supervise
             if not 1024 <= args.port <= 65535:
@@ -212,6 +301,8 @@ def main():
     except (ValueError, OSError, subprocess.SubprocessError) as error:
         if args.action in {"window", "desktop"}:
             print(json.dumps({"error": "NATIVE_WINDOW_SETUP_FAILED", "action": str(error)}))
+        elif args.action == "import-workspace":
+            print(json.dumps({"error": "WORKSPACE_IMPORT_FAILED", "action": str(error)}))
         else:
             print(json.dumps({"error": "CONNECTOR_SETUP_FAILED", "action": "Check the exact HTTPS origin and Skill installation."}))
         return 1

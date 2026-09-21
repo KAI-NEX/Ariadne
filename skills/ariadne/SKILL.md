@@ -12,7 +12,7 @@ description: 打开 Ariadne 独立 Mac 窗口，显示个人资料与职位工�
 所有脚本路径均相对于本 Skill；使用实际安装路径，不假设固定目录。
 
 1. 在可保留终端运行 `python3 scripts/ariadne.py window`。首次用本机 Swift 编译器生成轻量窗口程序，后续复用缓存。需要 macOS 14+、Apple Command Line Tools 和 Python 3.9+；缺依赖明确报告，不自动安装或降级为浏览器。
-2. 脚本返回 `opening_window` 后核对独立窗口实际显示工作空间。不要调用 Codex 内置浏览器或系统浏览器打开本地 URL。窗口已运行时直接使用它，不再创建一份或接管未知端口。
+2. 脚本返回 `opening_window` 后，用返回的完整 `application` 路径核对该独立窗口实际显示工作空间；不要只按应用名或 bundle id 选择窗口，因为保留的旧构建/QA App 可能同名。不要调用 Codex 内置浏览器或系统浏览器打开本地 URL。窗口已运行时直接使用它，不再创建一份或接管未知端口。
 3. 直接进入工作空间，使用已验证的 Codex 配置，无需选择模型首页。Codex/PDF 依赖不足仍可保存原件，但不能声称 AI 就绪；`doctor` 可复查。登录需用户本人完成，不读取认证文件。启动不发模型请求。
 4. 关闭最后一个 Ariadne 窗口或按 ⌘Q，即退出本次窗口和其专属本地服务；窗口异常退出也会收回服务。最小化不会退出，已保存资料保留，不安装开机启动或自动化。终端仅等待窗口结束，不需要用户手动结束服务。
 
@@ -27,6 +27,8 @@ description: 打开 Ariadne 独立 Mac 窗口，显示个人资料与职位工�
 当前已实现的路径是「Agent 调用 Skill → 独立窗口 → 本机 Ariadne → Codex CLI」。页面内 AI 操作使用已验证的 Codex adapter，不接入唤起它的那段聊天，也不继承该聊天的历史或工具。用户要求先跑通 Skill 时，复用现有页面、资料库和模型能力，不以反馈学习、通用个人档案或其他 Agent 适配作为前置条件。
 
 资料属于 Ariadne 工作区，独立于 Skill 安装和 Agent。磁盘根目录下的 `workspaces/<workspace-id>/` 保存内容；当前页面的 `ariadne-content-workspace-v1` 映射决定具体工作区。因此同一台电脑换 Agent 时应复用既有目录与已确认的工作区身份，不复制多份资料，也不按目录新旧猜测身份。跨电脑需要显式传输资料，指定路径本身不构成同步。其他 Agent 的页面连接仍需 adapter 与能力验证；直接改写 Markdown 不能替代来源、版本和人工保存流程。
+
+仅当用户明确要求把一个已经核实身份的本机工作区交给 Skill 时，运行 `python3 scripts/ariadne.py import-workspace --source-root <workspaces-root> --workspace <workspace-id>`。该操作在源库锁内校验所有索引、Markdown、状态和原件 hash，复制到 Skill 数据目录并写入显式窗口绑定；不合并、覆盖或删除源工作区，也不复制 API Key、Cookie 等浏览器状态。目标已有不同资料或映射时拒绝。导入后必须重新打开 Skill，核对页面对象数量和至少一份原件可读，再处理浏览器中的旧副本。
 
 ## 网页与 Skill 分工
 

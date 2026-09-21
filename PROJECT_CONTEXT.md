@@ -1,5 +1,7 @@
 # Ariadne 项目上下文
 
+2026-09-21 最新本机资料迁移：已修复 Ariadne Skill 同名旧构建可能被 Launch Services 误选及 Skill 工作区绑定路径不一致的问题，新增校验原件 hash、逐文件 SHA-256 和目标冲突拒绝的显式工作区导入。已确认的浏览器工作区 `cb3634b814d142b2a45f7f093397d092` 完整复制到独立 Skill 文件库，源目录与旧 Skill 工作区保留；Skill 显示 18 张个人卡片和 5 个职位。随后仅清理 egolite/Chrome 的 Ariadne 本地与公网 origin，未处理浏览历史、密码或其他网站数据。
+
 2026-09-20 最新内容更新：安装窗口复制按钮保留原坐标与尺寸，改为透明背景、700 字重；三个步骤标题改为纯黑。中英 README 以同一份已核实实现更新 Web/API 与 Skill/Codex 架构图，并说明从本地网页验证业务、独立安装包降低环境门槛，到 Skill 复用 Codex 入口的动机及依赖/同步限制。旧图和历史原地保留，新的 [双语图与回执](docs/architecture/archify/2026-09-20-web-skill/review.json)绑定源码 `a4fc904`。
 
 2026-09-20 最新入口与分发更新：用户要求将安装集成到「通过本地 Agent 使用」窗口，直接「复制安装指令」，不再单独跳安装页。已上线 [同页安装窗口](https://ariadne.kai-nex.com/#skill)，旧链接回到该窗口；完整 Skill 包发布于 [GitHub Release](https://github.com/KAI-NEX/Ariadne/releases/tag/skill-20260920-102511)，源码同步现有仓库。Pages `6062f6c7`，安装指令固定 GitHub 版本与 SHA-256；保留先安装再调用、本机直达工作空间及两端独立存储。

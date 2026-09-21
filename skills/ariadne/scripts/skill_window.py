@@ -64,9 +64,16 @@ def open_window(runtime, port, state):
                            stdout=subprocess.DEVNULL)
             if not app.exists():
                 shutil.copytree(stage, app)
+    # Re-register the exact current build so bundle-id/name lookups do not
+    # resolve to a retained QA or older cache copy with the same identity.
+    registrar = Path("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister")
+    if registrar.is_file():
+        subprocess.run([str(registrar), "-f", str(app)], check=False,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     # Launch through macOS so the window is registered as its own application.
     # The native process owns the service pipe; closing/crashing it ends the service.
-    print(json.dumps({"status": "opening_window", "application": str(app), "port": port}), flush=True)
+    print(json.dumps({"status": "opening_window", "application": str(app),
+                      "bundle_identifier": "com.kai-nex.ariadne.skill", "port": port}), flush=True)
     return subprocess.call(["/usr/bin/open", "-W", "-n", str(app), "--args", sys.executable,
                             str(Path(__file__).with_name("ariadne.py")), str(state), str(port)])
 

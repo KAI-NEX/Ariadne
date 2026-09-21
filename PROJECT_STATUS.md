@@ -1,5 +1,13 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-21 — Ariadne Skill 修复、浏览器资料迁移与清理（COMPLETE；本机）
+
+- 修复同 bundle identifier 的旧 QA/缓存 App 可能被按名称误选的问题：启动前向 Launch Services 注册当前精确构建，启动回执返回完整 App 路径与 bundle id，使用说明要求按路径核对。修正 Skill 原生窗口的工作区根目录，并以 `ariadne-desktop-workspace-binding-v1` 显式绑定经校验的导入工作区；保留旧目录，不以目录新旧猜测身份。
+- 新增 `import-workspace`：在源工作区锁内读取全部索引记录、校验 Markdown/JSON 与原件 hash，拒绝符号链接、损坏来源、目标冲突和覆盖；复制后逐文件 SHA-256 复核，重复执行仅在目标与映射完全一致时返回 `already_imported`。不迁移 API Key、Cookie、密码、历史记录或其他网站数据。
+- 已将已核实的浏览器工作区 `cb3634b814d142b2a45f7f093397d092` 导入 `~/Library/Application Support/Ariadne Skill/`：410 个文件、22 个原件，源目标清单完全一致；独立 Skill 实际显示 18 张个人卡片和 5 个职位。安装前副本、构建包和运行证据保存在 `.cache/skill-repair-20260921/`；发布 ZIP 为 2,834,430 bytes，SHA-256 `44b22c3707448d21f87017ff17e74d10fe78378d648dc241e56e69a21a544a51`。
+- 用户确认删除后，egolite 对 `http://127.0.0.1:8000` 与 `https://ariadne.kai-nex.com` 精确执行 origin 级清理，现场验证 localStorage 为空、IndexedDB 列表为空；Chrome 由用户在站点数据设置中删除，随后两个可见 Chrome 实例的本地/公网工作空间均实际显示“尚未添加”。未执行 profile 级 Cookie/缓存清理，Skill 文件库复核仍为 410 个文件和 22 个原件。
+- `skill_bundle_regression.py` 8 项、`desktop_workspace_copy_regression.py`、VI 检查与 `git diff --check` 通过；安装版重复导入返回 `already_imported` 且 SHA-256 验证成功。未发起真实模型请求、未发布公网、未 push；原有无关未提交修改和 QA 产物继续保留。
+
 ## 2026-09-20 — 透明安装按钮、纯黑步骤标题与双语架构说明（COMPLETE）
 
 - 按用户要求保留「复制安装指令」的原位置和尺寸，改透明背景、700 字重；悬停下划线、键盘可见焦点保留。三个步骤标题改纯黑，使用 manifest 新语义 token `--vi-text-emphasis` 并重新生成 CSS，不手改生成资源。实际桌面按钮 630×50.28125 px、390px 页面按钮 314×50.28125 px，变更前后矩形完全一致，三个标题均为 rgb(0,0,0)。

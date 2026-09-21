@@ -104,13 +104,23 @@ final class AriadneApp: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNav
         let file = home.appendingPathComponent("desktop-workspace.json")
         guard FileManager.default.fileExists(atPath: file.path) else { return }
         let settings = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: String]
+        #if SKILL_WINDOW
+        let workspaceRoot = home.appendingPathComponent("workspaces")
+        #else
+        let workspaceRoot = home.appendingPathComponent("data/workspaces")
+        #endif
+        let explicit = settings?["binding"] == "explicit"
         guard let id = settings?["workspace"], id.range(of: "^[a-f0-9]{32}$", options: .regularExpression) != nil,
               settings?["origin"] == origin.absoluteString,
-              FileManager.default.fileExists(atPath: home.appendingPathComponent("data/workspaces/\(id)/HEAD.json").path) else {
+              (!explicit || settings?["contract_id"] == "ariadne-desktop-workspace-binding-v1"),
+              FileManager.default.fileExists(atPath: workspaceRoot.appendingPathComponent("\(id)/HEAD.json").path) else {
             throw NSError(domain: "Ariadne", code: 1, userInfo: [NSLocalizedDescriptionKey: "资料库映射无效，未打开其他资料库。"])
         }
-        // Only seed a new native profile. Existing native workspaces retain their identity.
-        let script = "if(location.origin==='\(origin.absoluteString)'&&!localStorage.getItem('ariadne-content-workspace-v1')){localStorage.setItem('ariadne-content-workspace-v1','\(id)')}"
+        // Legacy App mappings only seed a new profile. A Skill import writes an
+        // explicit, validated binding and may intentionally replace an empty
+        // native profile identity without changing or deleting that old folder.
+        let condition = explicit ? "location.origin==='\(origin.absoluteString)'" : "location.origin==='\(origin.absoluteString)'&&!localStorage.getItem('ariadne-content-workspace-v1')"
+        let script = "if(\(condition)){localStorage.setItem('ariadne-content-workspace-v1','\(id)')}"
         configuration.userContentController.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
     }
 

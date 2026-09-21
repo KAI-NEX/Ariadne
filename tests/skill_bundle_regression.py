@@ -17,8 +17,10 @@ from unittest.mock import patch
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 from build_skill_bundle import build, safe_copy
+from src.workspace_storage import WorkspaceStorage
 
 
 class SkillTests(unittest.TestCase):
@@ -133,6 +135,63 @@ class SkillTests(unittest.TestCase):
         finally:
             proc.terminate(); proc.communicate(timeout=10)
         self.assertFalse((self.skill / "runtime/data/workspaces").exists())
+
+    def test_explicit_workspace_import_binds_skill_without_overwrite(self):
+        source_root = self.directory / "import-source"
+        state = self.directory / "import-state"
+        workspace = "d" * 32
+        original = b"synthetic browser original\x00\xff"
+        record = {
+            "source_document_id": "source-browser-synthetic", "filename": "resume.pdf",
+            "content_hash": "sha256:" + hashlib.sha256(original).hexdigest(),
+            "file_blob": {"$blob": "base64", "data": base64.b64encode(original).decode(), "type": "application/pdf"},
+        }
+        WorkspaceStorage(source_root).commit(
+            workspace, "job-radar-local-first-v1", {"source_documents": None},
+            [{"store": "source_documents", "operation": "add", "value": record}], initialize=True,
+        )
+        retained = state / "workspaces" / ("e" * 32)
+        retained.mkdir(parents=True)
+        (retained / "unrelated.txt").write_text("retained")
+        result = self.run_cli("import-workspace", "--source-root", str(source_root),
+                              "--workspace", workspace, "--data-dir", str(state))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        receipt = json.loads(result.stdout)
+        self.assertEqual(receipt["status"], "imported")
+        self.assertTrue(receipt["verified_sha256"])
+        self.assertEqual((retained / "unrelated.txt").read_text(), "retained")
+        mapping = json.loads((state / "desktop-workspace.json").read_text())
+        self.assertEqual(mapping, {
+            "contract_id": "ariadne-desktop-workspace-binding-v1", "workspace": workspace,
+            "origin": "http://127.0.0.1:8766", "binding": "explicit",
+        })
+        source_files = {str(path.relative_to(source_root / workspace)): hashlib.sha256(path.read_bytes()).hexdigest()
+                        for path in (source_root / workspace).rglob("*") if path.is_file() and path.name != ".lock"}
+        target_files = {str(path.relative_to(state / "workspaces" / workspace)): hashlib.sha256(path.read_bytes()).hexdigest()
+                        for path in (state / "workspaces" / workspace).rglob("*") if path.is_file() and path.name != ".lock"}
+        self.assertEqual(target_files, source_files)
+        repeated = self.run_cli("import-workspace", "--source-root", str(source_root),
+                                "--workspace", workspace, "--data-dir", str(state))
+        self.assertEqual(repeated.returncode, 0)
+        self.assertEqual(json.loads(repeated.stdout)["status"], "already_imported")
+        swift = (self.skill / "runtime/scripts/desktop_macos.swift").read_text()
+        self.assertIn('home.appendingPathComponent("workspaces")', swift)
+        self.assertIn('settings?["binding"] == "explicit"', swift)
+
+        corrupt_workspace = "f" * 32
+        WorkspaceStorage(source_root).commit(
+            corrupt_workspace, "job-radar-local-first-v1", {"source_documents": None},
+            [{"store": "source_documents", "operation": "add", "value": {**record, "source_document_id": "corrupt-source"}}],
+            initialize=True,
+        )
+        blob = next((source_root / corrupt_workspace / "originals").rglob("resume.pdf"))
+        blob.write_bytes(b"corrupt")
+        broken_state = self.directory / "broken-import-state"
+        rejected = self.run_cli("import-workspace", "--source-root", str(source_root),
+                                "--workspace", corrupt_workspace, "--data-dir", str(broken_state))
+        self.assertEqual(rejected.returncode, 1)
+        self.assertEqual(json.loads(rejected.stdout)["error"], "WORKSPACE_IMPORT_FAILED")
+        self.assertFalse((broken_state / "desktop-workspace.json").exists())
 
     def test_private_files_and_symlinks_refused(self):
         source = self.directory / "source"
