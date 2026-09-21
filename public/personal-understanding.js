@@ -142,7 +142,7 @@
     const button = event.target.closest("button"); if (!button || busy) return;
     const memoryId = button.dataset.memoryEdit || button.dataset.memoryForget;
     const memory = Memory.latest(state.memories).find((entry) => entry.memory_id === memoryId); if (!memory) return;
-    if (button.dataset.memoryEdit) { byId("personal-message").value = `我想修正这条已保存的补充：“${memory.text}”。实际情况是：`; byId("personal-message").focus(); return; }
+    if (button.dataset.memoryEdit) { byId("personal-message").value = window.AriadneI18n?.t(`我想修正这条已保存的补充：“${memory.text}”。实际情况是：`) || `我想修正这条已保存的补充：“${memory.text}”。实际情况是：`; byId("personal-message").focus(); return; }
     let db;
     try {
       db = await Truth.openDatabase();

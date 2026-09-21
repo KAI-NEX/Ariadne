@@ -92,7 +92,8 @@
       const images = [...(event.clipboardData?.items || [])].filter(x => x.kind === "file" && ["image/png", "image/jpeg"].includes(x.type)).map(x => x.getAsFile()).filter(Boolean);
       if (images.length) {
         event.preventDefault();
-        add(images.map((blob, i) => new File([blob], `粘贴图片-${Date.now()}-${i + 1}.${blob.type === "image/png" ? "png" : "jpg"}`, { type: blob.type })));
+        const pastedPrefix = root.AriadneI18n?.locale?.() === "en" ? "pasted-image" : "粘贴图片";
+        add(images.map((blob, i) => new File([blob], `${pastedPrefix}-${Date.now()}-${i + 1}.${blob.type === "image/png" ? "png" : "jpg"}`, { type: blob.type })));
         const pastedText = event.clipboardData.getData("text/plain");
         if (pastedText && event.target === text) {
           text.setRangeText(pastedText, text.selectionStart, text.selectionEnd, "end");
@@ -114,7 +115,7 @@
     form.addEventListener("submit", event => {
       if (!state.files.length) return;
       if (state.busy || !consent.checked || state.runtime !== identity() || runtime()?.mode !== "model") { event.preventDefault(); event.stopImmediatePropagation(); status.textContent = state.busy ? "附件正在发送，请稍候。" : "请先选择模型，并勾选本轮附件的传输确认。"; return; }
-      const text = form.querySelector("textarea"); if (!text.value.trim()) text.value = "请解读本轮附件。";
+      const text = form.querySelector("textarea"); if (!text.value.trim()) text.value = root.AriadneI18n?.t("请解读本轮附件。") || "请解读本轮附件。";
     }, true);
     root.JobRadarRuntimeGate?.subscribe?.(() => { consent.checked = false; state.runtime = identity(); render(); });
     state.render = render; render();

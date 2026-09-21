@@ -1,0 +1,46 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import vm from "node:vm";
+
+const source = fs.readFileSync(new URL("../public/i18n.js", import.meta.url), "utf8");
+const listeners = new Map();
+const storage = new Map();
+const context = {
+  document: {
+    readyState: "loading",
+    addEventListener(name, callback) { listeners.set(name, callback); },
+  },
+  localStorage: {
+    getItem(key) { return storage.get(key) || null; },
+    setItem(key, value) { storage.set(key, value); },
+  },
+};
+context.globalThis = context;
+vm.runInNewContext(source, context, { filename: "i18n.js" });
+
+const i18n = context.AriadneI18n;
+assert.ok(i18n, "i18n API should be available before DOMContentLoaded");
+assert.equal(i18n.translate("工作空间"), "Workspace");
+assert.equal(i18n.translate("3 张资料卡片"), "3 material cards");
+assert.equal(i18n.translate("1 个职位对象"), "1 job item");
+assert.equal(i18n.translate("自定义中文经历"), "自定义中文经历", "unknown personal content must not be rewritten");
+assert.equal(i18n.storageKey, "ariadne.ui.locale.v1");
+assert.match(source, /button\.textContent = "EN\/中"/);
+assert.ok(listeners.has("DOMContentLoaded"));
+
+const pages = [
+  "index", "workspace", "personal-information", "personal-import", "candidate-detail",
+  "jd", "jd-import", "job-detail", "personal-understanding", "job-overview", "about",
+  "install", "codex-connect", "gemini-connect", "gemini-api-key-guide", "download",
+];
+for (const page of pages) {
+  const html = fs.readFileSync(new URL(`../public/${page}.html`, import.meta.url), "utf8");
+  assert.match(html, /<script src="\/i18n\.js\?v=1"><\/script>/, `${page} must load the shared language layer`);
+}
+
+const css = fs.readFileSync(new URL("../public/styles.css", import.meta.url), "utf8");
+assert.match(css, /\.ariadne-language-switch\s*\{/);
+assert.match(css, /\[data-ariadne-product="skill"\] \.ariadne-language-switch \{ display: none; \}/);
+assert.doesNotMatch(source, /fetch\s*\(/, "language switching must remain local and must not send content anywhere");
+
+console.log("i18n regression PASS");
