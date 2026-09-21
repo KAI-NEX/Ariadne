@@ -2967,9 +2967,12 @@
     const owned = !database;
     const db = database || await Truth.openDatabase();
     try {
-      const revisions = await JobContext.getAll(db, "job_context_revisions");
-      const lifecycle = await JobContext.getAll(db, "job_context_lifecycle");
-      return JobContext.activeRevisions(revisions, lifecycle).map(JobContext.recordForUi);
+      const [revisions, lifecycle, sourceRecords] = await Promise.all([
+        JobContext.getAll(db, "job_context_revisions"),
+        JobContext.getAll(db, "job_context_lifecycle"),
+        JobContext.getAll(db, "source_documents"),
+      ]);
+      return JobContext.activeRevisions(revisions, lifecycle).map((revision) => JobContext.recordForUi(revision, sourceRecords));
     } finally { if (owned) db.close(); }
   }
 
@@ -3309,7 +3312,12 @@
     jobModelConsentSelectionVersion = selectionVersion;
     jobModelConsentRuntimeIdentity = runtimeIdentity(currentGate.authority.runtime);
     jobModelConsentId = `consent-job-model-import-${crypto.randomUUID()}`;
-    jobModelConsentBundle = await JobModel.sourceBundleFor(sources, sourceDocuments);
+    const consentBundle = await JobModel.sourceBundleFor(sources, sourceDocuments);
+    // Execution must consume the same source snapshot that the user approved,
+    // including a link entered after the files were selected.
+    selectedJobSources = sources;
+    selectedJobSource = sources[0] || null;
+    jobModelConsentBundle = consentBundle;
     byId("job-model-consent-provider").textContent = gate.authority.runtime.provider === "codex" ? "Codex / OpenAI" : gate.authority.runtime.provider;
     byId("job-model-consent-model").textContent = gate.authority.runtime.model;
     const dialog = byId("job-model-consent-dialog");
@@ -3909,18 +3917,20 @@
 
   async function initJobDetail() {
     const jobId = new URLSearchParams(window.location.search).get("job") || Demo.JOB_FIXTURE.job_context_id;
+    let activeJobSourceRecords = [];
     activeJobRevision = await canonicalJobRevision(jobId);
     if (activeJobRevision) {
       const database = await Truth.openDatabase();
       try {
         const sourceId = activeJobRevision.provenance.source_document_ids[0];
         const sourceDocuments = await JobContext.getAll(database, "source_documents");
+        activeJobSourceRecords = sourceDocuments;
         activeJobSourceDocuments = activeJobRevision.provenance.source_document_ids.map((entry) => sourceDocuments.find((document) => document.source_document_id === entry)).filter(Boolean);
         activeJobSourceDocument = activeJobSourceDocuments.find((document) => document.source_document_id === sourceId) || activeJobSourceDocuments[0] || null;
       } finally { database.close(); }
     }
     const storedJob = activeJobRevision ? null : await Demo.get(Demo.DEMO_STORES.jobs, jobId);
-    const job = activeJobRevision ? JobContext.recordForUi(activeJobRevision) : (await localizedJobRecords(storedJob ? [storedJob] : []))[0] || (jobId === Demo.JOB_FIXTURE.job_context_id ? Demo.clone(Demo.JOB_FIXTURE) : null);
+    const job = activeJobRevision ? JobContext.recordForUi(activeJobRevision, activeJobSourceRecords) : (await localizedJobRecords(storedJob ? [storedJob] : []))[0] || (jobId === Demo.JOB_FIXTURE.job_context_id ? Demo.clone(Demo.JOB_FIXTURE) : null);
     if (!job) throw new Error("job_context_not_found");
     const renderJob = (record) => {
       activeJob = record;

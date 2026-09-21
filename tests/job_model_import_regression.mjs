@@ -196,6 +196,7 @@ assert.match(pages, /currentOperationGate\(modelMode \? jobImportOperation\(\) :
 assert.doesNotMatch(pages, /selectedJobProcessingMode|configureJobProcessingMode/);
 const consentFlow = pages.slice(pages.indexOf("async function openJobModelConsent"), pages.indexOf("function runJobModelProcessing"));
 assert.ok(consentFlow.indexOf("SourceInput.persistDurableBundle") < consentFlow.indexOf("dialog.showModal()"));
+assert.ok(consentFlow.indexOf("selectedJobSources = sources") < consentFlow.indexOf("dialog.showModal()"), "execution reuses the consent sources that include the entered job link");
 assert.match(pages, /selectedJobSources = \[selectedJobSource\]/);
 const lifecycle = ImportLifecycle.createStateMachine();
 assert.equal(lifecycle.transition(ImportLifecycle.STATES.SOURCE_STORED), "SOURCE_STORED");

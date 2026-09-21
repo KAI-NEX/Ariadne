@@ -107,6 +107,19 @@ const confirmed = await JobContext.persistReview(database, proposal, "CONFIRM");
 assert.equal(confirmed.revision.version, 1);
 assert.equal(confirmed.revision.authority, "AUTHORITATIVE_CONFIRMED_CONTEXT");
 assert(!confirmed.revision.context_id.includes(sourceDocument.content_hash.replace("sha256:", "")));
+const revisionWithoutCopiedUrl = structuredClone(confirmed.revision);
+revisionWithoutCopiedUrl.payload.source_url = null;
+const archivedSource = {
+  contract_id: "ariadne-source-archive-v1",
+  source_document_id: "source-archive-v1::synthetic-link",
+  material_type: "JOB",
+  source_document_ids: [...confirmed.revision.payload.source_document_ids],
+  source_url: sourceInput.source_url,
+  created_at: "2026-09-04T01:00:04Z",
+};
+assert.equal(JobContext.archivedSourceUrl([archivedSource], confirmed.revision.payload.source_document_ids), sourceInput.source_url);
+assert.equal(JobContext.recordForUi(revisionWithoutCopiedUrl, [archivedSource]).source_url, sourceInput.source_url, "cards recover a link retained by the exact source archive");
+assert.equal(JobContext.recordForUi(revisionWithoutCopiedUrl, [{ ...archivedSource, source_document_ids: ["other-source"] }]).source_url, null, "an unrelated archive cannot lend its URL to this job");
 const immutableV1 = structuredClone(confirmed.revision);
 
 const directEdit = await JobContext.persistDirectEdit(database, confirmed.revision, { location: "上海（混合办公）", requirements: confirmed.revision.payload.requirements });

@@ -518,7 +518,19 @@
     });
   }
 
-  function recordForUi(revision) {
+  function archivedSourceUrl(sourceRecords, sourceIds) {
+    if (!Array.isArray(sourceRecords) || !Array.isArray(sourceIds) || !sourceIds.length) return null;
+    const expected = JSON.stringify(sourceIds);
+    const matches = sourceRecords.filter((record) => record?.contract_id === "ariadne-source-archive-v1"
+      && record.material_type === "JOB"
+      && typeof record.source_url === "string"
+      && record.source_url.trim()
+      && JSON.stringify(record.source_document_ids) === expected);
+    matches.sort((left, right) => String(right.created_at || "").localeCompare(String(left.created_at || "")));
+    return matches[0]?.source_url.trim() || null;
+  }
+
+  function recordForUi(revision, sourceRecords = []) {
     const current = Truth.validateContextRevision(revision);
     const payload = validateJobPayload(current.payload);
     return Object.freeze({
@@ -532,7 +544,7 @@
       summary: payload.summary || "摘要待确认",
       requirements: payload.requirements,
       source_document_ids: payload.source_document_ids,
-      source_url: payload.source_url,
+      source_url: payload.source_url || archivedSourceUrl(sourceRecords, payload.source_document_ids),
       source_availability: payload.source_availability,
       review_status: "CONFIRMED",
       updated_at: current.created_at,
@@ -545,6 +557,6 @@
     contextIdForProposal, latestRevision, latestRevisions, activeRevisions, persistRemoval, acceptedPayload, workingPayload, workingSubjectFor, reviewOutcome, getAll, persistReview,
     directEditProposal, persistDirectEdit,
     validateChangeProposal, createChangeProposal, persistChangeProposal, revisionFromChangeProposal,
-    changeDecision, persistAcceptedChange, persistRejectedChange, recordForUi,
+    changeDecision, persistAcceptedChange, persistRejectedChange, archivedSourceUrl, recordForUi,
   });
 }));

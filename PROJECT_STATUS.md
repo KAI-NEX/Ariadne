@@ -1,5 +1,11 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-21 — 职位卡片来源链接恢复（COMPLETE；本机）
+
+- 定位到链接不是被删除：当前 Skill 工作区有一条 URL 保存在 `ariadne-source-archive-v1`，但对应确认 Job revision 的 `source_url` 为空。原因是 consent 阶段使用了带链接的 source snapshot，执行阶段却重新复制了更早的 `selectedJobSources`，链接未进入模型职位提案和确认版本，卡片渲染按空值隐藏。
+- 新导入现在让模型执行复用已确认的 source snapshot。既有职位若确认版本没有 URL，则只从 `material_type=JOB`、有序 `source_document_ids` 完全相同的最新非空来源归档读取显示值；不修改历史确认版本，不跨职位借用链接，最终仍由 `http/https` 安全校验决定是否渲染。
+- 本机已重新构建并同步 Skill；ZIP 2,837,329 bytes，SHA-256 `73784244b9bfc0bade1a56edeffe794398852b3b3571e4c8e9a039ecc2ef3ff0`，216 个运行文件。独立窗口实际打开 7 个职位对象，确认「AI 产品工程师（协同办公创新方向）」卡片底部恢复 `职位链接 · jobs.mihoyo.com`，其他没有已保存 URL 的卡片不伪造入口。72/72 JavaScript 回归、Job 领域/导入/卡片专项、VI、Skill bundle 8 项、doctor、语法与 diff 检查通过；未打开外部职位站点、未调用模型、未改写用户资料、未部署公网或 push。
+
 ## 2026-09-21 — 对话附件 Turn Transport 架构整合（COMPLETE；本机）
 
 - 诊断用户截图对应的真实执行：`产品经理final.docx` 记录为 `SOURCE_INPUT_ONLY`、66,333 bytes，06:59:39 创建，07:00:46 结束，状态 `SUCCEEDED`；约 67 秒内文件并未被拒绝。结果包含 PDF deliverable，重启 Skill 后历史恢复并在本地重新生成 5 页 PDF，实际界面显示下载链接。

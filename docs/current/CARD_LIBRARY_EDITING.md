@@ -7,6 +7,7 @@
 - Candidate 复用 `candidate_context_lifecycle`，按 context + item 移除；同一来源其他条目保留。
 - 已确认 Job 新增 `job_context_lifecycle`，按 context 移除。记录包含用户权限、当前 revision、时间与原因，版本冲突及重复删除拒绝；不覆盖旧确认版本、不删除来源、对话或投递历史。
 - 当前资料库、工作空间计数和职位概况排除已移除 Job。职位概况的当前指纹随范围改变，旧概况缓存不能冒充当前结果；已确认后移除的 proposal 不退回 Working。
+- 职位卡片的来源链接优先读取当前确认 Job payload；历史确认版本缺少该字段时，只按完全一致的有序来源 ID 从 Job 来源归档回溯显示，不改写确认版本，也不从其他职位继承链接。新导入的模型执行必须复用用户确认时包含链接的 source snapshot。
 - 旧演示/Local 卡片继续采用既有领域删除行为，不以演示数据写入确认资料。
 - 主数据库契约版本 18；网页 Markdown 库按缺失 store 增量升级，保留原迁移标记、内容和原备份。本机文件库沿现有 schema 增加空记录集合。
 

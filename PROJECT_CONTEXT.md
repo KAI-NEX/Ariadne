@@ -1,5 +1,7 @@
 # Ariadne 项目上下文
 
+2026-09-21 最新职位来源链接修复：职位导入的知情确认阶段会把当时填写的链接持久化到来源归档，但模型执行此前重新读取了未带链接的文件选择对象，使正式 Job revision 的 `source_url` 为空，卡片因此隐藏链接。现在执行复用同一份 consent source snapshot；对于已发生的数据，卡片只按完全一致的有序 `source_document_ids` 从来源归档回溯链接，不改写确认版本，也不会借用其他职位的 URL。当前 Skill 工作区实际恢复出「AI 产品工程师（协同办公创新方向）」的 `jobs.mihoyo.com` 职位链接。
+
 2026-09-21 最新对话附件架构整合：用户看到 DOCX 与总 spinner 后误以为文件未发送；实际该轮在约 67 秒后 `SUCCEEDED`，原件已写入当前 Skill 工作区，并生成 5 页可下载 PDF。根因是附件准备、落盘、请求、解析与收尾分散在四个领域调用中，界面无法表达真实阶段。现新增共用 Turn Transport，Candidate、Job、个人理解和职位概况统一走「能力检查 → 读取校验 → 本机保存 → 发送并等待模型 → 完成/失败」，页面不再各自调用附件 `prepare/finish`；领域 schema、Working/Proposal、只读范围与人工保存仍独立。架构见 [共用对话 Turn 架构](docs/current/CONVERSATION_TURN_ARCHITECTURE.md)。
 
 2026-09-21 最新 Skill 对话与职位导入修复：粘贴职位中含 Emoji 等 Unicode 扩展字符时，浏览器原按 UTF-16 code unit 计数、Python 后端按 Unicode code point 校验，导致请求在模型调用前误报 `MODEL_FAILED`；现已统一为 code point 计数与切片，并补充明确的长时间等待状态。Skill 原生窗口改为 1392×944、最小 1080×720，保持既有长宽比；Skill 详情浮层使用 92% 宽度，资料与对话保持左右双栏。Candidate、Job、关于我的共用对话将说明区纳入可滚动历史、移除每轮耗时和底部多余留白，保存待回复用户消息；进行中的嵌入对话关闭后继续保留，返回同一卡片恢复原界面。「整理为个人补充」改在同一详情浮层内淡出切换，可返回原对话，不再硬跳转清空界面。
