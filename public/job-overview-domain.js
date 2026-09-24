@@ -3,9 +3,9 @@
   const dep = (name, file) => root[name] || (typeof module === "object" ? require(file) : null);
   const api = factory(dep("AriadneJobOverviewContract", "../data/job_overview_contract_v1.json"), dep("AriadneTruthPersistence", "./truth-persistence-domain.js"),
     dep("AriadneJobContext", "./job-context-domain.js"), dep("AriadnePersonalContext", "./personal-context-domain.js"),
-    dep("AriadneRuntimeExecution", "./runtime-capabilities.js"), dep("JobRadarRuntimeGate", "./runtime-capability-gate.js"));
+    dep("AriadneJobCandidateContext", "./job-candidate-context-domain.js"), dep("AriadneRuntimeExecution", "./runtime-capabilities.js"), dep("JobRadarRuntimeGate", "./runtime-capability-gate.js"));
   if (typeof module === "object" && module.exports) module.exports = api; else root.AriadneJobOverview = api;
-}(globalThis, function create(Contract, Truth, Job, Context, Runtime, Gate) {
+}(globalThis, function create(Contract, Truth, Job, Context, Candidate, Runtime, Gate) {
   const STORES = ["job_overview_fragments", "job_overview_snapshots", "job_overview_turns"];
   const INPUT_STORES = ["job_context_lifecycle", "job_context_revisions", "context_proposals", "context_review_decisions", "source_documents"];
   const id = (prefix) => `${prefix}-${crypto.randomUUID()}`, now = () => new Date().toISOString();
@@ -48,11 +48,12 @@
       semantic: semantic(entry.payload, "WORKING_UNCONFIRMED", entry.source_document_ids, sources) });
     records.sort((a, b) => a.identity.localeCompare(b.identity));
     for (let index = 0; index < records.length; index++) { records[index].ref = `job-${index + 1}`; records[index].semantic_hash = await fingerprint(records[index].semantic); }
-    return { records, fingerprint: await fingerprint(records.map(({ ref, ...entry }) => entry)), confirmed_count: revisions.length, working_count: pending.size };
+    return { candidate: await Candidate.buildSnapshot(input), records, fingerprint: await fingerprint(records.map(({ ref, ...entry }) => entry)), confirmed_count: revisions.length, working_count: pending.size };
   }
   async function snapshotFromDatabase(db) {
     const values = await Promise.all(INPUT_STORES.map((name) => getAll(db, name)));
     const snapshot = await buildSnapshot(Object.fromEntries(INPUT_STORES.map((name, index) => [name, values[index]])));
+    snapshot.candidate = await Candidate.buildSnapshotFromDatabase(db);
     snapshot.overview = (await getAll(db, "job_overview_snapshots")).filter((entry) => entry.authority === "NON_AUTHORITATIVE_JOB_OVERVIEW" && entry.fingerprint === snapshot.fingerprint && entry.prompt_version === Contract.prompt_version).sort((a, b) => b.created_at.localeCompare(a.created_at))[0] || null;
     return snapshot;
   }
@@ -69,7 +70,7 @@
     if (!consent || runtime?.mode !== "model" || !Gate.isModelRuntimeEligible({ mode: runtime.mode, provider: runtime.provider, model: runtime.model })) throw new Error("JOB_OVERVIEW_CONSENT_REQUIRED");
     if (!Contract.phases.includes(phase) || Context.bytes(context) > Contract.limits.context_bytes) throw new Error("JOB_OVERVIEW_CONTEXT_LIMIT");
     return { contract_id: Contract.request_contract, request_id: id("job-overview-request"), phase, context: clone(context), human_message: humanMessage, runtime_snapshot: runtime,
-      consent: { confirmed: true, purpose: "JOB_OVERVIEW", provider: runtime.provider, model: runtime.model } };
+      consent: { confirmed: true, purpose: Contract.consent_purpose, provider: runtime.provider, model: runtime.model } };
   }
   async function callRuntime(request) {
     const check = await (globalThis.AriadneTransport || globalThis).fetch("/api/job-overview-signature", { cache: "no-store" }), checked = await check.json();
@@ -83,6 +84,14 @@
     if (result?.contract_id !== Contract.result_contract || result.request_id !== request.request_id || result.phase !== request.phase || result.runtime_snapshot_id !== request.runtime_snapshot.snapshot_id
       || result.provider !== request.runtime_snapshot.provider || result.model !== request.runtime_snapshot.model || result.authority !== "NON_AUTHORITATIVE_JOB_OVERVIEW" || result.network_call_made !== true || result.persistence !== "not_written") throw new Error("JOB_OVERVIEW_RESULT_INVALID");
     const output = result.output, refs = new Set(request.context.evidence.map((entry) => entry.ref));
+    if (request.phase === "DISCUSS") {
+      if (!Array.isArray(result.web_sources || []) || (result.web_sources || []).length > 3) throw new Error("JOB_OVERVIEW_WEB_RECEIPT_INVALID");
+      for (const source of result.web_sources || []) if (source.status === "READ") {
+        if (!/^web-[12]$/.test(source.ref) || !/^https?:\/\//.test(source.final_url || "")) throw new Error("JOB_OVERVIEW_WEB_RECEIPT_INVALID");
+        refs.add(source.ref);
+      }
+    }
+    if (request.phase === "DISCUSS") for (const item of [...request.context.candidate.confirmed, ...request.context.candidate.working]) refs.add(item.candidate_ref);
     if (request.phase === "DISTILL") {
       if (!Array.isArray(output?.summaries) || output.summaries.length !== refs.size || new Set(output.summaries.map((entry) => entry.ref)).size !== refs.size) throw new Error("JOB_OVERVIEW_COVERAGE_INCOMPLETE");
       output.summaries.forEach((entry) => { if (!refs.has(entry.ref)) throw new Error("JOB_OVERVIEW_GROUNDING_INVALID"); text(entry.summary, 600); });
@@ -137,9 +146,23 @@
       if (!complete && Context.bytes(value) > 6000) { limited = true; value = { ...value, summary: value.summary?.slice(0, 1200) || null, requirements: value.requirements.slice(0, 12).map((entry) => ({ label: entry.label.slice(0, 100), detail: entry.detail.slice(0, 300) })), uncertainties: value.uncertainties.slice(0, 6) }; }
       const cost = Context.bytes(value); if (evidence.length >= 60 || bytes + cost > Contract.limits.evidence_bytes) continue; evidence.push(value); bytes += cost; if (limited) truncated++;
     }
-    const context = { scope: Contract.scope, evidence, overview: snapshot.overview ? { authority: snapshot.overview.authority, summary: snapshot.overview.summary, uncertainties: snapshot.overview.uncertainties, covered_jobs: snapshot.overview.covered_jobs } : null,
+    const context = { scope: Contract.discussion_scope, evidence, overview: snapshot.overview ? { authority: snapshot.overview.authority, summary: snapshot.overview.summary, uncertainties: snapshot.overview.uncertainties, covered_jobs: snapshot.overview.covered_jobs } : null,
       coverage: { total_jobs: snapshot.records.length, included_jobs: evidence.length, omitted_jobs: snapshot.records.length - evidence.length, truncated_jobs: truncated, strategy: complete ? "COMPLETE_CURRENT_EVIDENCE" : "LEXICAL_WITH_BOUNDED_DETAIL", evidence_bytes: bytes },
-      history: Context.boundedHistory(turns.filter((entry) => entry.fingerprint === snapshot.fingerprint).map((entry) => ({ ...entry, output: entry.output ? { ...entry.output, message: [entry.output.message, ...(entry.output.insights || []).map((item) => item.text), ...(entry.output.uncertainties || [])].join("\n") } : null })), 4000) };
+      history: Context.boundedHistory(turns.filter((entry) => entry.fingerprint === snapshot.fingerprint && entry.candidate_fingerprint === snapshot.candidate.aggregate_fingerprint && entry.prompt_version === Contract.prompt_version).map((entry) => ({ ...entry, output: entry.output ? { ...entry.output, message: [entry.output.message, ...(entry.output.insights || []).map((item) => item.text), ...(entry.output.uncertainties || [])].join("\n") } : null })), 4000) };
+    const candidate = snapshot.candidate;
+    if (!candidate) throw new Error("JOB_OVERVIEW_CANDIDATE_CONTEXT_REQUIRED");
+    context.candidate_catalog = Context.catalog(candidate, 3000);
+    const understanding = candidate.personal_understanding;
+    context.personal_understanding = understanding?.source_fingerprint === candidate.aggregate_fingerprint ? {
+      authority: understanding.authority, summary: understanding.summary, uncertainties: understanding.uncertainties, covered_records: understanding.covered_records,
+    } : null;
+    // Reserve room for coverage/policy and leave the Job-only digest independent.
+    if (Context.bytes(context.personal_understanding) > 4000) context.personal_understanding = null;
+    const budget = Math.max(0, Math.min(24000, Contract.limits.context_bytes - Context.bytes(context) - 1800));
+    const selected = Context.select(candidate, message, budget);
+    context.candidate = clone(selected.provider_view);
+    context.candidate_coverage = selected.context_coverage;
+    context.candidate_status = selected.context_coverage.total_records ? "AVAILABLE" : "NO_ACTIVE_RECORDS";
     if (Context.bytes(context) > Contract.limits.context_bytes) throw new Error("JOB_OVERVIEW_CONTEXT_LIMIT"); return context;
   }
   async function discuss(db, { human_message, ...options }) {
@@ -156,11 +179,15 @@
         refreshed = await refresh(db, options); snapshot = refreshed.snapshot;
         context = discussionContext(snapshot, message, turns);
       }
-      options.onProgress?.(context.coverage.strategy === "COMPLETE_CURRENT_EVIDENCE" ? "正在阅读当前职位并回应…" : "正在结合全部职位概况回应…");
+      options.onProgress?.(context.coverage.strategy === "COMPLETE_CURRENT_EVIDENCE" ? "正在结合个人资料与当前职位回应…" : "正在结合个人资料与全部职位概况回应…");
       const request = requestFor("DISCUSS", context, message, options.runtime_snapshot, options.consent), result = await (options.call || callRuntime)(request), output = validateResult(result, request);
-      if ((await snapshotFromDatabase(db)).fingerprint !== snapshot.fingerprint) throw new Error("JOB_OVERVIEW_CONTEXT_CHANGED");
-      const insights = output.insights.map((entry) => ({ text: entry.text, identities: entry.evidence_refs.map((ref) => snapshot.records.find((record) => record.ref === ref).identity) }));
-      const completed = { ...turn, runtime_snapshot: clone(options.runtime_snapshot), status: "SUCCEEDED", fingerprint: snapshot.fingerprint, output: { message: output.summary, insights, uncertainties: output.uncertainties, deliverable: Delivery.fromResult(result) }, context_coverage: context.coverage, context_bytes: Context.bytes(context), calls: refreshed.calls + 1, usage: result.usage || {}, refresh_usage: refreshed.usage };
+      const fresh = await snapshotFromDatabase(db);
+      if (fresh.fingerprint !== snapshot.fingerprint || fresh.candidate.aggregate_fingerprint !== snapshot.candidate.aggregate_fingerprint) throw new Error("JOB_OVERVIEW_CONTEXT_CHANGED");
+      const references = new Map([...snapshot.records.map(record => [record.ref, { identity: record.identity, title: record.semantic.title, domain: "JOB" }]),
+        ...Context.records(snapshot.candidate).map(record => [record.ref, { identity: record.identity, title: record.semantic.title, domain: "CANDIDATE" }])]);
+      const insights = output.insights.map(entry => ({ text: entry.text, identities: entry.evidence_refs.filter(ref => references.get(ref)?.domain === "JOB").map(ref => references.get(ref).identity),
+        candidate_sources: entry.evidence_refs.filter(ref => references.get(ref)?.domain === "CANDIDATE").map(ref => references.get(ref)) }));
+      const completed = { ...turn, runtime_snapshot: clone(options.runtime_snapshot), status: "SUCCEEDED", fingerprint: snapshot.fingerprint, candidate_fingerprint: snapshot.candidate.aggregate_fingerprint, prompt_version: Contract.prompt_version, candidate_coverage: context.candidate_coverage, web_sources: clone(result.web_sources || []), output: { message: output.summary, insights, uncertainties: output.uncertainties, deliverable: Delivery.fromResult(result) }, context_coverage: context.coverage, context_bytes: Context.bytes(context), calls: refreshed.calls + 1, usage: result.usage || {}, refresh_usage: refreshed.usage };
       await write(db, "job_overview_turns", completed, true); return completed;
     } catch (error) { await write(db, "job_overview_turns", { ...turn, status: "FAILED", error_code: String(error.message).slice(0, 100) }, true); throw error; }
   }

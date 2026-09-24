@@ -34,13 +34,13 @@
     </section>
     <section class="vi-span-6 personal-dialogue v1-conversation-pane" aria-label="了解职位概况对话">
       <span id="job-overview-runtime" class="personal-meta hidden"></span>
-      <p class="personal-meta">可以对比多个职位描述、讨论岗位类型与要求差异。概况和讨论不会改写原职位描述，也不会读取或修改个人资料。</p>
+      <p class="personal-meta">可以对比多个职位描述、讨论岗位类型与要求差异。对话会结合当前个人资料与已保存补充，帮助比较适合的方向；不会自动修改个人资料或职位。</p>
       <div id="job-overview-intro" class="understanding-intro" hidden>
         <p id="job-overview-dialogue-heading" class="understanding-intro-copy">关于这些信息或许你想问</p>
         <div class="personal-prompts" aria-label="开始讨论">
           <button type="button" data-job-overview-prompt="请总结我添加的全部职位描述，分别说明它们是什么类型的岗位。">总结全部职位描述</button>
           <button type="button" data-job-overview-prompt="这些职位描述有哪些共同要求和重要差异？请注明各自的来源。">共性与差异</button>
-          <a href="/personal-understanding.html">回顾我的项目与经历</a>
+          <button type="button" data-job-overview-prompt="结合关于我已保存的经历和偏好，这些职位中哪些更适合我？请区分能力、证据、表达与兴趣。">哪些更适合我</button>
         </div>
       </div>
       <button id="job-overview-older" class="personal-text-button hidden" type="button">查看更早对话</button>
@@ -61,16 +61,17 @@
     <script src="/product-config.js"></script>
     <script src="/product-shell.js"></script>
     <script src="/product-transport.js"></script>
-<script src="/model-settings-catalog-data.js"></script><script src="/model-settings.js"></script><script src="/runtime-selection-state.js?consent=2"></script>
+<script src="/model-settings-catalog-data.js"></script><script src="/model-settings.js"></script><script src="/runtime-selection-state.js?consent=3"></script>
     <script src="/runtime-capabilities.js"></script><script src="/runtime-capability-gate.js"></script>
 <script src="/workspace-storage-contract.js"></script>
     <script src="/content-document.js?v=1"></script>
     <script src="/content-browser-storage.js?v=1"></script>
     <script src="/content-database.js?v=2"></script>
     <script src="/truth-persistence-domain.js?storage=1"></script><script src="/job-intelligence-contract-manifest.js"></script><script src="/job-context-domain.js?storage=1"></script>
-<script src="/personal-context-domain.js?v=context-direct-1"></script><script src="/job-overview-contract.js"></script><script src="/job-overview-domain.js?v=context-direct-1"></script>
+<script src="/personal-memory-domain.js?storage=1"></script><script src="/personal-understanding-contract.js"></script><script src="/job-candidate-context-domain.js?storage=1"></script>
+<script src="/personal-context-domain.js?v=candidate-context-2"></script><script src="/job-overview-contract.js"></script><script src="/job-overview-domain.js?v=candidate-context-2"></script>
 <script src="/wave-physics-loader.js?v=1"></script><script src="/processing-indicator-domain.js?v=wave-1"></script><script src="/conversation-ui-domain.js?composer=3&amp;intro=1&amp;reply=2&amp;consent-hint=1"></script>
-<script src="/v1-demo-domain.js?storage=2"></script><script src="/v1-pages.js?storage=2"></script><script src="/job-overview.js?v=context-direct-1"></script>
+<script src="/v1-demo-domain.js?storage=2"></script><script src="/v1-pages.js?storage=2"></script><script src="/job-overview.js?v=candidate-context-2"></script>
   <script src="/conversation-model-selector.js?v=compact-menu-1"></script>
     <script src="/conversation-attachments.js?v=inline-composer-4&amp;composer=3&amp;storage=1"></script>
     <script src="/conversation-turn-transport.js?v=conversation-architecture-2"></script>

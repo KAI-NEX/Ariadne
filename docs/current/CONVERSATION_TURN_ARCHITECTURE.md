@@ -30,3 +30,7 @@
 ## 后续扩展原则
 
 新增对话领域时，应提供 endpoint、domain identity、Runtime signature 与领域 error factory，然后接入 Turn Transport；不得复制一套附件收尾代码。需要更细的服务端进度时，应增加有契约的执行状态端点或事件通道，而不是用前端定时器猜测上传/推理阶段。
+
+## 2026-09-24：跨职位上下文与公开链接
+
+职位概况的 DISCUSS 现在读取当前个人资料与职位集合，两类数据的确认保存权限不变。共用 Turn Transport 仍只负责附件与网络生命周期；跨域读取、两类版本指纹、证据覆盖与引用由 Job Overview 领域负责。公开页面在服务端验证本轮 Runtime/同意/凭据后准备，作为未核验来源注入同一请求，保留失败/节选回执，不给 Codex 开放工具。细节、限制与验收见 [跨职位对话契约](ARIADNE_JOB_OVERVIEW_V1.md)。

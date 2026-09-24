@@ -17,6 +17,19 @@
   ].join(",");
 
   const EN = Object.freeze({
+    "可以对比多个职位描述、讨论岗位类型与要求差异。对话会结合当前个人资料与已保存补充，帮助比较适合的方向；不会自动修改个人资料或职位。": "Compare jobs using your current profile and saved personal notes. Discussion does not automatically change your profile or jobs.",
+    "哪些更适合我": "Which roles suit me?",
+    "正在读取个人资料与当前职位…": "Reading your profile and current jobs\u2026",
+    "正在结合个人资料与当前职位回应…": "Considering your profile and current jobs\u2026",
+    "正在结合个人资料与全部职位概况回应…": "Considering your profile and the full job overview\u2026",
+    "个人资料或职位已经变化，本次结果未保存。请基于最新资料重试。": "Your profile or jobs changed. This result was not saved; please retry with the latest information.",
+    "暂时无法读取个人资料或职位，请重试；未将读取失败当作资料为空。": "Could not read your profile or jobs. Please retry; a read failure does not mean your records are empty.",
+    "从整体概况、岗位共性或某几份职位描述的差异开始。也可以结合关于我，讨论哪些方向更适合你。": "Discuss similarities and differences across jobs, or use your saved profile to explore suitable directions.",
+    "旧轮次未读取个人资料。": "This older turn did not read your profile.",
+    "（基于当时资料或旧读取范围的历史回答）": "(Historical answer based on earlier records or reading scope)",
+    "个人资料": "Personal profile",
+    "未能读取，未作为网页证据": "Could not read; not used as web evidence",
+
     "Ariadne · 衡": "Ariadne",
     "。": ".",
     "zh_CN": "en_US",
@@ -849,6 +862,10 @@
   });
 
   const RULES = Object.freeze([
+    [/^对话会将当前个人资料、已保存补充、职位与相关历史发送至 (.+)；可能消耗额度。会尝试读取本轮消息中的公开链接，并将网页内容交给模型；不自动保存为个人事实。$/, (_, target) => `Your profile, saved notes, jobs and relevant history will be sent to ${target}; usage may incur charges. Public links in this message will be read when possible and shared with the model, without being saved as personal facts.`],
+    [/^已读取当前页文字（节选），不含整站或图片$/, "Read an excerpt of this page's text; not the entire site or images"],
+    [/^已读取当前页文字，不含整站或图片$/, "Read this page's text; not the entire site or images"],
+    [/^其余 (\d+) 个链接未读取；每轮最多读取两个公开页面。$/, (_, count) => `${count} additional links were not read; at most two public pages per turn.`],
     [/^(\d+) 张资料卡片$/u, (_, count) => `${count} material ${count === "1" ? "card" : "cards"}`],
     [/^(\d+) 个职位对象$/u, (_, count) => `${count} job ${count === "1" ? "item" : "items"}`],
     [/^第 (\d+) /u, (_, number) => `Item ${number} `],

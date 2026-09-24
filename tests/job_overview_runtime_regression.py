@@ -17,7 +17,9 @@ validate_request(request)
 assert signature()["operation"] == "JOB_OVERVIEW_TURN"
 payload = build_payload(request)
 assert payload["model"] == MODEL
-assert "No Candidate profile or personal memory is provided" in prompt("DISCUSS")
+assert "current Candidate evidence" in prompt("DISCUSS")
+assert request["context"]["candidate"]["confirmed"]
+assert "星桥访谈项目" in json.dumps(payload,ensure_ascii=False)
 assert "past projects" in personal_prompt("DISCUSS")
 assert "credential_ref" not in json.dumps(payload)
 assert "source_document_id" not in json.dumps(payload)
@@ -52,7 +54,7 @@ for field, value in [("mode", "local"), ("model", "deepseek-v4-pro"), ("adapter_
     rejected(lambda: execute(invalid, credential, provider)); assert counts == baseline
 invalid = copy.deepcopy(request); invalid["consent"]["confirmed"] = False
 rejected(lambda: execute(invalid, credential, provider), "JOB_OVERVIEW_CONSENT_REQUIRED"); assert counts == baseline
-for field in ("candidate_context", "personal_memory", "source_document_id"):
+for field in ("unknown_candidate_context", "personal_memory", "source_document_id", "public_web_sources"):
     invalid = copy.deepcopy(request); invalid["context"][field] = "must not reach Provider"
     rejected(lambda: execute(invalid, credential, provider), "JOB_OVERVIEW_SCOPE_INVALID"); assert counts == baseline
 invalid = copy.deepcopy(request); invalid["context"]["evidence"][0]["candidate"] = {"summary": "private"}
@@ -65,7 +67,7 @@ invalid = copy.deepcopy(output); invalid["insights"][0]["evidence_refs"] = ["oth
 rejected(lambda: validate_output(invalid, request), "JOB_OVERVIEW_GROUNDING_INVALID")
 invalid = copy.deepcopy(output); invalid["summary"] = "根据 job-1"
 rejected(lambda: validate_output(invalid, request), "JOB_OVERVIEW_INTERNAL_REFERENCE_IN_PROSE")
-distill = copy.deepcopy(request); distill.update(phase="DISTILL", human_message="", context={"scope": request["context"]["scope"], "evidence": [{"ref": "fragment-1", "title": "研究员", "text": "合成 JD", "part": 1, "total_parts": 1}]})
+distill = copy.deepcopy(request); distill.update(phase="DISTILL", human_message="", context={"scope": "CURRENT_JOB_COLLECTION_ONLY", "evidence": [{"ref": "fragment-1", "title": "研究员", "text": "合成 JD", "part": 1, "total_parts": 1}]})
 validate_request(distill)
 validate_output({"summaries": [{"ref": "fragment-1", "summary": "研究岗位"}]}, distill)
 rejected(lambda: validate_output({"summaries": []}, distill), "JOB_OVERVIEW_COVERAGE_INCOMPLETE")
@@ -74,3 +76,36 @@ validate_request(empty); validate_output({"summary": "请先添加职位。", "i
 rejected(lambda: execute(request, credential, lambda *_: (503, {})), "JOB_OVERVIEW_PROVIDER_HTTP_ERROR")
 rejected(lambda: execute(request, credential, lambda *_: (200, {"model": "wrong-model"})), "JOB_OVERVIEW_OUTPUT_INVALID")
 print(json.dumps({"job_scope": "pass", "read_only_output": "pass", "runtime_and_consent_before_credentials": "pass", "grounding": "pass", "live_provider_calls": 0}))
+
+# Detailed personal refs can ground a conclusion; catalog-only refs cannot.
+personal_output = copy.deepcopy(output)
+personal_output["insights"][0]["evidence_refs"].append(request["context"]["candidate"]["confirmed"][0]["candidate_ref"])
+validate_output(personal_output, request)
+for edit in (lambda v: v["context"].pop("candidate"),
+             lambda v: v["context"]["candidate_coverage"].update(included_records=999),
+             lambda v: v["context"]["candidate"].get("confirmed")[0].update(authority="MODEL_CONFIRMED"),
+             lambda v: v["context"].update(candidate_status="NO_ACTIVE_RECORDS")):
+    invalid=copy.deepcopy(request);edit(invalid);rejected(lambda:validate_request(invalid))
+invalid=copy.deepcopy(output);invalid["insights"][0]["evidence_refs"]=["confirmed-candidate-999"]
+rejected(lambda:validate_output(invalid,request))
+print("Personal coverage, authority and grounding PASS")
+
+# Web preparation happens only after valid runtime/expanded consent/credentials.
+from unittest.mock import patch
+web_request=copy.deepcopy(request);web_request['human_message']='请结合 https://example.org/ 比较我的项目'
+receipt={'ref':'web-1','url':'https://example.org/','final_url':'https://example.org/','title':'合成公开项目','status':'READ','text':'public synthetic project evidence','truncated':False}
+with patch('src.job_overview_runtime.prepare_web',return_value=[receipt]) as fetch:
+    bad=copy.deepcopy(web_request);bad['consent']['purpose']='JOB_OVERVIEW'
+    rejected(lambda:execute(bad,credential,provider),'JOB_OVERVIEW_CONSENT_REQUIRED');fetch.assert_not_called()
+    def web_provider(key,value):
+        assert 'public synthetic project evidence' in json.dumps(value)
+        result=provider(key,value)
+        data=json.loads(result[1]['choices'][0]['message']['tool_calls'][0]['function']['arguments'])
+        data['insights'][0]['evidence_refs']=['web-1']
+        result[1]['choices'][0]['message']['tool_calls'][0]['function']['arguments']=json.dumps(data)
+        return result
+    web_result=execute(web_request,credential,web_provider)
+    fetch.assert_called_once_with(web_request['human_message'])
+    assert web_result['web_sources'][0]['status']=='READ'
+    assert 'text' not in web_result['web_sources'][0]
+print('Web retrieval consent, provider grounding and read receipts PASS')

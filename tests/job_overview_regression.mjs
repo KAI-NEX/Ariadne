@@ -38,7 +38,14 @@ function proposal(index, title = `Synthetic Job ${index}`, requirement = "研究
 }
 function revision(index, title, requirement) {return Job.reviewOutcome({proposal:proposal(index,title,requirement),decision:"CONFIRM"}).revision;}
 const a=revision(1,"用户研究产品经理","负责用户访谈和需求定义；允许远程协作"), b=revision(2,"AI 评估工程师","负责评估指标和测试框架；深圳现场办公"), pending=proposal(3,"设计研究员","负责研究计划；工作地点待确认");
-const input={job_context_revisions:[a,b],context_proposals:[pending],source_documents:[1,2,3].map(i=>({source_document_id:`source-job-${i}`}))};
+const person = { contract_id: "ariadne-context-revision-v1", context_type: "CANDIDATE", context_id: "synthetic-person", revision_id: "synthetic-person-1", version: 1,
+  previous_revision_id: null, created_at: "2026-09-24T08:00:00Z", confirmed_from_proposal_id: "synthetic-person-proposal", review_decision_id: "synthetic-person-decision",
+  provenance: { source_document_ids: ["synthetic-person-source"], processing_run_id: "synthetic-person-run", runtime_snapshot_id: "synthetic-person-runtime" },
+  authority: Truth.AUTHORITY.revision, payload: { items: [{ item_id: "synthetic-research-project", item_type: "PROJECT", title: "星桥访谈项目", summary: "林澄独立负责12次用户访谈与交互原型；开发和上线由同事负责，没有增长指标。",
+    facts: [{label: "职责", value: "用户研究与交互设计，不负责后端工程"}], uncertainties: [], grounding_refs: [] }] } };
+const preference = { contract_id: "ariadne-personal-memory-revision-v1", authority: "HUMAN_CONFIRMED_PERSONAL_MEMORY", memory_id: "synthetic-preference", revision_id: "synthetic-preference-1",
+  decision_id: "synthetic-memory-decision", created_at: "2026-09-24T08:00:00Z", version: 1, status: "ACTIVE", kind: "PREFERENCE", text: "我偏好远程用户研究工作，不希望以基础设施工程为主要职责。", related_identities: [] };
+const input={candidate_context_revisions:[person],personal_memory_revisions:[preference],job_context_revisions:[a,b],context_proposals:[pending],source_documents:[1,2,3].map(i=>({source_document_id:`source-job-${i}`}))};
 const snapshot=await Domain.buildSnapshot(input);
 if(process.argv.includes("--request")){console.log(JSON.stringify(Domain.requestFor("DISCUSS",Domain.discussionContext(snapshot,"这些职位有什么差异？",[]),"这些职位有什么差异？",runtime,true)));process.exit(0);}
 if(process.argv.includes("--seed")){console.log(JSON.stringify(input));process.exit(0);}
@@ -53,7 +60,7 @@ const rejected=await Domain.buildSnapshot({...input,context_review_decisions:[{p
 const fakeDecision=await Domain.buildSnapshot({...input,context_review_decisions:[{proposal_id:pending.proposal_id,authority:"MODEL",decision:"REJECT"}]});assert.equal(fakeDecision.records.length,3);
 const oldPending={...pending,proposal_id:"old-pending",created_at:"2020-01-01T00:00:00Z"};assert.equal((await Domain.buildSnapshot({...input,context_proposals:[oldPending,pending]})).working_count,1);
 const accepted=Job.reviewOutcome({proposal:pending,decision:"CONFIRM"}).revision;assert.equal((await Domain.buildSnapshot({...input,job_context_revisions:[a,b,accepted]})).working_count,0);
-const personalSnapshot=await Candidate.buildSnapshot({...input,personal_memory_revisions:[]});assert.equal(personalSnapshot.provider_view.confirmed.length,0,"personal context cannot acquire Job information");
+const personalSnapshot=await Candidate.buildSnapshot({...input,personal_memory_revisions:[]});assert.equal(personalSnapshot.provider_view.confirmed.length,1,"personal context cannot acquire Job information");
 const db=databaseFor(input), writesBefore=JSON.stringify([...db.data.get("job_context_revisions").values()]); const calls=[];
 async function stub(request){calls.push(request); const output=request.phase==="DISTILL" ? {summaries:request.context.evidence.map(x=>({ref:x.ref,summary:`模型替身摘要：${x.title}`}))} : {summary:"模型替身：不同岗位侧重不同。",insights:request.context.evidence.length?[{text:"模型替身有来源的说明",evidence_refs:[request.context.evidence[0].ref]}]:[],uncertainties:[]};return {contract_id:Domain.Contract.result_contract,request_id:request.request_id,phase:request.phase,runtime_snapshot_id:request.runtime_snapshot.snapshot_id,provider:runtime.provider,model:runtime.model,output,network_call_made:true,persistence:"not_written",authority:"NON_AUTHORITATIVE_JOB_OVERVIEW",usage:{prompt_tokens:10}};}
 const options={runtime_snapshot:runtime,consent:true,call:stub};
@@ -88,7 +95,7 @@ assert.equal(calls.length-beforeMismatched,1);
 db.data.get("job_overview_snapshots").set(currentOverview.overview_id,currentOverview);
 const first=await Domain.discuss(db,{...options,human_message:"共同要求是什么？"});assert.equal(first.calls,1);assert.equal(first.context_coverage.included_jobs,3);
 assert(Domain.discussionContext((await Domain.snapshotFromDatabase(db)),"继续说说",[first]).history[0].assistant.includes("模型替身有来源的说明"), "follow-up history includes grounded findings");
-assert(calls.every(x=>!JSON.stringify(x.context).includes("Candidate must stay out")));
+assert(calls.filter(x=>x.phase!=="DISCUSS").every(x=>!x.context.candidate), "Job digests remain independent of the person");
 assert.equal(JSON.stringify([...db.data.get("job_context_revisions").values()]),writesBefore,"overview cannot edit job facts");
 assert.throws(()=>Domain.write(db,"personal_memory_revisions",{}),/WRITE_SCOPE/);
 db.data.get("job_context_revisions").set(next.revision_id,next);
@@ -124,7 +131,7 @@ const fileTurn=await Domain.discuss(db,{...options,human_message:"制作介绍�
 assert.deepEqual(fileTurn.output.deliverable,delivered);
 assert.deepEqual(db.data.get("job_overview_turns").get(fileTurn.turn_id).output.deliverable,delivered);
 assert.equal(JSON.stringify([...db.data.get("job_context_revisions").values()]),beforeDelivery);
-console.log(JSON.stringify({job_only_scope:"pass",versions_and_review:"pass",incremental_cache:"pass",read_only_and_failure:"pass",bounded_context:"pass",provider_calls:0}));
+console.log(JSON.stringify({job_digest_scope:"pass",personal_discussion_scope:"pass",versions_and_review:"pass",incremental_cache:"pass",read_only_and_failure:"pass",bounded_context:"pass",provider_calls:0}));
 
 // Removing a confirmed card retains immutable history and changes current scope/cache.
 const removalDb = databaseFor({...input, context_proposals: [{...proposal(1), proposal_id: a.confirmed_from_proposal_id}, pending]});
@@ -149,3 +156,49 @@ assert.equal(conflictDb.data.get("job_context_lifecycle").size, 0);
 const failureDb = {transaction() { throw Error("storage unavailable"); }};
 await assert.rejects(Job.persistRemoval(failureDb, b), /storage unavailable/);
 console.log("job card removal: history/source preservation, current scope, duplicate/conflict and failure PASS");
+
+// Cross-job choice must use the same current profile and saved memories as Job detail.
+const jointDb = databaseFor(input);
+const sourceBefore = JSON.stringify([...jointDb.data.get("candidate_context_revisions").values()]);
+const memoriesBefore = JSON.stringify([...jointDb.data.get("personal_memory_revisions").values()]);
+let captured;
+const joint = await Domain.discuss(jointDb, {...options, human_message:"这些职位哪个更适合我？", call: async request => {
+  captured = request;
+  const result = await stub(request);
+  result.output.insights = [{text:"访谈项目支持用户研究方向，工程上线尚无证据。",evidence_refs:[request.context.candidate.confirmed[0].candidate_ref,request.context.evidence[0].ref]}];
+  return result;
+}});
+assert.equal(captured.context.scope,Domain.Contract.discussion_scope);
+assert(captured.context.candidate.confirmed.some(x=>x.title==="星桥访谈项目"));
+assert(captured.context.candidate.confirmed.some(x=>x.item_type==="PERSONAL_MEMORY" && JSON.stringify(x).includes("远程")));
+assert.equal(captured.context.candidate_status,"AVAILABLE");
+assert.equal(captured.context.candidate_coverage.complete,true);
+assert.equal(joint.output.insights[0].candidate_sources[0].title,"星桥访谈项目");
+assert.equal(JSON.stringify([...jointDb.data.get("candidate_context_revisions").values()]),sourceBefore);
+assert.equal(JSON.stringify([...jointDb.data.get("personal_memory_revisions").values()]),memoriesBefore);
+const updatedPerson = {...person,revision_id:"synthetic-person-2",version:2,previous_revision_id:person.revision_id,payload:{items:[{...person.payload.items[0],summary:"新版经历：已完成20次访谈，依然未负责工程上线。"}]}};
+jointDb.data.get("candidate_context_revisions").set(updatedPerson.revision_id,updatedPerson);
+const changedProfile = await Domain.snapshotFromDatabase(jointDb);
+const changedContext = Domain.discussionContext(changedProfile,"继续比较",[joint]);
+assert.equal(changedContext.history.length,0,"previous profile conclusions must not be current context");
+assert(JSON.stringify(changedContext.candidate).includes("20次"));
+const retracted = {...preference,revision_id:"synthetic-preference-2",version:2,status:"RETRACTED"};
+jointDb.data.get("personal_memory_revisions").set(retracted.revision_id,retracted);
+assert(!JSON.stringify(Domain.discussionContext(await Domain.snapshotFromDatabase(jointDb),"当前偏好",[joint]).candidate).includes("远程用户研究"));
+await assert.rejects(Domain.discuss(jointDb,{...options,human_message:"比较",call:async request=>{
+  const result=await stub(request);jointDb.data.get("personal_memory_revisions").set("synthetic-preference-3",{...preference,revision_id:"synthetic-preference-3",version:3});return result;
+}}),/CONTEXT_CHANGED/);
+const unreadable = databaseFor(input), oldTransaction = unreadable.transaction;
+unreadable.transaction = function(names,...args) { if(names==="candidate_context_revisions") throw Error("synthetic-profile-read-failed"); return oldTransaction.call(this,names,...args); };
+let madeCall=false;
+await assert.rejects(Domain.discuss(unreadable,{...options,human_message:"读取失败",call:async()=>{madeCall=true;}}),/synthetic-profile-read-failed/);
+assert.equal(madeCall,false,"reading failure cannot become empty profile or call model");
+const largePersonal = await Domain.buildSnapshot({...input,candidate_context_revisions:Array.from({length:60},(_,i)=>({...person,context_id:`person-${i}`,revision_id:`person-revision-${i}`,payload:{items:[{...person.payload.items[0],summary:"大段个人材料。".repeat(1000)}]}}))});
+const partial = Domain.discussionContext(largePersonal,"研究职位",[]);
+assert.equal(partial.candidate_status,"AVAILABLE");assert(partial.candidate_coverage.omitted_records>0);assert.equal(partial.candidate_coverage.complete,false);
+assert(new TextEncoder().encode(JSON.stringify(partial)).length<=Domain.Contract.limits.context_bytes);
+const onlyPerson = Domain.discussionContext(await Domain.buildSnapshot({candidate_context_revisions:[person]}),"我是谁",[]);
+assert.equal(onlyPerson.evidence.length,0);assert.equal(onlyPerson.candidate.confirmed.length,1);
+const noPerson = Domain.discussionContext(await Domain.buildSnapshot({job_context_revisions:[a]}),"我适合吗",[]);
+assert.equal(noPerson.candidate_status,"NO_ACTIVE_RECORDS");
+console.log("Cross-job personal evidence, saved preferences, read-only, versions, retraction, read failure and coverage PASS");

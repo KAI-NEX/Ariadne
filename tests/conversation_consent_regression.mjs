@@ -69,3 +69,13 @@ assert.equal(dialogs,1);
 storage.setItem(Gate.CURRENT_RUNTIME_STORAGE_KEY,JSON.stringify({mode:'local'}));
 assert.throws(()=>Selection.assertCurrent({...sol,execution_settings:Settings.envelope(sol,{},'old','personal_understanding')},'personal_understanding'));
 console.log('checkbox feedback, persisted exact-recipient consent, no duplicate dialog, revocation, batches, stale model and fallback PASS');
+// Old Job-only disclosure cannot authorize the expanded personal/web scope.
+storage.setItem(Gate.CURRENT_RUNTIME_STORAGE_KEY,JSON.stringify(sol));
+const overviewRuntime=Selection.resolve('job_overview','job_overview');
+const oldConsent=JSON.stringify(['conversation-context-and-cost-v1',Settings.identity(overviewRuntime)]);
+storage.setItem(Selection.TRANSFER_CONSENT_KEY,JSON.stringify({'job_overview:job_overview':[oldConsent]}));
+const expanded=checkbox();Selection.bindTransferConsent('job_overview',expanded);
+assert.equal(expanded.checked,false);
+await assert.rejects(Selection.beforeDispatch(overviewRuntime,'job_overview'),/RUNTIME_CONSENT_REQUIRED/);
+expanded.choose(true);await Selection.beforeDispatch(overviewRuntime,'job_overview');
+console.log('old Job-only consent cannot cover personal context/public links PASS');

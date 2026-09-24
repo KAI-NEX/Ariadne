@@ -117,7 +117,7 @@
       fail("RUNTIME_SELECTION_CHANGED");
     }
   }
-  const consentFingerprint = snapshot => JSON.stringify([TRANSFER_DISCLOSURE_VERSION, Settings.identity(snapshot)]);
+  const consentFingerprint = (snapshot, operation) => JSON.stringify([operation === "job_overview" ? "job-personal-context-public-links-v2" : TRANSFER_DISCLOSURE_VERSION, Settings.identity(snapshot)]);
   function consentStore(storage = root.localStorage) {
     try {
       const value = read(TRANSFER_CONSENT_KEY, storage);
@@ -143,7 +143,7 @@
     if (runtime.mode !== "model" || !runtime.execution_settings) {
       checkbox.checked = false; entry.fingerprint = null; return false;
     }
-    const fingerprint = consentFingerprint(runtime);
+    const fingerprint = consentFingerprint(runtime, operation);
     const accepted = rememberedConsent(operation, scope, fingerprint, storage);
     checkbox.checked = accepted;
     entry.fingerprint = accepted ? fingerprint : null;
@@ -161,7 +161,7 @@
     checkbox.addEventListener("change", () => {
       checkbox.setCustomValidity("");
       const runtime = resolve(operation, scope);
-      const fingerprint = runtime.mode === "model" && runtime.execution_settings ? consentFingerprint(runtime) : null;
+      const fingerprint = runtime.mode === "model" && runtime.execution_settings ? consentFingerprint(runtime, operation) : null;
       entry.fingerprint = checkbox.checked ? fingerprint : null;
       updateRememberedConsent(operation, scope, fingerprint, checkbox.checked);
     });
@@ -170,7 +170,7 @@
     assertCurrent(snapshot, operation);
     const explicit = transferConsents.get(`${operation}:${snapshot.execution_settings.scope}`);
     if (explicit) {
-      if (!explicit.checkbox.checked || explicit.fingerprint !== consentFingerprint(snapshot)) fail("RUNTIME_CONSENT_REQUIRED");
+      if (!explicit.checkbox.checked || explicit.fingerprint !== consentFingerprint(snapshot, operation)) fail("RUNTIME_CONSENT_REQUIRED");
       return;
     }
     if (!snapshot.execution_settings.scope) return;
