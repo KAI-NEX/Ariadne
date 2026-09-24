@@ -43,3 +43,9 @@
 .v1-journal-lightbox { max-width: 90vw; max-height: 90vh; box-sizing: border-box; border: 1px solid var(--vi-line); border-radius: var(--vi-radius-small); padding: var(--vi-space-16); background: var(--vi-surface); }
 .v1-journal-lightbox img { display: block; max-width: 100%; max-height: 75vh; object-fit: contain; }
 .v1-journal-lightbox::backdrop { background: color-mix(in srgb, var(--vi-ink) 20%, transparent); }
+
+.v1-journal-draft { box-sizing: border-box; }
+.v1-journal-dropzone.v1-file-dropzone { min-height: calc(var(--vi-space-48) * 2); flex-direction: column; gap: var(--vi-space-8); padding: var(--vi-space-16); border: 1px dashed var(--vi-line); border-radius: var(--vi-radius-small); font: var(--vi-text-body)/var(--vi-leading-reading) var(--vi-font-ui); color: var(--vi-ink); }
+.v1-journal-dropzone small { color: var(--vi-muted); font: var(--vi-text-caption)/1.65 var(--vi-font-ui); }
+.v1-journal-dropzone:focus-visible { outline: 2px solid var(--vi-focus); outline-offset: 2px; }
+.v1-journal-dropzone:disabled { cursor: wait; opacity: .6; }

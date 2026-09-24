@@ -17,6 +17,10 @@
   ].join(",");
 
   const EN = Object.freeze({
+    "选择记录图片": "Choose entry images",
+    "添加图片，可拖拽或粘贴": "Add images, drag or paste",
+    "拖拽图片到这里，或点击选择": "Drop images here, or click to choose",
+    "也可直接粘贴图片": "You can also paste images here",
     "暂无备注": "No notes yet",
     "暂无求职记录": "No application entries yet",
     "每行填写一条备注": "One note per line",
