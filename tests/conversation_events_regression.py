@@ -13,7 +13,7 @@ import os
 import subprocess
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from src.conversation_events import ChatStream, CONTENT_TYPE, SINK, emit, public_preview
+from src.conversation_events import ChatStream, CONTENT_TYPE, SINK, emit, public_preview, Preview
 import app
 from web_app import WebApplication
 
@@ -23,6 +23,18 @@ def sse(value):
 
 
 class EventsTests(unittest.TestCase):
+    def test_small_answer_deltas_are_not_buffered(self):
+        seen = []; token = SINK.set(seen.append)
+        try:
+            preview = Preview()
+            for text in ['你', '你好', '你好。', '你好。']:
+                preview.update('{"message":"' + text)
+            self.assertEqual(seen, [{'type': 'preview', 'text': '你'}, {'type': 'preview_delta', 'text': '好'}, {'type': 'preview_delta', 'text': '。'}])
+            for i in range(1, 6001):
+                preview.update('{"message":"' + '字' * i)
+            self.assertLess(len(json.dumps(seen).encode()), 1_000_000, 'long per-character streams must remain bounded')
+        finally: SINK.reset(token)
+
     def test_web_domain_stream_success_and_invalid_action(self):
         node = os.environ.get("ARIADNE_NODE_BINARY", "node")
         request = json.loads(subprocess.check_output([node, str(Path(__file__).with_name("personal_understanding_regression.mjs")), "--request"], text=True))

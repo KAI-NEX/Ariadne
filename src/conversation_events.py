@@ -1,4 +1,4 @@
-"""Request-local, non-authoritative public feedback. Never forward reasoning/tools."""
+"""Request-local public feedback. Never forward reasoning text or raw tool arguments."""
 from contextvars import ContextVar
 import json
 
@@ -94,9 +94,14 @@ class Preview:
 
     def update(self, raw):
         text = public_preview(raw)
-        if text and text != self.previous and (not self.previous or not text.startswith(self.previous) or len(text) - len(self.previous) >= 24):
+        if text and text != self.previous:
+            # Send only the suffix for growing answers: per-character updates
+            # remain linear in size instead of resending the whole answer.
+            if self.previous and text.startswith(self.previous):
+                emit("preview_delta", text=text[len(self.previous):])
+            else:
+                emit("preview", text=text)
             self.previous = text
-            emit("preview", text=text)
 
 
 class ChatStream:

@@ -21,14 +21,18 @@ class AppServerTests(unittest.TestCase):
             p = PublicEvents('t', 'r', False, 12)
             p.accept(event('item/started', item={'id': 'private', 'type': 'reasoning'}))
             p.accept(event('item/reasoning/summaryTextDelta', itemId='private', delta='PRIVATE'))
+            p.accept(event('item/completed', item={'id': 'private', 'type': 'reasoning', 'summary': ['PRIVATE']}))
             p.accept(event('item/started', item={'id': 'public', 'type': 'agentMessage', 'phase': 'commentary'}))
             for text in ['Public ', 'status']: p.accept(event('item/agentMessage/delta', itemId='public', delta=text))
             p.accept(event('item/started', item={'id': 'final', 'type': 'agentMessage', 'phase': 'final_answer'}))
             raw = json.dumps({'patches': [{'message': 'PRIVATE'}], 'message': 'Evidence ' * 20})
             for index in range(0, len(raw), 7): p.accept(event('item/agentMessage/delta', itemId='final', delta=raw[index:index+7]))
             self.assertFalse(p.completed)
-            self.assertGreater(len([e for e in seen if e['type'] == 'preview']), 3)
+            self.assertGreater(len([e for e in seen if e['type'] in {'preview', 'preview_delta'}]), 3)
             self.assertNotIn('PRIVATE', json.dumps(seen))
+            self.assertEqual([e for e in seen if e['type'] == 'activity'], [
+                {'type': 'activity', 'id': 'private', 'activity': 'thinking', 'state': 'started'},
+                {'type': 'activity', 'id': 'private', 'activity': 'thinking', 'state': 'completed'}])
             self.assertEqual([e['text'] for e in seen if e['type'] == 'commentary'], ['Public ', 'Public status'])
             p.accept(event('item/completed', item={'id': 'final', 'type': 'agentMessage', 'phase': 'final_answer', 'text': raw}))
             p.accept(event('turn/completed', turn={'id': 'r', 'status': 'completed'}))
@@ -52,6 +56,17 @@ class AppServerTests(unittest.TestCase):
         p.accept(event('item/completed', item={'id': 's', 'type': 'webSearch', 'action': {'type': 'openPage', 'url': 'https://python.org'}}))
         self.assertEqual(p.legacy[-1]['item']['action']['type'], 'open_page')
         with self.assertRaises(ValueError): p.accept(event('item/started', item={'id': 'second', 'type': 'webSearch'}))
+
+    def test_public_tool_lifecycle_has_no_query_or_page_contents(self):
+        seen = []; token = SINK.set(seen.append)
+        try:
+            p = PublicEvents('t', 'r', True, 12)
+            for i, (action, kind) in enumerate([('search', 'search'), ('openPage', 'reading'), ('findInPage', 'finding')]):
+                for phase in ['started', 'completed']:
+                    p.accept(event('item/' + phase, item={'id': str(i), 'type': 'webSearch', 'action': {'type': action, 'query': 'PRIVATE', 'url': 'PRIVATE'}}))
+                    self.assertEqual(seen[-1], {'type': 'activity', 'id': str(i), 'activity': kind, 'state': phase})
+            self.assertNotIn('PRIVATE', json.dumps(seen))
+        finally: SINK.reset(token)
 
     def test_policy_and_account(self):
         good = {'model': CODEX_MODEL, 'modelProvider': 'ariadne-openai', 'cwd': '/tmp/probe',

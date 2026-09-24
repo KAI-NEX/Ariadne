@@ -126,14 +126,18 @@ class PublicEvents:
             if kind not in {"userMessage", "agentMessage", "reasoning", "webSearch"}:
                 raise ValueError("CODEX_UNEXPECTED_TOOL_ACTIVITY")
             self.items[ident] = item
+            if kind == "reasoning":
+                # Expose lifecycle only, never summaries, deltas, or private reasoning.
+                emit("activity", id=ident, activity="thinking", state="completed" if method.endswith("completed") else "started")
             if kind == "webSearch":
                 if not self.search: raise ValueError("CODEX_UNEXPECTED_TOOL_ACTIVITY")
-                first = ident not in self.searches; self.searches.add(ident)
+                self.searches.add(ident)
                 if len(self.searches) > self.limit: raise ValueError("CODEX_SEARCH_LIMIT")
                 action = dict(item.get("action") or {})
                 action["type"] = {"openPage": "open_page", "findInPage": "find_in_page"}.get(action.get("type"), action.get("type", "other"))
                 self.legacy.append({"type": "item.completed" if method.endswith("completed") else "item.started", "item": {"id": ident, "type": "web_search", "action": action}})
-                if first: emit("update", text="正在查询公开网页；网上信息只作外部参考，不会写入个人经历。")
+                activity = {"open_page": "reading", "find_in_page": "finding"}.get(action["type"], "search")
+                emit("activity", id=ident, activity=activity, state="completed" if method.endswith("completed") else "started")
             if kind == "agentMessage" and method == "item/completed":
                 text = item.get("text", "")
                 if not isinstance(text, str): raise ValueError("CODEX_MESSAGE_INVALID")

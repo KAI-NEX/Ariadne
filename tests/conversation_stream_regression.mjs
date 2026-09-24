@@ -23,6 +23,17 @@ const publicSeen=[];
 await T.readStream(response([commentary,result])[0],event=>publicSeen.push(event));
 assert.deepEqual(publicSeen,[commentary]);
 await assert.rejects(T.readStream(response([{...commentary,id:null},result])[0],()=>{}));
+const activity = {seq:1,type:'activity',id:'a',activity:'thinking',state:'started'};
+const activitySeen=[];
+await T.readStream(response([activity,result])[0],event=>activitySeen.push(event));
+assert.deepEqual(activitySeen,[activity]);
+for (const bad of [{activity:'reasoning_text'}, {state:'guessed'}, {id:''}, {text:'PRIVATE'}, {query:'PRIVATE'}]) {
+  await assert.rejects(T.readStream(response([{...activity,...bad},result])[0],()=>{}));
+}
+const deltas=[];
+await T.readStream(response([{seq:1,type:'preview',text:'你'},{seq:2,type:'preview_delta',text:'好。'},{seq:3,type:'result',status:200,result:{output:'complete'}}])[0],event=>deltas.push(event.text));
+assert.deepEqual(deltas,['你','你好。']);
+await assert.rejects(T.readStream(response([{seq:1,type:'preview_delta',text:'missing base'},result])[0],()=>{}));
 let settled = false;
 const promise = T.readStream(r, event => seen.push(event)).then(value => { settled = true; return value; });
 await new Promise(resolve => setTimeout(resolve, 20));
