@@ -106,6 +106,10 @@ class WebApplication:
         self.slots = threading.BoundedSemaphore(max_concurrent)
 
     def __call__(self, environ, start_response):
+        from src.conversation_events import CONTENT_TYPE, PATHS
+        if (environ.get("REQUEST_METHOD") == "POST" and environ.get("PATH_INFO") in PATHS
+                and environ.get("HTTP_ACCEPT") == CONTENT_TYPE):
+            return self.stream(environ, start_response)
         try:
             status, headers, content = self.dispatch(environ)
         except WebBoundaryError as error:
@@ -126,6 +130,56 @@ class WebApplication:
                 content.close()
             return []
         return content
+
+    def stream(self, environ, start_response):
+        """WSGI event channel; normal dispatch still owns every access check."""
+        import queue
+        from contextvars import copy_context
+        from src.conversation_events import CONTENT_TYPE, SINK, encode
+        events, closed = queue.Queue(maxsize=64), threading.Event()
+        sequence = 0
+        def send(event):
+            nonlocal sequence
+            if closed.is_set(): raise ConnectionAbortedError()
+            sequence += 1
+            try:
+                events.put(encode({**event, "seq": sequence}), timeout=5)
+            except queue.Full:
+                raise ConnectionAbortedError() from None
+        def run():
+            token = SINK.set(send)
+            try:
+                send({"type": "received"})
+                try:
+                    status, _, body = self.dispatch(environ)
+                    result = json.loads(b"".join(body))
+                except WebBoundaryError as error:
+                    status, result = error.status, {"error": error.code, "persistence": "not_written"}
+                except Exception:
+                    status, result = 500, {"error": "WEB_REQUEST_FAILED", "persistence": "not_written"}
+                send({"type": "result", "status": status, "result": result})
+            except (ConnectionAbortedError, BrokenPipeError):
+                pass
+            finally:
+                SINK.reset(token)
+        def body():
+            start_response("200 OK", [("Content-Type", CONTENT_TYPE), ("Cache-Control", "no-store"),
+                           ("X-Content-Type-Options", "nosniff"), ("X-Accel-Buffering", "no")])
+            context = copy_context()
+            threading.Thread(target=lambda: context.run(run), daemon=True).start()
+            try:
+                while True:
+                    try:
+                        chunk = events.get(timeout=15)
+                    except queue.Empty:
+                        # Transport keepalive, never displayed as invented progress.
+                        yield b"\n"
+                        continue
+                    yield chunk
+                    if json.loads(chunk)["type"] == "result": break
+            finally:
+                closed.set()
+        return body()
 
     @staticmethod
     def json_response(status, value):

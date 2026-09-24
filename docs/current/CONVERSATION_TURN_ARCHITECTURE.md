@@ -1,6 +1,6 @@
 # 共用对话 Turn 架构
 
-更新：2026-09-21。适用于 Candidate、Job、个人理解与职位概况的 Model 对话；领域语义、结果校验和人工保存权限仍分别维护。
+更新：2026-09-24。适用于 Candidate、Job、个人理解与职位概况的 Model 对话；领域语义、结果校验和人工保存权限仍分别维护。对话现在通过同一 transport 接收请求局部实时事件；协议、公开预览与校验边界见 [对话实时反馈](CONVERSATION_LIVE_FEEDBACK.md)。
 
 ## 为什么需要整合
 
@@ -11,7 +11,7 @@
 ## 当前管线
 
 1. **Composer / Attachment Controller**：`conversation-attachments.js` 只负责选择、格式与大小检查、明确传输确认、本机 `SOURCE_INPUT_ONLY` 原件记录，以及可见阶段状态。
-2. **Turn Transport**：`conversation-turn-transport.js` 是唯一的前端网络编排入口，按顺序准备附件、标记模型请求、发起 JSON 请求、确认 composer dispatch、解析统一错误，并且恰好一次完成或失败附件状态。
+2. **Turn Transport**：`conversation-turn-transport.js` 是唯一的前端网络编排入口，按顺序准备附件、标记模型请求、发起请求、确认 composer dispatch、接收实时事件/公开预览、解析统一终态与错误，并且恰好一次完成或失败附件状态。旧 JSON 响应兼容但不宣称实时。
 3. **Domain Contract**：Candidate、Job、个人理解、职位概况继续分别创建请求、检查 Runtime signature、校验结果和执行各自的 Working/Proposal/只读权限；共用传输不解释领域语义。
 4. **Backend Attachment Adapter**：`src/conversation_attachments.py` 集中核对执行 ID、Provider/model 同意、文件名/MIME/大小/hash 和完整解码，再把本轮材料作为低权限 source material 放入对应领域 payload。
 5. **Persistence / Delivery**：领域持久化只保存已校验的对话与 Working 结果；附件不会自动成为确认资料。模型选择 PDF/图解 deliverable 时，`conversation-output.js` 在本地生成下载文件。
@@ -29,7 +29,7 @@
 
 ## 后续扩展原则
 
-新增对话领域时，应提供 endpoint、domain identity、Runtime signature 与领域 error factory，然后接入 Turn Transport；不得复制一套附件收尾代码。需要更细的服务端进度时，应增加有契约的执行状态端点或事件通道，而不是用前端定时器猜测上传/推理阶段。
+新增对话领域时，应提供 endpoint、domain identity、Runtime signature 与领域 error factory，然后接入 Turn Transport；不得复制一套附件收尾代码。更细服务端进度使用现有请求局部事件通道，不用前端定时器猜测上传/推理阶段，也不把模型观察标成代码验证结果。
 
 ## 2026-09-24：跨职位上下文与公开链接
 

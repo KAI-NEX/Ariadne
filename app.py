@@ -361,6 +361,12 @@ def candidate_conversation_failure_diagnostics(error: CandidateConversationRunti
 
 
 def call_ariadne_model(credential: str, payload: dict, *, response_limit: int) -> tuple[int, dict]:
+    from src.conversation_events import emit
+    images = sum(1 for message in payload.get("messages", [])
+                 if isinstance(message.get("content"), list)
+                 for part in message["content"] if part.get("type") == "image_url")
+    emit("input_ready", images=images, messages=len(payload.get("messages", [])))
+    emit("model_started")
     if isinstance(credential, RequestCredential):
         return call_provider(credential, payload, response_limit=response_limit)
     if credential == CODEX_CREDENTIAL:
@@ -374,6 +380,10 @@ def provider_urlopen(request, *, timeout):
 
 def call_deepseek_chat_completions(api_key: str, payload: dict, *, response_limit: int, timeout: int = 240) -> tuple[int, dict]:
     """Shared fixed-endpoint transport; callers own operation-specific normalization."""
+    from src.conversation_events import SINK, read_chat_stream
+    streaming = SINK.get() is not None
+    if streaming:
+        payload = {**payload, "stream": True}
     request = Request(
         DEEPSEEK_ENDPOINT,
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
@@ -381,6 +391,8 @@ def call_deepseek_chat_completions(api_key: str, payload: dict, *, response_limi
         method="POST",
     )
     with provider_urlopen(request, timeout=timeout) as response:  # fixed Provider endpoint
+        if streaming:
+            return response.status, read_chat_stream(response, response_limit)
         response_body = response.read(response_limit + 1)
         if len(response_body) > response_limit:
             raise ValueError("provider_response_too_large")
@@ -1076,6 +1088,41 @@ class JobRadarHandler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self) -> None:  # noqa: N802 - required by the standard library
+        from src.conversation_events import CONTENT_TYPE, PATHS, SINK, encode
+        if (not getattr(self, "web_request", False) and urlparse(self.path).path in PATHS
+                and self.headers.get("Accept") == CONTENT_TYPE):
+            if not self.local_request_allowed():
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", CONTENT_TYPE)
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.close_connection = True
+            sequence = 0
+            def send(event):
+                nonlocal sequence
+                sequence += 1
+                self.wfile.write(encode({**event, "seq": sequence}))
+                self.wfile.flush()
+            original = self.send_json
+            self.send_json = lambda status, payload: send({"type": "result", "status": int(status), "result": payload})
+            token = SINK.set(send)
+            try:
+                send({"type": "received"})
+                self._do_POST()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            except Exception:
+                self.send_json(500, {"error": "CONVERSATION_STREAM_FAILED", "persistence": "not_written"})
+            finally:
+                SINK.reset(token)
+                self.send_json = original
+            return
+        self._do_POST()
+
+    def _do_POST(self) -> None:
         if urlparse(self.path).path == "/api/workspace":
             if self.local_request_allowed():
                 self.handle_workspace()

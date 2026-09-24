@@ -16,7 +16,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 
 from workers import WorkerEntrypoint, DurableObject, Response, wsgi
-from pyodide.ffi import run_sync, to_js
+from pyodide.ffi import run_sync, to_js, create_proxy
 import js
 
 import app
@@ -26,6 +26,7 @@ from src.runtime_transport import PROVIDER_HTTP_OPEN
 from src.pdf_delivery import PDF_RENDERER
 from src.browser_pdf_delivery import BrowserPDFDelivery
 from src.web_execution import WebBoundaryError
+from src.conversation_events import CONTENT_TYPE, PATHS as TURN_PATHS, SINK, encode
 
 MAX_REQUEST = 12 * 1024 * 1024
 ENDPOINTS = {app.DEEPSEEK_ENDPOINT, app.DEEPSEEK_MODELS_ENDPOINT, *(item["endpoint"] for item in PROVIDERS.values())}
@@ -111,6 +112,39 @@ class ProviderResponse(io.BytesIO):
         self.status = status
 
 
+class StreamingProviderResponse:
+    """Pull SSE lines without buffering the whole Provider answer in Workers."""
+    def __init__(self, response):
+        self.status = response.status
+        self.reader, self.buffer, self.done, self.size = response.body.getReader(), b"", False, 0
+
+    def __enter__(self): return self
+
+    def __exit__(self, *_):
+        try:
+            if not self.done: run_sync(self.reader.cancel())
+        finally:
+            self.reader.releaseLock()
+
+    def readline(self, limit=8_000_001):
+        while b"\n" not in self.buffer and len(self.buffer) < limit and not self.done:
+            part = run_sync(self.reader.read())
+            self.done = bool(part.done)
+            if not self.done:
+                chunk = part.value.to_bytes()
+                self.size += len(chunk)
+                if self.size > 8_000_000: raise ValueError("PROVIDER_RESPONSE_TOO_LARGE")
+                self.buffer += chunk
+        if self.buffer.find(b"\n") >= limit or (b"\n" not in self.buffer and len(self.buffer) >= limit):
+            line, self.buffer = self.buffer[:limit], self.buffer[limit:]
+            return line
+        if b"\n" in self.buffer:
+            line, self.buffer = self.buffer.split(b"\n", 1)
+            return line + b"\n"
+        tail, self.buffer = self.buffer, b""
+        return tail
+
+
 class ExecutionSession(DurableObject):
     def __init__(self, ctx, env):
         self.ctx, self.env = ctx, env
@@ -119,6 +153,44 @@ class ExecutionSession(DurableObject):
         self.active = 0
 
     async def fetch(self, request):
+        if (request.headers.get("Accept") == CONTENT_TYPE and urlparse(request.url).path in TURN_PATHS
+                and allowed(request, self.env)):
+            # WSGI remains the domain/access boundary; the outer stream prevents
+            # its buffered final JSON response from holding up public feedback.
+            headers = {key: value for key, value in request.headers.items() if key.lower() != "accept"}
+            headers["Accept"] = "application/json"
+            forwarded = js.Request.new(getattr(request, "js_object", request), to_js({"headers": headers}, dict_converter=js.Object.fromEntries))
+            cancelled = False
+            proxies = []
+            async def start(controller):
+                sequence = 0
+                def send(event):
+                    nonlocal sequence
+                    if cancelled: raise ConnectionAbortedError()
+                    sequence += 1
+                    controller.enqueue(to_js(encode({**event, "seq": sequence})))
+                token = SINK.set(send)
+                try:
+                    send({"type": "received"})
+                    response = await self._fetch(forwarded)
+                    result = json.loads(await response.text())
+                    send({"type": "result", "status": response.status, "result": result})
+                except Exception:
+                    if not cancelled:
+                        send({"type": "result", "status": 500, "result": {"error": "WEB_STREAM_FAILED", "persistence": "not_written"}})
+                finally:
+                    SINK.reset(token)
+                    if not cancelled: controller.close()
+                    for proxy in proxies: proxy.destroy()
+            def cancel(_reason=None):
+                nonlocal cancelled
+                cancelled = True
+            proxies.extend([create_proxy(start), create_proxy(cancel)])
+            stream = js.ReadableStream.new(to_js({"start": proxies[0], "cancel": proxies[1]}, dict_converter=js.Object.fromEntries))
+            return Response(stream, headers={"Content-Type": CONTENT_TYPE, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+        return await self._fetch(request)
+
+    async def _fetch(self, request):
         if not allowed(request, self.env):
             return error("WEB_ORIGIN_DENIED", 403)
         path = urlparse(request.url).path
@@ -169,6 +241,8 @@ class ExecutionSession(DurableObject):
                     if response.status != 200:
                         await response.body.cancel()
                         raise HTTPError(outbound.full_url, response.status, "PROVIDER_HTTP_ERROR", {}, None)
+                    if SINK.get() and outbound.data and json.loads(outbound.data).get("stream") is True:
+                        return StreamingProviderResponse(response)
                     reader = response.body.getReader()
                     chunks, size = [], 0
                     try:

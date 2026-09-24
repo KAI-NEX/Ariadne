@@ -52,11 +52,16 @@ def provider_payload(credential, payload):
 
 
 def call_provider(credential, payload, *, response_limit, timeout=240):
+    from src.conversation_events import SINK, read_chat_stream
     body = provider_payload(credential, payload)
+    streaming = SINK.get() is not None
+    if streaming: body["stream"] = True
     request = Request(PROVIDERS[credential.provider]["endpoint"],
                       data=json.dumps(body, ensure_ascii=False).encode(),
                       headers={"Authorization": f"Bearer {credential.key}", "Content-Type": "application/json"}, method="POST")
     with (PROVIDER_HTTP_OPEN.get() or HTTP.open)(request, timeout=timeout) as response:
+        if streaming:
+            return response.status, read_chat_stream(response, response_limit)
         raw = response.read(response_limit + 1)
         if len(raw) > response_limit:
             raise ValueError("PROVIDER_RESPONSE_TOO_LARGE")

@@ -69,7 +69,7 @@ assert job_conversation_option["supports_complete_document_review"] is True
 assert runtime_payload["network_call_made"] is False
 assert runtime_payload["career_data_sent"] is False
 
-post_source = inspect.getsource(app.JobRadarHandler.do_POST)
+post_source = inspect.getsource(app.JobRadarHandler._do_POST)
 assert post_source.index("parsed.path in LEGACY_PROVIDER_ACTION_PATHS") < post_source.index('parsed.path == "/api/runtime-check"')
 for forbidden_dispatch in (
     "self.preflight_deepseek_text()",

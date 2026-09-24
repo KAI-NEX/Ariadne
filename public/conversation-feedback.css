@@ -1,0 +1,21 @@
+.v1-turn-feedback {
+  margin: var(--vi-space-12) 0;
+  padding: var(--vi-space-12) var(--vi-space-16);
+  border-left: 2px solid var(--vi-focus);
+  color: var(--vi-text-secondary);
+  font-size: 12px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.v1-turn-feedback summary { cursor: pointer; min-height: 24px; color: var(--vi-ink); }
+.v1-turn-feedback ol { margin: var(--vi-space-8) 0; padding-left: var(--vi-space-16); }
+.v1-turn-feedback li + li { margin-top: var(--vi-space-8); }
+.v1-turn-feedback .v1-turn-preview {
+  color: var(--vi-ink);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  margin: var(--vi-space-12) 0;
+}
+.v1-turn-boundary { margin: var(--vi-space-8) 0 0; }
+.v1-turn-feedback.is-active ~ .v1-conversation-status { display: none; }

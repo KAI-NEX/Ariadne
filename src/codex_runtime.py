@@ -18,6 +18,7 @@ import threading
 from copy import deepcopy
 
 from src.runtime_binding import CODEX_MODEL, CODEX_CREDENTIAL, codex_enabled
+from src.conversation_events import SINK, Preview, emit
 
 MAX_OUTPUT = 8_000_000
 BASE_TIMEOUT_SECONDS = 180
@@ -120,6 +121,12 @@ def prepare_input(payload, directory):
               "When a function output schema is provided, return its arguments object directly. "
               "Represent unused optional fields as null; the adapter removes them before domain validation.\n" +
               json.dumps(messages, ensure_ascii=False))
+    if SINK.get():
+        prompt += ("\nPUBLIC PROGRESS: When useful, give brief user-facing commentary updates in the Human's language "
+                   "before the final JSON: what supplied evidence is relevant, what remains uncertain, or a material correction. "
+                   "These are public status summaries, NOT private reasoning or a chain of thought. Never reveal internal IDs, "
+                   "credentials, tool arguments or raw source dumps. Do not invent checks, tool use, percentages, or saved changes. "
+                   "Do not narrate every step or delay a short answer to create updates. Final response MUST still be only the required JSON.")
     return prompt, images, schema_path, function_name
 
 
@@ -210,12 +217,34 @@ def _execute(payload, timeout):
             process = subprocess.Popen(command(directory, images, schema, payload.get("reasoning_effort")), stdin=stdin, stdout=stdout,
                 stderr=subprocess.DEVNULL, cwd=directory, env=isolated_environment(), start_new_session=True)
             deadline = time.monotonic() + timeout
+            # Separate file descriptor: never seek the descriptor used by the child.
+            live = (directory / "events.jsonl").open("rb") if SINK.get() else None
+            pending_line, updates, preview = b"", 0, Preview()
+            def progress():
+                nonlocal pending_line, updates
+                if live is None: return
+                pending_line += live.read(MAX_OUTPUT + 1)
+                while b"\n" in pending_line:
+                    line, pending_line = pending_line.split(b"\n", 1)
+                    event = json.loads(line)
+                    item = event.get("item") or {}
+                    if event.get("type") in {"item.started", "item.updated", "item.completed"}:
+                        if item.get("type") not in {"agent_message", "reasoning", "error"}:
+                            raise ValueError("CODEX_UNEXPECTED_TOOL_ACTIVITY")
+                    if event.get("type") == "item.completed" and item.get("type") == "agent_message":
+                        text = item.get("text", "")
+                        if text.lstrip().startswith("{"):
+                            preview.update(text)
+                        elif updates < 8 and isinstance(text, str) and text.strip():
+                            updates += 1
+                            emit("update", text=text[:1200])
             try:
                 while True:
                     if time.monotonic() >= deadline:
                         raise CodexTimeoutError(timeout, len(images))
                     if os.fstat(stdout.fileno()).st_size > MAX_OUTPUT:
                         raise ValueError("CODEX_OUTPUT_LIMIT")
+                    progress()
                     try:
                         code = process.wait(timeout=min(1, max(0.01, deadline - time.monotonic())))
                         break
@@ -223,6 +252,8 @@ def _execute(payload, timeout):
                         continue
                 if code:
                     raise ValueError("CODEX_EXECUTION_FAILED")
+                progress()
+                emit("checking")
                 stdout.seek(0)
                 raw = stdout.read(MAX_OUTPUT + 1)
                 if len(raw) > MAX_OUTPUT:
@@ -230,6 +261,7 @@ def _execute(payload, timeout):
                 output_schema = payload["tools"][0]["function"]["parameters"] if function_name else None
                 return 200, parse_events(raw, function_name, output_schema)
             finally:
+                if live is not None: live.close()
                 if process.poll() is None:
                     os.killpg(process.pid, signal.SIGKILL)
                     process.wait()

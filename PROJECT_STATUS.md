@@ -1,5 +1,14 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-24 — Web / Skill 对话实时透明反馈（代码与本地验收完成；待发布）
+
+- 六个对话入口共用真实请求事件、资料覆盖范围、公开回复预览和可折叠过程记录。Web 逐块读取所选 API 的 Chat Completions SSE；Skill 保留隔离的 Codex exec JSONL，在公开消息完成时提前转发，不切换模型/强度/工具权限，不声称 Codex 已提供连续 token delta。
+- 隐藏 reasoning、原始工具参数与修改动作；公开预览明确未校验。只有完整终态交回原领域校验/持久化，断流/乱序/失败撤回预览并恢复附件确认，Candidate/Job/补充的人工保存边界不变。结构校验不等于事实验证；临时过程记录不写入长期资料。
+- 122/122 离线 regression suite、VI/负向检查、语法与 diff 检查通过。包含新增 SSE 分字节中文、身份/大小/终态校验、公开字段隔离、Web 真领域合成成功与错误动作拒绝、本机 HTTP/WSGI 提前 flush、前端提前预览及失败收尾。
+- 1 次真实 Codex / gpt-5.6-sol / medium 合成资料调用：13.066 秒预览、16.943 秒终态，提前约 3.88 秒；未出现额外 commentary，不能据此声称持续逐字输出。没有发送私人资料或调用真实 BYOK API。
+- egolite 六页面共用链路合成验收、桌面/390px、失败撤回、完成折叠与减少动效通过；实际 workerd 验证公开事件早于终态、成功/422 失败保真、分块上游 SSE 和 reasoning 不外传。过程中修复 SDK Request 克隆类型错误；本地 SDK 依赖缺失、测试替身的 JsProxy/dict 使用错误和浏览器缓存加载失败的中间证据均保留，不计作通过。
+- 架构与限制见 [对话实时反馈](docs/current/CONVERSATION_LIVE_FEEDBACK.md)。QA 与生成包在 `.cache/conversation-transparency-20260924/`。当前未发布公网、未 push、未覆盖日常 Skill；真实三家 API 账号与跨机安装仍待验收。既有未提交历史文档及原件保留。
+
 ## 2026-09-24 — 跨职位对话认识当前个人资料（COMPLETE；本机 Skill）
 
 - 修复根因：`JOB_OVERVIEW_TURN / DISCUSS` 原来只读取 Job，并在 prompt/后端/测试中禁止 Candidate。现从同一工作区复用 JobCandidateContext 与 PersonalContext，读取当前个人经历、未确认 Working、已保存补充和同指纹个人理解；模型区分能力、证据、表达、相关性与偏好。DISTILL/SYNTHESIZE 继续只发送职位，模型无 Candidate/Job 确认写权限。

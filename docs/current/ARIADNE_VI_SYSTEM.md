@@ -150,6 +150,8 @@ VI 页面提供 `vi-resume-sheet/row/label/content/heading` 的**合成排版样
 
 共享组件的职责：
 
+- **对话实时反馈**（2026-09-24）：六入口由 Turn Transport 复用 `conversation-feedback.css`，在历史滚动区追加可折叠过程记录与纯文字预览。沿用 focus 细线、ink/text-secondary、12 px 辅助字、13 px 答复、8/12/16 px 间距；不是新模态框或循环动画。生成中标明未校验，失败撤回预览，结束折叠；无隐藏推理、伪造百分比或“结构通过即事实正确”的勾选徽章。详见 [实时反馈边界](CONVERSATION_LIVE_FEEDBACK.md)。
+
 - **模型更新提示**（2026-09-11）：首页提示区/六个 composer 上方共用 `model-updates.js/css` 轻提示。沿用 12 px/1.65 辅助文字、text-secondary、8 px 间距和 44 px 文字按钮；无新图标、卡片或重型弹窗，窄屏自然换行。「验证并切换」一次确认后显示验证进度，通过直接切换；「稍后」收起。失败明确保留原选择，不改变普通对话的资料传输确认。
 - **主/次/轻操作**：复用 `v1-primary-button / secondary / tertiary / consent-action`，禁止每个页面复制按钮尺寸。
 - **来源入口**：Candidate/Job 共用 source input、dropzone、预览与错误说明；不可用视觉提示替代材料传输确认。
