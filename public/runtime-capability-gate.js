@@ -143,7 +143,7 @@
     }
     if (normalized.provider === "codex" && normalized.model === "gpt-5.6-sol") {
       const domain = modelDescriptorForRuntime({ mode: "model", provider: "deepseek", model: "deepseek-flash" }, operation);
-      return Object.freeze({ ...domain, provider_id: "codex", model_id: "gpt-5.6-sol", protocol: "CODEX_EXEC_JSONL",
+      return Object.freeze({ ...domain, provider_id: "codex", model_id: "gpt-5.6-sol", protocol: "CODEX_APP_SERVER",
         discovery_source: "ariadne_codex_qualification_2026-09-09", adapter_version: domain.adapter_version?.replace(/^deepseek-/, "codex-") ?? null });
     }
     if (normalized.provider === CANDIDATE_PDF_MODEL_ADAPTER.provider_id && normalized.model === CANDIDATE_PDF_MODEL_ADAPTER.model_id) {

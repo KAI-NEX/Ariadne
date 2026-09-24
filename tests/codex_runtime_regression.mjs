@@ -8,7 +8,7 @@ const runtime={mode:'model',provider:'codex',model:'gpt-5.6-sol'};
 assert.equal(Gate.isModelRuntimeEligible(runtime),true);
 for (const operation of ['candidate_image_import','job_image_import','candidate_conversation','job_conversation','personal_understanding','job_overview']) {
  const descriptor=Gate.modelDescriptorForRuntime(runtime,operation);
- assert.equal(descriptor.protocol,'CODEX_EXEC_JSONL');assert.match(descriptor.adapter_version,/^codex-/);
+ assert.equal(descriptor.protocol,'CODEX_APP_SERVER');assert.match(descriptor.adapter_version,/^codex-/);
  assert.equal(descriptor.document_delivery,'rendered_pdf_pages');assert.equal(Gate.operationGate(operation,Gate.authorityFrom(runtime,operation)).allowed,true);
 }
 assert.equal(Gate.isModelRuntimeEligible({...runtime,model:'gpt-unknown'}),false);

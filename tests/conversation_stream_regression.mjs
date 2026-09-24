@@ -18,6 +18,11 @@ const preview = { seq: 1, type: "preview", text: "初步公开结论；未核验
 const result = { seq: 2, type: "result", status: 200, result: { output: "complete" } };
 const [r, controller] = response([preview], false);
 const seen = [];
+const commentary = {seq:1,type:'commentary',id:'public-1',text:'Public status'};
+const publicSeen=[];
+await T.readStream(response([commentary,result])[0],event=>publicSeen.push(event));
+assert.deepEqual(publicSeen,[commentary]);
+await assert.rejects(T.readStream(response([{...commentary,id:null},result])[0],()=>{}));
 let settled = false;
 const promise = T.readStream(r, event => seen.push(event)).then(value => { settled = true; return value; });
 await new Promise(resolve => setTimeout(resolve, 20));

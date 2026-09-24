@@ -1,0 +1,15 @@
+.v1-conversation-entry {
+  margin: auto 0;
+  padding: var(--vi-space-24) var(--vi-space-8);
+  color: var(--vi-ink);
+  text-align: left;
+  max-width: 520px;
+  animation: v1-entry-appear var(--vi-motion-open) var(--vi-ease-reveal) both;
+}
+.v1-conversation-entry[hidden], .v1-entry-obscured, .personal-consent[hidden], .job-overview-consent[hidden] { display: none !important; }
+.v1-conversation-entry h2 { font-size: 20px; font-weight: 550; margin: 0 0 var(--vi-space-16); }
+.v1-conversation-entry p { font-size: 14px; line-height: 1.85; margin: 0 0 var(--vi-space-16); overflow-wrap: anywhere; }
+.v1-conversation-entry .v1-entry-boundary { font-size: 12px; color: var(--vi-text-secondary); }
+.v1-conversation-entry button { margin-top: var(--vi-space-8); }
+@keyframes v1-entry-appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .v1-conversation-entry { animation: none; } }

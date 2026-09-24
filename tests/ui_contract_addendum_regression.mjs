@@ -37,7 +37,10 @@ assert.equal(ConversationUI.ProcessingIndicator, ProcessingIndicator);
 assert.equal(ConversationUI.humanSafeText("项目（card-3）对应 job-requirement-1。"), "项目对应。");
 assert.equal(ProductShell.CONTRACT.conversation.field, "v1-composer-field");
 assert.match(read("public/processing-indicator-domain.js"), /class="v1-processing-loop"/);
-assert.doesNotMatch(read("public/processing-indicator-domain.js"), /processing-mesh|<i>/);
+assert.doesNotMatch(read("public/processing-indicator-domain.js"), /processing-mesh/);
+// The 2026-09-24 UX request restores three waving dots for conversations only.
+assert.match(read("public/processing-indicator-domain.js"), /orb.innerHTML = "<i><\/i><i><\/i><i><\/i>"/);
+assert.match(read("public/conversation-dots.css"), /prefers-reduced-motion: reduce/);
 assert.match(styles, /\.v1-processing-loop \{[^}]*border-top-color: #8ea6ff;/);
 assert.doesNotMatch(styles.match(/\.v1-processing-loop \{[^}]*\}/)?.[0] || "", /box-shadow|radial-gradient|conic-gradient/);
 assert.doesNotMatch(styles, /v1-processing-(?:mesh|breathe|orbit)/);

@@ -6,7 +6,9 @@
 
 - 发送时显示本轮已选的详细资料范围（若当前编译器提供 coverage）、服务端接收、输入准备与真实模型调用边界。图片计数含完整转图后的 PDF 页面，不代表模型已逐页理解。
 - Web 从所选 Provider 的 Chat Completions SSE 中提取公开 `message` / `summary` / `semantic_action.message` 文字，作为生成中的临时预览。不显示 function 参数全文、patch、来源正文包或 `reasoning_content`。
-- Skill 不更换 `CODEX_EXEC_JSONL`，也不扩大工具权限。执行期间增量读取 JSONL：公开 `agent_message` 完成时立即显示阶段反馈或公开回复预览；`reasoning` 不传给页面。CLI 没有提供的 token delta 不凭空生成；并非持续逐字输出，也不保证每轮都有阶段消息。
+- Skill 使用 `CODEX_APP_SERVER`：`item/agentMessage/delta` 到达时提取公开答复字段；只有明确 `commentary` phase 才显示公开阶段文字。隐藏 reasoning、原始 JSON/修改参数与工具参数不传给页面，不保证每轮都有 commentary。保留旧 exec 实现作历史回归，不是运行失败时的 fallback。
+- 过程列表默认收起，生成文字实时显示在列表外；展开/收起可中断并自然过渡。等待为三个波动圆点，减少动态效果时静态呈现。已显示过实时答复的最终消息不再重复播放模拟逐字动画。
+- 六入口先显示资料范围、接收模型、费用与搜索边界，点击「同意并进入对话」只保存该 scope 与精确运行设置的同意，不发送请求。进入后移除底部重复说明；换接收方/推理强度/对话范围必须核对新同意，原件附件继续每轮单独确认。
 - 完整结果返回后仍执行原有领域结构、动作、来源范围、执行代次与版本校验。服务端通过后，临时预览清除，过程记录折叠；前端继续自己的校验与持久化。记录写明最终结果以对话历史为准，不能把“服务端校验通过”解释为已经保存或事实已证实。
 - 断流、失败或缺少完整终止帧：预览撤回，保留明确的失败与重试提示。附件按原有机制恢复并重新确认，不自动重发付费请求。
 
@@ -16,13 +18,26 @@
 
 请求仍 POST 至原来的四个领域 endpoint，以 `Accept: application/x-ariadne-turn+ndjson` 协商事件；旧 JSON 服务端可兼容返回整包，界面明确标为非实时。DISTILL/SYNTHESIZE 沿用 JSON。请求中选定的 Provider/model、推理强度、传输同意及多模态资格不变。
 
-`src/conversation_events.py` 使用请求局部 ContextVar。事件严格递增 seq，类型白名单为 received、input_ready、model_started、update、preview、checking、result；终态携带实际业务 status 与原领域结果。浏览器拒绝乱序、缺终态、额外终态、未知类型、过大响应或损坏 UTF-8。局部预览只作纯文字渲染，不执行 Markdown HTML 或工具。
+`src/conversation_events.py` 使用请求局部 ContextVar。事件严格递增 seq，类型白名单为 received、input_ready、model_started、update、commentary、preview、checking、result；commentary 使用有界 item ID 更新同一段，不为每个 delta 新建一行。终态携带实际业务 status 与原领域结果。浏览器拒绝乱序、缺终态、额外终态、未知类型、过大响应或损坏 UTF-8。局部预览只作纯文字渲染，不执行 Markdown HTML 或工具。
+
+App Server 每次请求启动独立 stdio 子进程、临时目录与 ephemeral thread；模型固定 `gpt-5.6-sol`，强度沿用请求，不接受 fallback。只读/never approval、禁用 shell/apps/plugins/memory/多代理等工具，逐项核对有效策略、空 instructionSources 与空 MCP 列表，任何不符在 turn/start 前失败。普通对话的公开搜索沿用既有开关和搜索-修改互斥；不是新增通用 Agent 权限。进程成功、失败、超时均回收，不复用会话；服务崩溃或浏览器断开不承诺取消已计费请求。
+
+实测 App Server 没有 exec 的 ignore-user-config / ignore-rules 选项，`project_doc_max_bytes=0` 仍会载入日常 Codex 的全局 AGENTS.md。因此用户批准使用独立 `Ariadne Codex` 目录并重新登录。只由官方 CLI 处理认证；Ariadne 不读取/复制凭据，不修改日常 Codex 配置。登录目录与资料库、临时请求、Skill 安装分开。协议依据 [OpenAI App Server 文档](https://developers.openai.com/codex/app-server) 和本机 CLI 生成的 schema；不输出隐藏推理。
 
 - 本机 HTTP：即时 flush，同一响应连接携带事件及终态；原 loopback/Origin 与 Skill Provider 门禁继续有效。
 - 普通 WSGI Web：有界队列转发同一次请求，所有 origin/key/session/配额与领域验证仍由原 dispatch 执行。消费者断开不代表 Provider 已取消，不承诺返还额度。
 - Cloudflare：同一 Durable Object、同一凭据/会话 namespace 与执行收据。ReadableStream 直接发送事件，上游 Reader 按 SSE 行读取，避免 WSGI 和原上游整包缓冲。没有新增跨域通道、日志正文或持久化模型答案。实现方式参考 [Cloudflare Streams](https://developers.cloudflare.com/workers/runtime-apis/streams/)。
 
 ## 验收与限制
+
+### 2026-09-24 连续流式升级
+
+- 真实合成文字：首预览 5.714 秒、21 次公开预览增长、12.999 秒完成。数字只说明此样本实际分批到达，不是延迟承诺。
+- 真实多模态：单图 + PDF 完整 2 页（共 3 张），逐项正确读出 JOB RADAR TEST / ARIADNE PAGE ONE / ARIADNE PAGE TWO；首预览 4.124 秒、20 次增长、6.531 秒完成。未以 OCR 代替图像，也未发送私人资料。
+- 真实 personal-understanding 领域调用：发生 2 次公开搜索事件，Python 官方 dataclasses 来源回执有效，自述与网页内容分开，proposals/card_proposals 为空、persistence=not_written。真实搜索后答复仍连续生成，保留校验和人工保存边界。
+- QA 与新登录前被安全预检拦截的记录在 `.cache/conversation-ux-v2/`。egolite 的截图接口多次超时，按项目规则回退到已有 Playwright/Chrome 无痕测试上下文；不改变用户浏览器设置。网页版三家真实 API 账号、跨机登录与安装仍未逐一验证。
+
+### 前一版验收记录（exec；历史）
 
 - 自动回归覆盖分字节中文解码、公开字段与私有字段隔离、Provider 身份/输出限制、提前预览、断流与终态顺序、原件/附件收尾，以及完整 Web 领域成功与不合法动作拒绝。
 - 一次真实 Codex `gpt-5.6-sol / medium` 合成资料调用：13.066 秒收到公开答复，16.943 秒得到终态；相差约 3.88 秒。只使用虚构年份/原型/收入冲突，未发送私人资料。此样本没有额外 commentary，不据此声称持续 token 流或普遍性能提升。

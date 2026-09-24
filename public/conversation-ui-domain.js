@@ -265,7 +265,8 @@
     const newReply = awaitingReplies.has(target) && messages.at(-1)?.role === "ASSISTANT" && !oldKeys.includes(lastKey);
     if (continuing || newReply) {
       awaitingReplies.delete(target);
-      revealReply(target, target.lastElementChild, lastKey, continuing ? previousReveal : null);
+      if (target.dataset?.liveReply === "true") delete target.dataset.liveReply;
+      else revealReply(target, target.lastElementChild, lastKey, continuing ? previousReveal : null);
     }
     withOutput(api => {
       if (renderedKeys.get(target) === keys) api.decorate(target, messages, textFor);

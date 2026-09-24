@@ -1,5 +1,6 @@
 """Bounded long-document waits and recoverable Candidate HTTP failures; no model calls."""
 import copy
+import io
 import http.client
 import json
 import os
@@ -18,6 +19,8 @@ from src.codex_runtime import call_codex, CodexTimeoutError, execution_timeout
 from src.runtime_binding import CODEX_CREDENTIAL, CODEX_MODEL, CODEX_PROTOCOL, adapter_for
 from src.model_settings import envelope
 from src.candidate_model_runtime import CandidateModelExecutionRegistry, candidate_model_operation_id, runtime_fingerprint
+from src.codex_app_server import Channel, overrides
+from src.codex_runtime import DISABLED_FEATURES
 
 assert execution_timeout(0) == execution_timeout(1) == 180
 assert execution_timeout(2) == 210
@@ -26,9 +29,8 @@ assert execution_timeout(25) == execution_timeout(80) == 900
 # A completed response after 200 virtual seconds must survive for all 25 images,
 # while a short request or an explicit deadline must still terminate and clean up.
 events = [
-    {"type": "thread.started", "thread_id": "synthetic"},
-    {"type": "item.completed", "item": {"type": "agent_message", "text": '{"ok":true}'}},
-    {"type": "turn.completed", "usage": {}},
+    {"method": "item/completed", "params": {"threadId":"thread", "turnId":"turn", "item": {"id":"final", "type": "agentMessage", "text": '{"ok":true}', "phase":"final_answer"}}},
+    {"method": "turn/completed", "params": {"threadId":"thread", "turn": {"id":"turn", "status":"completed"}}},
 ]
 payload = {"model": CODEX_MODEL, "reasoning_effort": "medium", "messages": [{"role": "user", "content": [
     {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,aW1hZ2U="}} for _ in range(25)
@@ -41,28 +43,46 @@ for image_count, override, should_timeout in [(25, None, False), (1, None, True)
     class Child:
         pid = 123456789
         def __init__(self, args, **kwargs):
-            assert args.count("--image") == image_count
-            assert args[args.index("-m") + 1] == CODEX_MODEL
+            assert args[1:3] == ['app-server', '--stdio']
             assert 'model_reasoning_effort="medium"' in args
-            kwargs["stdout"].write("\n".join(json.dumps(e) for e in events).encode())
-            kwargs["stdout"].flush()
+            self.stdin, self.stdout = io.BytesIO(), io.BytesIO()
+            self.cwd = kwargs['cwd']
             self.done = False
-            self.waits = 0
             children.append(self)
         def wait(self, timeout=None):
-            self.waits += 1
-            if self.waits == 1:
-                clock[0] = 200
-                raise subprocess.TimeoutExpired("synthetic", timeout)
             self.done = True
             return 0
         def poll(self):
             return 0 if self.done else None
 
+    class Protocol(Channel):
+        def request(self, method, params):
+            if method == 'initialize': return {}
+            if method == 'config/read': return {'config': {'features': {k:False for k in DISABLED_FEATURES}}}
+            if method == 'skills/list': return {'data': []}
+            if method == 'mcpServerStatus/list': return {'data': []}
+            if method == 'thread/start':
+                assert params['model'] == CODEX_MODEL
+                return {'model': CODEX_MODEL, 'modelProvider':'ariadne-openai', 'cwd':str(self.process.cwd), 'approvalPolicy':'never', 'sandbox':{'type':'readOnly'}, 'thread':{'id':'thread','ephemeral':True}, 'reasoningEffort':'medium'}
+            assert method == 'turn/start'
+            images = [part for part in params['input'] if part['type']=='localImage']
+            assert len(images) == image_count and all(Path(part['path']).read_bytes()==b'image' for part in images)
+            assert params['model'] == CODEX_MODEL and params['effort']=='medium'
+            self.index=0
+            return {'turn':{'id':'turn'}}
+        def read(self):
+            clock[0]=200
+            if self.deadline <= clock[0]:
+                # Use the real deadline branch, not a test-only timeout error.
+                return super().read()
+            value=events[self.index]; self.index+=1
+            return value
+
     with patch.dict(os.environ, {"ARIADNE_CODEX_ENABLED": "1"}), \
-         patch("src.codex_runtime.subprocess.Popen", Child), \
-         patch("src.codex_runtime.time.monotonic", side_effect=lambda: clock[0]), \
-         patch("src.codex_runtime.os.killpg") as kill:
+         patch("src.codex_app_server.subprocess.Popen", Child), \
+         patch("src.codex_app_server.Channel", Protocol), \
+         patch("src.codex_app_server.time.monotonic", side_effect=lambda: clock[0]), \
+         patch("src.codex_app_server.os.killpg") as kill:
         try:
             status, result = call_codex(CODEX_CREDENTIAL, current, timeout=override)
         except CodexTimeoutError as error:
@@ -73,7 +93,7 @@ for image_count, override, should_timeout in [(25, None, False), (1, None, True)
         else:
             assert not should_timeout and status == 200
             assert json.loads(result["choices"][0]["message"]["content"]) == {"ok": True}
-            kill.assert_not_called()
+            kill.assert_called_once()  # Per-request App Server is stopped on success too.
         assert children[0].done
 
 fixture = runpy.run_path(str(ROOT / "tests/candidate_model_runtime_regression.py"))

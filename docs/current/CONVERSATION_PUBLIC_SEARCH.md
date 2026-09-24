@@ -4,6 +4,8 @@
 
 ## 可用范围
 
+2026-09-24 后续流式升级：正式通道改为独立登录目录的 `CODEX_APP_SERVER`，typed `webSearch` 事件转换为下述同一搜索回执并保留全部修改禁令。新增真实合成搜索验收通过；此前 exec JSONL 的记录保留为历史。账号/有效隔离策略与连续文字边界见 [对话实时反馈](CONVERSATION_LIVE_FEEDBACK.md)。
+
 Candidate 列表/详情、Job 列表/详情、了解我、职位概况的 DISCUSS 请求，经服务器验证 Codex credential 后才开启 `web_search=live`。普通个人讨论不必搜索；需要最新招聘信息、公开研究或核对事实时按需调用。Candidate/Job 导入、DISTILL、SYNTHESIZE 与 Local 不开启搜索；BYOK 请求不注入此能力。
 
 沿用已合格的 `gpt-5.6-sol` 和该对话的推理强度。Codex 从独立临时目录运行，不复用唤起 Skill 的 Agent 会话或工具管道。当前验收 CLI 为 `0.155.0-alpha.16.3`：实际搜索需要同时开启本次进程的 `code_mode` 和 `code_mode_host`，否则真实探测报 host disabled。其他 shell、apps、插件、浏览器控制、多代理开关继续关闭；未修改用户全局 Codex 配置。JSONL 只接受已有消息事件和限定的 web_search 事件，出现其他工具活动立即失败并终止子进程，不把这一事后检查描述为操作系统级工具隔离。

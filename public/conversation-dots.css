@@ -1,0 +1,8 @@
+.v1-conversation-dots { display: inline-flex; align-items: center; gap: var(--vi-space-8); height: 24px; flex-shrink: 0; color: var(--vi-focus); }
+.v1-conversation-dots i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.is-active .v1-conversation-dots i { animation: v1-conversation-dot-wave 1.2s ease-in-out infinite; }
+.is-active .v1-conversation-dots i:nth-child(2) { animation-delay: .15s; }
+.is-active .v1-conversation-dots i:nth-child(3) { animation-delay: .3s; }
+.v1-processing-indicator:not(.is-active) .v1-conversation-dots { display: none; }
+@keyframes v1-conversation-dot-wave { 0%, 60%, 100% { transform: translateY(0); opacity: .4; } 30% { transform: translateY(-4px); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .is-active .v1-conversation-dots i { animation: none; opacity: .7; } }

@@ -214,7 +214,7 @@ python3 app.py
 
 Open [http://127.0.0.1:8000/](http://127.0.0.1:8000/). A clean clone starts with an empty local workspace and does not require the maintainer's private seed data.
 
-To enable the local Codex runtime, first install and log in to Codex CLI, confirm `codex login status`, then run:
+To enable local Codex, install a compatible CLI and run `python3 scripts/codex_login.py` to complete the official login in Ariadne's separate account directory. An installed Skill uses `python3 scripts/ariadne.py login`. Do not copy your regular Codex credentials or configuration. Then run:
 
 ```sh
 ARIADNE_CODEX_ENABLED=1 python3 app.py

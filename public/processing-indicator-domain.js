@@ -9,12 +9,19 @@
   function ensure(host) {
     if (!host) return null;
     host.classList.add("v1-processing-indicator");
-    const conversation = Boolean(Wave) && host.classList.contains("v1-conversation-status");
+    const conversation = host.classList.contains("v1-conversation-status");
+    if (conversation && host.ownerDocument?.head && !host.ownerDocument.querySelector('link[data-conversation-dots]')) {
+      const css = host.ownerDocument.createElement("link"); css.rel = "stylesheet"; css.href = "/conversation-dots.css?v=1"; css.dataset.conversationDots = ""; host.ownerDocument.head.append(css);
+    }
     host.classList.toggle("v1-wave-wait", conversation);
     if (!host.querySelector("[data-processing-orb]")) {
       const previous = host.textContent.trim();
       host.innerHTML = `<span class="v1-processing-loop" data-processing-orb aria-hidden="true"></span><span class="v1-processing-copy"><strong data-processing-copy></strong><small data-processing-boundary></small></span>`;
-      if (conversation) host.querySelector("[data-processing-orb]").className = "v1-wave-loader";
+      if (conversation) {
+        const orb = host.querySelector("[data-processing-orb]");
+        orb.className = "v1-conversation-dots";
+        orb.innerHTML = "<i></i><i></i><i></i>";
+      }
       if (previous) host.querySelector("[data-processing-copy]").textContent = previous;
     }
     return host;
@@ -41,7 +48,7 @@
     const target = ensure(host);
     if (!target) return;
     apply(target, { active: Boolean(active), copy, boundary, state });
-    if (target.classList.contains("v1-wave-wait")) Wave?.set(target.querySelector("[data-processing-orb]"), Boolean(active));
+    if (target.classList.contains("v1-wave-wait") && !active) Wave?.set(target.querySelector("[data-processing-orb]"), false);
     if (active && follow) scroll.scrollTop = scroll.scrollHeight;
   }
 

@@ -9,7 +9,7 @@ from pathlib import Path
 from src.byok_providers import PROVIDERS, BROWSER_REFERENCES
 
 CODEX_MODEL = "gpt-5.6-sol"
-CODEX_PROTOCOL = "CODEX_EXEC_JSONL"
+CODEX_PROTOCOL = "CODEX_APP_SERVER"
 CODEX_CREDENTIAL = "local-codex://authenticated-session"
 DEEPSEEK_CREDENTIAL = "keychain://AI-Learning-OS.JobRadar.DeepSeek/local-vision"
 BROWSER_CREDENTIAL = "browser-key://deepseek/request"

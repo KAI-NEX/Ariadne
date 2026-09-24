@@ -12,7 +12,7 @@
       "descriptor_revision": "qwen-38-20260918", "settings_schema_version": "qwen-fixed-v1", "parameters": {}
     },
     {
-      "provider": "codex", "model": "gpt-5.6-sol", "protocol": "CODEX_EXEC_JSONL",
+      "provider": "codex", "model": "gpt-5.6-sol", "protocol": "CODEX_APP_SERVER",
       "short_label": "GPT Sol", "compact_label": "Sol", "connection_id": "local-codex-v1",
       "descriptor_revision": "codex-sol-20260910", "settings_schema_version": "codex-effort-v1",
       "parameters": { "reasoning_effort": { "label": "推理强度", "default": "medium", "options": [

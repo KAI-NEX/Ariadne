@@ -16,21 +16,45 @@
     const messages = pane?.querySelector(".v1-conversation-messages") || pane?.querySelector(".v1-workspace-history");
     if (!messages) return { event() {}, finish() {} };
     if (!doc.querySelector('link[data-turn-feedback]')) {
-      const css = doc.createElement("link"); css.rel = "stylesheet"; css.href = "/conversation-feedback.css?v=1"; css.dataset.turnFeedback = ""; doc.head.append(css);
+      const css = doc.createElement("link"); css.rel = "stylesheet"; css.href = "/conversation-feedback.css?v=2"; css.dataset.turnFeedback = ""; doc.head.append(css);
     }
     pane.querySelectorAll(".v1-turn-feedback").forEach(node => node.remove());
     const panel = doc.createElement("section"); panel.className = "v1-turn-feedback is-active";
     panel.setAttribute("aria-label", tr("本轮过程反馈", "This turn’s progress"));
-    const details = doc.createElement("details"); details.open = true;
-    const summary = doc.createElement("summary"); summary.textContent = tr("正在准备本轮对话", "Preparing this turn");
+    const status = doc.createElement("div"); status.className = "v1-conversation-status";
+    root.AriadneProcessingIndicator?.set(status, { active: true, copy: tr("正在准备本轮对话", "Preparing this turn") });
+    const details = doc.createElement("details"); details.open = false;
+    const summary = doc.createElement("summary"); summary.textContent = tr("查看本轮过程", "View this turn’s activity");
     summary.setAttribute("role", "status");
     const log = doc.createElement("ol");
     const preview = doc.createElement("p"); preview.className = "v1-turn-preview"; preview.hidden = true;
     const note = doc.createElement("p"); note.className = "v1-turn-boundary";
     note.textContent = tr("实时预览 · 尚未完成校验，不会自动修改资料。", "Live preview · Not yet validated. No automatic changes to your records.");
-    details.append(summary, log, preview, note); panel.append(details); messages.after(panel);
-    const add = text => { const item = doc.createElement("li"); item.textContent = text; log.append(item); };
+    const content = doc.createElement("div"); content.className = "v1-turn-activity"; content.append(log, note);
+    details.append(summary, content); panel.append(status, preview, details); messages.after(panel);
+    const reduced = () => root.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    let expansion, targetOpen = false;
+    const resize = change => {
+      const before = content.getBoundingClientRect().height;
+      expansion?.cancel(); change();
+      const after = content.scrollHeight;
+      if (!reduced() && content.animate && details.open) expansion = content.animate([{ height: `${before}px`, opacity: .5 }, { height: `${after}px`, opacity: 1 }], { duration: 240, easing: "cubic-bezier(.22,.78,.24,1)" });
+    };
+    const expand = opening => {
+      const before = details.open ? content.getBoundingClientRect().height : 0;
+      expansion?.cancel(); targetOpen = opening;
+      if (opening) details.open = true;
+      if (!reduced() && content.animate) {
+        expansion = content.animate([{ height: `${before}px`, opacity: opening ? .5 : 1 }, { height: `${opening ? content.scrollHeight : 0}px`, opacity: opening ? 1 : 0 }], { duration: opening ? 240 : 190, easing: "cubic-bezier(.22,.78,.24,1)" });
+        const current = expansion;
+        current.onfinish = () => { if (expansion !== current) return; details.open = targetOpen; current.cancel(); };
+      } else details.open = opening;
+    };
+    summary.addEventListener("click", event => { event.preventDefault(); expand(!targetOpen); });
+    const stage = copy => root.AriadneProcessingIndicator?.set(status, { active: true, copy });
+    const add = text => resize(() => { const item = doc.createElement("li"); item.textContent = text; log.append(item); });
     let ended = false;
+    const commentary = new Map();
     return {
       event(event) {
         if (ended || !panel.isConnected) return;
@@ -40,19 +64,28 @@
         if (event.type === "scope") add(event.text);
         if (event.type === "input_ready") add(tr(`模型输入已准备：${event.images} 张图片 / PDF 页面`, `Model input prepared: ${event.images} images / PDF pages`));
         if (event.type === "model_started") {
-          summary.textContent = tr("等待模型的公开反馈", "Waiting for public model feedback");
+          stage(tr("正在等待模型输出", "Waiting for model output"));
           add(tr("已进入模型调用；尚未收到内容时会保持等待", "Model call started; waiting until content is available"));
         }
         if (event.type === "update") {
-          summary.textContent = tr("AI 正在反馈", "AI is reporting progress");
+          stage(tr("收到模型的公开反馈", "Receiving public model updates"));
           add(tr("AI 阶段反馈（未核验）：", "AI progress (unverified): ") + event.text);
         }
+        if (event.type === "commentary") {
+          stage(tr("收到模型的公开反馈", "Receiving public model updates"));
+          let item = commentary.get(event.id);
+          if (!item) { item = doc.createElement("p"); item.className = "v1-turn-preview"; panel.insertBefore(item, preview); commentary.set(event.id, item); }
+          item.textContent = event.text;
+        }
         if (event.type === "preview") {
-          summary.textContent = tr("回复正在生成", "Reply in progress");
+          stage(tr("回复正在生成", "Reply in progress"));
+          const first = preview.hidden;
           preview.hidden = false; preview.textContent = event.text;
+          messages.dataset.liveReply = "true";
+          if (first && !reduced()) preview.animate?.([{ opacity: 0, transform: "translateY(4px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: 240, easing: "ease-out" });
         }
         if (event.type === "checking") {
-          summary.textContent = tr("回复已收到，正在校验", "Reply received; validating");
+          stage(tr("正在校验回复", "Validating the reply"));
           add(tr("正在检查回复结构与领域约束；不等于事实核验", "Checking response structure and domain constraints, not factual truth"));
         }
         if (follow) scroll.scrollTop = scroll.scrollHeight;
@@ -60,7 +93,11 @@
       finish(ok, streamed = true, result = null) {
         if (ended) return; ended = true;
         panel.classList.remove("is-active");
+        root.AriadneProcessingIndicator?.clear(status);
+        expansion?.cancel();
         preview.textContent = ""; preview.hidden = true;
+        commentary.forEach(item => item.remove());
+        if (!ok) delete messages.dataset.liveReply;
         if (!streamed && ok) {
           summary.textContent = tr("本轮使用完整回复模式", "This turn used a complete response");
           add(tr("服务端未提供实时事件；没有模拟生成过程。", "Server did not provide live events; no simulated progress."));
@@ -71,7 +108,7 @@
         }
         note.textContent = tr("结构检查不证明内容真实；资料修改仍需你确认保存。", "Structural checks do not prove factual truth. Record changes still require your confirmation.");
         if (ok && Number.isInteger(result?.usage?.total_tokens) && result.usage.total_tokens >= 0) add(tr(`模型报告本轮用量：${result.usage.total_tokens} tokens`, `Model-reported usage: ${result.usage.total_tokens} tokens`));
-        details.open = !ok;
+        expand(!ok);
       },
     };
   }
@@ -100,7 +137,8 @@
           } else if (["received", "input_ready", "model_started", "checking"].includes(event.type)) {
             if (event.type === "input_ready" && (!Number.isInteger(event.images) || event.images < 0 || event.images > 80)) throw Error("CONVERSATION_STREAM_EVENT_INVALID");
             onEvent(event);
-          } else if (["update", "preview"].includes(event.type) && typeof event.text === "string" && event.text.length <= 12000) {
+          } else if (["update", "preview", "commentary"].includes(event.type) && typeof event.text === "string" && event.text.length <= 12000) {
+            if (event.type === "commentary" && (typeof event.id !== "string" || !event.id || event.id.length > 200)) throw Error("CONVERSATION_STREAM_EVENT_INVALID");
             onEvent(event);
           } else throw Error("CONVERSATION_STREAM_EVENT_INVALID");
         }

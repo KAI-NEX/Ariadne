@@ -37,7 +37,7 @@ class SkillTests(unittest.TestCase):
         cls.bin = cls.directory / "bin"
         cls.bin.mkdir()
         fake = cls.bin / "codex"
-        fake.write_text('#!/bin/sh\ncase "$*" in\n"exec --help") echo "--ignore-user-config --ignore-rules --ephemeral --output-schema --image";;\n"login status") exit 0;;\n*) exit 99;;\nesac\n')
+        fake.write_text('#!/bin/sh\ncase "$*" in\n"app-server --help") echo "--stdio generate-json-schema";;\n"login status") case "$CODEX_HOME" in *"Ariadne Codex") exit 0;; *) exit 1;; esac;;\n*) exit 99;;\nesac\n')
         fake.chmod(0o755)
         for name in ("pdftoppm", "pdfinfo"):
             p = cls.bin / name

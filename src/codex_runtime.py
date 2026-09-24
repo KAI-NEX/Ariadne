@@ -15,6 +15,7 @@ import subprocess
 import tempfile
 import time
 import threading
+import sys
 from copy import deepcopy
 
 from src.runtime_binding import CODEX_MODEL, CODEX_CREDENTIAL, codex_enabled
@@ -220,6 +221,17 @@ def call_codex(credential, payload, *, timeout=None):
 
 
 def _execute(payload, timeout):
+    from src.codex_app_server import execute
+    with tempfile.TemporaryDirectory(prefix="ariadne-codex-") as name:
+        directory = Path(name)
+        prompt, images, schema, _ = prepare_input(payload, directory)
+        return execute(directory, prompt, images, schema, payload,
+                       execution_timeout(len(images)) if timeout is None else timeout,
+                       sys.modules[__name__])
+
+
+def _execute_legacy(payload, timeout):
+    """Retained exec implementation for historical regression; never a fallback."""
     # Transient files contain only the current request, never durable app state.
     with tempfile.TemporaryDirectory(prefix="ariadne-codex-") as name:
         directory = Path(name)

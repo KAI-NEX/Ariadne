@@ -14,6 +14,8 @@
     const attachUpdates = () => {
       const script = root.document.createElement("script"); script.src = "/model-updates.js?v=1";
       root.document.head.append(script);
+      const entry = root.document.createElement("script"); entry.src = "/conversation-entry-consent.js?v=1";
+      root.document.head.append(entry);
     };
     if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", attachUpdates, { once: true });
     else attachUpdates();
@@ -22,7 +24,8 @@
   const revision = () => root.crypto.randomUUID();
   const notify = () => root.dispatchEvent?.(new Event("ariadne-runtime-selection"));
   const COPIES = { RUNTIME_SELECTION_CHANGED: "模型设置已变化，本轮尚未发送；请确认当前设置后重试。", RUNTIME_SELECTION_UPGRADE: "运行设置已升级，请刷新页面后重试。", RUNTIME_SELECTION_DECLINED: "本轮未发送，输入和附件已保留。", RUNTIME_CONSENT_REQUIRED: "请先勾选底部的资料传输与费用说明，再点击发送。" };
-  const errorCopy = error => COPIES[error?.code || error?.message] || "";
+  const errorCopy = error => (error?.code || error?.message) === "RUNTIME_CONSENT_REQUIRED" && root.AriadneConversationEntry
+    ? "请先确认资料传输与费用说明，再进入对话。" : COPIES[error?.code || error?.message] || "";
   const fail = code => { const error = new Error(code); error.code = code; throw error; };
   function scopeFor(operation) {
     if (["personal_understanding", "job_overview"].includes(operation)) return operation;
@@ -166,6 +169,22 @@
       updateRememberedConsent(operation, scope, fingerprint, checkbox.checked);
     });
   }
+  function entryConsent(operation, storage = root.localStorage) {
+    const scope = scopeFor(operation), runtime = resolve(operation, scope, storage);
+    const fingerprint = runtime.mode === "model" && runtime.execution_settings ? consentFingerprint(runtime, operation) : null;
+    return { scope, runtime, fingerprint, token: JSON.stringify([scope, fingerprint]), accepted: Boolean(scope && fingerprint && rememberedConsent(operation, scope, fingerprint, storage)) };
+  }
+  function acceptEntryConsent(operation, expected, storage = root.localStorage) {
+    const current = entryConsent(operation, storage);
+    if (!current.scope || !current.fingerprint || current.token !== expected) fail("RUNTIME_SELECTION_CHANGED");
+    updateRememberedConsent(operation, current.scope, current.fingerprint, true, storage);
+    const explicit = transferConsents.get(`${operation}:${current.scope}`);
+    if (explicit) {
+      syncTransferConsent(operation, explicit.checkbox, storage);
+      explicit.checkbox.dispatchEvent?.(new Event("change", { bubbles: true }));
+    }
+    notify();
+  }
   async function beforeDispatch(snapshot, operation) {
     assertCurrent(snapshot, operation);
     const explicit = transferConsents.get(`${operation}:${snapshot.execution_settings.scope}`);
@@ -174,6 +193,8 @@
       return;
     }
     if (!snapshot.execution_settings.scope) return;
+    if (rememberedConsent(operation, snapshot.execution_settings.scope, consentFingerprint(snapshot, operation))) return;
+    if (root.AriadneConversationEntry) fail("RUNTIME_CONSENT_REQUIRED");
     const key = `ariadne-model-consent:${snapshot.execution_settings.scope}`;
     const fingerprint = JSON.stringify([Settings.identity(snapshot), snapshot.execution_settings.selection_revision]);
     if (root.sessionStorage?.getItem(key) !== fingerprint) {
@@ -188,5 +209,5 @@
     const raw = read(CURRENT), old = read(LEGACY)?.[operation];
     return old && old.provider === homepage().provider && old.model !== raw?.model;
   }
-  return Object.freeze({ KEY, TRANSFER_CONSENT_KEY, errorCopy, bind, bindings, scopeFor, homepage, eligibleModels, resolve, version, update, assertCurrent, beforeDispatch, bindTransferConsent, syncTransferConsent, hasOverride, legacyDifference });
+  return Object.freeze({ KEY, TRANSFER_CONSENT_KEY, errorCopy, bind, bindings, scopeFor, homepage, eligibleModels, resolve, version, update, assertCurrent, beforeDispatch, bindTransferConsent, syncTransferConsent, entryConsent, acceptEntryConsent, hasOverride, legacyDifference });
 }));

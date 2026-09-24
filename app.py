@@ -366,7 +366,8 @@ def call_ariadne_model(credential: str, payload: dict, *, response_limit: int) -
                  if isinstance(message.get("content"), list)
                  for part in message["content"] if part.get("type") == "image_url")
     emit("input_ready", images=images, messages=len(payload.get("messages", [])))
-    emit("model_started")
+    if credential != CODEX_CREDENTIAL:
+        emit("model_started")
     if isinstance(credential, RequestCredential):
         return call_provider(credential, payload, response_limit=response_limit)
     if credential == CODEX_CREDENTIAL:

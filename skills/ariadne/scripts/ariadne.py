@@ -1,4 +1,4 @@
-"""Portable Skill entry point; no downloads, account/config edits or model calls."""
+"""Portable Skill entry point; only explicit login launches account setup."""
 from __future__ import annotations
 
 import argparse
@@ -130,16 +130,17 @@ def import_workspace(runtime, source_root, state, workspace, port=8766):
     }
 
 
-def probe(command):
+def probe(command, env=None):
     try:
         return subprocess.run(command, capture_output=True, text=True, timeout=15,
-                              env=clean_environment())
+                              env=clean_environment() if env is None else env)
     except (OSError, subprocess.SubprocessError):
         return None
 
 
 def doctor():
     checks = []
+    account_environment = None
     def record(name, ok, action):
         checks.append({"check": name, "ok": bool(ok), "action": "" if ok else action})
     record("python", sys.version_info >= (3, 9), "Use Python 3.9 or newer.")
@@ -148,20 +149,22 @@ def doctor():
         runtime = runtime_root()
         sys.path.insert(0, str(runtime))
         import app  # noqa: F401 - prove the distributed runtime imports intact
+        from src.codex_account import environment
+        account_environment = environment()
         record("runtime", True, "")
     except (OSError, ValueError, ImportError, SyntaxError):
         record("runtime", False, "Install the complete Skill ZIP, including runtime and its manifest.")
     codex = executable("codex", os.environ.get("ARIADNE_CODEX_BINARY"))
     record("codex", codex, "Install a compatible Codex CLI for this computer, or make it available on PATH.")
     if codex:
-        help_result = probe([codex, "exec", "--help"])
-        flags = ("--ignore-user-config", "--ignore-rules", "--ephemeral", "--output-schema", "--image")
+        help_result = probe([codex, "app-server", "--help"])
+        flags = ("--stdio", "generate-json-schema")
         record("codex_protocol", help_result is not None and help_result.returncode == 0
                and all(flag in help_result.stdout for flag in flags),
                "This Codex CLI lacks the isolated multimodal protocol required by Ariadne; use a compatible version.")
-        login = probe([codex, "login", "status"])
+        login = probe([codex, "login", "status"], env=account_environment) if account_environment is not None else None
         record("codex_login", login is not None and login.returncode == 0,
-               "Run codex login and complete login yourself, then retry. Do not share credentials.")
+               "Run python3 scripts/ariadne.py login for Ariadne's separate Codex account directory. Complete the official login yourself; do not share credentials.")
     for tool in ("pdftoppm", "pdfinfo"):
         binary = executable(tool)
         result = probe([binary, "-v"]) if binary else None
@@ -266,7 +269,7 @@ def open_local(port=8766, data_dir=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("doctor", "open", "window", "desktop", "connect", "import-workspace"))
+    parser.add_argument("action", choices=("doctor", "login", "open", "window", "desktop", "connect", "import-workspace"))
     parser.add_argument("--origin", default="https://ariadne.kai-nex.com")
     parser.add_argument("--port", type=int, default=8766, help="Local UI port; changing it creates a different browser origin.")
     parser.add_argument("--data-dir", type=Path, help="Explicit local UI data directory; defaults outside the Skill install.")
@@ -278,6 +281,12 @@ def main():
         print(json.dumps(result, ensure_ascii=False))
         return 0 if result["ready"] else 1
     try:
+        if args.action == "login":
+            sys.path.insert(0, str(runtime_root()))
+            from src.codex_account import login
+            codex = executable("codex", os.environ.get("ARIADNE_CODEX_BINARY"))
+            if not codex: raise ValueError("CODEX_BINARY_MISSING")
+            return login(codex)
         if args.action == "import-workspace":
             if not args.source_root or not args.workspace or not 1024 <= args.port <= 65535:
                 raise ValueError("WORKSPACE_IMPORT_ARGUMENTS_INVALID")

@@ -11,6 +11,8 @@
 
 独立窗口要求 macOS 14+、Python 3.9+ 和 Apple 命令行开发工具；Codex 分析还需兼容 CLI、本人登录和 Poppler。缺依赖时明确提示，不切换到 API 或生成本地替代回答。当前仅 Codex adapter 已验收，其他 Agent 与操作系统不自动视为支持。
 
+2026-09-24 流式升级：首次使用或旧版升级，在安装的 Skill 目录运行 `python3 scripts/ariadne.py login`，由本人完成官方登录。Ariadne 使用独立 `~/Library/Application Support/Ariadne Codex` 目录（其他 POSIX 为 `~/.local/share/Ariadne Codex`），不再继承日常 Codex 的认证/配置/AGENTS.md；不要手动复制认证文件。日常 Codex 和个人资料不受影响。`doctor` 只检查依赖与登录，不代表模型质量认证。
+
 ## 数据和维护
 
 默认地址 `http://127.0.0.1:8766`，资料位于 `~/Library/Application Support/Ariadne Skill/workspaces/<workspace-id>/`。页面的 `ariadne-content-workspace-v1` 映射决定具体工作区；保持既有目录与身份，不按最新目录猜测。Skill 安装目录不保存个人资料，更新运行代码不迁移旧 App 或浏览器的数据。

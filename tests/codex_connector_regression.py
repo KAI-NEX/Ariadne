@@ -10,6 +10,7 @@ import os
 import runpy
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import threading
 from http.server import ThreadingHTTPServer
@@ -125,14 +126,16 @@ print(json.dumps({'pairing_origin_host_expiry_revoke':'pass','route_and_provider
 # Actual child-process failures and timeout cleanup, with no provider involved.
 with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ,{'ARIADNE_CODEX_ENABLED':'1'}):
     script=Path(directory)/'fake.py';payload={'model':CODEX_MODEL,'reasoning_effort':'medium','messages':[{'role':'user','content':'synthetic'}]}
+    real_popen = subprocess.Popen
+    def fake_child(_args, **kwargs): return real_popen([sys.executable, str(script)], **kwargs)
     script.write_text('import time\ntime.sleep(30)\n')
-    with patch('src.codex_runtime.command',return_value=[sys.executable,str(script)]):
+    with patch('src.codex_app_server.subprocess.Popen',side_effect=fake_child):
         try:call_codex(CODEX_CREDENTIAL,payload,timeout=0.05)
         except TimeoutError:pass
         else:raise AssertionError('timeout accepted')
     script.write_text('raise SystemExit(1)\n')
-    with patch('src.codex_runtime.command',return_value=[sys.executable,str(script)]):
+    with patch('src.codex_app_server.subprocess.Popen',side_effect=fake_child):
         try:call_codex(CODEX_CREDENTIAL,payload,timeout=2)
-        except ValueError as error:assert str(error)=='CODEX_EXECUTION_FAILED'
+        except ValueError as error:assert str(error)=='CODEX_STREAM_INCOMPLETE'
         else:raise AssertionError('failed child accepted')
 print(json.dumps({'child_failure_timeout_cleanup':'pass','live_provider_calls':0}))

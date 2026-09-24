@@ -209,7 +209,7 @@ python3 app.py
 
 打开 [http://127.0.0.1:8000/](http://127.0.0.1:8000/)。干净克隆会初始化空的本地工作区，不需要维护者的私人数据。
 
-如需本机 Codex，先安装并登录 Codex CLI，确认 `codex login status` 成功，再运行：
+如需本机 Codex，先安装兼容 Codex CLI，运行 `python3 scripts/codex_login.py` 并本人完成 Ariadne 专用目录的官方登录，再运行下方命令。已安装 Skill 可用 `python3 scripts/ariadne.py login`；不复制日常 Codex 认证文件或修改其配置：
 
 ```sh
 ARIADNE_CODEX_ENABLED=1 python3 app.py
