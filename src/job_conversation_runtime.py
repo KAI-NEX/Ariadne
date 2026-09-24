@@ -256,7 +256,7 @@ For ordinary EXPLAIN/advice turns, the Human-visible message is your own natural
 Use prior user and assistant turns as real conversation history. Resolve follow-up referents such as “哪个”, “这个项目”, “那应该怎么做” from that history and the active Job/Candidate context; do not require the Human to restate the Job.
 Advance the conversation instead of repeating the previous gap summary. If the latest request asks for a choice, choose and explain. If it asks how to improve a project, give concrete next steps grounded in the known project and Job requirements. If it asks for alternatives, provide distinct alternatives.
 The structured findings and recommendations support provenance and validation, but they may be empty when they do not help the latest conversational answer. Do not force every EXPLAIN turn into the same fit/gap template.
-Realtime Web Search is unavailable in J1. If the Human asks you to search the internet, GitHub, or current repositories, clearly state that you cannot perform realtime web search in this runtime. You may still suggest grounded project directions from the supplied Candidate and Job context, but never claim you searched and never invent repository names or URLs.
+Public search is available only when the runtime explicitly supplies the PUBLIC SEARCH BOUNDARY and a web tool. Otherwise explain that live search is unavailable. Never claim you searched without actual tool results. External requirements or repository examples never establish personal experience.
 The `message` field must contain exactly the Provider-authored copy intended for the Human; the system will not replace it with canned semantic text. Write that message as readable plain text with numbered lines when useful, never Markdown delimiters such as **, # or backticks."""
 
 
@@ -298,6 +298,8 @@ def job_conversation_tool() -> dict[str, Any]:
 def build_job_conversation_payload(request: JobConversationRequest) -> dict[str, Any]:
     context = dict(request.compiled_context)
     history = context.pop("history", [])
+    # Only the server runtime declares tools; legacy browser capability hints are not authoritative.
+    context["capabilities"] = {"realtime_web_search": "LIVE_PUBLIC_READ_ONLY" if request.runtime_snapshot["provider"] == "codex" else "UNAVAILABLE"}
     provider_input = {"context": context, "human_message": request.human_message, "history": history}
     _assert_provider_safe(provider_input)
     messages = [

@@ -36,6 +36,24 @@
     if (result.delivery_version !== VERSION) throw new Error("文件输出版本不兼容，请刷新后重试");
     return validate(result.deliverable);
   }
+  function searchFromResult(result) {
+    const value = result.web_search;
+    if (value == null) return null;
+    const fail = () => { throw new Error("搜索来源信息无效，请重试"); };
+    if (value.version !== "ariadne-public-search-v1" || value.authority !== "EXTERNAL_WEB_NON_AUTHORITATIVE"
+      || value.personal_data_written !== false || value.source_verification !== "MODEL_CITED"
+      || !Number.isInteger(value.calls) || value.calls < 1 || value.calls > 12
+      || typeof value.searched_at !== "string" || !Number.isFinite(Date.parse(value.searched_at))
+      || !Array.isArray(value.sources) || value.sources.length > 6) fail();
+    for (const source of value.sources) {
+      if (!source || typeof source.title !== "string" || !source.title.trim() || source.title.length > 160
+        || typeof source.url !== "string" || source.url.length > 2000 || /[\s\x00-\x1f]/.test(source.url)) fail();
+      let url; try { url = new URL(source.url); } catch (_) { fail(); }
+      if (!["http:", "https:"].includes(url.protocol) || url.username || url.password
+        || !url.hostname.includes(".") || ["localhost", "127.0.0.1", "0.0.0.0"].includes(url.hostname)) fail();
+    }
+    return JSON.parse(JSON.stringify(value));
+  }
   function documentText(value) {
     // Avoid adding a second title when the model already included it verbatim.
     const body = value.body.trim();
@@ -195,8 +213,25 @@
     });
     state.observer.observe(doc.body, { childList: true, subtree: true });
     messages.forEach((message, index) => {
-      if (message.role !== "ASSISTANT" || !message.deliverable) return;
-      const bubble = bubbles[index]; if (!bubble || bubble.querySelector(".v1-reply-exports")) return;
+      if (message.role !== "ASSISTANT") return;
+      const searchBubble = bubbles[index];
+      if (searchBubble && message.web_search) {
+        const area = doc.createElement("span"); area.className = "v1-reply-exports v1-web-search";
+        try {
+          const search = searchFromResult(message);
+          const label = doc.createElement("span"); label.className = "v1-reply-export-status";
+          label.textContent = search.sources.length ? "外部网页参考 · 不属于个人经历 · 未写入资料" : "已尝试搜索，未取得可用来源 · 未写入资料";
+          const links = doc.createElement("span"); links.className = "v1-reply-export-files";
+          for (const source of search.sources) {
+            const link = doc.createElement("a"); link.textContent = source.title; link.href = source.url;
+            link.target = "_blank"; link.rel = "noopener noreferrer"; links.append(link);
+          }
+          area.append(label, links);
+        } catch (_) { area.textContent = "搜索来源信息无效 · 请勿据此确认个人经历"; }
+        searchBubble.append(area);
+      }
+      if (!message.deliverable) return;
+      const bubble = bubbles[index]; if (!bubble || bubble.querySelector(".v1-reply-exports:not(.v1-web-search)")) return;
       const area = doc.createElement("span"); area.className = "v1-reply-exports";
       const actions = doc.createElement("span"); actions.className = "v1-reply-export-actions";
       const status = doc.createElement("span"); status.className = "v1-reply-export-status"; status.setAttribute("role", "status");
@@ -247,12 +282,12 @@
     form?.parentElement?.querySelectorAll?.(".v1-conversation-elapsed").forEach((label) => label.remove());
   }
   function historyText(message, limit = 1200) {
-    const text = message.content ?? message.text ?? message.message ?? "";
+    const text = (message.web_search ? "[含外部网页参考，非个人经历，不得作为个人修改依据]\n" : "") + (message.content ?? message.text ?? message.message ?? "");
     if (!message.deliverable) return text;
     try {
       const value = validate(message.deliverable);
       return `${text}\n[历史生成文件，非确认资料，内容可能截断]\n${JSON.stringify(value).slice(0, limit)}`;
     } catch (_) { return text; }
   }
-  return Object.freeze({ VERSION, validate, fromResult, documentText, historyText, pdfFromJpegs, wrapText, renderPages, renderDiagram, decorate, execution });
+  return Object.freeze({ VERSION, validate, fromResult, searchFromResult, documentText, historyText, pdfFromJpegs, wrapText, renderPages, renderDiagram, decorate, execution });
 }));

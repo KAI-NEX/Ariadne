@@ -159,8 +159,9 @@
   }
 
   function validateRuntimeResult(value, execution, session, snapshot) {
-    const result = exactKeys(value, [...RESULT_KEYS, ...(Object.hasOwn(value || {}, "deliverable") ? ["deliverable", "delivery_version"] : [])], "RUNTIME_RESULT_SHAPE_INVALID");
+    const result = exactKeys(value, [...RESULT_KEYS, ...(Object.hasOwn(value || {}, "web_search") ? ["web_search"] : []), ...(Object.hasOwn(value || {}, "deliverable") ? ["deliverable", "delivery_version"] : [])], "RUNTIME_RESULT_SHAPE_INVALID");
     Delivery.fromResult(result);
+    Delivery.searchFromResult(result);
     if (result.contract_id !== RESULT_CONTRACT || result.execution_id !== execution.execution_id
       || result.generation !== execution.generation || result.conversation_id !== session.conversation_id
       || result.operation !== Conversation.OPERATION || result.provider !== snapshot.provider || result.model !== snapshot.model
@@ -453,7 +454,7 @@
         model: snapshot.model,
         runtime_snapshot_id: snapshot.snapshot_id,
         candidate_action_id: actionRecord.action_id,
-        deliverable: Delivery.fromResult(result),
+        deliverable: Delivery.fromResult(result), web_search: Delivery.searchFromResult(result),
         created_at: nowIso(now),
       });
       try {

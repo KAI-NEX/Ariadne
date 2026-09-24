@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url), Output=require('../public/conversation-output.js');
+const web_search={version:'ariadne-public-search-v1',authority:'EXTERNAL_WEB_NON_AUTHORITATIVE',searched_at:'2026-09-24T12:00:00Z',calls:1,sources:[{title:'Python 文档',url:'https://docs.python.org/3/library/dataclasses.html'}],source_verification:'MODEL_CITED',personal_data_written:false};
+assert.deepEqual(Output.searchFromResult({web_search}),web_search);
+assert.equal(Output.searchFromResult({}),null);
+assert.match(Output.historyText({content:'官方要求并非我的经历',web_search}),/非个人经历/);
+assert.equal(Output.historyText({content:'原始自述'}),'原始自述');
+for(const bad of [{...web_search,personal_data_written:true},{...web_search,calls:0},{...web_search,sources:[{title:'错误链接',url:'javascript:alert(1)'}]},{...web_search,sources:[{title:'本地',url:'http://127.0.0.1/private'}]}]) assert.throws(()=>Output.searchFromResult({web_search:bad}));
+console.log('search receipt validation and history attribution PASS');

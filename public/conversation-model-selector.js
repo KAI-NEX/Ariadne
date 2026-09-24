@@ -25,7 +25,7 @@
     const prefix = form.id + "-model";
     panel.id = prefix;
     trigger.setAttribute("aria-controls", prefix);
-    panel.innerHTML = `<h3>选择模型</h3><div data-model-options role="group"></div><p>${root.AriadneProduct?.kind === "skill" ? "由 Ariadne Skill 使用本机 Codex。" : '切换模型服务请前往<a href="/index.html">连接设置</a>。'}</p><p data-model-error role="status"></p>`;
+    panel.innerHTML = `<h3>选择模型</h3><div data-model-options role="group"></div><p>${root.AriadneProduct?.kind === "skill" ? "由 Ariadne Skill 使用本机 Codex。对话可按需搜索公开网页，查询词会发送至搜索服务；网页信息只作外部参考，不写入个人经历。" : '切换模型服务请前往<a href="/index.html">连接设置</a>。'}</p><p data-model-error role="status"></p>`;
     document.body.append(panel);
     const choices = panel.querySelector("[data-model-options]"), error = panel.querySelector("[data-model-error]");
     let openedRevision, openedScope, original, saving = false, opening = 0;

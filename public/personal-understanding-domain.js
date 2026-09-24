@@ -186,7 +186,7 @@
         evidence: Context.records(snapshot).filter((item) => selectedRefs.has(item.ref) && item.semantic.item_type !== "PERSONAL_MEMORY") }));
       const preparedCards = await CandidateCards.prepare(database, { raw_proposals: output.card_proposals, human_message: humanMessage,
         context: compiled.context, snapshot, runtime_snapshot, turn_id: turn.turn_id });
-      const completed = { ...turn, runtime_snapshot: clone(runtime_snapshot), status: "SUCCEEDED", output: { message: output.message, deliverable: Delivery.fromResult(result) }, source_fingerprint: snapshot.aggregate_fingerprint,
+      const completed = { ...turn, runtime_snapshot: clone(runtime_snapshot), status: "SUCCEEDED", output: { message: output.message, deliverable: Delivery.fromResult(result), web_search: Delivery.searchFromResult(result) }, source_fingerprint: snapshot.aggregate_fingerprint,
         context_coverage: compiled.selected.context_coverage, context_bytes: Context.bytes(compiled.context),
         calls: 1, refresh_usage: {}, usage: result.usage || {}, proposal_ids: proposals.map((entry) => entry.proposal_id), card_proposal_ids: preparedCards.proposals.map((entry) => entry.proposal_id) };
       await new Promise((resolve, reject) => {

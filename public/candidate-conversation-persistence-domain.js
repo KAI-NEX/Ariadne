@@ -123,7 +123,7 @@
     });
   }
 
-  function createAssistantMessage({ message_id: messageId, conversation_id: conversationId, turn_id: turnId, text, provider, model, runtime_snapshot_id: runtimeSnapshotId, candidate_action_id: candidateActionId, deliverable = null, created_at: createdAt = new Date() }) {
+  function createAssistantMessage({ message_id: messageId, conversation_id: conversationId, turn_id: turnId, text, provider, model, runtime_snapshot_id: runtimeSnapshotId, candidate_action_id: candidateActionId, deliverable = null, web_search = null, created_at: createdAt = new Date() }) {
     return validateMessage({
       contract_id: MESSAGE_CONTRACT,
       message_id: messageId,
@@ -137,11 +137,16 @@
       runtime_snapshot_id: runtimeSnapshotId,
       candidate_action_id: candidateActionId,
       ...(deliverable ? { deliverable: Delivery.validate(deliverable) } : {}),
+      ...(web_search ? { web_search: Delivery.searchFromResult({web_search}) } : {}),
     });
   }
 
   function validateMessage(value) {
-    const message = exact(value, ["contract_id", "message_id", "conversation_id", "turn_id", "role", "text", "created_at", "provider", "model", "runtime_snapshot_id", "candidate_action_id", ...(Object.hasOwn(value || {}, "deliverable") ? ["deliverable"] : [])], "MESSAGE_SHAPE_INVALID");
+    const message = exact(value, ["contract_id", "message_id", "conversation_id", "turn_id", "role", "text", "created_at", "provider", "model", "runtime_snapshot_id", "candidate_action_id", ...(Object.hasOwn(value || {}, "web_search") ? ["web_search"] : []), ...(Object.hasOwn(value || {}, "deliverable") ? ["deliverable"] : [])], "MESSAGE_SHAPE_INVALID");
+    if (Object.hasOwn(message, "web_search")) {
+      if (message.role !== "ASSISTANT") throw new CandidateConversationPersistenceError("USER_MESSAGE_METADATA_FORBIDDEN");
+      Delivery.searchFromResult(message);
+    }
     if (Object.hasOwn(message, "deliverable")) {
       if (message.role !== "ASSISTANT") throw new CandidateConversationPersistenceError("USER_MESSAGE_METADATA_FORBIDDEN");
       Delivery.validate(message.deliverable);

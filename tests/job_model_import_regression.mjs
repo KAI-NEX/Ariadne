@@ -188,7 +188,7 @@ assert.match(modelFailure, /id="job-ai-workspace" class="v1-workspace-layer hidd
 assert.match(modelFailure, /NON_AUTHORITATIVE WORKING JOB/);
 assert.match(modelFailure, /id="job-workspace-save"[^>]*>保存职位</);
 assert.match(pages, /原件已安全保存在本机；长文本或图片可能需要几分钟/);
-assert.match(pages, /const assistantMessage = \{ \.\.\.JobConversation\.createMessage\(session, "ASSISTANT", result\.output\.message\), deliverable: globalThis\.AriadneConversationOutput\.fromResult\(result\) \};/);
+assert.match(pages, /const assistantMessage = \{ \.\.\.JobConversation\.createMessage\(session, "ASSISTANT", result\.output\.message\), deliverable: globalThis\.AriadneConversationOutput\.fromResult\(result\), web_search: globalThis\.AriadneConversationOutput\.searchFromResult\(result\) \};/);
 assert.match(pages, /const visible = JobConversation\.connectedHistory\(messages\)/);
 assert.match(pages, /include_pending_user: true/);
 assert.doesNotMatch(modelFailure, /确认并创建职位版本[^<]*<\/button>[\s\S]*model_generated_non_authoritative/);

@@ -133,7 +133,8 @@ for private in ["job-context-private", "job-revision-private", "private-candidat
 assert "working-candidate-1" in serialized and "NON_AUTHORITATIVE" in serialized
 assert "match percentages" in payload["messages"][0]["content"]
 assert "Advance the conversation instead of repeating" in payload["messages"][0]["content"]
-assert "Realtime Web Search is unavailable" in payload["messages"][0]["content"]
+assert "Public search is available only when the runtime explicitly supplies" in payload["messages"][0]["content"]
+assert "Otherwise explain that live search is unavailable" in payload["messages"][0]["content"]
 assert "copy every requirement_ref and candidate_ref byte-for-byte" in payload["messages"][0]["content"]
 assert "For ordinary conversation use action exactly EXPLAIN" in payload["messages"][0]["content"]
 assert "never Markdown delimiters" in payload["messages"][0]["content"]

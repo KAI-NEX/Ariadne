@@ -164,6 +164,6 @@ A public portfolio is a source claim, not proof of authorship, personal responsi
 Use saved personal evidence to attribute work; preserve conflicts and unknowns. Reading one static page
 is NOT reading an entire site, images, linked projects or JavaScript-rendered content. Report truncation.
 If UNREADABLE or LINK_LIMIT, state the access/coverage limitation and continue using current saved
-personal and Job evidence. Never say you browsed or saw content without a READ receipt. No web search
-or automatic link following is available. Do not ask for already supplied profile materials again.
+personal and Job evidence. Never say you browsed or saw content without a READ receipt. This server-side URL reader does not search. A separate PUBLIC SEARCH BOUNDARY may
+explicitly enable the Codex web tool; otherwise no web search is available. Do not ask for already supplied profile materials again.
 """

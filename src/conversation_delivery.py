@@ -7,6 +7,8 @@ from copy import deepcopy
 from functools import wraps
 import json
 import re
+from src import conversation_search as Search
+from src.runtime_binding import CODEX_CREDENTIAL
 
 VERSION = "ariadne-conversation-delivery-v1"
 
@@ -98,17 +100,24 @@ def conversation_delivery(error_type):
             if isinstance(payload, dict) and payload.get("phase", "DISCUSS") != "DISCUSS":
                 return execute(payload, credential_reader, provider_call)
             delivery = None
+            search_receipt = None
             invalid_delivery = False
 
             def call(credential, request):
-                nonlocal delivery, invalid_delivery
+                nonlocal delivery, invalid_delivery, search_receipt
                 request = deepcopy(request)
                 parameters = request["tools"][0]["function"]["parameters"]
                 parameters["properties"]["deliverable"] = schema()
                 request["messages"][0]["content"] += "\n" + INSTRUCTIONS
+                if credential == CODEX_CREDENTIAL:
+                    request[Search.FLAG] = Search.VERSION
+                    if Search.enabled(request):
+                        parameters["properties"]["external_sources"] = Search.source_schema()
+                        request["messages"][0]["content"] += "\n" + Search.INSTRUCTIONS
                 request["max_tokens"] = max(request.get("max_tokens", 0), 8000)
                 status, response = provider_call(credential, request)
                 if status != 200: return status, response
+                if credential == CODEX_CREDENTIAL: search_receipt = response.get("web_search")
                 response = deepcopy(response)
                 try:
                     choice = response["choices"][0]
@@ -136,6 +145,8 @@ def conversation_delivery(error_type):
             result = execute(payload, credential_reader, call)
             if invalid_delivery:
                 raise error_type("DELIVERABLE_OUTPUT_INVALID", "model_output", True)
+            if search_receipt is not None:
+                result = {**result, "web_search": search_receipt}
             if delivery is not None:
                 result = {**result, "deliverable": delivery, "delivery_version": VERSION}
             return result

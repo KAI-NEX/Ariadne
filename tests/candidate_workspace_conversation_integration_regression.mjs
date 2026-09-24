@@ -799,3 +799,11 @@ for (const action of ["EXPLAIN", "NO_CHANGE", "ASK_CLARIFICATION"]) {
   assert.equal(fileDb.records.get("candidate_context_revisions").size, 0);
 }
 console.log("candidate_workspace_conversation_integration=pass");
+
+// Public references survive persistence and reload without creating a Working revision.
+const searchReceipt = {version:"ariadne-public-search-v1",authority:"EXTERNAL_WEB_NON_AUTHORITATIVE",searched_at:"2026-09-24T12:00:00Z",calls:1,sources:[{title:"官方文档",url:"https://docs.python.org/3/library/dataclasses.html"}],source_verification:"MODEL_CITED",personal_data_written:false};
+const searchOutcome = await Integration.executeListTurn({database:fileDb,session:fileSession,human_message:"搜索官方资料，与我的经历分开",runtime_snapshot:snapshot(),id_factory:idFactory,now,
+  call_runtime:async r=>({...noPatches(r,"EXPLAIN","外部参考，不属于个人经历。"),web_search:searchReceipt})});
+assert.deepEqual(searchOutcome.assistant_message.web_search,searchReceipt);
+assert.deepEqual((await Persistence.restoreConversation(fileDb,fileSession.conversation_id)).messages.at(-1).web_search,searchReceipt);
+assert.equal(fileDb.records.get("candidate_working_models").size,1);

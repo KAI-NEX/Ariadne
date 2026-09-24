@@ -82,3 +82,7 @@ Job PDF 受最多 48 个来源块的完整处理预算约束，PDF 页图总字�
 - 合成请求、结果、PDF、浏览器与回归证据留在 `.cache/codex-integration-20260909/`，不加入 Git；没有用私人简历或真实职位进行质量认证。
 
 实现参考：[Codex 配置参考](https://learn.chatgpt.com/docs/config-file/config-reference)、[Codex 认证](https://learn.chatgpt.com/docs/auth)。本机 CLI 的 `exec --help` 和实测结果用于核对当前安装版本。
+
+## 2026-09-24 对话公开搜索
+
+Skill 普通对话新增限定的公开 web_search；导入与阶段性理解仍不使用搜索。搜索回合禁止提交个人/记忆/职位修改，外部来源随对话保存并明确标记。当前 CLI 的搜索 host、来源证据局限及真实验收见 [对话公开搜索与个人经历隔离](CONVERSATION_PUBLIC_SEARCH.md)。此前工具隔离记录中未启用搜索的描述保留为阶段历史。
