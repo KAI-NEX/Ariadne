@@ -21,9 +21,9 @@
     boundary.className = "v1-entry-boundary";
     button.type = "button"; button.className = "v1-primary-button";
     gate.append(title, copy, boundary, button); pane.prepend(gate);
-    const entry = { form, pane, gate, title, copy, boundary, button, operation, fingerprint: null, locked: false, states: new Map() };
+    const entry = { form, pane, gate, title, copy, boundary, button, operation, enteredToken: null, locked: false, states: new Map() };
     button.addEventListener("click", () => {
-      try { selection.acceptEntryConsent(operation, entry.token); refresh(); form.querySelector("textarea")?.focus({ preventScroll: true }); }
+      try { selection.acceptEntryConsent(operation, entry.token); entry.enteredToken = entry.token; refresh(); form.querySelector("textarea")?.focus({ preventScroll: true }); }
       catch (_) { refresh(); boundary.textContent = tr("模型设置已变化，请核对后重新确认。", "Model settings changed. Review them before accepting."); }
     });
     entries.set(form.id, entry); return entry;
@@ -53,12 +53,15 @@
       const state = selection.entryConsent(operation);
       // Existing checkbox stays as the domain guard, not a second visible consent.
       entry.pane.querySelectorAll(".personal-consent, .job-overview-consent").forEach(label => { if (!label.hidden) label.hidden = true; });
-      const locked = Boolean(state.scope && state.fingerprint && !state.accepted);
+      // Library-wide conversations start with a fresh entry screen on every visit,
+      // even when the exact recipient/settings disclosure was accepted before.
+      const visitEntry = entry.pane.dataset.entryConfirmation === "visit";
+      const locked = Boolean(state.scope && state.fingerprint && (!state.accepted || (visitEntry && entry.enteredToken !== state.token)));
       entry.token = state.token;
       const recipient = state.runtime.provider === "codex" ? "Codex / OpenAI" : state.runtime.provider;
       const scope = operation === "personal_understanding" || operation === "candidate_conversation"
-        ? tr("问题、相关个人资料、已保存补充和对话历史", "Your question, relevant personal records, saved notes and conversation history")
-        : tr("问题、当前职位、相关个人资料、已保存补充和对话历史", "Your question, current jobs, relevant personal records, saved notes and conversation history");
+        ? tr("后续问题、相关个人资料、已保存补充和对话历史", "Your subsequent questions, relevant personal records, saved notes and conversation history")
+        : tr("后续问题、当前职位、相关个人资料、已保存补充和对话历史", "Your subsequent questions, current jobs, relevant personal records, saved notes and conversation history");
       const copy = tr(`${scope}将发送至 ${recipient} · ${state.runtime.model}，可能消耗模型额度或产生 API 费用。更新理解可能分批调用。`, `${scope} will be sent to ${recipient} · ${state.runtime.model}, using model credits or incurring API charges. Updating understanding may require multiple calls.`);
       if (entry.copy.textContent !== copy) entry.copy.textContent = copy;
       const title = tr("开始对话前", "Before starting a conversation"); if (entry.title.textContent !== title) entry.title.textContent = title;
@@ -69,11 +72,17 @@
       if (entry.boundary.textContent !== boundary) entry.boundary.textContent = boundary;
       const button = tr("同意并进入对话", "Accept and enter conversation"); if (entry.button.textContent !== button) entry.button.textContent = button;
       lock(entry, locked);
+      entry.pane.dataset.entryReady = "true";
     }
   }
   let queued = false;
   const schedule = () => { if (queued) return; queued = true; root.requestAnimationFrame(() => { queued = false; refresh(); }); };
-  root.AriadneConversationEntry = Object.freeze({ refresh });
+  root.AriadneConversationEntry = Object.freeze({ refresh, requiresConfirmation: operation => [...entries.values()].some(entry => entry.operation === operation && entry.locked) });
+  root.addEventListener("pageshow", event => {
+    if (!event.persisted) return;
+    for (const entry of entries.values()) if (entry.pane.dataset.entryConfirmation === "visit") entry.enteredToken = null;
+    refresh();
+  });
   root.addEventListener("ariadne-runtime-selection", schedule);
   root.addEventListener("storage", schedule);
   root.JobRadarRuntimeGate?.subscribe(schedule);

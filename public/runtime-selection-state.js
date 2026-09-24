@@ -14,7 +14,7 @@
     const attachUpdates = () => {
       const script = root.document.createElement("script"); script.src = "/model-updates.js?v=1";
       root.document.head.append(script);
-      const entry = root.document.createElement("script"); entry.src = "/conversation-entry-consent.js?v=1";
+      const entry = root.document.createElement("script"); entry.src = "/conversation-entry-consent.js?v=2";
       root.document.head.append(entry);
     };
     if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", attachUpdates, { once: true });
@@ -187,6 +187,7 @@
   }
   async function beforeDispatch(snapshot, operation) {
     assertCurrent(snapshot, operation);
+    if (root.AriadneConversationEntry?.requiresConfirmation?.(operation)) fail("RUNTIME_CONSENT_REQUIRED");
     const explicit = transferConsents.get(`${operation}:${snapshot.execution_settings.scope}`);
     if (explicit) {
       if (!explicit.checkbox.checked || explicit.fingerprint !== consentFingerprint(snapshot, operation)) fail("RUNTIME_CONSENT_REQUIRED");

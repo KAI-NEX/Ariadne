@@ -17,6 +17,9 @@ for (const operation of ['personal_understanding', 'job_overview', 'candidate_co
   await assert.rejects(S.beforeDispatch(before.runtime, operation), /RUNTIME_CONSENT_REQUIRED/);
   S.acceptEntryConsent(operation, before.token);
   assert.equal(S.entryConsent(operation).accepted, true);
+  globalThis.AriadneConversationEntry.requiresConfirmation = name => name === operation;
+  await assert.rejects(S.beforeDispatch(before.runtime, operation), /RUNTIME_CONSENT_REQUIRED/, 'a fresh visit must enter before a remembered consent can dispatch');
+  globalThis.AriadneConversationEntry.requiresConfirmation = () => false;
   await S.beforeDispatch(before.runtime, operation);
   const effort = before.runtime.execution_settings.effective_settings.reasoning_effort === 'high' ? 'low' : 'high';
   const next = { ...runtime, execution_settings: Settings.envelope(runtime, { reasoning_effort: effort }) };
