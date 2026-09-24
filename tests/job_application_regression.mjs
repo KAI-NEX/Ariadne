@@ -40,7 +40,7 @@ const styles=readFileSync(new URL('../public/styles.css',import.meta.url),'utf8'
 const applicationStyles=readFileSync(new URL('../public/job-application.css',import.meta.url),'utf8');
 assert.doesNotMatch(library,/job-stage-dialog|job-stage-note/,'no separate stage dialog or notes editor in the library');
 assert.doesNotMatch(library,/job-stage-filters|job-stage-empty/,'the library no longer exposes stage filters');
-assert.match(detail,/id="job-application-form"/);
+assert.match(detail,/id="job-application-notes"/);
 assert.match(detail,/job-application-domain\.js/);
 assert.doesNotMatch(pages,/jobStageFilter|data-job-filter/);
 assert.match(pages,/JobApplications\.orderJobs\(jobs, applications\)/);

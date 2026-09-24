@@ -46,6 +46,7 @@
     } catch (_error) { return null; }
   }
   function open(indexedDb = globalThis.indexedDB) {
+    if (indexedDb === globalThis.indexedDB && globalThis.AriadneJobFollowupStorage) return globalThis.AriadneJobFollowupStorage.open(DB_NAME, () => openNative(indexedDb));
     if (indexedDb === globalThis.indexedDB && globalThis.AriadneContentDatabase) {
       return globalThis.AriadneContentDatabase.open(DB_NAME, () => openNative(indexedDb));
     }

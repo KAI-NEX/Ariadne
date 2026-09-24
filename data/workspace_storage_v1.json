@@ -53,7 +53,11 @@
       "demo_candidate_items": "item_id",
       "demo_job_contexts": "job_context_id",
       "demo_conversations": "conversation_id",
-      "demo_ui_state": "state_id"
+      "demo_ui_state": "state_id",
+      "applications": "job_context_id",
+      "job_journal_entries": "entry_id",
+      "job_journal_images": "image_id",
+      "job_followup_migrations": "migration_id"
     },
     "ariadne-job-applications-v1": {
       "applications": "job_context_id"

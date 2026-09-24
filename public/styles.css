@@ -757,10 +757,17 @@ button.danger { background: #9c2525; border-color: #9c2525; }
 .v1-detail-edit-button:disabled, .v1-detail-remove-button:disabled { box-shadow: none; cursor: not-allowed; opacity: .48; transform: none; }
 .v1-button-row.v1-edit-actions { align-items: center; flex-wrap: nowrap; gap: var(--vi-space-24); justify-content: space-between; }
 .v1-edit-secondary-actions { align-items: center; display: inline-flex; gap: var(--vi-space-24); justify-content: flex-end; margin-left: auto; }
+.v1-journal-edit-section .v1-edit-text-action,
+.v1-journal-lightbox .v1-edit-text-action,
 .v1-edit-actions .v1-edit-text-action { background: transparent; border: 0; border-radius: 0; box-shadow: none; color: var(--vi-ink); cursor: pointer; font: inherit; font-size: 13px; font-weight: 500; line-height: 20px; margin: 0; min-height: var(--vi-target-comfort); padding: var(--vi-space-8) 0; scale: 1; transform: none; white-space: nowrap; }
 .v1-edit-actions [data-edit-cancel] { color: var(--vi-muted); }
+.v1-journal-edit-section [data-edit-destructive],
 .v1-edit-actions [data-edit-destructive] { color: var(--vi-danger); }
+.v1-journal-edit-section .v1-edit-text-action:hover,
+.v1-journal-lightbox .v1-edit-text-action:hover,
 .v1-edit-actions .v1-edit-text-action:hover { text-decoration: underline; text-underline-offset: 4px; }
+.v1-journal-edit-section .v1-edit-text-action:disabled,
+.v1-journal-lightbox .v1-edit-text-action:disabled,
 .v1-edit-actions .v1-edit-text-action:disabled { cursor: not-allowed; opacity: .48; text-decoration: none; }
 .v1-detail-action-row { align-items: center; justify-content: flex-end; }
 .v1-detail-state-panel { max-height: 0; opacity: 0; overflow: hidden; pointer-events: none; transform: translateY(-5px); transition: max-height 210ms var(--vi-ease-standard), opacity 170ms ease, transform 210ms var(--vi-ease-standard); }

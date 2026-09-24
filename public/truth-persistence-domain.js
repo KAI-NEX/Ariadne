@@ -10,8 +10,13 @@
 
   const CONTRACT_ID = "ariadne-truth-persistence-v1";
   const DB_NAME = "job-radar-local-first-v1";
-  const DB_VERSION = 18;
+  const DB_VERSION = 19;
   const STORE_SPECS = Object.freeze([
+    Object.freeze({ name: "applications", keyPath: "job_context_id", lifecycle: "new" }),
+    Object.freeze({ name: "job_journal_entries", keyPath: "entry_id", lifecycle: "new" }),
+    Object.freeze({ name: "job_journal_images", keyPath: "image_id", lifecycle: "new" }),
+    Object.freeze({ name: "job_followup_migrations", keyPath: "migration_id", lifecycle: "new" }),
+
     Object.freeze({ name: "source_documents", keyPath: "source_document_id", lifecycle: "reused" }),
     Object.freeze({ name: "runtime_snapshots", keyPath: "snapshot_id", lifecycle: "new" }),
     Object.freeze({ name: "extraction_artifacts", keyPath: "artifact_id", lifecycle: "new" }),

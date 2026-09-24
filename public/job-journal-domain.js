@@ -48,14 +48,14 @@
       request.onerror = request.onblocked = () => reject(Error("求职记录无法打开，请重试。"));
     });
   }
-  const open = () => globalThis.AriadneContentDatabase ? globalThis.AriadneContentDatabase.open(DB, native) : native();
+  const open = () => globalThis.AriadneJobFollowupStorage ? globalThis.AriadneJobFollowupStorage.open(DB, native) : globalThis.AriadneContentDatabase ? globalThis.AriadneContentDatabase.open(DB, native) : native();
   async function list(jobId) {
     const db = await open();
     try {
       const metadata = await new Promise((resolve, reject) => {
         const store = db.transaction(STORE).objectStore(STORE);
         const read = store.getAllMetadata ? store.getAllMetadata() : store.getAll();
-        read.onsuccess = () => resolve(read.result.filter(entry => entry.job_context_id === jobId));
+        read.onsuccess = () => resolve(read.result.filter(entry => entry.job_context_id === jobId && !entry.deleted_at));
         read.onerror = () => reject(Error("求职记录读取失败，请重试。"));
       });
       const entries = await Promise.all(metadata.map(entry => new Promise((resolve, reject) => {
@@ -68,13 +68,13 @@
           const read = db.transaction(IMAGES).objectStore(IMAGES).get(image.image_id);
           read.onsuccess = () => {
             if (!read.result || read.result.entry_id !== entry.entry_id || read.result.job_context_id !== jobId) return reject(Error("求职记录图片来源不一致。"));
-            resolve({ name: image.name, file: read.result.file });
+            resolve({ image_id: image.image_id, name: image.name, file: read.result.file });
           };
           read.onerror = () => reject(Error("求职记录图片无法读取，请重试。"));
         })));
         validate(entry);
       }
-      return entries.sort((a, b) => b.observed_on.localeCompare(a.observed_on) || b.created_at.localeCompare(a.created_at));
+      return entries.sort((a, b) => a.observed_on.localeCompare(b.observed_on) || a.created_at.localeCompare(b.created_at) || a.entry_id.localeCompare(b.entry_id));
     } finally { db.close(); }
   }
   async function save(record) {
@@ -91,5 +91,6 @@
     }); } finally { db.close(); }
     return record;
   }
-  return Object.freeze({ DB, STORE, IMAGES, FEEDBACK, validate, prepareImages, list, save });
+  const fingerprint = entries => JSON.stringify(entries.map(entry => [entry.entry_id, entry.revision || 0]).sort((a, b) => a[0].localeCompare(b[0])));
+  return Object.freeze({ fingerprint, DB, STORE, IMAGES, FEEDBACK, validate, prepareImages, list, save });
 }));

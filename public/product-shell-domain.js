@@ -253,15 +253,16 @@
     return Object.freeze({ trigger, shell, fields: Object.freeze(fields), actions, cancel, previewAction, destructive, previewPanel, previewActions, apply, back });
   }
 
-  function createDetailEditController({ trigger, form, preview, window: windowObject, populate }) {
+  function createDetailEditController({ trigger, form, preview, window: windowObject, populate, onStateChange }) {
     const binding = bindDetailEditShell({ trigger, form, preview });
     const panels = createDetailPanelController({ trigger, stages: { edit: binding.shell }, window: windowObject });
     const open = ({ focusFirst = true, resetPreview = true } = {}) => {
       populate?.();
       if (resetPreview) binding.previewPanel.classList.add("hidden");
       panels.show("edit", { focusFirst });
+      onStateChange?.("edit");
     };
-    const close = () => panels.show("closed");
+    const close = () => { panels.show("closed"); onStateChange?.("closed"); };
     const toggle = () => panels.current() === "closed" ? open() : close();
     const showPreview = () => {
       close();

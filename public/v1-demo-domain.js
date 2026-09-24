@@ -6,9 +6,14 @@
   "use strict";
 
   const DB_NAME = "job-radar-local-first-v1";
-  const DB_VERSION = 18;
+  const DB_VERSION = 19;
   const DATA_CLASS = "DEMO_FIXTURE";
   const STORES = [
+    ["applications", "job_context_id"],
+    ["job_journal_entries", "entry_id"],
+    ["job_journal_images", "image_id"],
+    ["job_followup_migrations", "migration_id"],
+
     ["jobs", "job_id"], ["candidates", "candidate_id"], ["source_documents", "source_document_id"],
     ["runtime_snapshots", "snapshot_id"], ["extraction_artifacts", "artifact_id"],
     ["extraction_runs", "extraction_run_id"], ["career_entities", "entity_id"], ["entity_review_decisions", "decision_id"],

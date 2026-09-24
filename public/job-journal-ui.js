@@ -1,81 +1,126 @@
 "use strict";
-globalThis.AriadneJobJournalUI = { mount(jobId) {
-  const form = document.getElementById("job-journal-form");
-  if (!form || form.dataset.mounted) return;
-  form.dataset.mounted = "true";
-  const D = globalThis.AriadneJobJournal, byId = id => document.getElementById(id);
-  const message = byId("job-journal-message"), timeline = byId("job-journal-timeline");
-  const feedback = byId("job-journal-feedback"), text = byId("job-journal-text"), date = byId("job-journal-date"), input = byId("job-journal-images");
-  let images = [], busy = false, preparing = false, generation = 0, imageGeneration = 0, channel;
-  let pendingId = crypto.randomUUID();
-  const urls = new Map();
-  function clearURLs(key) { (urls.get(key) || []).forEach(URL.revokeObjectURL); urls.set(key, []); }
-  function imageURL(file, key) { const url = URL.createObjectURL(file); urls.get(key).push(url); return url; }
-  function element(tag, value, className) { const node = document.createElement(tag); if (value) node.textContent = value; if (className) node.className = className; return node; }
-  const say = (value, error = false) => { message.textContent = value; message.classList.toggle("error", error); };
-  const controls = () => form.querySelectorAll("input, textarea, select, button").forEach(node => { node.disabled = busy || preparing; });
-  function reset() {
-    images = []; text.value = ""; input.value = ""; feedback.value = "UPDATE"; pendingId = crypto.randomUUID();
-    const now = new Date(); date.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    preview();
+globalThis.AriadneJobJournalUI = { async mount(jobId) {
+  const D = globalThis.AriadneJobJournal, A = globalThis.AriadneJobApplications, byId = id => document.getElementById(id);
+  const timeline = byId("job-journal-timeline"), editor = byId("job-journal-editor"), note = byId("job-application-note"), outcome = byId("job-application-outcome");
+  const urls = new Map(), message = byId("job-detail-message");
+  let entries = [], application, drafts = [], editing = false, busy = false, preparing = 0, generation = 0, channel;
+  const element = (tag, value, className) => { const node = document.createElement(tag); if (value) node.textContent = value; if (className) node.className = className; return node; };
+  const clearURLs = key => { (urls.get(key) || []).forEach(URL.revokeObjectURL); urls.set(key, []); };
+  const imageURL = (file, key) => { const url = URL.createObjectURL(file); if (!urls.has(key)) urls.set(key, []); urls.get(key).push(url); return url; };
+  const say = (text, error = false) => { message.textContent = text; message.classList.toggle("error", error); };
+  function controls() {
+    byId("job-edit-form").querySelectorAll("input, textarea, select, button").forEach(node => { node.disabled = busy || preparing > 0; });
+    byId("open-job-edit").disabled = busy || preparing > 0;
   }
-  function preview() {
-    clearURLs("preview"); const target = byId("job-journal-preview"); target.replaceChildren();
-    images.forEach((image, index) => {
-      const figure = element("figure"), img = element("img"); img.src = imageURL(image.file, "preview"); img.alt = image.name;
-      const remove = element("button", `移除 ${image.name}`, "v1-edit-text-action"); remove.type = "button";
-      remove.onclick = () => { images.splice(index, 1); preview(); };
-      figure.append(img, remove); target.append(figure);
+  function thumbnail(image, key) {
+    const button = element("button", "", "v1-journal-thumbnail"), img = element("img");
+    button.type = "button"; button.setAttribute("aria-label", `查看图片 ${image.name}`);
+    img.src = imageURL(image.file, key); img.alt = image.name; img.loading = "lazy"; button.append(img);
+    button.onclick = () => {
+      const dialog = byId("job-journal-lightbox"), full = byId("job-journal-full-image");
+      full.src = img.src; full.alt = image.name; dialog.showModal();
+    };
+    return button;
+  }
+  const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const blank = () => ({ entry_id: crypto.randomUUID(), job_context_id: jobId, observed_on: today(), feedback: "UPDATE", text: "", images: [], created_at: new Date().toISOString(), provenance: "USER_RECORDED" });
+  function render() {
+    clearURLs("history"); timeline.replaceChildren();
+    const notes = byId("job-application-notes"); notes.replaceChildren();
+    application.note.split("\n").map(line => line.trim()).filter(Boolean).forEach((line, index) => {
+      const row = element("div"), text = element("p", line); text.dataset.i18n = "off";
+      row.append(element("span", String(index + 1).padStart(2, "0")), text); notes.append(row);
+    });
+    if (!notes.children.length) notes.append(element("p", "暂无备注", "v1-source-note"));
+    byId("job-application-stage").textContent = A.STAGES[application.stage] + (application.outcome ? ` · ${A.OUTCOMES[application.outcome]}` : "");
+    if (!entries.length) timeline.append(element("p", "暂无求职记录", "v1-source-note"));
+    entries.forEach(entry => {
+      const article = element("article", "", "v1-journal-entry");
+      article.append(element("p", `${entry.observed_on}${entry.feedback === "UPDATE" ? "" : ` · ${D.FEEDBACK[entry.feedback]}`}`, "v1-section-label"));
+      const prose = element("p", entry.text, "v1-journal-text"); prose.dataset.i18n = "off"; article.append(prose);
+      const gallery = element("div", "", "v1-journal-images");
+      entry.images.forEach(image => gallery.append(thumbnail(image, "history")));
+      article.append(gallery); timeline.append(article);
     });
   }
   async function load() {
+    if (editing || busy) return;
     const reading = ++generation;
-    try {
-      const entries = await D.list(jobId); if (reading !== generation) return;
-      clearURLs("history"); timeline.replaceChildren();
-      if (!entries.length) timeline.append(element("p", "还没有求职记录。记录沟通过程、公司反馈或等待情况。", "v1-source-note"));
-      entries.forEach(entry => {
-        const article = element("article", "", "v1-journal-entry");
-        article.append(element("p", `${entry.observed_on} · ${D.FEEDBACK[entry.feedback]}`, "v1-section-label"));
-        const prose = element("p", entry.text, "v1-journal-text"); prose.dataset.i18n = "off"; article.append(prose);
-        const gallery = element("div", "", "v1-journal-images");
-        entry.images.forEach(image => {
-          const link = element("a"), img = element("img"); link.href = imageURL(image.file, "history"); link.target = "_blank"; link.rel = "noopener";
-          img.src = link.href; img.alt = image.name; img.loading = "lazy"; link.setAttribute("aria-label", `查看图片 ${image.name}`); link.append(img); gallery.append(link);
-        });
-        article.append(gallery); timeline.append(article);
-      });
-    } catch (error) { say(error.message, true); }
+    const [all, loaded] = await Promise.all([A.all(), D.list(jobId)]);
+    if (reading !== generation || editing || busy) return;
+    application = all.get(jobId) || A.initial(jobId); entries = loaded; render();
   }
-  for (const [value, label] of Object.entries(D.FEEDBACK)) { const option = element("option", label); option.value = value; feedback.append(option); }
-  input.addEventListener("change", async () => {
-    const attempt = ++imageGeneration; preparing = true; controls();
-    try {
-      const next = await D.prepareImages([...images.map(image => new File([image.file], image.name, { type: image.file.type })), ...input.files]);
-      for (const image of next) {
-        let bitmap;
-        try { bitmap = await createImageBitmap(image.file); } catch (_) { throw Error("图片无法解码，请换一张完整的 PNG、JPEG 或 WebP 图片。"); }
-        const tooLarge = bitmap.width * bitmap.height > 30000000; bitmap.close();
-        if (tooLarge) throw Error("图片分辨率过大，请使用截图或较小的图片。");
-      }
-      if (attempt !== imageGeneration) return;
-      images = next; preview(); say("");
-    } catch (error) { say(error.message || "图片无法读取。", true); }
-    finally { input.value = ""; preparing = false; controls(); }
-  });
-  form.addEventListener("submit", async event => {
-    event.preventDefault(); if (busy || preparing) return;
-    busy = true; controls();
-    try {
-      await D.save({ entry_id: pendingId, job_context_id: jobId, observed_on: date.value, feedback: feedback.value, text: text.value.trim(), images, created_at: new Date().toISOString(), provenance: "USER_RECORDED" });
-      reset(); say("求职记录已保存；职位要求和个人资料没有变化。"); channel?.postMessage({ jobId }); await load();
-    } catch (error) { say(error.message, true); }
-    finally { busy = false; controls(); }
-  });
-  byId("job-journal-cancel").onclick = () => { reset(); say(""); };
-  const connect = () => { if (!channel && typeof BroadcastChannel === "function") { channel = new BroadcastChannel("ariadne-job-journal"); channel.onmessage = event => { if (event.data.jobId === jobId) load(); }; } };
-  window.addEventListener("focus", load);
-  window.addEventListener("pagehide", () => { clearURLs("preview"); clearURLs("history"); channel?.close(); channel = null; generation++; });
-  window.addEventListener("pageshow", event => { if (event.persisted) { connect(); preview(); load(); } });
-  connect(); reset(); load();
+  function field(title, input) { const label = element("label", title, "v1-edit-field"); label.append(input); return label; }
+  function renderEditor() {
+    clearURLs("preview"); editor.replaceChildren();
+    drafts.forEach((entry, index) => {
+      const row = element("section", "", "v1-journal-draft"); row.dataset.entryId = entry.entry_id;
+      const header = element("div", "", "v1-journal-draft-heading"), remove = element("button", "删除记录", "v1-edit-text-action v1-detail-remove-button"); remove.type = "button"; remove.dataset.editDestructive = "";
+      remove.onclick = () => { drafts.splice(index, 1); renderEditor(); };
+      header.append(element("p", `记录 ${index + 1}`, "v1-section-label"), remove);
+      const date = element("input"); date.type = "date"; date.value = entry.observed_on; date.required = true; date.oninput = () => { entry.observed_on = date.value; };
+      const text = element("textarea"); text.rows = 4; text.maxLength = 6000; text.value = entry.text; text.placeholder = "记录沟通经过、反馈或下一步安排"; text.oninput = () => { entry.text = text.value; };
+      const input = element("input"); input.type = "file"; input.accept = "image/png,image/jpeg,image/webp"; input.multiple = true;
+      const gallery = element("div", "", "v1-journal-images");
+      entry.images.forEach((image, imageIndex) => {
+        const figure = element("figure"), removeImage = element("button", "移除图片", "v1-edit-text-action"); removeImage.type = "button";
+        removeImage.setAttribute("aria-label", `移除图片 ${image.name}`);
+        removeImage.onclick = () => { entry.images.splice(imageIndex, 1); renderEditor(); };
+        figure.append(thumbnail(image, "preview"), removeImage); gallery.append(figure);
+      });
+      input.onchange = async () => {
+        preparing++; controls();
+        try {
+          const next = await D.prepareImages([...entry.images.map(image => new File([image.file], image.name, { type: image.file.type })), ...input.files]);
+          for (const image of next) {
+            let bitmap;
+            try { bitmap = await createImageBitmap(image.file); } catch (_) { throw Error("图片无法解码，请换一张完整的 PNG、JPEG 或 WebP 图片。"); }
+            const tooLarge = bitmap.width * bitmap.height > 30000000; bitmap.close();
+            if (tooLarge) throw Error("图片分辨率过大，请使用截图或较小的图片。");
+          }
+          entry.images = next; say(""); renderEditor();
+        } catch (error) { say(error.message, true); }
+        finally { input.value = ""; preparing--; controls(); }
+      };
+      row.append(header, field("发生日期", date), field("内容", text), field("添加图片", input), gallery);
+      editor.append(row);
+    });
+    controls();
+  }
+  for (const [value, label] of Object.entries(A.OUTCOMES)) { const option = element("option", label); option.value = value; outcome.append(option); }
+  byId("job-journal-add").onclick = () => { drafts.push(blank()); renderEditor(); editor.lastElementChild?.querySelector("textarea")?.focus(); };
+  byId("job-journal-close-image").onclick = () => byId("job-journal-lightbox").close();
+  byId("job-journal-lightbox").onclick = event => { if (event.target === event.currentTarget) event.currentTarget.close(); };
+  const refresh = () => load().catch(error => say(error.message, true));
+  const connect = () => { if (!channel && typeof BroadcastChannel === "function") { channel = new BroadcastChannel("ariadne-job-applications"); channel.onmessage = refresh; } };
+  window.addEventListener("focus", refresh);
+  window.addEventListener("pagehide", () => { clearURLs("history"); clearURLs("preview"); channel?.close(); channel = null; generation++; });
+  window.addEventListener("pageshow", event => { if (event.persisted) { connect(); if (editing) renderEditor(); else refresh(); } });
+  connect(); await load();
+  return {
+    begin() {
+      editing = true; generation++;
+      drafts = entries.map(entry => ({ ...entry, images: entry.images.map(image => ({ ...image })) }));
+      if (!drafts.length) drafts.push(blank());
+      note.value = application.note; outcome.value = application.outcome;
+      byId("job-application-outcome-field").hidden = application.stage !== "CLOSED";
+      say(""); renderEditor();
+    },
+    cancel() { editing = false; drafts = []; clearURLs("preview"); editor.replaceChildren(); say(""); refresh(); },
+    async save(context) {
+      if (busy || preparing) return false;
+      const savedIds = new Set(entries.map(entry => entry.entry_id));
+      const values = drafts.filter(entry => savedIds.has(entry.entry_id) || entry.text.trim() || entry.images.length).map(entry => ({ ...entry, text: entry.text.trim() }));
+      // Empty new rows are ignored; existing records require content or explicit deletion.
+      values.forEach(D.validate);
+      busy = true; controls();
+      try {
+        const result = await globalThis.AriadneJobFollowupStorage.save({ ...context, jobId, application: { ...application, draftNote: note.value, draftOutcome: application.stage === "CLOSED" ? outcome.value : "" }, entries: values, observedEntries: entries });
+        editing = false; busy = false; clearURLs("preview"); drafts = [];
+        application = result.application; entries = result.entries.sort((a, b) => a.observed_on.localeCompare(b.observed_on) || a.created_at.localeCompare(b.created_at) || a.entry_id.localeCompare(b.entry_id));
+        render(); channel?.postMessage({ jobId });
+        return result;
+      } finally { busy = false; controls(); }
+    },
+  };
 } };

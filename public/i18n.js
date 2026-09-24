@@ -17,6 +17,16 @@
   ].join(",");
 
   const EN = Object.freeze({
+    "暂无备注": "No notes yet",
+    "暂无求职记录": "No application entries yet",
+    "每行填写一条备注": "One note per line",
+    "添加更多": "Add more",
+    "删除记录": "Delete entry",
+    "移除图片": "Remove image",
+    "关闭图片": "Close image",
+    "内容": "Content",
+    "记录沟通经过、反馈或下一步安排": "Record conversations, feedback or next steps",
+    "修改已保存。": "Changes saved.",
     "求职记录": "Application journal",
     "发生日期": "Date",
     "公司反馈": "Company feedback",

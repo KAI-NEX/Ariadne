@@ -2677,6 +2677,7 @@
       conversation_allowed: conversationAllowed,
       runtime_label: runtimeLabel(runtime),
     });
+    if (editButtonId === "open-job-edit") byId(editButtonId).classList.remove("hidden");
     setRuntimeGateMessage(record.item_id ? "candidate-detail-message" : "job-detail-message", runtime.mode === "model" && !conversationAllowed ? unavailableCopy(gate, "对话") : "");
     return conversationAllowed;
   }
@@ -3548,55 +3549,6 @@
     } });
   }
 
-  function initJobApplicationNotes(jobId) {
-    globalThis.AriadneJobJournalUI?.mount(jobId);
-    if (!JobApplications || !byId("job-application-form")) return;
-    const form = byId("job-application-form"), note = byId("job-application-note"), outcome = byId("job-application-outcome"), message = byId("job-application-message");
-    const controls = [...form.querySelectorAll("button, textarea, select")];
-    let state = null, saving = false, channel = null, generation = 0;
-    outcome.innerHTML = Object.entries(JobApplications.OUTCOMES).map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
-    const dirty = () => state && (note.value !== state.note || outcome.value !== state.outcome);
-    const feedback = (text, error = false) => { message.textContent = text; message.classList.toggle("error", error); };
-    const load = async (reset = false) => {
-      const reading = ++generation;
-      try {
-        const latest = (await JobApplications.all()).get(jobId) || JobApplications.initial(jobId);
-        if (reading !== generation || saving) return;
-        if (!reset && dirty()) {
-          if (latest.revision !== state.revision) feedback("投递记录已在其他页面更新。你的输入仍保留，可复制后点击取消重新读取。", true);
-          return;
-        }
-        state = latest; note.value = state.note; outcome.value = state.outcome;
-        byId("job-application-stage").textContent = JobApplications.STAGES[state.stage];
-        byId("job-application-outcome-field").hidden = state.stage !== "CLOSED";
-        controls.forEach(control => { control.disabled = false; });
-        feedback("");
-      } catch (error) { feedback(error.message, true); }
-    };
-    controls.forEach(control => { control.disabled = true; });
-    const refresh = () => load();
-    const connect = () => {
-      if (!channel && typeof BroadcastChannel === "function") { channel = new BroadcastChannel("ariadne-job-applications"); channel.onmessage = refresh; }
-    };
-    connect(); load();
-    window.addEventListener("focus", refresh);
-    window.addEventListener("pagehide", () => { channel?.close(); channel = null; });
-    window.addEventListener("pageshow", event => { connect(); if (event.persisted) refresh(); });
-    byId("job-application-cancel").addEventListener("click", () => load(true));
-    form.addEventListener("submit", async event => {
-      event.preventDefault();
-      if (!state || saving) return;
-      saving = true; generation += 1; controls.forEach(control => { control.disabled = true; }); form.setAttribute("aria-busy", "true");
-      try {
-        state = await JobApplications.save(jobId, { stage: state.stage, outcome: state.stage === "CLOSED" ? outcome.value : "", note: note.value }, state.revision);
-        note.value = state.note; outcome.value = state.outcome;
-        channel?.postMessage({ changed: true });
-        feedback("投递备注已保存。");
-      } catch (error) { feedback(error.message, true); }
-      finally { saving = false; controls.forEach(control => { control.disabled = false; }); form.removeAttribute("aria-busy"); }
-    });
-  }
-
   function initJobImport() {
     ProductShell.bindImportShell(document);
     jobSharedWorkspace();
@@ -3950,7 +3902,7 @@
       byId("job-requirements").innerHTML = (record.requirements || []).map((requirement, index) => `<div><span>${String(index + 1).padStart(2, "0")}</span><p><b>${escapeHtml(requirement.label)}</b>${escapeHtml(requirement.detail)}</p></div>`).join("");
     };
     renderJob(job);
-    initJobApplicationNotes(jobId);
+    const followupEditor = await globalThis.AriadneJobJournalUI.mount(jobId);
     const conversationAllowed = setDetailRuntimeMode(job, "job-ai-pane", "open-job-edit", "job-ai-runtime", "job_conversation") && Boolean(activeJobRevision);
     if (!activeJobRevision) {
       byId("job-ai-pane").classList.add("hidden");
@@ -3959,7 +3911,12 @@
     if (activeJobRevision) byId("open-job-delete").classList.add("hidden");
     const editShell = ProductShell.createDetailEditController({
       trigger: byId("open-job-edit"), form: byId("job-edit-form"), preview: byId("job-edit-preview"), window,
+      onStateChange: state => {
+        document.body.classList.toggle("v1-job-detail-editing", state === "edit");
+        if (state === "closed") followupEditor.cancel();
+      },
       populate: () => {
+        followupEditor.begin();
         byId("job-edit-title").value = activeJob.title || "";
         byId("job-edit-company").value = activeJob.company || "";
         byId("job-edit-location").value = activeJob.location || "";
@@ -3983,57 +3940,34 @@
       submit: ({ content }) => submitJobConversation(content),
     });
     const deletePopover = createDeletePopover("job-delete-popover");
-    let pendingJobEdit = null;
-    window.addEventListener("message", (event) => {
+    window.addEventListener("message", event => {
       if (event.origin === window.location.origin && event.data?.type === "job-radar-v1-open-detail-edit") byId("open-job-edit").click();
     });
-    byId("open-job-delete").addEventListener("click", (event) => deletePopover.open(event.currentTarget));
-    byId("preview-job-edit").addEventListener("click", () => {
+    byId("open-job-delete").addEventListener("click", event => deletePopover.open(event.currentTarget));
+    byId("job-edit-form").addEventListener("submit", async event => {
+      event.preventDefault();
       const title = byId("job-edit-title").value.trim();
-      if (!title) return;
-      const requirements = byId("job-edit-requirements").value.split("\n").map((line) => line.trim()).filter(Boolean).map((detail, index) => {
+      if (!title) { byId("job-edit-title").focus(); return; }
+      const requirements = byId("job-edit-requirements").value.split("\n").map(line => line.trim()).filter(Boolean).map((detail, index) => {
         const previous = activeJob.requirements?.[index];
-        return {
-          requirement_id: previous?.requirement_id || `job-user-requirement-${index + 1}`,
-          label: previous?.detail === detail ? previous.label : (detail.length > 36 ? `${detail.slice(0, 34)}…` : detail),
-          detail,
-          grounding_refs: previous?.grounding_refs || [],
-          content_origin: previous?.detail === detail ? previous.content_origin : "HUMAN_EDITED",
-        };
+        if (previous?.detail === detail) return previous;
+        return { requirement_id: previous?.requirement_id || `job-user-requirement-${index + 1}`, label: detail.length > 36 ? `${detail.slice(0, 34)}…` : detail,
+          detail, grounding_refs: previous?.grounding_refs || [], content_origin: "HUMAN_EDITED" };
       });
-      pendingJobEdit = { title, company: byId("job-edit-company").value.trim(), location: byId("job-edit-location").value.trim(), summary: byId("job-edit-summary").value.trim(), requirements };
-      byId("job-edit-before").textContent = `${activeJob.title} · ${activeJob.requirements?.length || 0} 条要求`;
-      byId("job-edit-after").textContent = `${pendingJobEdit.title} · ${pendingJobEdit.requirements.length} 条要求`;
-      editShell.showPreview();
-    });
-    byId("confirm-job-edit").addEventListener("click", async () => {
-      if (!pendingJobEdit) return;
-      const button = byId("confirm-job-edit");
-      button.disabled = true;
+      const edits = { title, company: byId("job-edit-company").value.trim(), location: byId("job-edit-location").value.trim(), summary: byId("job-edit-summary").value.trim(), requirements };
       try {
-        if (activeJobRevision) {
-          const database = await Truth.openDatabase();
-          try {
-            const outcome = await JobContext.persistDirectEdit(database, activeJobRevision, pendingJobEdit);
-            activeJobRevision = outcome.revision;
-            activeJob = JobContext.recordForUi(activeJobRevision);
-            byId("job-detail-message").textContent = `修改已保存为职位第 ${activeJobRevision.version} 版；上一版本仍保留。`;
-          } finally { database.close(); }
-        } else {
-          activeJob = { ...activeJob, ...pendingJobEdit, item_version: (Number(activeJob.item_version) || 1) + 1, updated_at: new Date().toISOString() };
-          await Demo.put(Demo.DEMO_STORES.jobs, activeJob);
-          byId("job-detail-message").textContent = "修改已保存到当前本地演示记录。";
-        }
-        renderJob(activeJob);
-        if (isEmbeddedDetail && window.parent !== window) {
-          window.parent.postMessage({ type: "job-radar-v1-detail-updated", library: "jd", sourceKey: `job:${activeJob.job_context_id}` }, window.location.origin);
-        }
+        const result = await followupEditor.save({ currentJob: activeJob, currentRevision: activeJobRevision, edits });
+        if (!result) return;
+        activeJobRevision = result.revision;
+        renderJob(activeJobRevision ? JobContext.recordForUi(activeJobRevision, activeJobSourceRecords) : result.job);
         editShell.complete();
-        pendingJobEdit = null;
+        byId("job-detail-message").textContent = "修改已保存。";
+        byId("job-detail-message").classList.remove("error");
+        if (isEmbeddedDetail && window.parent !== window) window.parent.postMessage({ type: "job-radar-v1-detail-updated", library: "jd", sourceKey: `job:${activeJob.job_context_id}` }, window.location.origin);
       } catch (error) {
-        byId("job-detail-message").textContent = `保存未完成：${personalErrorCopy(error)}`;
+        byId("job-detail-message").textContent = `保存未完成：${error.message}`;
         byId("job-detail-message").classList.add("error");
-      } finally { button.disabled = false; }
+      }
     });
     if (conversationAllowed) {
       const database = await Truth.openDatabase();
