@@ -14,7 +14,7 @@
       const release = await response.json();
       if (release.url !== "/downloads/Ariadne-Skill.zip" || !/^[a-f0-9]{64}$/.test(release.sha256)
           || !Number.isSafeInteger(release.bytes) || release.bytes <= 0) throw new Error("invalid");
-      if (release.github_url !== undefined && !/^https:\/\/github\.com\/KAI-NEX\/Ariadne\/releases\/download\/skill-[A-Za-z0-9.-]+\/Ariadne-Skill\.zip$/.test(release.github_url)) throw new Error("invalid GitHub release");
+      if (release.github_url !== undefined && !/^https:\/\/github\.com\/(?:orocoa|KAI-NEX)\/Ariadne\/releases\/download\/skill-[A-Za-z0-9.-]+\/Ariadne-Skill\.zip$/.test(release.github_url)) throw new Error("invalid GitHub release");
       const archive = await fetch(release.url, { method: "HEAD", cache: "no-store", redirect: "error" });
       if (!archive.ok) throw new Error("missing");
       const length = archive.headers.get("content-length");

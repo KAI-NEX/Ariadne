@@ -65,3 +65,10 @@ for(const github_url of ['https://evil.invalid/Ariadne-Skill.zip', githubURL+'?r
   assert.equal((await render({...release, github_url})).nodes['skill-install-copy'].disabled, true);
 }
 console.log('Skill install: lazy shared preparation and pinned GitHub release allowlist PASS');
+
+const canonicalURL = githubURL.replace('KAI-NEX', 'orocoa');
+const canonical = await render({...release, github_url: canonicalURL});
+await canonical.nodes['skill-install-copy'].click();
+assert.ok(canonical.copied().includes(canonicalURL));
+assert.equal((await render({...release, github_url: canonicalURL.replace('orocoa', 'other-owner')})).nodes['skill-install-copy'].disabled, true);
+console.log('Skill install: canonical repository and legacy release compatibility PASS');

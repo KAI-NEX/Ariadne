@@ -125,6 +125,10 @@ Ariadne 可以成为这些工作流的前置层：先形成经本人审阅、有
 
 ## 当前能力
 
+- 结合当前个人资料与已保存补充讨论职位；纯职位摘要仍独立，职位对话不能静默改写个人资料。
+- 职位正文、逐行备注和图文求职记录统一编辑、保存或取消；支持多条记录、删除、缩略图放大、图片拖拽/粘贴，以及平滑增删动效。
+- 「了解我」「了解职位概况」每次先核对发送范围与当前模型，再平滑进入对话；尊重系统减少动态效果设置。
+- 展示实时公开回答、真实模型活动及可用的公开思路说明；移除技术过程列表和 token 计数，不显示内部推理。
 - 导入 PDF、DOCX、图片、文本和 Markdown 的 Candidate/Job 材料；保存并恢复原始来源。
 - Local 模式只保存原件，零 Provider 调用；之后可选择通过图片与视觉 PDF 门槛的 Model 分析。
 - 模型结果先成为 Working 内容，用户明确保存后才生成确认版本。
@@ -202,7 +206,7 @@ Ariadne 可以成为这些工作流的前置层：先形成经本人审阅、有
 需要 Python 3.11+；运行回归还需要 Node.js 20+。完整文档路径目前以 macOS 验收为准；部分本地 PDF/OCR 依赖 Swift、PDFKit、Vision 及 Poppler 的 `pdftoppm`。
 
 ```sh
-git clone https://github.com/KAI-NEX/Ariadne.git
+git clone https://github.com/orocoa/Ariadne.git
 cd Ariadne
 python3 app.py
 ```

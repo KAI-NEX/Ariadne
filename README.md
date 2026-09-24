@@ -125,6 +125,10 @@ Ariadne can sit before any of these workflows: it prepares a reviewed, source-gr
 
 ## What works today
 
+- Discuss saved jobs together with current personal materials and saved notes; job-only summaries remain separate, and conversations cannot silently change personal records.
+- Edit job content, line-by-line notes and image journals together, then save or cancel once. Journals support multiple entries, deletion, thumbnail zoom, image drag-and-drop/paste and smooth add/remove transitions.
+- Enter personal-understanding and job-overview conversations after reviewing the current transmission scope and model. Shared entry transitions fade into the conversation; reduced-motion settings are respected.
+- See live public response text and actual model activity, with public commentary when available. Technical process lists and token counts are hidden; private reasoning is never displayed.
 - Import Candidate and Job materials from PDF, DOCX, images, text, and Markdown; retain the original source and restore it later.
 - Archive original materials in Local mode with zero provider calls; analyze them later with a Model runtime that has passed the image and visual-PDF capability gate.
 - Review model output as Working content and explicitly save it as a new confirmed version.
@@ -207,7 +211,7 @@ Requirements:
 - Poppler's `pdftoppm` for complete PDF-to-image rendering
 
 ```sh
-git clone https://github.com/KAI-NEX/Ariadne.git
+git clone https://github.com/orocoa/Ariadne.git
 cd Ariadne
 python3 app.py
 ```

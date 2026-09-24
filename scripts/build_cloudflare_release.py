@@ -111,7 +111,7 @@ def build(output, pdfjs, download_url=None, skill_release_tag=None):
     shutil.copyfile(output / "skill-bundle/Ariadne-Skill.zip.sha256", downloads / "Ariadne-Skill.zip.sha256")
     skill_metadata = {"url": "/downloads/Ariadne-Skill.zip", "bytes": skill["bytes"], "sha256": skill["sha256"]}
     if skill_release_tag:
-        skill_metadata["github_url"] = f"https://github.com/KAI-NEX/Ariadne/releases/download/{skill_release_tag}/Ariadne-Skill.zip"
+        skill_metadata["github_url"] = f"https://github.com/orocoa/Ariadne/releases/download/{skill_release_tag}/Ariadne-Skill.zip"
     (downloads / "skill.json").write_text(json.dumps(skill_metadata))
     files = list(pages.rglob("*"))
     if sum(p.is_file() for p in files) > 1000 or any(p.is_file() and p.stat().st_size > 25 * 1024 * 1024 for p in files):
