@@ -35,6 +35,8 @@ App Server 每次请求启动独立 stdio 子进程、临时目录与 ephemeral 
 - 真实合成文字：首预览 5.714 秒、21 次公开预览增长、12.999 秒完成。数字只说明此样本实际分批到达，不是延迟承诺。
 - 真实多模态：单图 + PDF 完整 2 页（共 3 张），逐项正确读出 JOB RADAR TEST / ARIADNE PAGE ONE / ARIADNE PAGE TWO；首预览 4.124 秒、20 次增长、6.531 秒完成。未以 OCR 代替图像，也未发送私人资料。
 - 真实 personal-understanding 领域调用：发生 2 次公开搜索事件，Python 官方 dataclasses 来源回执有效，自述与网页内容分开，proposals/card_proposals 为空、persistence=not_written。真实搜索后答复仍连续生成，保留校验和人工保存边界。
+- 实际浏览器→HTTP→领域→App Server→模型：4.99 秒首预览、13.354 秒完成；生成中公开文字已持续增长，未写入资料、没有修改提案。完整工作区 127/127、干净最终发布源码 126/126 suites 通过（差异为未跟踪历史 Mac launcher 测试，不进入发布）。
+- 最终 Pages `73e26b06`、API Worker `194e65db-8eb2-4c52-8d15-390c65c819b0`；[Skill Release](https://github.com/KAI-NEX/Ariadne/releases/tag/skill-20260924-streaming-v2) 2,875,197 bytes，SHA-256 `46fa34793c6fb4e33c042304467efe6c19093ff2f960e14e3b7d67f05855fcab`。本机已完整备份后更新、doctor 通过，702 个工作区文件更新前后与重开后 hash 一致；227 个运行文件与包一致。首版及中间 QA 保留，未覆盖原件。
 - QA 与新登录前被安全预检拦截的记录在 `.cache/conversation-ux-v2/`。egolite 的截图接口多次超时，按项目规则回退到已有 Playwright/Chrome 无痕测试上下文；不改变用户浏览器设置。网页版三家真实 API 账号、跨机登录与安装仍未逐一验证。
 
 ### 前一版验收记录（exec；历史）
