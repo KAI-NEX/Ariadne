@@ -62,7 +62,10 @@
       const copy = tr(`${scope}将发送至 ${recipient} · ${state.runtime.model}，可能消耗模型额度或产生 API 费用。更新理解可能分批调用。`, `${scope} will be sent to ${recipient} · ${state.runtime.model}, using model credits or incurring API charges. Updating understanding may require multiple calls.`);
       if (entry.copy.textContent !== copy) entry.copy.textContent = copy;
       const title = tr("开始对话前", "Before starting a conversation"); if (entry.title.textContent !== title) entry.title.textContent = title;
-      const boundary = tr("确认只是进入对话，不会立即发送资料。提交后，本机 Codex 可按需查询公开网页；网上信息不属于你的个人经历。资料修改仍需另行确认保存，附件仍按本轮单独确认。", "Accepting only opens the conversation; nothing is sent yet. After submission, local Codex may search public websites when needed; online information is not your personal experience. Record changes require separate confirmation, as do attachments for each turn.");
+      const search = state.runtime.provider === "codex"
+        ? tr("提交后，本机 Codex 可按需查询公开网页；网上信息不属于你的个人经历。", "After submission, local Codex may search public websites when needed; online information is not your personal experience. ") : "";
+      const boundary = tr("确认只是进入对话，不会立即发送资料。", "Accepting only opens the conversation; nothing is sent yet. ") + search
+        + tr("资料修改仍需另行确认保存，附件仍按本轮单独确认。", "Record changes require separate confirmation, as do attachments for each turn.");
       if (entry.boundary.textContent !== boundary) entry.boundary.textContent = boundary;
       const button = tr("同意并进入对话", "Accept and enter conversation"); if (entry.button.textContent !== button) entry.button.textContent = button;
       lock(entry, locked);
