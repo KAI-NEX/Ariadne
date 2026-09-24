@@ -1,6 +1,6 @@
 # Ariadne：免费托管与腾讯域名部署
 
-更新：2026-09-24。正式入口 **https://ariadne.kai-nex.com** 已发布 Web / Skill 双端架构、连续公开回复与对话前确认：网页版免安装使用自己的 API Key，本地 Agent 入口按先安装、再调用说明使用 Skill。网页版保留运行选择，Skill 直接进入工作空间。当前 Pages 为 `73e26b06`，绑定 API Worker 版本 `194e65db-8eb2-4c52-8d15-390c65c819b0`，公开包为 `skill-20260924-streaming-v2`，源码提交 `d1e2a55`（API 相同于 `7d6e76d`）；产品仍属公网预览阶段，页面不显示全局预览提示行。本机首次升级需在独立 Ariadne Codex 目录完成官方登录，不复制日常 Codex 凭据。实时反馈的合成/真实验证范围见 [专项记录](CONVERSATION_LIVE_FEEDBACK.md)。
+更新：2026-09-25。正式入口 **https://ariadne.kai-nex.com** 已同步当前个人上下文、统一求职记录与对话体验。Pages 为 `47227fc3`，绑定 API Worker `0070f6ad-1107-4aee-9e55-b37baa112350`，源码 `b4f995f`；公开包为 [skill-20260925-context-journal-ui](https://github.com/orocoa/Ariadne/releases/tag/skill-20260925-context-journal-ui)，2,879,841 bytes，SHA-256 `80eb91046f6883dcdbe4ef7c0201bf22559c84f9c4f7775e4a06f7baa076be8a`。GitHub、官网和本机 Skill 安装内容已核对；用户资料各自保存，不自动同步。线上检查及本地 128 项回归通过，GitHub 自动回归两组启动超时（126/128），不视为全绿验收；详见 [发布回执](../../PROJECT_STATUS.md)。旧版本保留。本机旧版升级需在独立 Ariadne Codex 目录完成官方登录，不复制日常 Codex 凭据。
 
 当前部署：Pages 项目 `ariadne`，实际默认域名 `ariadne-7pc.pages.dev`；通过 `ARIADNE_API` 绑定 Python Worker `ariadne-api`。腾讯 DNSPod 已添加 `ariadne` CNAME 指向上述 Pages 域名，Cloudflare 自定义域名显示 Active / SSL enabled。未购买 VPS、迁移整个 DNS 或修改原有邮箱记录。以下步骤供后续更新与重新部署使用。
 

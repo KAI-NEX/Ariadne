@@ -1,5 +1,15 @@
 # AI Job Radar｜Phase 4 Status
 
+## 2026-09-25 — 全端与 GitHub 同步（PUBLISHED；CI 启动超时待处理）
+
+- 用户授权同步所有项目内容，包括 GitHub。将此前 5 次已验收修复及发布准备 `b4f995f11a8bba0bc41e99e9196d4bac53fa74fe` 推送 `orocoa/Ariadne/main`；保持原 `KAI-NEX` 历史记录与旧 Release，不修改个人资料、登录或无关未完成文件。
+- 中英文 README、CHANGELOG 更新当前个人上下文、统一求职记录与对话体验。GitHub API 核实当前仓库名称后，安装 metadata 改用 `orocoa/Ariadne`；精确仓库白名单兼容原地址，仍拒绝其他所有者、任意下载路径和浮动 tag。新增兼容回归通过。
+- 从干净 detached worktree 构建 Pages/Worker/Skill，同一源码 `b4f995f` 发布 Pages `47227fc3`，API Worker `0070f6ad-1107-4aee-9e55-b37baa112350`；[Skill Release](https://github.com/orocoa/Ariadne/releases/tag/skill-20260925-context-journal-ui)完整 ZIP 为 2,879,841 bytes，SHA-256 `80eb91046f6883dcdbe4ef7c0201bf22559c84f9c4f7775e4a06f7baa076be8a`。旧包、构建与 QA 均保留。
+- 已重新下载 GitHub 包并检查 ZIP、大小和 hash；官网 `/downloads/skill.json`、同源 ZIP 及 28 个变化资源/API 健康与模式检查通过，静态内容与本次构建逐字节一致。核验遵循 Pages 的 `.html` 规范化重定向；未修改站点或资料 origin。
+- 本地干净源码 128/128 离线回归、公开文件门禁、VI、安装包与 Worker dry-run 通过。GitHub [检查 36045362815](https://github.com/orocoa/Ariadne/actions/runs/36045362815) 为 126/128：`desktop_lifecycle_regression.py` 与 `skill_bundle_regression.py` 在 10 秒内未收到服务 ready 事件。线上检查通过不代表 CI 通过；本轮没有放宽测试或声称已修复该 CI 启动问题。
+- egolite 核实官网安装指令引用当前 tag 与 hash；截图超时后使用隔离 Chrome 完成 1280/390px 安装窗口、无横向溢出、了解我/职位概况入口和渐入验证，无页面异常及模型请求。API 接收方使用隔离页面合成设置，无凭据、不认证真实模型质量。QA、下载校验和发布日志在 `.cache/sync-all-20260925/`。
+- 已完整备份并用同一发布 Skill 更新本机，228 个运行文件 hash 一致、716 个原件/历史/工作区绑定文件 hash 不变。尚未收到解除锁屏确认，未重启或强行关闭原生窗口，需重新打开加载新版。原有两份项目文档历史改动、Mac 启动脚本、手工 handoff、work 与架构 QA 等未完成/未纳入发布内容继续原地保留。
+
 ## 2026-09-25 — 同意后平滑进入对话（VALIDATED；本机文件已更新）
 
 - 共用六入口从仅输入框 240ms 动画改为整个说明面板淡出 240ms，历史/引导/输入框整体渐入 540ms 并轻移 8px，时长与曲线取已有 VI token；布局切换发生在透明时，面板高度稳定。
