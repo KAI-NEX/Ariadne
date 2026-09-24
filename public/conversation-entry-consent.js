@@ -21,29 +21,71 @@
     boundary.className = "v1-entry-boundary";
     button.type = "button"; button.className = "v1-primary-button";
     gate.append(title, copy, boundary, button); pane.prepend(gate);
-    const entry = { form, pane, gate, title, copy, boundary, button, operation, enteredToken: null, locked: false, states: new Map() };
-    button.addEventListener("click", () => {
-      try { selection.acceptEntryConsent(operation, entry.token); entry.enteredToken = entry.token; refresh(); form.querySelector("textarea")?.focus({ preventScroll: true }); }
-      catch (_) { refresh(); boundary.textContent = tr("模型设置已变化，请核对后重新确认。", "Model settings changed. Review them before accepting."); }
-    });
+    const entry = { form, pane, gate, title, copy, boundary, button, operation, enteredToken: null, locked: false, transition: null, states: new Map() };
+    button.addEventListener("click", () => enter(entry));
     entries.set(form.id, entry); return entry;
   }
-  function lock(entry, locked) {
-    const changed = entry.locked !== locked;
-    entry.locked = locked;
+  function cancelTransition(entry) {
+    const transition = entry.transition;
+    entry.transition = null;
+    transition?.animation?.cancel();
+    entry.button.disabled = false;
+    delete entry.pane.dataset.entryTransition;
+  }
+  function lock(entry, locked, blocked = locked) {
+    entry.locked = blocked;
     if (entry.gate.hidden === locked) entry.gate.hidden = !locked;
     for (const child of entry.pane.children) {
       if (child === entry.gate) continue;
-      if (locked) {
+      if (blocked) {
         if (!entry.states.has(child)) entry.states.set(child, child.inert);
         if (!child.inert) child.inert = true;
-        if (!child.classList.contains("v1-entry-obscured")) child.classList.add("v1-entry-obscured");
       } else if (entry.states.has(child)) {
-        child.inert = entry.states.get(child); entry.states.delete(child); child.classList.remove("v1-entry-obscured");
+        child.inert = entry.states.get(child); entry.states.delete(child);
       }
+      child.classList.toggle("v1-entry-obscured", locked);
     }
-    if (changed && !locked && !root.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      entry.form.animate?.([{ opacity: 0, transform: "translateY(4px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: 240, easing: "cubic-bezier(.22,.78,.24,1)" });
+  }
+  async function enter(entry) {
+    if (entry.transition || !entry.locked) return;
+    const transition = { token: entry.token, animation: null };
+    entry.transition = transition;
+    entry.button.disabled = true;
+    try {
+      selection.acceptEntryConsent(entry.operation, transition.token);
+      entry.enteredToken = transition.token;
+      const style = root.getComputedStyle(entry.pane);
+      const duration = name => {
+        const value = style.getPropertyValue(name).trim();
+        return parseFloat(value) * (value.endsWith("ms") ? 1 : 1000) || 0;
+      };
+      const animate = async (frames, time, easing) => {
+        const previous = transition.animation;
+        transition.animation = entry.pane.animate(frames, { duration: time, easing, fill: "both" });
+        previous?.cancel();
+        await transition.animation.finished;
+      };
+      if (!root.matchMedia("(prefers-reduced-motion: reduce)").matches && entry.pane.animate) {
+        // Fade the whole pane so history, introduction and composer share one transition.
+        entry.pane.dataset.entryTransition = "leaving";
+        await animate([{ opacity: 1 }, { opacity: 0 }], duration("--vi-motion-close") / 2,
+          style.getPropertyValue("--vi-ease-standard").trim() || "ease");
+        if (entry.transition !== transition) return;
+        lock(entry, false, true);
+        entry.pane.dataset.entryTransition = "entering";
+        await animate([{ opacity: 0, transform: "translateY(8px)" }, { opacity: 1, transform: "translateY(0)" }],
+          duration("--vi-motion-open"), style.getPropertyValue("--vi-ease-reveal").trim() || "ease");
+      }
+      if (entry.transition !== transition) return;
+      cancelTransition(entry);
+      refresh();
+      if (!entry.locked) entry.form.querySelector("textarea")?.focus({ preventScroll: true });
+    } catch (_) {
+      // Cancellation belongs to a newer scope/settings state or page lifecycle.
+      if (entry.transition !== transition) return;
+      cancelTransition(entry);
+      refresh();
+      if (entry.locked) entry.boundary.textContent = tr("模型设置已变化，请核对后重新确认。", "Model settings changed. Review them before accepting.");
     }
   }
   function refresh() {
@@ -57,6 +99,7 @@
       // even when the exact recipient/settings disclosure was accepted before.
       const visitEntry = entry.pane.dataset.entryConfirmation === "visit";
       const locked = Boolean(state.scope && state.fingerprint && (!state.accepted || (visitEntry && entry.enteredToken !== state.token)));
+      if (entry.transition && (entry.transition.token !== state.token || locked)) cancelTransition(entry);
       entry.token = state.token;
       const recipient = state.runtime.provider === "codex" ? "Codex / OpenAI" : state.runtime.provider;
       const scope = operation === "personal_understanding" || operation === "candidate_conversation"
@@ -71,13 +114,20 @@
         + tr("资料修改仍需另行确认保存，附件仍按本轮单独确认。", "Record changes require separate confirmation, as do attachments for each turn.");
       if (entry.boundary.textContent !== boundary) entry.boundary.textContent = boundary;
       const button = tr("同意并进入对话", "Accept and enter conversation"); if (entry.button.textContent !== button) entry.button.textContent = button;
-      lock(entry, locked);
+      if (!entry.transition) lock(entry, locked);
       entry.pane.dataset.entryReady = "true";
     }
   }
   let queued = false;
   const schedule = () => { if (queued) return; queued = true; root.requestAnimationFrame(() => { queued = false; refresh(); }); };
   root.AriadneConversationEntry = Object.freeze({ refresh, requiresConfirmation: operation => [...entries.values()].some(entry => entry.operation === operation && entry.locked) });
+  root.addEventListener("pagehide", () => {
+    for (const entry of entries.values()) {
+      cancelTransition(entry);
+      if (entry.pane.dataset.entryConfirmation === "visit") entry.enteredToken = null;
+    }
+    refresh();
+  });
   root.addEventListener("pageshow", event => {
     if (!event.persisted) return;
     for (const entry of entries.values()) if (entry.pane.dataset.entryConfirmation === "visit") entry.enteredToken = null;
