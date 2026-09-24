@@ -1,13 +1,16 @@
 # AI Job Radar｜Phase 4 Status
 
-## 2026-09-24 — Web / Skill 对话实时透明反馈（代码与本地验收完成；待发布）
+## 2026-09-24 — Web / Skill 对话实时透明反馈（COMPLETE；已发布并更新本机）
 
 - 六个对话入口共用真实请求事件、资料覆盖范围、公开回复预览和可折叠过程记录。Web 逐块读取所选 API 的 Chat Completions SSE；Skill 保留隔离的 Codex exec JSONL，在公开消息完成时提前转发，不切换模型/强度/工具权限，不声称 Codex 已提供连续 token delta。
 - 隐藏 reasoning、原始工具参数与修改动作；公开预览明确未校验。只有完整终态交回原领域校验/持久化，断流/乱序/失败撤回预览并恢复附件确认，Candidate/Job/补充的人工保存边界不变。结构校验不等于事实验证；临时过程记录不写入长期资料。
 - 122/122 离线 regression suite、VI/负向检查、语法与 diff 检查通过。包含新增 SSE 分字节中文、身份/大小/终态校验、公开字段隔离、Web 真领域合成成功与错误动作拒绝、本机 HTTP/WSGI 提前 flush、前端提前预览及失败收尾。
 - 1 次真实 Codex / gpt-5.6-sol / medium 合成资料调用：13.066 秒预览、16.943 秒终态，提前约 3.88 秒；未出现额外 commentary，不能据此声称持续逐字输出。没有发送私人资料或调用真实 BYOK API。
 - egolite 六页面共用链路合成验收、桌面/390px、失败撤回、完成折叠与减少动效通过；实际 workerd 验证公开事件早于终态、成功/422 失败保真、分块上游 SSE 和 reasoning 不外传。过程中修复 SDK Request 克隆类型错误；本地 SDK 依赖缺失、测试替身的 JsProxy/dict 使用错误和浏览器缓存加载失败的中间证据均保留，不计作通过。
-- 架构与限制见 [对话实时反馈](docs/current/CONVERSATION_LIVE_FEEDBACK.md)。QA 与生成包在 `.cache/conversation-transparency-20260924/`。当前未发布公网、未 push、未覆盖日常 Skill；真实三家 API 账号与跨机安装仍待验收。既有未提交历史文档及原件保留。
+- 从干净提交 `eccac62` 构建并发布：Pages `8b602e80`，API Worker `6c86cee2-5816-4e43-a525-5b77e8ee2634`；[官网](https://ariadne.kai-nex.com) 实际浏览器核对运行边界、生产脚本/CSS hash、事件 Content-Type 与收到请求 → 422 拒绝的完整终态，`network_call_made=false`。未使用私人资料或真实 API Key 作公网验证。
+- [公开 Skill Release](https://github.com/KAI-NEX/Ariadne/releases/tag/skill-20260924-live-feedback) 已上传完整 ZIP；GitHub 与官网实际下载均为 2,852,833 bytes，SHA-256 `645d63db4ad87507afc13779ec83f26655197168336233bfec5eb79ad2af3129`，ZIP 完整。官网安装指令绑定此版本与 hash；实现提交已 push。
+- 本机旧 Skill 完整备份在 `.cache/conversation-transparency-20260924/installed-backup/`，更新后 219 个运行文件 hash 全部一致、doctor 全部通过。重开精确独立窗口，仍显示 18 张个人卡片和 6 个职位；更新前、更新后、重开后 694 个工作区文件 SHA-256 完全一致。没有代发用户问题或重置其模型选择。
+- 架构与限制见 [对话实时反馈](docs/current/CONVERSATION_LIVE_FEEDBACK.md)。QA、生成包及发布时的短 SHA Release 拒绝/首次网络失败日志均保留在 `.cache/conversation-transparency-20260924/`；后续用完整 commit SHA 与正确依赖目录成功发布。真实三家 API 账号与跨机安装仍待验收。既有未提交历史文档及原件保留。
 
 ## 2026-09-24 — 跨职位对话认识当前个人资料（COMPLETE；本机 Skill）
 

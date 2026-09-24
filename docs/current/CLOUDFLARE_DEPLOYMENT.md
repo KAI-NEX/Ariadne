@@ -1,6 +1,6 @@
 # Ariadne：免费托管与腾讯域名部署
 
-更新：2026-09-20。正式入口 **https://ariadne.kai-nex.com** 已发布 Web / Skill 双端架构：网页版免安装使用自己的 API Key，本地 Agent 入口按先安装、再调用说明使用 Skill。网页版保留运行选择，Skill 直接进入工作空间。当前 Pages 为 `a56a6d36`，绑定 API Worker 版本 `4ab1078e-7937-4687-a827-ddba54044bc5`；产品仍属公网预览阶段，页面不显示全局预览提示行。
+更新：2026-09-24。正式入口 **https://ariadne.kai-nex.com** 已发布 Web / Skill 双端架构与对话实时反馈：网页版免安装使用自己的 API Key，本地 Agent 入口按先安装、再调用说明使用 Skill。网页版保留运行选择，Skill 直接进入工作空间。当前 Pages 为 `8b602e80`，绑定 API Worker 版本 `6c86cee2-5816-4e43-a525-5b77e8ee2634`，公开包为 `skill-20260924-live-feedback`，源码提交 `eccac62`；产品仍属公网预览阶段，页面不显示全局预览提示行。实时反馈的合成/真实验证范围见 [专项记录](CONVERSATION_LIVE_FEEDBACK.md)。
 
 当前部署：Pages 项目 `ariadne`，实际默认域名 `ariadne-7pc.pages.dev`；通过 `ARIADNE_API` 绑定 Python Worker `ariadne-api`。腾讯 DNSPod 已添加 `ariadne` CNAME 指向上述 Pages 域名，Cloudflare 自定义域名显示 Active / SSL enabled。未购买 VPS、迁移整个 DNS 或修改原有邮箱记录。以下步骤供后续更新与重新部署使用。
 
