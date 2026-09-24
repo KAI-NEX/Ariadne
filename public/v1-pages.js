@@ -2831,6 +2831,7 @@
         byId("candidate-edit-facts").value = activeCandidate.facts.map((fact) => fact.value).join("\n");
       },
     });
+    if (canonicalRevision) byId("open-candidate-delete").classList.add("hidden");
     const deletePopover = createDeletePopover("candidate-delete-popover");
     window.addEventListener("message", (event) => {
       if (event.origin === window.location.origin && event.data?.type === "job-radar-v1-open-detail-edit") byId("open-direct-edit").click();
@@ -3548,6 +3549,7 @@
   }
 
   function initJobApplicationNotes(jobId) {
+    globalThis.AriadneJobJournalUI?.mount(jobId);
     if (!JobApplications || !byId("job-application-form")) return;
     const form = byId("job-application-form"), note = byId("job-application-note"), outcome = byId("job-application-outcome"), message = byId("job-application-message");
     const controls = [...form.querySelectorAll("button, textarea, select")];

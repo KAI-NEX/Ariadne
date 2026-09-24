@@ -58,11 +58,16 @@
     "ariadne-job-applications-v1": {
       "applications": "job_context_id"
     },
+    "ariadne-job-journal-v1": {
+      "job_journal_entries": "entry_id",
+      "job_journal_images": "image_id"
+    },
     "ariadne-conversation-attachments-v1": {
       "turns": "request_id"
     }
   },
   "markdown_stores": [
+    "job_journal_entries",
     "jobs",
     "candidates",
     "career_entities",

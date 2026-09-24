@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="/styles.css?v=candidate-job-parity-v1&amp;vi=1&amp;top-edit=1&amp;composer=4&amp;edit-footer=1&amp;wave=1">
     <link rel="stylesheet" href="/personal-understanding.css">
     <link rel="stylesheet" href="/wave-physics-loader.css?v=2">
-    <link rel="stylesheet" href="/job-application.css?v=2">
+    <link rel="stylesheet" href="/job-application.css?v=journal-1">
   </head>
   <body class="v1-body" data-v1-page="job-detail">
     <main class="v1-page-shell v1-detail-shell" data-ariadne-shell="detail">
@@ -42,6 +42,21 @@
               <div class="v1-button-row v1-edit-actions"><button type="submit" class="v1-edit-text-action" disabled>保存备注</button><button id="job-application-cancel" type="button" class="v1-edit-text-action" data-edit-cancel disabled>取消</button></div>
               <p id="job-application-message" class="v1-inline-message" aria-live="polite"></p>
             </form>
+          </section>
+          <section class="v1-detail-block" aria-labelledby="job-journal-heading">
+            <p id="job-journal-heading" class="v1-section-label">求职记录</p>
+            <p class="v1-source-note">记录你观察到的反馈。无回复不等于拒绝；这些记录不会自动改变投递阶段或发送给 AI。</p>
+            <form id="job-journal-form" class="v1-job-application-form">
+              <label class="v1-edit-field">发生日期<input id="job-journal-date" type="date" required></label>
+              <label class="v1-edit-field">公司反馈<select id="job-journal-feedback"></select></label>
+              <label class="v1-edit-field">经过与补充<textarea id="job-journal-text" rows="3" maxlength="6000" placeholder="例如：9 月 24 日向 HR 跟进，消息显示已读，目前还没有回复。"></textarea></label>
+              <label class="v1-edit-field">添加图片<input id="job-journal-images" type="file" accept="image/png,image/jpeg,image/webp" multiple></label>
+              <p class="v1-source-note">每条最多 4 张，单张 5 MB、合计 12 MB。可保存聊天截图、邮件反馈或面试通知。</p>
+              <div id="job-journal-preview" class="v1-journal-images"></div>
+              <div class="v1-button-row v1-edit-actions"><button type="submit" class="v1-edit-text-action">添加记录</button><button id="job-journal-cancel" type="button" class="v1-edit-text-action">取消</button></div>
+              <p id="job-journal-message" class="v1-inline-message" aria-live="polite"></p>
+            </form>
+            <div id="job-journal-timeline" aria-label="求职记录时间线"></div>
           </section>
           <form id="job-edit-form" class="v1-edit-form v1-detail-state-panel hidden" data-ariadne-edit-shell="detail" aria-hidden="true">
             <label class="v1-edit-field" data-ariadne-edit-field>职位名称<input id="job-edit-title"></label>
@@ -112,6 +127,8 @@
     <script src="/local-context-lifecycle-domain.js?v=lifecycle-final-v1"></script>
     <script src="/local-job-lifecycle-domain.js?v=lifecycle-final-v1"></script>
     <script src="/job-application-domain.js?v=1&amp;storage=1"></script>
+    <script src="/job-journal-domain.js?v=1"></script>
+    <script src="/job-journal-ui.js?v=1"></script>
     <script src="/v1-demo-domain.js?v=v1-motion-33&amp;storage=1"></script>
     <script src="/scoped-conversation-domain.js"></script>
     <script src="/floating-window.js?v=v1-motion-33"></script>

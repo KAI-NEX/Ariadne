@@ -9,7 +9,8 @@ const contract = require("../data/workspace_storage_v1.json"), Demo = require(".
 const name = Truth.DB_NAME, schema = contract.databases[name], workspace = crypto.randomUUID().replaceAll("-", "");
 assert.deepEqual(schema, Object.fromEntries(Demo.STORES));
 for (const spec of Truth.STORE_SPECS) assert.equal(schema[spec.name], spec.keyPath);
-for (const store of Content.STORES) assert(schema[store], store);
+for (const store of Content.STORES) assert(Object.values(contract.databases).some(database => database[store]), store);
+assert.equal(contract.databases['ariadne-job-journal-v1'].job_journal_entries, 'entry_id');
 const root = await fs.mkdtemp(path.resolve(".cache/content-database-regression-"));
 const serverScript = `
 import faulthandler, sys
